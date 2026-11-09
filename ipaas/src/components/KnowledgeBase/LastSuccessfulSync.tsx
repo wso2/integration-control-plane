@@ -44,9 +44,16 @@ export default function LastSuccessfulSync({ kb, dataSource }: { kb: KnowledgeBa
   const running = (executions ?? []).some((e) => executionPhase(e.status) === 'inProgress');
   // History is newest-first.
   const last = (executions ?? []).find((e) => executionPhase(e.status) === 'succeeded');
+  // A one-time source whose first run did not start says so until it has any run.
+  const firstRunMissed = !!dataSource.firstRunError && (executions ?? []).length === 0;
   return (
     <Stack>
       <Typography variant="body2">{last ? formatDateTime(last.completionTime || last.startTime) : '—'}</Typography>
+      {firstRunMissed && (
+        <Typography variant="caption" color="warning.main">
+          {dataSource.firstRunError}
+        </Typography>
+      )}
       {running && (
         <Typography variant="caption" color="text.secondary">
           Ingesting…

@@ -36,6 +36,7 @@ interface BffKnowledgeBaseDataSource {
   cronTimezone?: string;
   status?: string;
   error?: string;
+  firstRunError?: string;
   releaseName?: string;
   createdAt?: string;
 }
@@ -67,6 +68,7 @@ export function toKnowledgeBaseDataSource(d: BffKnowledgeBaseDataSource): Knowle
     cronTimezone: d.cronTimezone ?? '',
     status: d.status ?? '',
     error: d.error ?? '',
+    firstRunError: d.firstRunError ?? '',
     releaseName: d.releaseName ?? '',
     createdAt: d.createdAt ?? '',
   };

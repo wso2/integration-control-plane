@@ -46,6 +46,11 @@ describe('toKnowledgeBase', () => {
     });
   });
 
+  it("keeps a data source's first run that did not start", () => {
+    const kb = toKnowledgeBase({ name: 'docs-kb', projectName: 'ai-services', environment: 'development', dataSources: [{ name: 'docs-s3', firstRunError: 'not started' }] });
+    expect(kb.dataSources[0].firstRunError).toBe('not started');
+  });
+
   it('keeps how publishing the service on the gateway is going', () => {
     const apiStatus = { status: 'FAILED', error: 'GATEWAY_UNAVAILABLE', nextRetryAt: '2026-11-08T10:00:00Z' };
     expect(toKnowledgeBase({ name: 'docs-kb', projectName: 'ai-services', environment: 'development', apiStatus }).apiStatus).toEqual(apiStatus);
@@ -60,7 +65,9 @@ describe('toKnowledgeBase', () => {
       dataSources: [{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], status: 'ACTIVE' }],
     });
     expect(kb.secretKeys).toEqual(['PINECONE_APIKEY']);
-    expect(kb.dataSources).toEqual([{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', error: '', releaseName: '', createdAt: '' }]);
+    expect(kb.dataSources).toEqual([
+      { name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', error: '', firstRunError: '', releaseName: '', createdAt: '' },
+    ]);
   });
 });
 

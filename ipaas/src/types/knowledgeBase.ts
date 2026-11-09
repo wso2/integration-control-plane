@@ -70,6 +70,8 @@ export interface KnowledgeBaseDataSource {
   status: string;
   /** Why the create FAILED; '' otherwise. */
   error: string;
+  /** Set when a one-time source's first ingestion, started after its create, could not be started; '' otherwise. */
+  firstRunError: string;
   releaseName: string;
   createdAt: string;
 }
