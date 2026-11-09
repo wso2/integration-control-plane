@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { type IntervalUnit, type CronField, intervalToCron, cronToInterval, parseCronParts, buildCronFromParts, describeCron } from '../../../utils/cronUtils';
 import { validateCronFields, validatePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
-import type { SchedulePolicyRead } from '../../../hooks/useScheduleLimits';
+import type { SchedulePolicy } from '../../../types/schedule';
 import type { ExecutionConfigs } from '../../../types/executions';
 import type { PlanAccess } from '../../../utils/billing';
 import type { DeployDeploymentTrackInput } from '../../../types/deployment';
@@ -62,8 +62,8 @@ export interface ScheduleFormApi extends ScheduleValues {
   description: string;
   /** The org's plan, null while it loads. Anything but a paid plan gets the free plan's limits. */
   plan: PlanAccess | null;
-  /** The limits and defaults ipaas-service applies to this kind of schedule. Save is blocked until they load. */
-  policy: SchedulePolicyRead;
+  /** The limits and defaults of this kind of schedule. */
+  policy: SchedulePolicy;
 }
 
 /**
@@ -72,13 +72,12 @@ export interface ScheduleFormApi extends ScheduleValues {
  * the RAG ingestion Configure drawer's Schedule step — the single source of the
  * cron editing logic. Pair with the `ScheduleFields` presentational component.
  */
-export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined, plan: PlanAccess | null, policy: SchedulePolicyRead): ScheduleFormApi {
-  const [tab, setTab] = useState(0);
-  const [intervalCount, setIntervalCount] = useState<number | ''>(1);
-  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>('Day');
-  const [cronFields, setCronFields] = useState<Record<CronField, string>>(() => parseCronParts('0 0 */1 * *'));
-  // A new schedule takes the policy's default once it loads, unless the user has edited it already.
-  const [scheduleEdited, setScheduleEdited] = useState(false);
+export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined, plan: PlanAccess | null, policy: SchedulePolicy): ScheduleFormApi {
+  const defaultInterval = cronToInterval(policy.defaultCron);
+  const [tab, setTab] = useState(defaultInterval ? 0 : 1);
+  const [intervalCount, setIntervalCount] = useState<number | ''>(defaultInterval?.count ?? 1);
+  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>(defaultInterval?.unit ?? 'Minute');
+  const [cronFields, setCronFields] = useState<Record<CronField, string>>(() => parseCronParts(policy.defaultCron));
   const [timezone, setTimezone] = useState('UTC');
   const [timeoutSeconds, setTimeoutSeconds] = useState('');
   const [allowConcurrency, setAllowConcurrency] = useState(false);
@@ -101,37 +100,16 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
     }
   }, [existingConfigs]);
 
-  const keepsItsSchedule = !!existingConfigs?.cronjobFrequency || scheduleEdited;
-  const defaultCron = keepsItsSchedule ? null : (policy.policy?.defaultCron ?? null);
-  useEffect(() => {
-    if (!defaultCron) return;
-    const parsed = cronToInterval(defaultCron);
-    if (parsed) {
-      setTab(0);
-      setIntervalCount(parsed.count);
-      setIntervalUnit(parsed.unit);
-    } else {
-      setTab(1);
-    }
-    setCronFields(parseCronParts(defaultCron));
-  }, [defaultCron]);
-  const edit =
-    <T>(set: (v: T) => void) =>
-    (v: T) => {
-      setScheduleEdited(true);
-      set(v);
-    };
-
   const cron = tab === 0 ? intervalToCron(intervalCount || 1, intervalUnit) : buildCronFromParts(cronFields);
   const free = plan?.state !== 'paid';
-  const limits = policy.policy ? (free ? policy.policy.free : policy.policy.paid) : null;
+  const limits = free ? policy.free : policy.paid;
   const savedCron = existingConfigs?.cronjobFrequency ?? '';
   const savedTimeout = existingConfigs?.timeoutSeconds ?? null;
   const savedConcurrency = existingConfigs?.cronjobAllowConcurrency ?? null;
 
   // Only the active tab's fields are validated: the other tab's state is not written.
   const errors = useMemo<ScheduleFormErrors>(() => {
-    const planErrors = limits ? validatePlanSchedule(cron, timeoutSeconds, allowConcurrency, { cron: savedCron, timeoutSeconds: savedTimeout, allowConcurrency: savedConcurrency }, limits, free) : {};
+    const planErrors = validatePlanSchedule(cron, timeoutSeconds, allowConcurrency, { cron: savedCron, timeoutSeconds: savedTimeout, allowConcurrency: savedConcurrency }, limits, free);
     return {
       timeout: validateTimeout(timeoutSeconds) ?? planErrors.timeout,
       intervalCount: tab === 0 ? validateIntervalCount(intervalCount) : undefined,
@@ -140,17 +118,17 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
       overlap: planErrors.overlap,
     };
   }, [timeoutSeconds, tab, intervalCount, cronFields, cron, allowConcurrency, limits, free, savedCron, savedTimeout, savedConcurrency]);
-  const isValid = !!limits && !errors.timeout && !errors.intervalCount && !errors.frequency && !errors.overlap && Object.keys(errors.cron).length === 0;
+  const isValid = !errors.timeout && !errors.intervalCount && !errors.frequency && !errors.overlap && Object.keys(errors.cron).length === 0;
 
   return {
     tab,
-    setTab: edit(setTab),
+    setTab,
     intervalCount,
-    setIntervalCount: edit(setIntervalCount),
+    setIntervalCount,
     intervalUnit,
-    setIntervalUnit: edit(setIntervalUnit),
+    setIntervalUnit,
     cronFields,
-    setCronFields: edit(setCronFields),
+    setCronFields,
     timezone,
     setTimezone,
     timeoutSeconds,

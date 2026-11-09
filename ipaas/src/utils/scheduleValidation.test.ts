@@ -158,7 +158,7 @@ describe('describeMinutes and describeSeconds', () => {
   });
 });
 
-// The service's default limits (GET /schedule-limits).
+// The limits in constants/scheduleLimits.ts, the same as ipaas-service's.
 const automationFree: ScheduleLimits = { minRunIntervalMinutes: 5, maxTimeoutSeconds: 300, allowOverlap: true };
 const ingestionFree: ScheduleLimits = { minRunIntervalMinutes: 1440, maxTimeoutSeconds: 3600, allowOverlap: false };
 const ingestionPaid: ScheduleLimits = { minRunIntervalMinutes: 0, maxTimeoutSeconds: 0, allowOverlap: true };

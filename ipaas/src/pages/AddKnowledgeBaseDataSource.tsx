@@ -22,7 +22,7 @@ import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { usePlanAccess } from '../hooks/useBillingOrg';
-import { useSchedulePolicy } from '../hooks/useScheduleLimits';
+import { SCHEDULE_POLICIES } from '../constants/scheduleLimits';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBaseDataSource, useKnowledgeBase } from '../hooks/useKnowledgeBases';
@@ -98,7 +98,7 @@ function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledge
   const [names, setNames] = useState<NameFields>({ displayName: '', name: '', description: '' });
   const [datasource, setDatasource] = useState<DatasourceConfig | null>(null);
   const [mode, setMode] = useState<IngestionMode>('scheduled');
-  const schedule = useScheduleForm(null, usePlanAccess(), useSchedulePolicy('ingestion'));
+  const schedule = useScheduleForm(null, usePlanAccess(), SCHEDULE_POLICIES.ingestion);
   const stepValid = [isNameValid(names), isDatasourceValid(datasource), mode === 'once' || schedule.isValid];
 
   const submit = () => {

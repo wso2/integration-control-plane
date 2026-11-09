@@ -32,12 +32,5 @@ export interface SchedulePolicy {
   defaultConcurrencyPolicy: string;
 }
 
-/** The schedule policies ipaas-service applies, from its configuration (GET /schedule-limits). */
-export interface SchedulePolicies {
-  automation: SchedulePolicy;
-  ingestion: SchedulePolicy;
-  retries: number;
-}
-
 /** What a scheduled component runs. A knowledge base ingestion has its own policy. */
 export type ScheduleKind = 'automation' | 'ingestion';

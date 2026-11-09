@@ -21,39 +21,23 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import ScheduleFields from './ScheduleFields';
 import { useScheduleForm, type ScheduleFormApi } from './useScheduleForm';
-import type { SchedulePolicyRead } from '../../../hooks/useScheduleLimits';
+import { SCHEDULE_POLICIES } from '../../../constants/scheduleLimits';
 import type { ExecutionConfigs } from '../../../types/executions';
 import type { SchedulePolicy } from '../../../types/schedule';
-import type { PlanAccess } from '../../../utils/billing';
 
-// The service's default policies (GET /schedule-limits).
-const automation: SchedulePolicy = {
-  free: { minRunIntervalMinutes: 5, maxTimeoutSeconds: 300, allowOverlap: true },
-  paid: { minRunIntervalMinutes: 1, maxTimeoutSeconds: 0, allowOverlap: true },
-  defaultCron: '*/5 * * * *',
-  defaultTimeoutSeconds: 300,
-  defaultConcurrencyPolicy: 'Forbid',
-};
-const ingestion: SchedulePolicy = {
-  free: { minRunIntervalMinutes: 1440, maxTimeoutSeconds: 3600, allowOverlap: false },
-  paid: { minRunIntervalMinutes: 0, maxTimeoutSeconds: 0, allowOverlap: true },
-  defaultCron: '0 0 */1 * *',
-  defaultTimeoutSeconds: 3600,
-  defaultConcurrencyPolicy: 'Forbid',
-};
-const read = (policy: SchedulePolicy | null, isError = false, retry = () => {}): SchedulePolicyRead => ({ policy, isError, retry });
+const { automation, ingestion } = SCHEDULE_POLICIES;
+import type { PlanAccess } from '../../../utils/billing';
 
 let container: HTMLDivElement;
 let root: Root;
 let form: ScheduleFormApi;
 
-function Probe({ saved, plan, policy, executionSettings }: { saved: ExecutionConfigs | null; plan: PlanAccess | null; policy: SchedulePolicyRead; executionSettings?: boolean }) {
+function Probe({ saved, plan, policy, executionSettings }: { saved: ExecutionConfigs | null; plan: PlanAccess | null; policy: SchedulePolicy; executionSettings?: boolean }) {
   form = useScheduleForm(saved, plan, policy);
   return <ScheduleFields form={form} executionSettings={executionSettings} />;
 }
 
-const render = (saved: ExecutionConfigs | null, plan: PlanAccess | null, policy: SchedulePolicyRead = read(automation), executionSettings?: boolean) =>
-  act(() => root.render(<Probe saved={saved} plan={plan} policy={policy} executionSettings={executionSettings} />));
+const render = (saved: ExecutionConfigs | null, plan: PlanAccess | null, policy: SchedulePolicy = automation, executionSettings?: boolean) => act(() => root.render(<Probe saved={saved} plan={plan} policy={policy} executionSettings={executionSettings} />));
 const saved = (cron: string, timeoutSeconds?: number, cronjobAllowConcurrency?: boolean): ExecutionConfigs => ({ cronjobFrequency: cron, cronjobTimezone: 'UTC', timeoutSeconds, cronjobAllowConcurrency }) as ExecutionConfigs;
 const free: PlanAccess = { state: 'free' };
 const paid: PlanAccess = { state: 'paid' };
@@ -80,25 +64,10 @@ describe('useScheduleForm defaults', () => {
     ['free', free],
     ['paid', paid],
   ])('starts a new ingestion daily at 00:00 on a %s plan', async (_name, plan) => {
-    await render(null, plan, read(ingestion));
+    await render(null, plan, ingestion);
     expect(form.cron).toBe('0 0 */1 * *');
     expect([form.tab, form.intervalCount, form.intervalUnit]).toEqual([0, 1, 'Day']);
     expect(form.isValid).toBe(true);
-  });
-
-  it('takes the default once the limits load, unless the schedule was edited', async () => {
-    await render(null, paid, read(null));
-    expect(form.isValid).toBe(false);
-    await render(null, paid, read(automation));
-    expect(form.cron).toBe('*/5 * * * *');
-
-    await act(() => root.unmount());
-    root = createRoot(container);
-    await render(null, paid, read(null));
-    await act(() => form.setIntervalCount(3));
-    await act(() => form.setIntervalUnit('Hour'));
-    await render(null, paid, read(automation));
-    expect(form.cron).toBe('0 */3 * * *');
   });
 
   it('keeps a saved schedule', async () => {
@@ -109,7 +78,7 @@ describe('useScheduleForm defaults', () => {
   it('shows the default timeout of each kind in the empty field', async () => {
     await render(null, paid);
     expect(timeoutField()?.placeholder).toBe('Default: 300');
-    await render(null, paid, read(ingestion));
+    await render(null, paid, ingestion);
     expect(timeoutField()?.placeholder).toBe('Default: 3600');
   });
 });
@@ -131,7 +100,7 @@ describe('useScheduleForm plan limits', () => {
   });
 
   it('holds an ingestion on a free plan to one run a day, 1 hour and no overlap, and says so', async () => {
-    await render(saved('0 2 * * *', 3600, false), free, read(ingestion));
+    await render(saved('0 2 * * *', 3600, false), free, ingestion);
     expect(container.textContent).toContain('Schedules that run more often than every 1 day, job timeouts over 3600 seconds (1 hour), and overlapping executions can only be configured on a paid plan.');
     expect(form.isValid).toBe(true);
     await act(() => form.setTimeoutSeconds('3601'));
@@ -147,7 +116,7 @@ describe('useScheduleForm plan limits', () => {
   });
 
   it('lets a paid plan run an ingestion every minute, for any time, overlapping, with no notice', async () => {
-    await render(null, paid, read(ingestion));
+    await render(null, paid, ingestion);
     await act(() => form.setIntervalCount(1));
     await act(() => form.setIntervalUnit('Minute'));
     await act(() => form.setTimeoutSeconds('86400'));
@@ -163,30 +132,16 @@ describe('useScheduleForm plan limits', () => {
   });
 
   it('lets a free plan save values it already runs, but not raise them', async () => {
-    await render(saved('*/2 * * * *', 3600, true), free, read(ingestion));
+    await render(saved('*/2 * * * *', 3600, true), free, ingestion);
     expect(form.isValid).toBe(true);
     await act(() => form.setTimeoutSeconds('7200'));
     expect(form.errors.timeout).toBeDefined();
   });
 
   it('names only the schedule when the timeout is not shown', async () => {
-    await render(null, free, read(ingestion), false);
+    await render(null, free, ingestion, false);
     expect(container.textContent).toContain('Schedules that run more often than every 1 day can only be configured on a paid plan.');
     expect(container.textContent).not.toContain('job timeouts');
-  });
-
-  it('blocks saving, and offers a retry, when the limits could not be read', async () => {
-    let retried = false;
-    await render(
-      null,
-      paid,
-      read(null, true, () => (retried = true)),
-    );
-    expect(form.isValid).toBe(false);
-    expect(container.textContent).toContain("Couldn't load the schedule limits.");
-    const retry = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Retry');
-    await act(() => retry?.click());
-    expect(retried).toBe(true);
   });
 
   it('offers a retry when the plan could not be read', async () => {

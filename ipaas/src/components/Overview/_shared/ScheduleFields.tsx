@@ -43,7 +43,7 @@ function freePlanNotice(free: ScheduleLimits, paid: ScheduleLimits, executionSet
 export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan, policy } = form;
-  const notice = policy.policy ? freePlanNotice(policy.policy.free, policy.policy.paid, executionSettings) : null;
+  const notice = freePlanNotice(policy.free, policy.paid, executionSettings);
   const frequencyError = errors.frequency && (
     <Typography variant="body2" color="error">
       {errors.frequency}
@@ -52,17 +52,6 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
 
   return (
     <Stack gap={2}>
-      {policy.isError && (
-        <Alert
-          severity="warning"
-          action={
-            <Button color="inherit" size="small" onClick={policy.retry}>
-              Retry
-            </Button>
-          }>
-          Couldn&apos;t load the schedule limits. The schedule can be saved once they load.
-        </Alert>
-      )}
       {plan?.state === 'free' && notice && <Alert severity="info">{notice}</Alert>}
       {plan?.state === 'unavailable' && (
         <Alert
@@ -180,7 +169,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                     type="number"
                     value={form.timeoutSeconds}
                     onChange={(e) => form.setTimeoutSeconds(e.target.value)}
-                    placeholder={policy.policy ? `Default: ${policy.policy.defaultTimeoutSeconds}` : undefined}
+                    placeholder={`Default: ${policy.defaultTimeoutSeconds}`}
                     error={!!errors.timeout}
                     helperText={errors.timeout || ' '}
                   />
