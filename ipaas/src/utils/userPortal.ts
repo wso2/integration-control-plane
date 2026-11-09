@@ -57,6 +57,8 @@ const MESSAGES: Record<string, (env: string) => string> = {
   USER_PORTAL_SCOPES_NOT_SYNCED: () => "The User Portal's scopes could not be updated. Try again.",
   USER_PORTAL_SIGN_IN_NOT_READY: (env) => `The User Portal's sign-in isn't ready in ${env} yet. Publish again once it is.`,
   USER_PORTAL_REDEPLOY_FAILED: () => "The workflow couldn't be redeployed for the User Portal's sign-in, so it isn't published. Publish again.",
+  USER_PORTAL_PUBLISH_INTERRUPTED: () => "Publishing didn't finish. Publish again.",
+  USER_PORTAL_PUBLISH_FAILED: () => 'Publishing to the User Portal failed. Publish again.',
   USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED: () => 'The workflow is unpublished, but switching it back to the console failed. Unpublish again to finish.',
 };
 
@@ -68,6 +70,9 @@ export const refusalText = ({ code, message }: UserPortalRefusal, env: string): 
 
 /** A failed User Portal call: its code worded, or else the API's sentence. */
 export const userPortalErrorText = (error: unknown, env: string): string => MESSAGES[httpCodeOf(error)]?.(env) ?? apiErrorMessage(error, 'Something went wrong.');
+
+/** The note shown while a workflow's publish finishes in the background. */
+export const publishingText = (env: string): string => `Publishing to the User Portal in ${env}. The workflow is redeployed for the User Portal's sign-in; this takes a minute or two.`;
 
 // The rules about what runs in the environment. With nothing deployed there they all fail, and deploying is the fix.
 const NEEDS_A_DEPLOYMENT = new Set(['USER_PORTAL_NO_PUBLIC_ENDPOINT', 'USER_PORTAL_NO_MANAGEMENT_API', 'USER_PORTAL_API_KEY', 'USER_PORTAL_SECURED_BY_PROMOTION', 'USER_PORTAL_AUDIENCE_MISSING', 'USER_PORTAL_TOKEN_NOT_FORWARDED']);

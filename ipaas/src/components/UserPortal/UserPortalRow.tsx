@@ -113,7 +113,14 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
         {action}
       </Stack>
 
-      {!data.published && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={envName} />}
+      {/* A running publish is switching the workflow, so the rules read mid-switch aren't shown until it ends. */}
+      {!data.published && !data.publishing && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={envName} />}
+
+      {publish.progress && (
+        <Typography variant="caption" color="text.secondary" component="p" sx={styles.rowNoteSx}>
+          {publish.progress}
+        </Typography>
+      )}
 
       {/* An unpublish failure shows in its confirm dialog, and so does a publish that was confirmed; each stays open on it. */}
       {publish.error && (

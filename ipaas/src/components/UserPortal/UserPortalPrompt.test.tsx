@@ -41,7 +41,7 @@ const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const publish = vi.mocked(api.publishToUserPortal);
 
 const ACTIVE: UserPortal = { environment: 'production', state: 'active', url: 'https://portal.example/acme' };
-const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true };
+const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, rejectedScopes: [] };
 const NOT_ENABLED: UserPortalPublishability = {
   ...PUBLISHABLE,
   publishable: false,
@@ -100,7 +100,7 @@ describe('the way to a workflow in the User Portal', () => {
   it('shows the scopes the portal could not hold once a publish from here goes through', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValueOnce({ ...PUBLISHABLE, redeploys: false }).mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
-    publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: ['bad scope'] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: ['bad scope'] });
     const container = await prompt(DEVELOPER);
     await act(async () => button(container, 'Publish to User Portal')?.click());
     await flush();
@@ -147,7 +147,7 @@ describe('the way to a workflow in the User Portal', () => {
   it('offers to publish where the User Portal runs, warning first of the redeploy', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue(PUBLISHABLE);
-    publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
 
     await act(async () => button(container, 'Publish to User Portal')?.click());
@@ -236,5 +236,45 @@ describe('the way to a workflow in the User Portal', () => {
     publishability.mockRejectedValue(new BffError(404, '404 page not found'));
     const container = await prompt(DEVELOPER);
     expect(container.textContent).toBe('');
+  });
+});
+
+describe('a publish that finishes in the background, from the prompt', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
+  afterEach(() => vi.useRealTimers());
+  const poll = () => act(async () => vi.advanceTimersByTimeAsync(3_000));
+
+  it('shows Publishing… after the 202 and offers to open the portal once published', async () => {
+    portal.mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValueOnce(PUBLISHABLE).mockResolvedValue({ ...PUBLISHABLE, publishing: true });
+    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, rejectedScopes: [] });
+    const container = await prompt(DEVELOPER);
+    await act(async () => button(container, 'Publish to User Portal')?.click());
+    await flush();
+    const confirm = [...container.ownerDocument.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((b) => b.textContent === 'Publish');
+    await act(async () => confirm?.click());
+    await flush();
+    expect(dialogText(container)).toBe('');
+    expect(button(container, 'Publishing…')?.disabled).toBe(true);
+    expect(container.textContent).toContain('this takes a minute or two');
+
+    publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, publishing: false, rejectedScopes: ['bad scope'] });
+    await poll();
+    await flush();
+    expect(container.textContent).toContain('Open User Portal');
+    expect(container.textContent).toContain('bad scope');
+  });
+
+  it('follows a publish running at load, and words the failure it ends with', async () => {
+    portal.mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue({ ...PUBLISHABLE, publishing: true });
+    const container = await prompt(DEVELOPER);
+    expect(button(container, 'Publishing…')?.disabled).toBe(true);
+
+    publishability.mockResolvedValue({ ...PUBLISHABLE, publishError: { code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'interrupted' } });
+    await poll();
+    await flush();
+    expect(container.textContent).toContain("Publishing didn't finish. Publish again.");
+    expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
   });
 });

@@ -21,10 +21,10 @@ import { CircleAlert, ExternalLink, Info, Users } from '@wso2/oxygen-ui-icons-re
 import { useState, type JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
-import { usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
+import { useBackgroundPublishOutcome, usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import type { EnvCardNotification } from '../../types/integration';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { DEPLOY_REFUSAL, rejectedScopesText, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
+import { DEPLOY_REFUSAL, publishingText, refusalText, rejectedScopesText, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import AboutUserPortalDialog from './AboutUserPortalDialog';
 import PublishWorkflowDialog from './PublishWorkflowDialog';
@@ -73,18 +73,26 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
     setOpen(null);
   };
 
+  const notifyPublished = (rejectedScopes: string[]) =>
+    onNotify({
+      text: `Published to the User Portal in ${envName}.`,
+      severity: 'success',
+      // Scopes the endpoints require that the portal's users' tokens can't carry.
+      detail: rejectedScopes.length > 0 ? rejectedScopesText(rejectedScopes) : undefined,
+    });
+  // A publish that finishes in the background is reported when the publishability says it ended, so it is also
+  // reported after a page reload.
+  useBackgroundPublishOutcome(componentId, environment, {
+    onPublished: notifyPublished,
+    onFailed: (failure) => onNotify({ text: `Could not publish to the User Portal in ${envName}.`, severity: 'error', detail: refusalText(failure, envName) }),
+  });
   const startPublish = () =>
     publish.mutate(
       { componentId, environment },
       {
-        onSuccess: ({ rejectedScopes }) => {
+        onSuccess: ({ publishing, rejectedScopes }) => {
           close();
-          onNotify({
-            text: `Published to the User Portal in ${envName}.`,
-            severity: 'success',
-            // Scopes the endpoints require that the portal's users' tokens can't carry.
-            detail: rejectedScopes.length > 0 ? rejectedScopesText(rejectedScopes) : undefined,
-          });
+          if (!publishing) notifyPublished(rejectedScopes);
         },
       },
     );
@@ -178,17 +186,34 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
     // A publish or unpublish stays pending until the publishability is read again (useWritePublication
     // awaits it), so the switch is never clickable on a stale state after one.
     const { published } = data;
+    const publishing = data.publishing || publish.isPending;
+    // A failed background publish stays in the report until the next publish; a published one has outlived it.
+    const publishFailure = !publishing && !published && data.publishError ? refusalText(data.publishError, envName) : null;
     const toggle = () => openDialog(published ? 'unpublish' : data.publishable ? 'publish' : 'refusals');
+    // The switch sits in a header row, so what a publish is doing, or why the last one failed, goes in its tooltip.
+    const tooltip = !canDeploy ? DEPLOY_REFUSAL : publishing ? publishingText(envName) : (publishFailure ?? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}`);
     return (
       <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
-        <Tooltip title={canDeploy ? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}` : DEPLOY_REFUSAL}>
+        <Tooltip title={tooltip}>
           <FormControlLabel
-            control={<Switch size="small" checked={published} onChange={toggle} disabled={!canDeploy || publish.isPending || unpublish.isPending} />}
+            control={<Switch size="small" checked={published} onChange={toggle} disabled={!canDeploy || publishing || unpublish.isPending} />}
             label={
-              published ? (
+              publishing ? (
+                <Box component="span" sx={styles.publishedLabelSx}>
+                  <CircularProgress size={12} color="inherit" />
+                  Publishing…
+                </Box>
+              ) : published ? (
                 <Box component="span" sx={styles.publishedLabelSx}>
                   <Box component="span" sx={styles.publishedDotSx} />
                   Published to User Portal
+                </Box>
+              ) : publishFailure ? (
+                <Box component="span" sx={styles.publishedLabelSx}>
+                  <Box component="span" sx={{ display: 'inline-flex', color: 'error.main' }}>
+                    <CircleAlert size={14} />
+                  </Box>
+                  Publish to User Portal
                 </Box>
               ) : (
                 'Publish to User Portal'

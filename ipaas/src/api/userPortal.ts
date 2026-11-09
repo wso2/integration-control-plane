@@ -98,6 +98,9 @@ interface BffUserPortalPublishability {
   publishable: boolean;
   reasons?: { code: string; message: string }[];
   redeploys?: boolean;
+  publishing?: boolean;
+  publishError?: { code: string; message: string };
+  rejectedScopes?: string[];
 }
 
 // models.UserPortalPublications.
@@ -109,6 +112,7 @@ interface BffUserPortalPublications {
 interface BffUserPortalPublication {
   environment: string;
   published: boolean;
+  publishing?: boolean;
   rejectedScopes?: string[];
 }
 
@@ -121,6 +125,9 @@ export const toUserPortalPublishability = (p: BffUserPortalPublishability): User
   reasons: p.reasons ?? [],
   // A BFF from before publishing switched workflows to the User Portal's sign-in never redeploys.
   redeploys: p.redeploys ?? false,
+  publishing: p.publishing ?? false,
+  ...(p.publishError ? { publishError: p.publishError } : {}),
+  rejectedScopes: p.rejectedScopes ?? [],
 });
 
 export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [] });
@@ -131,7 +138,7 @@ export const fetchUserPortalPublications = (componentId: string): Promise<UserPo
 /** Runs a publish's rules without publishing: whether it is published there, and every rule it breaks. */
 export const fetchUserPortalPublishability = (componentId: string, environment: string): Promise<UserPortalPublishability> => bff.get<BffUserPortalPublishability>(publicationPath(componentId, environment)).then(toUserPortalPublishability);
 
-const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, rejectedScopes: p.rejectedScopes ?? [] });
+const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, publishing: p.publishing ?? false, rejectedScopes: p.rejectedScopes ?? [] });
 
 export const publishToUserPortal = (componentId: string, environment: string): Promise<UserPortalPublication> => bff.put<BffUserPortalPublication>(publicationPath(componentId, environment)).then(toPublication);
 

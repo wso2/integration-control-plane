@@ -30,6 +30,17 @@ describe('refusalText', () => {
   });
 });
 
+describe('refusalText for a background publish', () => {
+  it('words the codes a background publish ends with as the synchronous one does', () => {
+    expect(refusalText({ code: 'USER_PORTAL_REDEPLOY_FAILED', message: 'x' }, 'Production')).toBe(userPortalErrorText(new BffError(502, '{"code":"USER_PORTAL_REDEPLOY_FAILED","message":"x"}'), 'Production'));
+  });
+
+  it('words an interrupted publish and a generic failure as asking to publish again', () => {
+    expect(refusalText({ code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'x' }, 'Production')).toBe("Publishing didn't finish. Publish again.");
+    expect(refusalText({ code: 'USER_PORTAL_PUBLISH_FAILED', message: 'x' }, 'Production')).toBe('Publishing to the User Portal failed. Publish again.');
+  });
+});
+
 describe('userPortalErrorText', () => {
   it('words a coded error', () => {
     expect(userPortalErrorText(new BffError(502, '{"code":"USER_PORTAL_SCOPES_NOT_SYNCED","message":"scopes"}'), 'Production')).toBe("The User Portal's scopes could not be updated. Try again.");
