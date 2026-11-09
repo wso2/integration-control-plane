@@ -48,6 +48,11 @@ describe('shownRefusals', () => {
     expect(shownRefusals(reasons).map((r) => r.code)).toEqual(['USER_PORTAL_NOT_ENABLED', 'USER_PORTAL_NOT_DEPLOYED']);
   });
 
+  it('drops the gateway security a promotion would bring when nothing is deployed', () => {
+    const reasons = [refusal('USER_PORTAL_NOT_DEPLOYED'), refusal('USER_PORTAL_SECURED_BY_PROMOTION')];
+    expect(shownRefusals(reasons).map((r) => r.code)).toEqual(['USER_PORTAL_NOT_DEPLOYED']);
+  });
+
   it('keeps every rule of a deployed integration', () => {
     const reasons = [refusal('USER_PORTAL_NO_PUBLIC_ENDPOINT'), refusal('USER_PORTAL_API_KEY')];
     expect(shownRefusals(reasons)).toEqual(reasons);

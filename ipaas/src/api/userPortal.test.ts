@@ -94,10 +94,11 @@ describe('toUserPortalPublishability', () => {
       { code: 'USER_PORTAL_PIPELINE', message: 'pipeline' },
       { code: 'USER_PORTAL_NOT_ENABLED', message: 'not enabled' },
     ];
-    expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: false, reasons })).toEqual({ environment: 'prod', published: false, publishable: false, reasons });
+    expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: false, reasons, redeploys: true })).toEqual({ environment: 'prod', published: false, publishable: false, reasons, redeploys: true });
   });
 
   it('gives a publishable integration an empty reasons list', () => {
     expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true }).reasons).toEqual([]);
+    expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true }).redeploys).toBe(false);
   });
 });

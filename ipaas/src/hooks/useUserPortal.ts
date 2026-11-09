@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
+import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublications, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
 import type { UserPortal } from '../types/userPortal';
 import { isUserPortalUnavailable } from '../utils/apiErrors';
 
@@ -56,6 +56,7 @@ function useWritePortal(write: (environment: string) => Promise<UserPortal>) {
       qc.setQueryData([ROOT_KEY, 'portal', portal.environment], portal);
       // A disable unpublishes the portal's integrations, and an enable changes what can be published.
       void qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publishability'] });
+      void qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publications'] });
     },
   });
 }
@@ -75,11 +76,25 @@ export function useUserPortalPublishability(componentId: string, environment: st
   });
 }
 
+/**
+ * The environments the integration is published to the User Portal in. A workflow published in one is managed
+ * from the User Portal there, so the console's workflow views step aside.
+ */
+export function useUserPortalPublications(componentId: string, { enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'publications', componentId],
+    queryFn: () => fetchUserPortalPublications(componentId),
+    enabled: enabled && !!componentId,
+    retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
+    staleTime: 30_000,
+  });
+}
+
 function useWritePublication<T>(write: (componentId: string, environment: string) => Promise<T>) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ componentId, environment }: { componentId: string; environment: string }) => write(componentId, environment),
-    onSettled: (_data, _err, { componentId }) => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publishability', componentId] }),
+    onSettled: (_data, _err, { componentId }) => Promise.all([qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publishability', componentId] }), qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publications', componentId] })]),
   });
 }
 

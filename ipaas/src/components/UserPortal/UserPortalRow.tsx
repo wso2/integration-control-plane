@@ -28,6 +28,7 @@ import type { UserPortalRefusal } from '../../types/userPortal';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
 import { refusalText, shownRefusals, USER_PORTAL_NOT_ENABLED, userPortalErrorText } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
+import PublishWorkflowDialog from './PublishWorkflowDialog';
 import * as styles from './UserPortal.styles';
 
 const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
@@ -44,6 +45,8 @@ interface UserPortalRowProps {
  * Whether an AI agent, automation or workflow is published to this environment's User Portal, with
  * Publish or Unpublish. Publish is offered only when ipaas-service's publishing rules all pass; when
  * they don't, the row lists each rule broken, worded from its code, so the user knows what to change.
+ * A publish that redeploys a workflow for the User Portal's sign-in is confirmed first: it turns the
+ * console's workflow management off in the environment.
  */
 export default function UserPortalRow({ orgHandler, componentId, environment, envName }: UserPortalRowProps): JSX.Element | null {
   const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
@@ -51,6 +54,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
+  const [confirmPublish, setConfirmPublish] = useState(false);
   // Scopes the last publish's endpoints require that the portal's users' tokens can't carry.
   const [rejectedScopes, setRejectedScopes] = useState<string[]>([]);
 
@@ -75,7 +79,27 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   const startPublish = () => {
     setRejectedScopes([]);
     unpublish.reset();
-    publish.mutate({ componentId, environment }, { onSuccess: (out) => setRejectedScopes(out.rejectedScopes) });
+    publish.mutate(
+      { componentId, environment },
+      {
+        onSuccess: (out) => {
+          setRejectedScopes(out.rejectedScopes);
+          setConfirmPublish(false);
+        },
+      },
+    );
+  };
+  const requestPublish = () => {
+    if (!data.redeploys) {
+      startPublish();
+      return;
+    }
+    publish.reset();
+    setConfirmPublish(true);
+  };
+  const closePublish = () => {
+    publish.reset();
+    setConfirmPublish(false);
   };
   const closeUnpublish = () => {
     unpublish.reset();
@@ -98,7 +122,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   ) : (
     <Tooltip title={!canDeploy ? DEPLOY_REFUSAL : data.publishable ? '' : 'Fix what is listed below to publish.'}>
       <span>
-        <Button size="small" onClick={startPublish} disabled={!canDeploy || !data.publishable || pending || isFetching}>
+        <Button size="small" onClick={requestPublish} disabled={!canDeploy || !data.publishable || pending || isFetching}>
           {publish.isPending ? 'Publishing…' : 'Publish'}
         </Button>
       </span>
@@ -125,8 +149,8 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
         </Stack>
       )}
 
-      {/* An unpublish failure shows in its confirm dialog, which stays open on it. */}
-      {publish.isError && (
+      {/* An unpublish failure shows in its confirm dialog, and so does a publish that was confirmed; each stays open on it. */}
+      {publish.isError && !confirmPublish && (
         <Typography variant="caption" color="error" component="p" sx={styles.rowNoteSx}>
           {userPortalErrorText(publish.error, envName)}
         </Typography>
@@ -136,6 +160,8 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
           The User Portal can&apos;t hold {rejectedScopes.length === 1 ? 'this scope' : 'these scopes'}, so its users&apos; tokens never carry {rejectedScopes.length === 1 ? 'it' : 'them'}: {rejectedScopes.join(', ')}.
         </Typography>
       )}
+
+      {confirmPublish && <PublishWorkflowDialog envName={envName} onConfirm={startPublish} onClose={closePublish} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} />}
 
       {confirmUnpublish && (
         <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">

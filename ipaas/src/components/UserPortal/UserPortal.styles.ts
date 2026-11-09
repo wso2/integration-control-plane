@@ -78,3 +78,5 @@ export const reasonSx = { display: 'flex', gap: 0.75, alignItems: 'flex-start' }
 export const reasonIconSx = { flexShrink: 0, mt: '2px', color: 'warning.main', display: 'inline-flex' } as const;
 
 export const dialogErrorSx = { mt: 2 } as const;
+
+export const dialogBodySx = { mt: 2 } as const;

@@ -49,12 +49,17 @@ const access = vi.hoisted(() => {
 });
 const testAccessCalls = vi.hoisted(() => [] as unknown[][]);
 const endpoints = vi.hoisted(() => ({ list: [] as EnvEndpoint[], releaseIds: [] as string[] }));
+// The environments the integration is published to the User Portal in.
+const publications = vi.hoisted(() => ({ environments: [] as string[] }));
 
 vi.mock('../../../hooks/useDeployments', () => ({
   useEnvEndpoints: (_componentId: string, _trackId: string | undefined, releaseId: string) => {
     endpoints.releaseIds.push(releaseId);
     return releaseId ? { data: endpoints.list, isPending: false, isError: false, refetch: vi.fn() } : { data: undefined, isPending: true, isError: false, refetch: vi.fn() };
   },
+}));
+vi.mock('../../../hooks/useUserPortal', () => ({
+  useUserPortalPublications: () => ({ data: { environments: publications.environments }, isPending: false, isFetched: true }),
 }));
 vi.mock('../../../hooks/useEndpointTestAccess', () => ({
   useEndpointTestAccess: (...args: unknown[]) => {
@@ -159,6 +164,7 @@ beforeEach(() => {
   endpoints.list = [business, management];
   endpoints.releaseIds = [];
   testAccessCalls.length = 0;
+  publications.environments = [];
   rendered = undefined;
   access.reset(keyAccess());
   fetchMock.mockReset();
@@ -186,6 +192,21 @@ describe('useWorkflowConnection', () => {
       { componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' },
       { enabled: true, gatewayUrlFallback: GATEWAY_URL },
     ]);
+  });
+
+  // Publishing redeploys the workflow to take only User Portal sign-ins, so no test key opens it.
+  it('steps aside for a workflow published to the User Portal in the environment, asking for no test key', async () => {
+    publications.environments = ['development'];
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', notice: { severity: 'info' }, action: null }));
+    expect(testAccessCalls.every(([, options]) => (options as { enabled: boolean }).enabled === false)).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('connects as before to a workflow published to the User Portal only in another environment', async () => {
+    publications.environments = ['production'];
+    mount();
+    await vi.waitFor(() => expect(status()).toBe('ready'));
   });
 
   it('lists only the task queue the integration reports, since every integration in an environment shares its namespace', async () => {

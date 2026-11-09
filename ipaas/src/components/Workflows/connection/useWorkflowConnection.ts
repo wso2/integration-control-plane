@@ -20,6 +20,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
+import { useUserPortalPublications } from '../../../hooks/useUserPortal';
 import type { EndpointRef } from '../../../types/consumers';
 import type { ComponentDeployment } from '../../../types/deployment';
 import { createWorkflowClient, type WorkflowClient } from '../api/client';
@@ -46,6 +47,10 @@ import { isKeyRefusal } from './workflowTestKey';
  * `GET /runtime` probe decides the connection is ready: a 404 there means the integration does not
  * serve the API, and a 401 with a fresh key means the credentials themselves are refused.
  *
+ * A workflow published to the User Portal in the environment is managed from the portal: publishing
+ * redeploys it so its management API takes only User Portal sign-ins, on the gateway and in the
+ * workflow, and no test key opens it. The connection then says so rather than reach for a key.
+ *
  * Call it once per view and environment and pass the result down, so one probe and one renewal
  * serve the whole view.
  */
@@ -64,7 +69,7 @@ export interface WorkflowTarget {
   isDeploymentLoading: boolean;
 }
 
-export type WorkflowUnavailableReason = TestKeyReason | 'no-endpoint' | 'api-disabled';
+export type WorkflowUnavailableReason = TestKeyReason | 'no-endpoint' | 'api-disabled' | 'published-to-user-portal';
 
 /** What a notice offers to do about its state. */
 export interface WorkflowNoticeAction {
@@ -109,6 +114,11 @@ const API_DISABLED: WorkflowNotice = {
   text: 'This integration answers that it does not serve the Workflow Management API. Check that its management API is enabled, then deploy it again.',
 };
 
+const PUBLISHED: WorkflowNotice = {
+  severity: 'info',
+  text: 'This workflow is published to the User Portal in this environment, so its runs and human tasks are managed there. Its Workflow Management API accepts only User Portal sign-ins, so the console can’t reach it. Unpublish it to manage it from the console again.',
+};
+
 export function useWorkflowConnection({ componentId, environmentId, trackId, deployment, isDeploymentLoading }: WorkflowTarget): WorkflowConnection {
   const queryClient = useQueryClient();
   const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
@@ -122,9 +132,14 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const endpoint = resolution.status === 'ready' ? resolution.endpoint : null;
   const endpointName = endpoint?.id ?? '';
 
+  // A BFF that serves no User Portal, or a read that fails, publishes nothing: the views carry on as before.
+  const publications = useUserPortalPublications(componentId, { enabled: isActive });
+  const publishedHere = publications.data?.environments.includes(environmentId) ?? false;
+
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
-  // Release-scoped discovery already returns the gateway's public URL; the security read may too.
-  const access = useEndpointTestAccess(ref, { enabled: !!ref, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
+  // Release-scoped discovery already returns the gateway's public URL; the security read may too. A
+  // published workflow takes no test key, so none is read or minted for it.
+  const access = useEndpointTestAccess(ref, { enabled: !!ref && publications.isFetched && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
   const { authHeader, apiKey, mintKey, renewKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 
@@ -141,7 +156,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const probe = useQuery({
     queryKey: workflowKeys.runtime(scopeId),
     queryFn: () => client!.runtime.get(),
-    enabled: !!client && !!scopeId && access.isAuthorized,
+    enabled: !!client && !!scopeId && access.isAuthorized && !publishedHere,
     staleTime: 5 * 60_000,
     retry: retryWorkflowRead,
   });
@@ -216,6 +231,10 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   }
   if (!isActive) {
     return { status: 'not-deployed', deploymentStatus: deployment.deploymentStatusV2 ?? null };
+  }
+  if (publications.isPending) return LOADING;
+  if (publishedHere) {
+    return { status: 'unavailable', reason: 'published-to-user-portal', notice: PUBLISHED, action: null };
   }
   if (endpoints.isError) {
     return { status: 'error', message: 'Could not load this integration’s endpoints.', retry: () => void endpoints.refetch() };
