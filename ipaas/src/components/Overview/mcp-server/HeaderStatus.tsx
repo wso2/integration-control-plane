@@ -79,6 +79,7 @@ export default function HeaderStatus({
             commitHash={deployedCommitSha}
             releaseId={releaseId}
             displayType={component.displayType}
+            isMcpServer
             releaseMgtReleaseId={releaseMgtReleaseId}
             releaseMgtDeploymentId={releaseMgtDeploymentId}
             envTemplateId={envTemplateId}

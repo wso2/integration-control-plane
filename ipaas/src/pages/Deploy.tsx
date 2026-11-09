@@ -97,6 +97,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   const integrationType = identifyIntegration(component.displayType ?? '', component.componentSubType ?? null).type;
   // A workflow builds and runs as a Ballerina service, so it deploys like one.
   const isWorkflow = integrationType === 'workflow';
+  const isMcpServer = integrationType === 'mcp-server';
   const flags = getComponentTypeFlags(isWorkflow ? 'ballerinaService' : (component.displayType ?? ''), component.componentSubType);
   // File/event/AI-agent integrations share a service displayType but expose no
   // user-configurable endpoints — devant opens the endpoint-less
@@ -143,6 +144,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
               displayType={component.displayType}
               hideEndpoints={hideEndpoints}
               isWorkflow={isWorkflow}
+              isMcpServer={isMcpServer}
             />
           </Box>
 
@@ -166,6 +168,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
                     hideEndpoints={hideEndpoints}
                     displayType={component.displayType}
                     isWorkflow={isWorkflow}
+                    isMcpServer={isMcpServer}
                     publishesToUserPortal={publishesToUserPortal}
                     scheduleKind={integrationType === 'rag-ingestion' ? 'ingestion' : 'automation'}
                     env={env}

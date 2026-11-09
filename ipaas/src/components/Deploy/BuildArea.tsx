@@ -79,6 +79,7 @@ export default function BuildArea({
   displayType,
   hideEndpoints = false,
   isWorkflow = false,
+  isMcpServer = false,
 }: BuildAreaProps): JSX.Element {
   // Determine build-in-progress state first so images can poll faster during active builds
   const { data: builds = [] } = useDeploymentStatus(componentId, versionId);
@@ -364,6 +365,7 @@ export default function BuildArea({
       {/* Configure env vars (opened via Configure & Deploy) */}
       <ConfigureDrawer
         isWorkflow={isWorkflow}
+        isMcpServer={isMcpServer}
         open={configureOpen}
         onClose={() => setConfigureOpen(false)}
         onSaved={handleConfigureSaved}

@@ -20,7 +20,7 @@ import { IconButton, MenuItem, Select, Tooltip } from '@wso2/oxygen-ui';
 import { Download } from '@wso2/oxygen-ui-icons-react';
 import EndpointPanelLayout from './EndpointPanelLayout';
 import type { EnvEndpoint } from '../../../types/component';
-import { trimEndpointName, envCardUrlRows } from '../../../utils/endpoints';
+import { aiGatewayUrlRows, trimEndpointName, envCardUrlRows } from '../../../utils/endpoints';
 import EndpointUrlRows from './EndpointUrlRows';
 import { decodeBase64Spec, specFileType } from '../../../utils/openApiSpec';
 
@@ -35,6 +35,8 @@ interface EndpointUrlsPanelProps {
    * integration-as-api env card passes it; other component types leave it undefined (unchanged).
    */
   externalUrlOverride?: string;
+  /** For an MCP server on Agent Manager's AI gateway, its proxy URL, shown as the Public URL; '' before the proxy has one. */
+  aiGatewayUrl?: string;
 }
 
 /**
@@ -42,7 +44,7 @@ interface EndpointUrlsPanelProps {
  * invoke URLs (with copy), and the API-spec download. Shared by the env-card
  * bodies of integration-as-api and ai-agent
  */
-export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, externalUrlOverride }: EndpointUrlsPanelProps) {
+export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, externalUrlOverride, aiGatewayUrl }: EndpointUrlsPanelProps) {
   // Clamp a stale/out-of-bounds selection (e.g. the endpoint list shrank) to a
   // valid index so the panel stays visible and the selector stays consistent,
   // instead of silently rendering nothing.
@@ -51,7 +53,7 @@ export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, ex
   if (!ep) return null;
 
   // An exposed external endpoint lists the enforcing API Platform gateway URL as its Public URL, not the open raw route.
-  const urlOptions = envCardUrlRows(ep, externalUrlOverride);
+  const urlOptions = aiGatewayUrl !== undefined ? aiGatewayUrlRows(aiGatewayUrl) : envCardUrlRows(ep, externalUrlOverride);
 
   // The spec arrives with the endpoint list, base64 in the apimRevisionId slot (see api/deployments.ts).
   const inlineSpec = decodeBase64Spec(ep.apimRevisionId);
@@ -86,7 +88,7 @@ export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, ex
           ))}
         </Select>
       }
-      urls={<EndpointUrlRows options={urlOptions} gatewayUrl={externalUrlOverride} />}
+      urls={aiGatewayUrl !== undefined ? <EndpointUrlRows options={urlOptions} gatewayUrl={aiGatewayUrl} gatewayName="AI gateway" /> : <EndpointUrlRows options={urlOptions} gatewayUrl={externalUrlOverride} />}
       download={
         <Tooltip title={canDownload ? 'Download API specification' : 'No API specification published for this endpoint'}>
           <span>

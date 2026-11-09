@@ -80,6 +80,8 @@ export interface EndpointTestAccess {
   isUnavailable: boolean;
   /** The security read's failure, for `endpointLoadNotice` — 409 is a state, other statuses are not. */
   securityError: unknown;
+  /** The endpoint's security is still being read, so which gateway fronts it, and how, is not known yet. */
+  isResolving: boolean;
   /**
    * Mint a new test key, for an explicit action such as regenerating one. Every view of the
    * endpoint moves to it. Resolves to the plaintext, or `null` on failure.
@@ -187,7 +189,7 @@ interface TestAccessOptions {
 }
 
 export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
-  const { data: security, isError: isSecurityError, error: securityError } = useEndpointSecurity(ref, enabled);
+  const { data: security, isError: isSecurityError, error: securityError, isLoading: isSecurityLoading } = useEndpointSecurity(ref, enabled);
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
   const canSwitch = canCreateKey && !agent && can(Scopes.ENDPOINT_UPDATE);
@@ -332,6 +334,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     // URL is still terminal, including a deployed open binding whose URL is absent.
     isUnavailable: (!aiGateway && isSecurityError) || (mode !== null && !mcpUrl),
     securityError,
+    isResolving: isSecurityLoading,
     mintKey,
     renewKey,
     retryUnauthorized,
