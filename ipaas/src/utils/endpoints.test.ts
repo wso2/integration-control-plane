@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { editorExposure, envCardUrlRows, exposureLabels, gatewayExposureState, getEndpointLabel, isBrowserReachable, isExposureTransitioning, resolveEndpointInvokeUrl, trimEndpointName, visibilityUrlOptions } from './endpoints';
+import { aiGatewayUrlRows, editorExposure, envCardUrlRows, exposureLabels, gatewayExposureState, getEndpointLabel, isBrowserReachable, isExposureTransitioning, resolveEndpointInvokeUrl, trimEndpointName, visibilityUrlOptions } from './endpoints';
 import type { EnvEndpoint } from '../types/component';
 
 const ep = (partial: Partial<EnvEndpoint>): EnvEndpoint => ({ id: 'e', releaseId: 'r', environmentId: 'env', displayName: 'ep', type: 'GraphQL', visibility: 'Public', ...partial }) as EnvEndpoint;
@@ -245,5 +245,17 @@ describe('envCardUrlRows', () => {
 
   it('shows the saved host as pending while the gateway still serves the other one', () => {
     expect(rows({ networkVisibilities: ['Public'], exposure: 'organization' })).toEqual({ organization: '' });
+  });
+});
+
+describe('aiGatewayUrlRows', () => {
+  const proxyUrl = 'https://gw.example.com/default/orders-mcp/mcp';
+
+  it('shows only the AI gateway proxy URL, as Public', () => {
+    expect(aiGatewayUrlRows(proxyUrl)).toEqual([{ key: 'public', label: 'Public', url: proxyUrl }]);
+  });
+
+  it('lists nothing while the proxy has no URL', () => {
+    expect(aiGatewayUrlRows('')).toEqual([]);
   });
 });

@@ -33,6 +33,7 @@ import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCardList } from '../EndpointCardList';
+import { useAiGatewayUrls } from '../../hooks/useAiGatewayUrls';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
 import { addressableFields, linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
@@ -692,6 +693,8 @@ export interface ConfigureDrawerProps {
   hideEndpoints?: boolean;
   /** A workflow integration, whose management endpoint the Endpoints step leaves out (see isUserVisibleEndpoint). */
   isWorkflow?: boolean;
+  /** An MCP server, whose endpoints the AI gateway may front instead of the API Platform. */
+  isMcpServer?: boolean;
   envTemplateId?: string;
   buildId?: string;
   /**
@@ -768,6 +771,7 @@ function GenericServiceConfigureDrawer({
   continueWithoutChanges = false,
   hideEndpoints = false,
   isWorkflow = false,
+  isMcpServer = false,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
   // File/event integrations have no endpoints (devant: they open the
@@ -800,6 +804,7 @@ function GenericServiceConfigureDrawer({
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
   const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
   const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
+  const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId, envId, versionId }, open && isMcpServer && !hideEndpoints);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
   const deployTrack = useDeployDeploymentTrack();
@@ -1133,7 +1138,7 @@ function GenericServiceConfigureDrawer({
         </Box>
       );
     }
-    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} />;
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} aiGatewayUrls={aiGateway.urls} aiGatewayPending={aiGateway.pending} />;
   };
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();
