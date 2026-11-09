@@ -792,7 +792,7 @@ function GenericServiceConfigureDrawer({
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
   const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
   const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
-  const aiGatewayUrls = useAiGatewayUrls(endpoints, { projectId, componentId, envId, versionId }, open && isMcpServer && !hideEndpoints);
+  const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId, envId, versionId }, open && isMcpServer && !hideEndpoints);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
   const generateEp = useGenerateComponentEndpoints();
@@ -1108,7 +1108,7 @@ function GenericServiceConfigureDrawer({
         </Box>
       );
     }
-    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} aiGatewayUrls={aiGatewayUrls} />;
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} aiGatewayUrls={aiGateway.urls} aiGatewayPending={aiGateway.pending} />;
   };
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();

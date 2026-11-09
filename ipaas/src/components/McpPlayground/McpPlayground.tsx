@@ -109,7 +109,7 @@ export default function McpPlayground({ url, token, headerName = 'test-key', isT
 
   return (
     <Stack gap={1.5} sx={{ height: '100%', minHeight: 0 }}>
-      <ConnectionAlert error={conn.error} errorKind={conn.errorKind} isTokenFetching={isTokenFetching} onGetTestKey={onTokenRegenerate} />
+      <ConnectionAlert error={conn.error} errorKind={conn.errorKind} isTokenFetching={isTokenFetching} onGetTestKey={onTokenRegenerate} keyless={!!relay} />
 
       <Stack direction="row" gap={2} sx={{ flex: 1, minHeight: 0 }}>
         <ConnectionSidebar

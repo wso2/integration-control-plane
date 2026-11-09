@@ -41,7 +41,7 @@ interface EndpointsDrawerProps {
 }
 
 export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, projectId, componentId, environmentId, versionId, isMcpServer = false }: EndpointsDrawerProps) {
-  const aiGatewayUrls = useAiGatewayUrls(endpoints, { projectId, componentId: componentId ?? '', envId: environmentId, versionId: versionId ?? '' }, open && isMcpServer && !!componentId);
+  const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId: componentId ?? '', envId: environmentId, versionId: versionId ?? '' }, open && isMcpServer && !!componentId);
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -82,7 +82,7 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
               </Typography>
             </Box>
           ) : (
-            <EndpointCardList endpoints={endpoints} projectId={projectId} envId={environmentId} onSettings={handleSettings} aiGatewayUrls={aiGatewayUrls} />
+            <EndpointCardList endpoints={endpoints} projectId={projectId} envId={environmentId} onSettings={handleSettings} aiGatewayUrls={aiGateway.urls} aiGatewayPending={aiGateway.pending} />
           )}
         </DrawerPanel.Body>
       </DrawerPanel>

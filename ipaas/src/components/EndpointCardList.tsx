@@ -30,6 +30,11 @@ interface EndpointCardListProps {
   onSettings?: (ep: EnvEndpoint) => void;
   /** The endpoints Agent Manager's AI gateway fronts, by id, each with its public proxy URL (see `useAiGatewayUrls`). */
   aiGatewayUrls?: Record<string, string>;
+  /**
+   * Which endpoints the AI gateway fronts is still being read. Edit and API settings wait for it: offered
+   * for an endpoint that turns out to be on the AI gateway, they would only be refused.
+   */
+  aiGatewayPending?: boolean;
 }
 
 /**
@@ -38,13 +43,21 @@ interface EndpointCardListProps {
  * source's visibility with it, so elsewhere the cards offer neither and say where to go instead.
  * An endpoint on the AI gateway has neither in any environment: it is public through the gateway.
  */
-export function EndpointCardList({ endpoints, projectId, envId, onEdit, onSettings, aiGatewayUrls = {} }: EndpointCardListProps): JSX.Element {
+export function EndpointCardList({ endpoints, projectId, envId, onEdit, onSettings, aiGatewayUrls = {}, aiGatewayPending = false }: EndpointCardListProps): JSX.Element {
   const { isEntry, loading, entryEnvironmentName } = useEntryEnvironment(projectId, envId);
   const allOnAiGateway = endpoints.length > 0 && endpoints.every((ep) => ep.id in aiGatewayUrls);
   return (
     <Box>
       {endpoints.map((ep, idx) => (
-        <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} readOnly={!isEntry || !onEdit} onEdit={isEntry ? onEdit : undefined} onSettings={isEntry ? onSettings : undefined} aiGatewayUrl={aiGatewayUrls[ep.id]} />
+        <EndpointCard
+          key={ep.id}
+          ep={ep}
+          defaultExpanded={idx === 0}
+          readOnly={!isEntry || !onEdit || aiGatewayPending}
+          onEdit={isEntry && !aiGatewayPending ? onEdit : undefined}
+          onSettings={isEntry && !aiGatewayPending ? onSettings : undefined}
+          aiGatewayUrl={aiGatewayUrls[ep.id]}
+        />
       ))}
       {!isEntry && !loading && !allOnAiGateway && (onEdit || onSettings) && (
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>

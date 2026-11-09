@@ -29,6 +29,13 @@ interface AiGatewayUrlsScope {
   versionId: string;
 }
 
+export interface AiGatewayUrls {
+  /** The endpoints the AI gateway fronts, by endpoint id, each with its public proxy URL ('' while the proxy has none). */
+  urls: Record<string, string>;
+  /** Some endpoint's security is still being read, so which ones the AI gateway fronts is not known yet. */
+  pending: boolean;
+}
+
 /**
  * The endpoints Agent Manager's AI gateway fronts, by endpoint id, each with its public proxy URL ('' while the
  * proxy has none, such as before it is deployed). An endpoint left out is fronted by the API Platform.
@@ -37,7 +44,7 @@ interface AiGatewayUrlsScope {
  * keeps a rule of its own for which MCP servers that is. Only an MCP server can be fronted, so pass
  * `enabled: false` for any other component and no security is read.
  */
-export function useAiGatewayUrls(endpoints: EnvEndpoint[], { projectId, componentId, envId, versionId }: AiGatewayUrlsScope, enabled: boolean): Record<string, string> {
+export function useAiGatewayUrls(endpoints: EnvEndpoint[], { projectId, componentId, envId, versionId }: AiGatewayUrlsScope, enabled: boolean): AiGatewayUrls {
   const refs = useMemo<EndpointRef[]>(
     () => (enabled ? endpoints.map((ep) => ({ projectName: projectId, componentName: componentId, environmentName: envId, endpointName: ep.id, deploymentTrackId: versionId })) : []),
     [enabled, endpoints, projectId, componentId, envId, versionId],
@@ -48,5 +55,5 @@ export function useAiGatewayUrls(endpoints: EnvEndpoint[], { projectId, componen
     const { data, error } = securities[i] ?? {};
     if (aiGatewayAccessOf(data, error)) urls[ref.endpointName] = data?.publicUrl ?? '';
   });
-  return urls;
+  return { urls, pending: securities.some((q) => q.isLoading) };
 }

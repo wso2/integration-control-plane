@@ -31,8 +31,10 @@ const endpoint = { id: 'http', releaseId: 'r1', environmentId: 'e', displayName:
 let container: HTMLDivElement;
 let root: Root;
 
-async function render(aiGatewayUrls?: Record<string, string>): Promise<void> {
-  await act(async () => root.render(<EndpointCardList endpoints={[{ ...endpoint, publicUrl: 'https://raw-route.example.com/orders' }]} projectId="p" envId="e" onEdit={() => {}} onSettings={() => {}} aiGatewayUrls={aiGatewayUrls} />));
+async function render(aiGatewayUrls?: Record<string, string>, aiGatewayPending = false): Promise<void> {
+  await act(async () =>
+    root.render(<EndpointCardList endpoints={[{ ...endpoint, publicUrl: 'https://raw-route.example.com/orders' }]} projectId="p" envId="e" onEdit={() => {}} onSettings={() => {}} aiGatewayUrls={aiGatewayUrls} aiGatewayPending={aiGatewayPending} />),
+  );
 }
 
 const button = (label: string) => container.querySelector(`[aria-label="${label}"]`);
@@ -82,5 +84,12 @@ describe('EndpointCardList', () => {
     await render({ http: '' });
     expect(container.textContent).not.toContain('Promote to apply them here');
     expect(container.textContent).toContain('Not published on the AI gateway yet.');
+  });
+
+  it('offers neither while it is not yet known whether the AI gateway fronts the endpoint', async () => {
+    entry.isEntry = true;
+    await render({}, true);
+    expect(button('Edit endpoint')).toBeNull();
+    expect(button('API settings')).toBeNull();
   });
 });
