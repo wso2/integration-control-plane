@@ -57,7 +57,7 @@ const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 
 export function BaseElement(props: BaseElementProps) {
   const link = useFieldLink(props.jsonPath);
-  return link?.source ? <LinkedElement title={props.title} source={link.source} picker={link.picker} /> : <EditableElement {...props} picker={link?.picker} />;
+  return link?.source ? <LinkedElement title={props.title} source={link.source} picker={link.picker} /> : <EditableElement {...props} picker={link?.picker} busy={link?.busy} />;
 }
 
 function EditableElement({
@@ -79,7 +79,8 @@ function EditableElement({
   sensitiveMap,
   setSensitiveMap,
   picker,
-}: BaseElementProps & { picker?: Picker }) {
+  busy,
+}: BaseElementProps & { picker?: Picker; busy?: boolean }) {
   const numberRegex = /^-?\d+(\.\d+)?$/;
   const isOptional = isRequired === false;
   const labelText = title;
@@ -316,7 +317,7 @@ function EditableElement({
           size="small"
           value={String(valueMap.get(jsonPath) ?? '')}
           onChange={(e) => handleChange(e.target.value)}
-          disabled={!!linked}
+          disabled={!!linked || !!busy}
           error={isEdited && !linked && validationMap.get(jsonPath) === false}
           helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
           inputProps={{ 'aria-required': Boolean(isRequired) }}
@@ -356,7 +357,7 @@ function EditableElement({
           <Switch
             size="small"
             checked={valueMap.get(jsonPath) === 'true' || valueMap.get(jsonPath) === true || false}
-            disabled={!!linked}
+            disabled={!!linked || !!busy}
             inputProps={{ 'aria-required': Boolean(isRequired) }}
             onChange={(e) => {
               handleValueChange(jsonPath, e.target.checked);
@@ -442,6 +443,7 @@ function EditableElement({
               type={showContent ? 'text' : 'password'}
               value={String(valueMap.get(jsonPath) ?? '')}
               onChange={(e) => handleChange(e.target.value)}
+              disabled={!!busy}
               error={isEdited && !linked && validationMap.get(jsonPath) === false}
               helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
               inputProps={{ 'aria-required': Boolean(isRequired) }}
@@ -509,6 +511,7 @@ function EditableElement({
         type={isSensitive && !showContent ? 'password' : 'text'}
         value={String(valueMap.get(jsonPath) ?? '')}
         onChange={(e) => handleChange(e.target.value)}
+        disabled={!!busy}
         placeholder="Enter a value"
         error={isEdited && !linked && validationMap.get(jsonPath) === false}
         helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}

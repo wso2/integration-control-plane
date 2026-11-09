@@ -34,6 +34,7 @@ const links = (): IntegrationLinks => ({
   usedByOrphaned: {},
   connections: [],
   fieldLinks: server.linked ? { [target]: ref } : {},
+  endpointLinks: {},
   orphaned: [],
   env: {},
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: server.linked !== server.inRelease, connections: {}, configurables: server.inRelease ? { [target]: ref } : {}, env: {} }],

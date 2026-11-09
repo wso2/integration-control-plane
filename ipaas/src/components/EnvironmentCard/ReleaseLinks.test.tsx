@@ -31,6 +31,7 @@ const links: IntegrationLinks = {
   usedByOrphaned: {},
   connections: [],
   fieldLinks: {},
+  endpointLinks: {},
   orphaned: [],
   env: {},
   environments: [
@@ -53,9 +54,9 @@ beforeEach(() => {
 afterEach(() => act(() => root.unmount()));
 
 describe('an environment card', () => {
-  it("lists the resources the first environment's release uses, and that the links need a deploy", async () => {
+  it("lists the resources the first environment's release uses, and that the links are not applied yet", async () => {
     await render('development');
-    expect(container.textContent).toBe('This release usesOrders DBLinks need a deploy');
+    expect(container.textContent).toBe('This release usesOrders DBLinks apply on the next Apply');
   });
 
   it('says when values changed after the pods started', async () => {

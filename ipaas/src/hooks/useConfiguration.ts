@@ -17,7 +17,19 @@
  */
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings, fetchIntegrationLinks, writeLink } from '../api/configuration';
+import {
+  fetchCertificateGroups,
+  fetchConfigGroups,
+  fetchCertificateMappings,
+  fetchSchemaConfig,
+  fetchConfigMgt,
+  saveSchemaConfig,
+  postConfigMgt,
+  postCertificateMappings,
+  fetchIntegrationLinks,
+  writeLink,
+  fetchConnectableEndpoints,
+} from '../api/configuration';
 import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, IntegrationLinks, LinkWrite, LinkWriteInput } from '../types/configuration';
 import type { PromoteInput } from '../types/deployment';
 import { sameLinks } from '../utils/integrationLinks';
@@ -114,6 +126,16 @@ export function useIntegrationLinks(projectId: string, componentId: string, enab
   });
 }
 
+/** The integrations this one may call. Read with the links, and only while the form is open. */
+export function useConnectableEndpoints(projectId: string, componentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['connectableEndpoints', projectId, componentId],
+    queryFn: () => fetchConnectableEndpoints(projectId, componentId),
+    enabled: enabled && !!projectId && !!componentId,
+    retry: false,
+  });
+}
+
 export function useLinkWrite() {
   const qc = useQueryClient();
   return useMutation({
@@ -121,6 +143,8 @@ export function useLinkWrite() {
     mutationFn: (input: LinkWriteInput) => writeLink(input),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['integrationLinks', vars.projectId, vars.componentId] });
+      // A link to an endpoint makes the project's connection to it, which the listing then carries a ref for.
+      qc.invalidateQueries({ queryKey: ['connectableEndpoints', vars.projectId, vars.componentId] });
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
     },
   });

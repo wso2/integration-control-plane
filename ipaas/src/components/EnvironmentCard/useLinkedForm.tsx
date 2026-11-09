@@ -20,7 +20,7 @@ import { useMemo, type ReactNode } from 'react';
 import { Alert, Button, Stack, Typography } from '@wso2/oxygen-ui';
 import { BffError } from '../../api/_client';
 import { useEnvironments } from '../../hooks/useEnvironments';
-import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
+import { useConnectableEndpoints, useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
 import type { IntegrationLinks, LinkTarget } from '../../types/configuration';
 import { configKey, configurableId, formLinkView, targetName } from '../../utils/integrationLinks';
 import { ConnectionLink } from './ConnectionLink';
@@ -28,30 +28,60 @@ import { OrphanedLinks } from './OrphanedLinks';
 import type { FormGroup } from '../SchemaConfigForm/ConfigForm';
 import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
 
-const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [] };
+const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, endpointLinks: {}, orphaned: [], env: {}, environments: [] };
+
+/**
+ * One pick of a field's link icon as a link write: a resource key, an endpoint, or neither, which unlinks the
+ * field. An endpoint of another project carries the output picked with it; one of this project has none.
+ */
+const pickedTarget = (configurable: string, pick: { resource: string; key: string } | { endpoint: string; key?: string } | null): LinkTarget => {
+  if (pick && 'endpoint' in pick) return { configurable, endpoint: pick.endpoint, ...(pick.key && { key: pick.key }) };
+  if (pick) return { configurable, ref: pick.resource, key: pick.key };
+  return { configurable };
+};
 
 /** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's linkable config keys (`linkableFields`). */
-export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[]) {
+export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[], addressable: string[]) {
   const read = useIntegrationLinks(projectId, componentId, open);
   const links = read.data ?? noLinks;
   // Until the links read, the form can't tell linked fields from others: it offers no link action and no save.
   const linksUnread = !read.data || read.isError;
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
+  const callable = useConnectableEndpoints(projectId, componentId, open);
+  const connectable = callable.data ?? [];
   const ids = fields.map(configurableId).join();
-  const view = useMemo(() => formLinkView(links, env, envName, ids ? ids.split(',') : []), [links, env, environments, ids]); // eslint-disable-line react-hooks/exhaustive-deps
+  const addressableIds = addressable.map(configurableId).join();
+  const view = useMemo(
+    () => formLinkView(links, env, envName, ids ? ids.split(',') : [], connectable, addressableIds ? addressableIds.split(',') : []),
+    [links, env, environments, ids, addressableIds, connectable], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const write = useLinkWrite();
   const change = (target: LinkTarget) => write.mutateAsync({ projectId, componentId, target }).catch(() => undefined);
 
   const linkable = new Set(fields);
   const fieldLinks: FieldLinks = (path) => {
-    // A member of a record, map or array is no configurable of its own: nothing links it.
-    if (!linkable.has(path)) return undefined;
     const id = configurableId(path);
     const t = view.target(id);
+    // Only a linkable key is offered a picker. One that is not keeps showing a link it already holds, so a
+    // key the rules no longer cover does not look unlinked while a write still feeds it.
+    const offered = linkable.has(path);
+    if (!offered && !t.source) return undefined;
     return {
-      ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }), ...(t.source.declared && { declared: true }) } }),
-      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
+      ...(t.source && {
+        source: {
+          resource: t.source.name,
+          key: t.source.key,
+          ...(t.source.endpoint && { endpoint: true }),
+          ...(t.source.overrides && { overrides: true }),
+          ...(t.source.noValues && { noValuesIn: envName(env) }),
+          ...(t.source.declared && { declared: true }),
+        },
+      }),
+      ...(offered && t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pickedTarget(id, pick)) } }),
+      // A link write replaces what feeds the field, so its value is not the user's to set until the
+      // write lands. One write is in flight at a time, so this holds for every field at once.
+      ...(write.isPending && { busy: true }),
     };
   };
 
@@ -79,7 +109,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   }));
 
   const linkedKeys = new Set(
-    [...Object.keys(links.fieldLinks), ...Object.keys(links.declared ?? {}), ...links.connections.flatMap((c) => c.fields.map((f) => f.configurable)), ...Object.keys(links.environments.find((e) => e.name === env)?.configurables ?? {})]
+    [...Object.keys(links.fieldLinks), ...Object.keys(links.endpointLinks), ...Object.keys(links.declared ?? {}), ...links.connections.flatMap((c) => c.fields.map((f) => f.configurable)), ...Object.keys(links.environments.find((e) => e.name === env)?.configurables ?? {})]
       .filter((id) => view.target(id).source)
       .map(configKey),
   );
@@ -98,17 +128,25 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
           {read.data ? "Couldn't refresh this integration's links. These are from the last read." : "Couldn't read this integration's links."}
         </Alert>
       )}
+      {callable.isError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 1.5 }}
+          action={
+            <Button size="small" color="inherit" disabled={callable.isFetching} onClick={() => void callable.refetch()}>
+              Try again
+            </Button>
+          }>
+          {/* Both groups render empty on a failed read, which otherwise reads as having no integration to call. */}
+          Couldn&apos;t read the integrations this one can call. Those sections are empty until it is read.
+        </Alert>
+      )}
       {view.sourceDefined && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           Links come from workload.yaml in the repository.
         </Typography>
       )}
       {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending || linksUnread} change={change} />}
-      {write.data?.workload === 'next_deploy' && (
-        <Alert severity="info" sx={{ mb: 1.5 }}>
-          Deploy to apply.
-        </Alert>
-      )}
       {write.isError && (
         <Alert
           severity="error"
