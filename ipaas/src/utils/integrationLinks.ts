@@ -52,6 +52,11 @@ export interface Picker {
   resources: { id: string; name: string; keys: { key: string; usedBy?: string; orphanOf?: string }[] }[];
   /** Integrations of this project, which supply an address and need no key. */
   endpoints: { id: string; name: string; unavailable?: string }[];
+  /**
+   * Integrations of other projects no connection stands for yet. Each is picked by one of its
+   * outputs, which makes the connection and feeds the target that value.
+   */
+  connections: { id: string; name: string; outputs: { name: string; secret: boolean }[]; unavailable?: string }[];
 }
 
 /** One target's link in a form: where its value comes from, and the picker's choices where links can change. */
