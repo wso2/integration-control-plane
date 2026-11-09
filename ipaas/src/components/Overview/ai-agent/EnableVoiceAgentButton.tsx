@@ -57,17 +57,17 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
   const blockedReason = loadingBuilds
     ? 'Checking the latest build…'
     : !latest
-      ? 'Build this agent first. Voice agents can be enabled once a build succeeds.'
+      ? 'Build this AI agent first. You can enable its voice agent once a build succeeds.'
       : latest.status !== 'completed'
         ? 'Available once the running build succeeds.'
         : !buildSucceeded
-          ? 'The latest build failed. Fix it and rebuild to enable voice agents.'
+          ? 'The latest build failed. Fix it and rebuild to enable the voice agent.'
           : endpoint.status === 'loading'
             ? "Checking the agent's endpoints…"
             : endpoint.status === 'not-deployed' || endpoint.status === 'no-environment'
-              ? 'Deploy this AI agent to enable voice.'
+              ? 'Deploy this AI agent to enable its voice agent.'
               : endpoint.status === 'no-endpoint'
-                ? 'Add a WebSocket endpoint to this AI Agent to enable voice.'
+                ? 'Add a WebSocket endpoint to this AI agent to enable its voice agent.'
                 : '';
   return (
     <Tooltip title={blockedReason} placement="left">
@@ -78,7 +78,7 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
           startIcon={<Mic size={16} />}
           disabled={!buildSucceeded || endpoint.status !== 'ready'}
           onClick={() => navigate(enableVoiceAgentUrl(orgHandler, projectHandler, component.handler))}>
-          Enable voice agents
+          Enable voice agent
         </Button>
       </span>
     </Tooltip>

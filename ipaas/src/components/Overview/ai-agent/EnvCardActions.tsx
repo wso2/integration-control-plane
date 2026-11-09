@@ -111,7 +111,7 @@ export default function EnvCardActions({
   return (
     <>
       {hasDeployment && !env.critical && voiceSelected && (
-        <Tooltip title={voiceAgent ? 'Talk to this agent through its voice agent' : 'Enable a voice agent for this agent first.'}>
+        <Tooltip title={voiceAgent ? 'Talk to this AI agent through its voice agent.' : 'Enable the voice agent for this AI agent first.'}>
           <span>
             <Button
               variant="text"
