@@ -17,7 +17,7 @@
  */
 
 import type { EnvEndpoint } from '../types/component';
-import type { AiGatewayBinding, SecurityConfig, SecurityMode } from '../types/consumers';
+import type { AiGatewayBinding, SecurityConfig } from '../types/consumers';
 import { httpCodeOf, httpStatusOf } from './apiErrors';
 
 /** An MCP server endpoint on Agent Manager's AI gateway, or not published there yet (`binding: null`). */
@@ -62,31 +62,9 @@ export function mcpTransportUrlOf(mcpUrl: string): URL {
 }
 
 /**
- * Why an MCP server on the AI gateway can't be called from the console right now, or `null` when it can: deployed
- * there and open. A secured one can't, as the AI gateway issues its API keys only to Agent Manager agents.
- */
-export function aiGatewayNotice(aiGateway: AiGatewayAccess, mode: SecurityMode | null): { text: string; severity: 'info' | 'warning' } | null {
-  const { binding } = aiGateway;
-  if (!binding) return { text: "This MCP server isn't published on the AI gateway in this environment yet. Deploying it publishes it.", severity: 'info' };
-  switch (binding.deploymentStatus) {
-    case undefined:
-      return { text: 'This environment has no AI gateway yet. The MCP server is published on it as soon as one is available.', severity: 'info' };
-    case 'Deploying':
-      return { text: 'Publishing this MCP server on the AI gateway.', severity: 'info' };
-    case 'Failed':
-      return {
-        text: `Publishing this MCP server on the AI gateway failed${binding.deploymentStatusReason ? ` (${binding.deploymentStatusReason})` : ''}. Redeploy it to try again.`,
-        severity: 'warning',
-      };
-  }
-  if (mode === 'none') return null;
-  return { text: "The AI gateway issues this MCP server's API keys only to the Agent Manager agents that use it, so its tools can't be tried from here yet.", severity: 'info' };
-}
-
-/**
  * The endpoints an MCP server's Test page offers: those with a public URL, or every endpoint when none has
  * one. An MCP server on the AI gateway is never exposed on the API Platform, so its endpoints carry no
- * public URL; offering them lets the page read where the AI gateway stands instead of finding nothing.
+ * public URL; offering them lets the page test it through ipaas-service's relay instead of finding nothing.
  */
 export function mcpTestEndpoints(endpoints: EnvEndpoint[]): EnvEndpoint[] {
   const routed = endpoints.filter((e) => e.publicUrl);

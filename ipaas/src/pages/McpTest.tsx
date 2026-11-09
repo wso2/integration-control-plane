@@ -33,13 +33,17 @@ import type { ComponentScope } from '../nav';
 import type { EndpointRef } from '../types/consumers';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
-import { aiGatewayNotice, mcpTestEndpoints } from '../utils/mcpGateway';
+import { mcpTestEndpoints } from '../utils/mcpGateway';
+import { mcpRelayUrl } from '../api/consumers';
+import { bffFetch } from '../api/_client';
 import { PILL_SELECT_SX } from '../constants/styles';
 
 /**
  * MCP Server "Test" page: resolves the deployed MCP endpoint's gateway URL + a test
  * credential for the selected environment, then hands them to the in-house
  * {@link McpPlayground} (the interactive connect / list-tools / invoke / ping surface).
+ * An MCP server on Agent Manager's AI gateway takes no test key: the page shows its proxy
+ * URL and connects through ipaas-service's relay instead.
  */
 export default function McpTest(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
@@ -79,8 +83,9 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.
   const mcpUrl = access.mcpUrl;
-  // Where an AI gateway MCP server stands, when that rules out testing it here.
-  const aiGatewayNote = access.aiGateway ? aiGatewayNotice(access.aiGateway, access.mode) : null;
+  // The AI gateway gives the console no key, so the page talks to an MCP server there through ipaas-service's relay.
+  const onAiGateway = !!access.aiGateway;
+  const relay = useMemo(() => (onAiGateway && accessRef ? { url: mcpRelayUrl(accessRef), fetch: bffFetch } : undefined), [onAiGateway, accessRef]);
 
   const endpointSwitcher = { options: testableEndpoints.map((e) => ({ label: e.displayName, value: e.id })), value: activeEndpointId, onChange: setSelectedEndpointId };
 
@@ -116,8 +121,8 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
         </Stack>
         {!isActive ? (
           <NotDeployedAlert status={deployment?.deploymentStatusV2} />
-        ) : aiGatewayNote ? (
-          <Alert severity={aiGatewayNote.severity}>{aiGatewayNote.text}</Alert>
+        ) : relay ? (
+          <McpPlayground url={mcpUrl} token={null} relay={relay} visibility="Public" endpointSwitcher={endpointSwitcher} />
         ) : !mcpUrl ? (
           // Deployed, but with no enforcing URL to call — a different state from "not deployed".
           <Alert severity="info">{access.isUnavailable ? 'This MCP server isn’t exposed as an API on the gateway yet, so it cannot be tested from here.' : 'No testable endpoint URL is available for this MCP server yet.'}</Alert>

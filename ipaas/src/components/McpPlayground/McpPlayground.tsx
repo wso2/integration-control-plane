@@ -48,6 +48,13 @@ interface McpPlaygroundProps {
   onTokenRegenerate?: () => void;
   /** Endpoint chooser rendered in the sidebar. */
   endpointSwitcher?: McpSwitcher;
+  /**
+   * Connect through ipaas-service's MCP relay instead of to `url`, which is then only shown: for a server whose
+   * gateway gives the console no key. The relay takes the console's session, so no token is asked for.
+   */
+  relay?: { url: string; fetch: (input: string | URL, init?: RequestInit) => Promise<Response> };
+  /** The endpoint's visibility, shown read-only in the sidebar. */
+  visibility?: string;
 }
 
 /**
@@ -55,8 +62,8 @@ interface McpPlaygroundProps {
  * Tools tab (list → schema-driven form → run → result), a Ping tab, and a resizable
  * activity-history panel — all over the `useMcpConnection` session.
  */
-export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, endpointSwitcher }: McpPlaygroundProps): JSX.Element {
-  const conn = useMcpConnection({ url, token, headerName });
+export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, endpointSwitcher, relay, visibility }: McpPlaygroundProps): JSX.Element {
+  const conn = useMcpConnection(relay ? { url: relay.url, token: null, headerName, fetch: relay.fetch } : { url, token, headerName });
   const { status, listTools } = conn;
 
   const [tab, setTab] = useState<PlaygroundTab>('tools');
@@ -108,6 +115,8 @@ export default function McpPlayground({ url, token, headerName = 'test-key', isT
         <ConnectionSidebar
           url={url}
           token={token ?? ''}
+          keyless={!!relay}
+          visibility={visibility}
           status={conn.status}
           isTokenFetching={isTokenFetching}
           endpointSwitcher={endpointSwitcher}

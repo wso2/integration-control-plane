@@ -31,6 +31,10 @@ interface ConnectionSidebarProps {
   onDisconnect: () => void;
   onReconnect: () => void;
   onGetTestKey?: () => void;
+  /** The connection takes no key: the token field gives way to a note on why. */
+  keyless?: boolean;
+  /** The endpoint's visibility, shown read-only. */
+  visibility?: string;
 }
 
 const STATUS_META: Record<McpConnectionStatus, { label: string; color: string }> = {
@@ -43,7 +47,7 @@ const STATUS_META: Record<McpConnectionStatus, { label: string; color: string }>
 const readOnlyInputSx = { bgcolor: 'action.hover', fontFamily: 'monospace', fontSize: 12.5 } as const;
 
 /** The playground's left panel: the endpoint selector, the derived URL + test key, and connect controls. */
-export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey }: ConnectionSidebarProps): JSX.Element {
+export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, visibility }: ConnectionSidebarProps): JSX.Element {
   const [showToken, setShowToken] = useState(false);
   const connected = status === 'connected';
   const connecting = status === 'connecting';
@@ -66,6 +70,8 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         </Tooltip>
       )}
 
+      {visibility && <TextField labelPlacement="top" label="Visibility" size="small" fullWidth value={visibility} InputProps={{ readOnly: true, sx: readOnlyInputSx }} />}
+
       <TextField
         labelPlacement="top"
         label="URL"
@@ -87,31 +93,37 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         }}
       />
 
-      <TextField
-        labelPlacement="top"
-        label="Token"
-        size="small"
-        fullWidth
-        type={showToken ? 'text' : 'password'}
-        value={token}
-        InputProps={{
-          readOnly: true,
-          sx: readOnlyInputSx,
-          endAdornment: (
-            <InputAdornment position="end">
-              {isTokenFetching && <CircularProgress size={14} sx={{ mr: 0.5 }} />}
-              <IconButton size="small" aria-label={showToken ? 'Hide token' : 'Show token'} onClick={() => setShowToken((s) => !s)} edge="end">
-                {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
-              </IconButton>
-              <Tooltip title="Copy token">
-                <IconButton size="small" aria-label="Copy token" onClick={() => copy(token)} edge="end">
-                  <Copy size={14} />
+      {keyless ? (
+        <Typography variant="caption" color="text.secondary">
+          Calls from this page need no key: the integration platform passes them to the MCP server. Agents call it at this URL with keys Agent Manager gives them.
+        </Typography>
+      ) : (
+        <TextField
+          labelPlacement="top"
+          label="Token"
+          size="small"
+          fullWidth
+          type={showToken ? 'text' : 'password'}
+          value={token}
+          InputProps={{
+            readOnly: true,
+            sx: readOnlyInputSx,
+            endAdornment: (
+              <InputAdornment position="end">
+                {isTokenFetching && <CircularProgress size={14} sx={{ mr: 0.5 }} />}
+                <IconButton size="small" aria-label={showToken ? 'Hide token' : 'Show token'} onClick={() => setShowToken((s) => !s)} edge="end">
+                  {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
                 </IconButton>
-              </Tooltip>
-            </InputAdornment>
-          ),
-        }}
-      />
+                <Tooltip title="Copy token">
+                  <IconButton size="small" aria-label="Copy token" onClick={() => copy(token)} edge="end">
+                    <Copy size={14} />
+                  </IconButton>
+                </Tooltip>
+              </InputAdornment>
+            ),
+          }}
+        />
+      )}
 
       {onGetTestKey && (
         <Button variant="outlined" size="small" onClick={onGetTestKey} disabled={isTokenFetching}>
@@ -129,7 +141,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
           </Button>
         </Stack>
       ) : (
-        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || !url || !token}>
+        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || !url || (!token && !keyless)}>
           {connecting ? 'Connecting…' : 'Connect'}
         </Button>
       )}

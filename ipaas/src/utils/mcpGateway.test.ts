@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { EnvEndpoint } from '../types/component';
-import { aiGatewayAccessOf, aiGatewayNotice, mcpTestEndpoints, mcpTransportUrlOf, mcpUrlOf } from './mcpGateway';
+import { aiGatewayAccessOf, mcpTestEndpoints, mcpTransportUrlOf, mcpUrlOf } from './mcpGateway';
 
 const coded = (status: number, code: string) => ({ status, code, body: JSON.stringify({ code }) });
 
@@ -58,24 +58,6 @@ describe('mcpUrlOf', () => {
   it('preserves an existing query while adding the transport selector', () => {
     const mcpUrl = mcpUrlOf('https://gw.example.com/demo/orders-mcp/mcp/?route=blue', { binding: { deploymentStatus: 'Deployed' } });
     expect(mcpTransportUrlOf(mcpUrl).toString()).toBe('https://gw.example.com/demo/orders-mcp/mcp?route=blue&transportType=streamable-http');
-  });
-});
-
-describe('aiGatewayNotice', () => {
-  it.each([
-    ['not published', { binding: null }, 'api-key' as const, 'info', /isn't published/],
-    ['no gateway', { binding: { deploymentStatusReason: 'NO_GATEWAY' } }, 'api-key' as const, 'info', /no AI gateway/],
-    ['deploying', { binding: { deploymentStatus: 'Deploying' as const } }, 'api-key' as const, 'info', /Publishing/],
-    ['failed', { binding: { deploymentStatus: 'Failed' as const, deploymentStatusReason: 'CONTEXT_IN_USE' } }, 'none' as const, 'warning', /failed \(CONTEXT_IN_USE\)/],
-    ['deployed with an api key', { binding: { deploymentStatus: 'Deployed' as const } }, 'api-key' as const, 'info', /only to the Agent Manager agents/],
-  ])('%s', (_, access, mode, severity, text) => {
-    const notice = aiGatewayNotice(access, mode);
-    expect(notice?.severity).toBe(severity);
-    expect(notice?.text).toMatch(text);
-  });
-
-  it('has nothing to say about a deployed, open MCP server', () => {
-    expect(aiGatewayNotice({ binding: { deploymentStatus: 'Deployed' } }, 'none')).toBeNull();
   });
 });
 

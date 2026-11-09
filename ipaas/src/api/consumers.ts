@@ -39,7 +39,7 @@ import type {
 import { normalizeConsumerStatus } from '../utils/apiConsumption';
 import { userFacingError } from '../utils/apiSecurity';
 import type { McpTool } from '../types/mcp';
-import { bff, items, q, seg, type ListResponse } from './_client';
+import { bff, bffAbsoluteUrl, items, q, seg, type ListResponse } from './_client';
 
 /** List routes return a bare array; other BFF routes use `{ items: [] }`. Accept both. */
 const asList = <T>(r: T[] | ListResponse<T> | null | undefined): T[] => (Array.isArray(r) ? r : items(r));
@@ -98,6 +98,13 @@ export const getEndpointSecurity = (ref: EndpointRef): Promise<SecurityConfig> =
  * The tools an MCP server on the AI gateway exposes (`GET .../mcp-tools`). The BFF lists them over the
  * server's own route: the AI gateway gives keys only to Agent Manager agents, so the console can't ask it.
  */
+/**
+ * Where the Test page's MCP client connects for an MCP server on the AI gateway: ipaas-service relays each
+ * request to the server, since the AI gateway gives the console no key and answers no browser's CORS preflight.
+ * Send with `bffFetch`, which carries the console's session.
+ */
+export const mcpRelayUrl = (ref: EndpointRef): string => bffAbsoluteUrl(endpointUrl(ref, '/mcp'));
+
 export const getMcpServerTools = (ref: EndpointRef): Promise<McpTool[]> => bff.get<{ tools?: McpTool[] }>(endpointUrl(ref, '/mcp-tools')).then((r) => r?.tools ?? []);
 
 /** Set the single active auth mode. The BFF clears the other mode + redeploys. */
