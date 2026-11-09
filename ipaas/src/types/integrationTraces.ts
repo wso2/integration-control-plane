@@ -89,7 +89,7 @@ export interface ServiceSpanSeries {
   series: ServiceSeries[];
 }
 
-/** One service's share of the sampled traces. */
+/** One service's share of the traces. */
 export interface ServiceTraceSummary {
   service: string;
   traces: number;
@@ -101,7 +101,7 @@ export interface ServiceTraceSummary {
 /** A trace a service took part in, with the operation it entered the service through. */
 export interface ServiceTrace {
   trace: TraceRow;
-  /** Every sampled span of the trace, from all services. */
+  /** Every span of the trace, from all services. */
   spans: SpanRow[];
   /** Name of the service's entry span in the trace, e.g. "post /albums". */
   operation: string;

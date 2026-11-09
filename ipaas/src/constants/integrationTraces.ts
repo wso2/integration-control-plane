@@ -22,11 +22,8 @@ export const TRACE_QUERY_LIMIT = 1000;
 /** OpenTelemetry's service.name for a process that sets none. */
 export const UNKNOWN_SERVICE = 'unknown_service';
 
-/**
- * Traces whose spans are read for the per-service views. The observer lists traces
- * without their services, so each sampled trace costs one span query.
- */
-export const SPAN_SAMPLE_TRACES = 100;
+/** The newest traces a service's trace list shows; its counts still cover every trace. */
+export const SERVICE_TRACE_LIST_LIMIT = 100;
 
 /** Span queries in flight at once while reading the sample. */
 export const SPAN_FETCH_CONCURRENCY = 6;

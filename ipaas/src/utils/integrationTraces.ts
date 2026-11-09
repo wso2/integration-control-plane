@@ -108,7 +108,7 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(Math.ceil(p * sorted.length) - 1, sorted.length - 1)] ?? 0;
 }
 
-/** The spans of each sampled trace, keyed by trace id. */
+/** The spans of each trace, keyed by trace id. */
 function spansByTrace(spans: SpanRow[]): Map<string, SpanRow[]> {
   const byTrace = new Map<string, SpanRow[]>();
   for (const s of spans) {
@@ -126,7 +126,7 @@ function entrySpan(traceSpans: SpanRow[], service: string): SpanRow | undefined 
 }
 
 /**
- * The sampled traces each service took part in, newest first. Only traces whose spans
+ * The traces each service took part in, newest first. Only traces whose spans
  * were read appear, since the trace list does not name the services a trace passed through.
  */
 export const tracesOfService = (traces: TraceRow[], spans: SpanRow[], service: string): ServiceTrace[] => serviceTraces(traces, spansByTrace(spans), service);
@@ -142,7 +142,7 @@ function serviceTraces(traces: TraceRow[], byTrace: Map<string, SpanRow[]>, serv
     .sort((a, b) => Date.parse(b.trace.startTime) - Date.parse(a.trace.startTime));
 }
 
-/** Per service: the sampled traces it took part in, how many had an error, and their duration. */
+/** Per service: the traces it took part in, how many had an error, and their duration. */
 export function summarizeServiceTraces(traces: TraceRow[], spans: SpanRow[]): ServiceTraceSummary[] {
   const byTrace = spansByTrace(spans);
   return servicesBySpanCount(spans).map((service) => {

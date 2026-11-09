@@ -19,6 +19,7 @@
 import { Box, ButtonBase, Chip, Collapse, IconButton, Table, TableBody, TableCell, TableHead, TablePagination, TableRow, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronRight } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useMemo, useState, type JSX } from 'react';
+import { SERVICE_TRACE_LIST_LIMIT } from '../../constants/integrationTraces';
 import { formatDuration, traceWaterfall, tracesOfService } from '../../utils/integrationTraces';
 import { formatDateTime } from '../../utils/time';
 import type { ServiceTrace, ServiceTraceSummary, SpanRow, TraceRow } from '../../types/integrationTraces';
@@ -211,24 +212,24 @@ function TraceTable({ rows }: { rows: ServiceTrace[] }): JSX.Element {
   );
 }
 
-/** Services found in the sampled spans, and the traces of the one selected. */
+/** Services found in the spans, and the newest traces of the one selected. */
 export default function ServiceTraces({ summaries, traces, spans }: ServiceTracesProps): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   // A refresh can drop the selected service, so fall back to the busiest one rather than show nothing.
   const active = summaries.find((s) => s.service === selected) ?? summaries[0];
   const rows = useMemo(() => (active ? tracesOfService(traces, spans, active.service) : []), [active, traces, spans]);
 
-  if (!active) return <Typography color="text.secondary">No spans in the sampled traces.</Typography>;
+  if (!active) return <Typography color="text.secondary">No spans in these traces.</Typography>;
   return (
     <>
       <ServiceTable summaries={summaries} selected={active.service} onSelect={setSelected} />
       <Typography variant="subtitle2" sx={styles.subheading}>
-        Traces through{' '}
+        {rows.length > SERVICE_TRACE_LIST_LIMIT ? `Newest ${SERVICE_TRACE_LIST_LIMIT} of ${rows.length.toLocaleString()} traces through ` : 'Traces through '}
         <Box component="span" sx={styles.mono}>
           {active.service}
         </Box>
       </Typography>
-      <TraceTable key={active.service} rows={rows} />
+      <TraceTable key={active.service} rows={rows.slice(0, SERVICE_TRACE_LIST_LIMIT)} />
     </>
   );
 }
