@@ -17,6 +17,7 @@
  */
 
 import { toHandler } from './string';
+import { matchCatalogEntry } from './catalogMatch';
 import type { PrebuiltIntegration, PrebuiltIntegrationsData } from '../types/prebuilt';
 import type { Repository } from '../types/repository';
 
@@ -26,10 +27,7 @@ import type { Repository } from '../types/repository';
  * setup instructions. Mirrors Devant's matching. Returns undefined if no match.
  */
 export function matchPrebuiltIntegration(repository: Repository | null | undefined, prebuilts: PrebuiltIntegration[] | undefined): PrebuiltIntegration | undefined {
-  if (!prebuilts?.length || !repository?.organizationApp || !repository?.nameApp || !repository?.appSubPath) return undefined;
-  const repoUrl = `https://github.com/${repository.organizationApp}/${repository.nameApp}/`;
-  const componentPath = `/${repository.appSubPath.replace(/^\/+/, '')}`;
-  return prebuilts.find((pi) => pi.repositoryUrl === repoUrl && pi.componentPath === componentPath && (repository.branch ? (pi.branch ?? 'main') === repository.branch : true));
+  return matchCatalogEntry(repository, prebuilts, (pi) => pi.componentPath);
 }
 
 /**

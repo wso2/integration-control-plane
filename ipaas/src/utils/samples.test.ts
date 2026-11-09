@@ -61,6 +61,14 @@ describe('matchSample', () => {
     expect(matchSample({ ...repository, branch: 'dev' }, [sample])).toBeUndefined();
   });
 
+  it('matches a catalog path with a trailing slash', () => {
+    expect(matchSample(repository, [{ ...sample, componentPath: `${sample.componentPath}/` }])).toBeDefined();
+  });
+
+  it('does not match a repository on another git provider', () => {
+    expect(matchSample({ ...repository, gitProvider: 'gitlab' }, [sample])).toBeUndefined();
+  });
+
   it('returns undefined without a repository or samples', () => {
     expect(matchSample(null, [sample])).toBeUndefined();
     expect(matchSample(repository, undefined)).toBeUndefined();

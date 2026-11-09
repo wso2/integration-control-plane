@@ -205,10 +205,12 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   // Open-in-Cloud editor entry: only for components with a source repo and types
   // that don't opt out of it (e.g. MCP sets `hideOpenInEditor`). Integrations created
   // from a sample don't offer it. Prebuilt integrations live in the same repository but
-  // at their own paths, so they don't match a sample and keep it.
-  const { data: samplesData } = useSamples();
+  // at their own paths, so they don't match a sample and keep it. The entry waits for the
+  // sample catalog, so it never shows and then vanishes on a sample. If the catalog can't
+  // be fetched it is shown: hiding it then would take the editor from every integration.
+  const { data: samplesData, isPending: isSamplesPending } = useSamples();
   const isSample = !!matchSample(repository, samplesData?.samples);
-  const showOpenInEditor = hasSource && !isSample && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
+  const showOpenInEditor = hasSource && !isSamplesPending && !isSample && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
   const HeaderActions = module?.HeaderActions;
 
   const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;

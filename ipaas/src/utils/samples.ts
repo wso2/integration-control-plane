@@ -17,6 +17,7 @@
  */
 
 import { sampleId } from '../constants/integrations';
+import { matchCatalogEntry } from './catalogMatch';
 import type { Repository } from '../types/repository';
 import type { Sample } from '../types/samples';
 
@@ -26,8 +27,5 @@ import type { Sample } from '../types/samples';
  * from one the user brought. Returns undefined if no sample matches.
  */
 export function matchSample(repository: Repository | null | undefined, samples: Sample[] | undefined): Sample | undefined {
-  if (!samples?.length || !repository?.organizationApp || !repository?.nameApp || !repository?.appSubPath) return undefined;
-  const repoUrl = `https://github.com/${repository.organizationApp}/${repository.nameApp}/`;
-  const path = repository.appSubPath.replace(/^\/+|\/+$/g, '');
-  return samples.find((s) => s.repositoryUrl === repoUrl && sampleId(s) === path && (repository.branch ? (s.branch ?? 'main') === repository.branch : true));
+  return matchCatalogEntry(repository, samples, sampleId);
 }
