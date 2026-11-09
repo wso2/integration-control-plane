@@ -20,11 +20,17 @@
 
 export const SAMPLE = 'Hello World Service';
 /**
- * An MI automation sample in wso2/integration-samples (.metadata/samples.json), owned by the integration samples maintainers.
- * Quick deploy names the integration after it, so a rename there breaks 04d.
+ * The scheduled-task sample second in wso2/integration-samples' .metadata/samples.json, so the Samples tab
+ * features it next to SAMPLE. Both publish an image, so they deploy without a build. The deploy names the
+ * integration after the sample, so a rename there breaks 04d.
  */
-export const AUTOMATION = 'Person Lookup Automation';
+export const AUTOMATION = 'Scheduled Logger';
 export const MI_TECHNOLOGY = 'WSO2 Integrator: MI';
+/** The MI samples publish no runnable image, so 04e imports one from source and builds it. */
+export const MI_AUTOMATION_REPO_URL = 'https://github.com/wso2/integration-samples';
+export const MI_AUTOMATION_SUB_PATH = ['integrator-mi-profile', 'PersonLookupAutomation'] as const;
+/** formatRepoNameToDisplayName of the sub path's last segment, which the import form derives. */
+export const MI_AUTOMATION = 'PersonLookupAutomation';
 export const AGENT_TYPE = 'AI Agent';
 export const ENV = 'Development';
 
@@ -74,7 +80,9 @@ export const EXECUTE_GAP_MS = 8_000;
 export const PROBE_TIMEOUT_MS = 3 * 60_000;
 export const PROBE_GAP_MS = 10_000;
 
-/** A one-minute schedule fires eight times in the budget, so five survives a late first fire. */
-export const EXECUTIONS_TARGET = 5;
-export const EXECUTIONS_WATCH_MS = 8 * 60_000;
+/** The free plan's shortest schedule interval, from the billing limits (scheduleValidation.ts); a shorter one disables Update. */
+export const SCHEDULE_INTERVAL_MINUTES = 5;
+/** A five-minute schedule fires four times in the budget, so three survives a late first fire. */
+export const EXECUTIONS_TARGET = 3;
+export const EXECUTIONS_WATCH_MS = 20 * 60_000;
 export const EXECUTIONS_POLL_MS = 45_000;
