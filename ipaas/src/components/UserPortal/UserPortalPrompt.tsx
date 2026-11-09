@@ -170,7 +170,13 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   return (
     <Stack alignItems="center" gap={1}>
       <PublishButton flow={publish} publishable={report.publishable} redeploys={report.redeploys} busy={publishability.isFetching} label="Publish to User Portal" variant="contained" size="medium" />
-      {reasons.length > 0 && <PublishRefusals reasons={reasons} envName={environment.name} />}
+      {publish.progress && (
+        <Typography variant="caption" color="text.secondary" textAlign="center">
+          {publish.progress}
+        </Typography>
+      )}
+      {/* A running publish is switching the workflow, so the rules read mid-switch aren't shown until it ends. */}
+      {!report.publishing && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={environment.name} />}
       {publish.error && (
         <Typography variant="caption" color="error">
           {publish.error}
