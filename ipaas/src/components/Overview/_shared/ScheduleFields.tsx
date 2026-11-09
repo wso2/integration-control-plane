@@ -16,11 +16,35 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
+import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, Link, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
+import { cloudConsoleSubscriptionsUrl } from '../../../paths';
 import type { ScheduleFormApi } from './useScheduleForm';
+
+const UPGRADE = 'Upgrade';
+
+/** A plan limit the value goes over. Its "Upgrade …" sentence, if any, links "Upgrade" to the subscriptions page. */
+function PlanLimitWarning({ message, sx }: { message: string; sx?: object }): JSX.Element {
+  const at = message.lastIndexOf(`. ${UPGRADE} `);
+  if (at < 0)
+    return (
+      <Alert severity="warning" sx={sx}>
+        {message}
+      </Alert>
+    );
+  const upgradeAt = at + 2;
+  return (
+    <Alert severity="warning" sx={sx}>
+      {message.slice(0, upgradeAt)}
+      <Link href={cloudConsoleSubscriptionsUrl()} target="_blank" rel="noopener noreferrer" color="inherit" underline="always">
+        {UPGRADE}
+      </Link>
+      {message.slice(upgradeAt + UPGRADE.length)}
+    </Alert>
+  );
+}
 
 /**
  * Presentational cron editor bound to a {@link useScheduleForm} instance.
@@ -30,7 +54,7 @@ import type { ScheduleFormApi } from './useScheduleForm';
 export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan, policy } = form;
-  const frequencyError = errors.frequency && <Alert severity="warning">{errors.frequency}</Alert>;
+  const frequencyError = errors.frequency && <PlanLimitWarning message={errors.frequency} />;
 
   return (
     <Stack gap={2}>
@@ -154,19 +178,11 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                     error={!!errors.timeout}
                     helperText={errors.timeout}
                   />
-                  {errors.timeoutLimit && (
-                    <Alert severity="warning" sx={{ mt: 1 }}>
-                      {errors.timeoutLimit}
-                    </Alert>
-                  )}
+                  {errors.timeoutLimit && <PlanLimitWarning message={errors.timeoutLimit} sx={{ mt: 1 }} />}
                 </Box>
                 <Box>
                   <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow overlapping executions" />
-                  {errors.overlap && (
-                    <Alert severity="warning" sx={{ mt: 1 }}>
-                      {errors.overlap}
-                    </Alert>
-                  )}
+                  {errors.overlap && <PlanLimitWarning message={errors.overlap} sx={{ mt: 1 }} />}
                 </Box>
               </>
             )}
