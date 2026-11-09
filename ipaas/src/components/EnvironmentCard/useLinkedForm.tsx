@@ -48,7 +48,8 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   const linksUnread = !read.data || read.isError;
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
-  const { data: connectable = [] } = useConnectableEndpoints(projectId, componentId, open);
+  const callable = useConnectableEndpoints(projectId, componentId, open);
+  const connectable = callable.data ?? [];
   const ids = fields.map(configurableId).join();
   const addressableIds = addressable.map(configurableId).join();
   const view = useMemo(
@@ -125,6 +126,19 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
             </Button>
           }>
           {read.data ? "Couldn't refresh this integration's links. These are from the last read." : "Couldn't read this integration's links."}
+        </Alert>
+      )}
+      {callable.isError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 1.5 }}
+          action={
+            <Button size="small" color="inherit" disabled={callable.isFetching} onClick={() => void callable.refetch()}>
+              Try again
+            </Button>
+          }>
+          {/* Both groups render empty on a failed read, which otherwise reads as having no integration to call. */}
+          Couldn&apos;t read the integrations this one can call. Those sections are empty until it is read.
         </Alert>
       )}
       {view.sourceDefined && (

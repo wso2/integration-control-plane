@@ -49,7 +49,7 @@ const links: IntegrationLinks = {
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: false, connections: {}, configurables: {}, env: {} }],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0, connectable: [] as ConnectableEndpoint[] }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0, connectable: [] as ConnectableEndpoint[], connectableFailed: false }));
 const failed = vi.hoisted(() => ({ current: undefined as { error: Error; variables: { target: unknown } } | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
   useIntegrationLinks: () => ({
@@ -59,7 +59,7 @@ vi.mock('../../hooks/useConfiguration', () => ({
     isFetching: false,
     refetch: async () => void answer.refetches++,
   }),
-  useConnectableEndpoints: () => ({ data: answer.connectable }),
+  useConnectableEndpoints: () => ({ data: answer.connectable, isError: answer.connectableFailed, isFetching: false, refetch: async () => undefined }),
   useLinkWrite: () => ({ isPending: answer.pending, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useEnvironments', () => ({ useEnvironments: () => ({ data: [{ id: 'development', name: 'Development' }] }) }));
@@ -119,7 +119,7 @@ beforeEach(async () => {
   writes.length = 0;
   failed.current = undefined;
   answer.links = undefined;
-  Object.assign(answer, { pending: false, readFailed: false, cached: true, refetches: 0 });
+  Object.assign(answer, { pending: false, readFailed: false, cached: true, refetches: 0, connectableFailed: false });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -364,6 +364,14 @@ describe('the Configure form with links', () => {
     } finally {
       answer.pending = false;
     }
+  });
+
+  // Both groups render empty on a failed read, which otherwise reads as having no integration to call —
+  // the shape of a bug nobody reports.
+  it("says it couldn't read the integrations this one can call", async () => {
+    answer.connectableFailed = true;
+    await act(async () => root.render(<Form />));
+    expect(container.textContent).toContain("Couldn't read the integrations this one can call");
   });
 
   it('links a field to the key picked from its link icon', async () => {
