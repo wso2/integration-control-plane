@@ -94,10 +94,6 @@ export const CHUNKING_STRATEGIES: { value: ChunkingStrategy; label: string }[] =
 
 export const DEFAULT_CHUNKING: ChunkingConfig = { strategy: 'recursive', maxSegmentSize: 1000, maxOverlapSize: 200 };
 
-/**
- * Ingestion re-reads the whole source, so a new data source starts daily rather than at the every-minute schedule default.
- * Written as the interval form ("every 1 day") so the schedule form opens on By Interval; `0 0 * * *` would open on By Cron.
- */
 // ── Retrieval ───────────────────────────────────────────────────────────────
 
 export const DEFAULT_RERANKER_MODEL = 'rerank-english-v3.0';
