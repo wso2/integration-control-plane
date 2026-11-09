@@ -205,3 +205,25 @@ export function stepStatusAt(state: StepperState, index: number): StepStatus {
   if (index === activeIndex) return isError ? 'failed' : 'inProgress';
   return 'notStarted';
 }
+
+/** How a build stands, for its colour: running, succeeded, failed, or anything else (queued, cancelled…). */
+export type BuildTone = 'running' | 'success' | 'error' | 'neutral';
+
+/**
+ * The status a build shows: its label and tone, from its status, conclusion and stage state.
+ * `failedLabel` is how a failure reads ("Failed", or "Failed while building the image").
+ */
+export function describeBuildStatus(status: string | undefined, conclusion: string, stepper: StepperState, failedLabel: string): { label: string; tone: BuildTone } {
+  if (status === 'queued') return { label: 'Queued', tone: 'neutral' };
+  if (status === 'in_progress') {
+    // A stage can fail before the build itself is marked complete; surface that
+    // straight away instead of reading "In progress" until the run wraps up.
+    return stepper.failedStages.size > 0 ? { label: failedLabel, tone: 'error' } : { label: 'In progress', tone: 'running' };
+  }
+  if (status === 'completed' && conclusion === 'success') return { label: 'Completed', tone: 'success' };
+  if (status === 'completed' && isFailedConclusion(conclusion)) return { label: failedLabel, tone: 'error' };
+  // Terminal, but neither success nor failure — cancelled, timed out, neutral.
+  // Name the verdict rather than leaving the card reading "Unknown".
+  if (status === 'completed') return { label: humanizeConclusion(conclusion), tone: 'neutral' };
+  return { label: 'Unknown', tone: 'neutral' };
+}

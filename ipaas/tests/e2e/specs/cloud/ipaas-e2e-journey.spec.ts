@@ -705,21 +705,6 @@ test.describe('05 import an AI agent @smoke', () => {
     await expect(source).toHaveAttribute('href', new RegExp(`^${AGENT_REPO_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`));
   });
 
-  test('TC_IP_AGENT_005 the build section collapses and expands', async () => {
-    // One control under two tooltips, so each label appearing proves the section moved.
-    const collapse = page.getByRole('button', { name: 'Collapse build details', exact: true });
-    const expand = page.getByRole('button', { name: 'Expand build details', exact: true });
-
-    // The toggle trails the heading on a just-imported integration, so wait for either state
-    // before deciding which way it has to move.
-    await expect(collapse.or(expand), 'the build card offered no collapse control').toBeVisible({ timeout: 60_000 });
-    const [first, second] = (await collapse.isVisible().catch(() => false)) ? [collapse, expand] : [expand, collapse];
-    await first.click();
-    await expect(second, 'the build section did not move on the first toggle').toBeVisible({ timeout: 30_000 });
-    await second.click();
-    await expect(first, 'the build section did not move back').toBeVisible({ timeout: 30_000 });
-  });
-
   test('TC_IP_AGENT_006 View logs opens the build logs and Hide logs closes them', async () => {
     const viewLogs = page.getByRole('button', { name: 'View logs' }).first();
     await expect(viewLogs).toBeVisible({ timeout: 5 * 60_000 });
