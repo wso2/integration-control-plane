@@ -30,6 +30,7 @@ import { Navigate } from 'react-router';
 import { trackEvent } from '../services/tracking/tracking';
 import type { ComponentScope } from '../nav';
 import { componentUrl } from '../paths';
+import { isWorkflowIntegration } from '../utils/workflowIntegration';
 
 /**
  * The component "Test" page dispatches by integration type (identified once via
@@ -65,6 +66,8 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
       </PageContent>
     );
   }
+
+  if (identity?.type === 'workflow') return <Navigate to={componentUrl(scope.org, scope.project, scope.component)} replace />;
 
   // RAG ingestion is a scheduled task — it uses the same Automation test view.
   if (identity?.type === 'automation' || identity?.type === 'rag-ingestion') return <AutomationTest {...scope} />;
@@ -104,4 +107,15 @@ export function AgentChatTestRoute(scope: ComponentScope): JSX.Element {
   if (comp && identity?.type !== 'ai-agent') return <Navigate to={`${componentUrl(scope.org, scope.project, scope.component)}/test`} replace />;
 
   return <AgentChatConsole {...scope} />;
+}
+
+/**
+ * `test/console` for a workflow goes to the integration's overview: workflows are exercised through
+ * their User Portal, not this console. Any other type gets the console as before.
+ */
+export function TestConsoleRoute(scope: ComponentScope): JSX.Element {
+  const { projectId } = useProjectId(scope.project);
+  const { data: comp } = useComponentByHandler(projectId, scope.component);
+  if (comp && isWorkflowIntegration(comp)) return <Navigate to={componentUrl(scope.org, scope.project, scope.component)} replace />;
+  return <TestConsole {...scope} />;
 }
