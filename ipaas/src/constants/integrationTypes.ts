@@ -17,7 +17,7 @@
  */
 
 import type { ComponentType } from 'react';
-import { AlertCircle, AudioLines, Clock, FileStack, Folder, Globe, MCP, Mic, Network, Sparkles, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
+import { AlertCircle, Clock, FileStack, Folder, Globe, MCP, Mic, Network, Sparkles, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
 import type { IntegrationType } from '../types/integration';
 
 export interface IntegrationTypeInfo {

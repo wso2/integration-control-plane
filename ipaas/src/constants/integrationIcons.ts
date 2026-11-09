@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { AudioLines, Bot, Boxes, CalendarClock, Database, FileText, Globe, MCP, Mic, Network, Puzzle, ShieldCheck, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
+import { Bot, Boxes, CalendarClock, Database, FileText, Globe, MCP, Mic, Network, Puzzle, ShieldCheck, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentType } from 'react';
 import type { IntegrationType } from '../types/integration';
 
