@@ -83,9 +83,11 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
   const offering = isTemporal ? temporalOffering : dbOffering;
   const plans = offering.data?.plans ?? [];
   const planIds = plans.map((p) => p.id);
-  // A free plan may only provision the dev tier; the BFF refuses the rest, so the other plans are not offered as choices.
-  const freeTierOnly = usePlanAccess()?.state === 'free';
-  const planLocked = (id: string): boolean => freeTierOnly && id !== FREE_PLAN_TIER;
+  // Only a paid plan may provision beyond the dev tier, and the BFF refuses the rest, so the other plans stay locked
+  // until billing confirms the plan is paid: while it loads or when it cannot be read, the BFF could not verify it either.
+  const planAccess = usePlanAccess();
+  const freeTierOnly = planAccess?.state === 'free';
+  const planLocked = (id: string): boolean => planAccess?.state !== 'paid' && id !== FREE_PLAN_TIER;
   const selectableIds = planIds.filter((id) => !planLocked(id));
   const defaultPlan = offering.data?.defaultPlan;
   const fallbackPlan = defaultPlan && selectableIds.includes(defaultPlan) ? defaultPlan : (selectableIds[0] ?? '');
@@ -218,7 +220,7 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
         Service plan
       </Typography>
       {freeTierOnly && (
-        <Alert severity="info">Your free plan includes one {isTemporal ? 'Temporal server' : 'database'} on the {FREE_PLAN_TIER} tier. Upgrade your subscription to choose another tier.</Alert>
+        <Alert severity="info">Free plans can only create {isTemporal ? 'Temporal servers' : 'databases'} on the {FREE_PLAN_TIER} tier. Upgrade your subscription to choose another tier.</Alert>
       )}
       {planCards}
     </Box>
