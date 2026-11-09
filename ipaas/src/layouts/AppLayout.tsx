@@ -114,6 +114,16 @@ import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
 import { expandedMenusFrom } from '../utils/sidebar';
 
+// Matches Agent Manager's level switcher arrow.
+const nextScopeArrowSx = {
+  p: 1,
+  color: 'text.primary',
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 0.5,
+  '&:hover': { borderColor: 'text.primary' },
+} as const;
+
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
@@ -295,7 +305,7 @@ export default function AppLayout(): JSX.Element {
               ref={orgCardRef}
               role="button"
               tabIndex={0}
-              sx={{ position: 'relative', display: 'inline-flex', alignSelf: 'center', cursor: 'pointer' }}
+              sx={{ position: 'relative', display: 'inline-flex', alignSelf: 'center', cursor: 'pointer', ml: 1 }}
               onClick={() => navigateTo(orgHomeUrl(scope.org))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -324,11 +334,12 @@ export default function AppLayout(): JSX.Element {
                 <IconButton
                   aria-label="Select project"
                   size="small"
+                  sx={nextScopeArrowSx}
                   onClick={() => {
                     setProjectMenuDir('right');
                     setProjectMenuAnchor(orgCardRef.current);
                   }}>
-                  <ChevronRight size={18} />
+                  <ChevronRight size={20} />
                 </IconButton>
               </Tooltip>
             )}
@@ -471,11 +482,12 @@ export default function AppLayout(): JSX.Element {
                     <IconButton
                       aria-label="Select integration"
                       size="small"
+                      sx={nextScopeArrowSx}
                       onClick={() => {
                         setComponentMenuDir('right');
                         setComponentMenuAnchor(projectCardRef.current);
                       }}>
-                      <ChevronRight size={18} />
+                      <ChevronRight size={20} />
                     </IconButton>
                   </Tooltip>
                 )}

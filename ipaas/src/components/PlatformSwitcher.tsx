@@ -41,16 +41,8 @@ function PulseIcon(): JSX.Element {
   );
 }
 
-// On the shared origin the platforms read as one product: the same tab. Elsewhere, a new one.
-const isSameOrigin = (url: string): boolean => {
-  try {
-    return new URL(url, window.location.href).origin === window.location.origin;
-  } catch {
-    return false;
-  }
-};
-
-const sameTab = (url: string) => (isSameOrigin(url) ? { target: '_self' as const } : {});
+// oxygen-ui opens other apps in a new tab by default; the platforms read as one product, so stay in this tab.
+const SAME_TAB = { target: '_self' as const };
 
 /** WSO2 Cloud's nine-dot platform switcher, leading the header as in the WSO2 Cloud and Agent Platform consoles. */
 export default function PlatformSwitcher(): JSX.Element {
@@ -58,7 +50,7 @@ export default function PlatformSwitcher(): JSX.Element {
   const apps = useMemo<AppSwitcherAppItem[]>(
     () =>
       // A URL-less card shows as coming soon.
-      buildPlatformSwitcher(window.API_CONFIG, withBase('/')).map(({ id, name, url }) => ({ id, name, url, icon: <PulseIcon />, ...(url ? sameTab(url) : {}) })),
+      buildPlatformSwitcher(window.API_CONFIG, withBase('/')).map(({ id, name, url }) => ({ id, name, url, icon: <PulseIcon />, ...SAME_TAB })),
     [],
   );
   const manageLinks = useMemo(
@@ -66,7 +58,7 @@ export default function PlatformSwitcher(): JSX.Element {
       [
         { id: 'cloud-home', name: 'Cloud home', url: cloudConsoleHomeUrl(), icon: <House size={18} /> },
         { id: 'settings', name: 'Settings', url: cloudConsoleOrganizationsUrl(), icon: <Settings size={18} /> },
-      ].map((link) => ({ ...link, ...sameTab(link.url) })),
+      ].map((link) => ({ ...link, ...SAME_TAB })),
     [],
   );
 

@@ -28,6 +28,10 @@ export function cloudConsoleOrganizationsUrl(): string {
   return cloudConsoleUrl('/organizations');
 }
 
+export function cloudConsoleProjectManageUrl(projectHandle: string): string {
+  return cloudConsoleUrl(`/projects/${encodeURIComponent(projectHandle)}/manage`);
+}
+
 export function cloudConsoleSubscriptionsUrl(): string {
   return cloudConsoleUrl('/billing?tab=subscriptions');
 }
