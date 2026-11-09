@@ -69,8 +69,7 @@ function CustomStepIcon({ icon }: { icon?: ReactNode }): JSX.Element {
 /**
  * A resizable horizontal stepper built on the oxygen-ui (MUI) Stepper with `alternativeLabel`
  * layout: our own status icon per step (instead of numbers), labels beneath, joined by the
- * theme's thin connector line. Shared by the BuildCard and the Automation Test page so both
- * render an identical stepper at their chosen `size`.
+ * theme's thin connector line, at the chosen `size`. The Automation Test page's TestStepper uses it.
  */
 export default function HorizontalStepper({ steps, currentStepIndex, size = 'm', paddingY }: HorizontalStepperProps): JSX.Element {
   const cfg = SIZE_CONFIG[size];

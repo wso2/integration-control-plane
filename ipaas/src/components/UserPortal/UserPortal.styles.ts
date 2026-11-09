@@ -78,3 +78,23 @@ export const reasonSx = { display: 'flex', gap: 0.75, alignItems: 'flex-start' }
 export const reasonIconSx = { flexShrink: 0, mt: '2px', color: 'warning.main', display: 'inline-flex' } as const;
 
 export const dialogErrorSx = { mt: 2 } as const;
+
+// The row for an environment with no User Portal, and its About dialog.
+
+export const infoButtonSx = { p: 0.25, color: 'text.secondary' } as const;
+
+export const aboutNoteSx = { mt: 1.5 } as const;
+
+// The env card's User Portal action, while the environment has no User Portal.
+export const offActionSx = { color: 'text.secondary' } as const;
+
+// A published integration's label starts with a green dot.
+export const publishedLabelSx = { display: 'inline-flex', alignItems: 'center', gap: 0.75 } as const;
+
+export const publishedDotSx = { width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main', flexShrink: 0 } as const;
+
+// The publish switch, after its label, with the pair flush with the card's left edge.
+export const toggleSx = { m: 0, gap: 1 } as const;
+
+// The footer's Open User Portal link: its icon sits centred on the text.
+export const footerLinkSx = { display: 'inline-flex', alignItems: 'center', gap: 0.5 } as const;

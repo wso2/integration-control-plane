@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, type StepperState } from './buildProgress';
+import { buildStepperSteps, describeBuildStatus, failedStepPhrase, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, type StepperState } from './buildProgress';
 import { BUILD_STAGES } from '../constants/build';
 import type { BuildRunLogs, BuildStage } from '../types/build';
 
@@ -259,5 +259,38 @@ describe('mergeForward', () => {
   it('unions newly reported failures in', () => {
     const merged = mergeForward(state({ failedStages: new Set([0]) }), state({ failedStages: new Set([2]) }));
     expect([...merged.failedStages].sort()).toEqual([0, 2]);
+  });
+});
+
+describe('describeBuildStatus', () => {
+  const running = (over: Partial<StepperState> = {}): StepperState => ({ activeIndex: 1, isError: false, skippedStages: new Set(), failedStages: new Set(), passedStages: new Set([0]), ...over });
+  const FAILED = 'Failed while building the image';
+
+  it('reads a queued build as neutral', () => {
+    expect(describeBuildStatus('queued', '', running(), FAILED)).toEqual({ label: 'Queued', tone: 'neutral' });
+  });
+
+  it('reads a running build as in progress', () => {
+    expect(describeBuildStatus('in_progress', '', running(), FAILED)).toEqual({ label: 'In progress', tone: 'running' });
+  });
+
+  it('reads a running build whose stage already failed as failed, before the build says so', () => {
+    expect(describeBuildStatus('in_progress', '', running({ failedStages: new Set([1]) }), FAILED)).toEqual({ label: FAILED, tone: 'error' });
+  });
+
+  it('reads a successful build as completed', () => {
+    expect(describeBuildStatus('completed', 'success', running(), FAILED)).toEqual({ label: 'Completed', tone: 'success' });
+  });
+
+  it('reads a failed build with its failure label', () => {
+    expect(describeBuildStatus('completed', 'failure', running(), FAILED)).toEqual({ label: FAILED, tone: 'error' });
+  });
+
+  it('names any other verdict, neutrally', () => {
+    expect(describeBuildStatus('completed', 'cancelled', running(), FAILED)).toEqual({ label: humanizeConclusion('cancelled'), tone: 'neutral' });
+  });
+
+  it('reads a build with no status as unknown', () => {
+    expect(describeBuildStatus(undefined, '', running(), FAILED)).toEqual({ label: 'Unknown', tone: 'neutral' });
   });
 });

@@ -28,7 +28,8 @@ import type { UserPortal as Portal, UserPortalState } from '../types/userPortal'
 import OrgSettingsTabs from '../components/Settings/OrgConfigureTabs';
 import EnableUserPortalDialog from '../components/UserPortal/EnableUserPortalDialog';
 import UserPortalCard from '../components/UserPortal/UserPortalCard';
-import UserPortalSkeleton, { UserPortalUnavailable } from '../components/UserPortal/UserPortalSkeleton';
+import UserPortalSkeleton from '../components/UserPortal/UserPortalSkeleton';
+import { ComingSoonInline } from './ComingSoon';
 import * as styles from '../components/UserPortal/UserPortal.styles';
 import { hasSomeEnvironments } from '../utils/userPortal';
 
@@ -105,7 +106,8 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
   };
 
   const loading = environments.isLoading || portals.some((q) => q.isLoading);
-  // Every portal read was refused because the BFF serves none: nothing here can work.
+  // Every portal read was refused because the BFF serves none: nothing here can work yet, so the
+  // page says the User Portal is coming.
   const unavailable = !loading && portals.length > 0 && portals.every((q) => isUserPortalUnavailable(q.error));
 
   const body = (): JSX.Element => {
@@ -122,7 +124,7 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
           Could not load the environments of the default deployment pipeline.
         </Alert>
       );
-    if (unavailable) return <UserPortalUnavailable />;
+    if (unavailable) return <ComingSoonInline description={SUBHEADER} />;
     if (envs.length === 0) return <Alert severity="info">The default deployment pipeline has no environments, so there is nowhere to enable the User Portal.</Alert>;
     // A failed read sits above either view, so it never hides the empty state and its Enable button.
     const failedAlert = failedRows.length > 0 && (

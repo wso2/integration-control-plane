@@ -120,4 +120,15 @@ describe('the User Portal page', () => {
       vi.useRealTimers();
     }
   });
+
+  // A deployment of ipaas-service without the User Portal answers its routes with 404.
+  it('says the User Portal is coming where the BFF serves none', async () => {
+    vi.mocked(api.fetchUserPortalEnvironments).mockResolvedValue([env('dev'), env('prod')]);
+    vi.mocked(api.fetchUserPortal).mockRejectedValue(new BffError(404, '404 page not found'));
+    const r = await renderWithScopes(<UserPortal level="organizations" org="acme" />, PLATFORM_ENGINEER);
+    unmount = r.unmount;
+    for (let i = 0; i < 5 && !r.container.textContent?.includes('Coming soon'); i++) await flush();
+    expect(r.container.textContent).toContain('Coming soon');
+    expect(button(r.container, 'Enable User Portal')).toBeUndefined();
+  });
 });
