@@ -39,14 +39,16 @@ const links: IntegrationLinks = {
     environment('staging', { deployed: false }),
   ],
 };
-vi.mock('../../hooks/useConfiguration', () => ({ useIntegrationLinks: () => ({ data: links }), useLinksFollowDeployment: () => {} }));
+const followed = vi.hoisted(() => [] as string[]);
+vi.mock('../../hooks/useConfiguration', () => ({ useIntegrationLinks: () => ({ data: links }), useLinksFollowDeployment: (_p: string, _c: string, deployment: string) => void followed.push(deployment) }));
 
 let container: HTMLDivElement;
 let root: Root;
-const render = (env: string) => act(async () => root.render(<ReleaseLinks projectId="default" componentId="ghdemo" env={env} releaseId="r" />));
+const render = (env: string, status = 'ACTIVE') => act(async () => root.render(<ReleaseLinks projectId="default" componentId="ghdemo" env={env} releaseId="r" status={status} />));
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  followed.length = 0;
   container = document.createElement('div');
   root = createRoot(container);
 });
@@ -66,5 +68,11 @@ describe('an environment card', () => {
   it('says nothing where the integration is not deployed', async () => {
     await render('staging');
     expect(container.textContent).toBe('');
+  });
+
+  it('reads the links again when a Start runs the same release with new pods', async () => {
+    await render('production', 'SUSPENDED');
+    await render('production', 'ACTIVE');
+    expect(followed[0]).not.toBe(followed.at(-1));
   });
 });

@@ -115,7 +115,7 @@ export function useIntegrationLinks(projectId: string, componentId: string, enab
   });
 }
 
-/** Reads the integration's links again when an environment's deployment changes: what its release uses changes with it. */
+/** Reads the integration's links again when an environment's deployment changes, its release or its status: what the release uses, and whether its pods have the values saved, change with it. */
 export function useLinksFollowDeployment(projectId: string, componentId: string, deployment: string) {
   const qc = useQueryClient();
   const seen = useRef(deployment);

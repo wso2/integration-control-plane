@@ -184,7 +184,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
 
         {EnvCardBody && <EnvCardBody {...slotProps} pendingTriggerTime={pendingTriggerTime} pendingTriggerArgs={pendingTriggerArgs} onTriggerResolved={onTriggerResolved} />}
 
-        <ReleaseLinks projectId={projectId} componentId={component.id} env={slotProps.envTemplateId} releaseId={slotProps.releaseId} />
+        <ReleaseLinks projectId={projectId} componentId={component.id} env={slotProps.envTemplateId} releaseId={slotProps.releaseId} status={deploymentStatusV2} />
 
         {EnvCardFooter && <EnvCardFooter {...slotProps} />}
       </CardContent>
