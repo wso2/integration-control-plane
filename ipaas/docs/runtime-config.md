@@ -41,7 +41,9 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `SYSTEM_APIS_BASE_URL`, `SYS_API_PREFIX`                                     | System APIs gateway (component logs, usage insights)                                                                     |
 | `BILLING_API_BASE_URL`                                                       | Billing user API. Loading the billing org activates the org's subscription.                                              |
 | `ENABLE_BILLING_FEATURE`, `BILLING_CONSOLE_URL`, `CHOREO_SAAS_OFFER_URL`     | Upgrade button and billing links                                                                                         |
-| `CLOUD_CONSOLE_URL`                                                          | WSO2 Cloud console origin for the header's settings and billing links. Unset, the console's own origin.                  |
+| `CLOUD_CONSOLE_URL`                                                          | WSO2 Cloud console origin for billing links and the switcher's Manage row. Unset, the console's own origin. |
+| `AGENT_MANAGER_URL`, `API_PLATFORM_URL`, `INTEGRATION_PLATFORM_URL`, `IDENTITY_PLATFORM_URL` | The platform consoles in the header's platform switcher, as the Agent Platform console names them. A platform with no URL is left out; `INTEGRATION_PLATFORM_URL` defaults to this console. |
+| `COMING_SOON_PLATFORMS`                                                      | Comma-separated platform ids the platform switcher shows as coming soon, e.g. `agent-manager`. |
 | `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_AUTH_REDIRECTION_URL` | GitHub App authorization and installation. GitHub is off without the client ID.                                          |
 | `AZURE_DEVOPS_CLIENT_ID`                                                     | Entra application client ID for Azure DevOps repository access. Azure DevOps is hidden when this is empty.               |
 | `EDITOR_CALLBACK_ORIGINS`, `EDITOR_CALLBACK_DOMAINS`                         | Comma-separated https origins and parent domains an editor's sign-in or GitHub result may be sent to. Empty allows none. |

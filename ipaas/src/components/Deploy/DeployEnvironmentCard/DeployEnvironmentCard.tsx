@@ -41,6 +41,7 @@ import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 import DeploymentHistoryDrawer from './DeploymentHistoryDrawer';
 import EndpointsDrawer from './EndpointsDrawer';
 import WorkflowRuntimeRow from './WorkflowRuntimeRow';
+import UserPortalRow from '../../UserPortal/UserPortalRow';
 import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
 import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
@@ -59,6 +60,7 @@ export default function DeployEnvironmentCard({
   displayType,
   isWorkflow = false,
   isMcpServer = false,
+  publishesToUserPortal = false,
   env,
   componentName,
   projectHandler,
@@ -365,6 +367,7 @@ export default function DeployEnvironmentCard({
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
           <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
+          {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} componentId={componentId} environment={env.id} envName={env.name} />}
         </CardContent>
 
         {showPromote && (

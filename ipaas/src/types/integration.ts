@@ -144,7 +144,7 @@ export interface EnvCardBodyProps extends EnvCardSlotProps {
   onTriggerResolved: () => void;
 }
 
-/** Optional footer slot, rendered below the body. No type ships one today. */
+/** Optional footer slot, rendered below the body: the User Portal row, for the types the portal shows. */
 export type EnvCardFooterProps = EnvCardSlotProps;
 
 /**

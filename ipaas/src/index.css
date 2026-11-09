@@ -63,16 +63,6 @@ body {
   }
 }
 
-/* @wso2/cell-diagram pulls in @material-ui/core v4, which injects a global JSS rule:
- * .MuiCircularProgress-colorPrimary { color: #3f51b5 }  (specificity 0,1,0)
- * JSS inserts its <style> tag dynamically, so it can land after MUI v5 emotion styles
- * and override them with purple. Counter it with a doubled-class rule (specificity 0,2,0)
- * that restores the app's own primary color. Does not affect color="inherit" spinners
- * (those carry MuiCircularProgress-colorInherit, not colorPrimary). */
-.MuiCircularProgress-colorPrimary.MuiCircularProgress-colorPrimary {
-  color: var(--oxygen-palette-primary-main);
-}
-
 /* Minimal scrollbar — transparent track, light-grey thumb only */
 * {
   scrollbar-width: thin;
