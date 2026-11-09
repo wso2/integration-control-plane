@@ -59,6 +59,7 @@ const MESSAGES: Record<string, (env: string) => string> = {
   USER_PORTAL_REDEPLOY_FAILED: () => "The workflow couldn't be redeployed for the User Portal's sign-in, so it isn't published. Publish again.",
   USER_PORTAL_PUBLISH_INTERRUPTED: () => "Publishing didn't finish. Publish again.",
   USER_PORTAL_PUBLISH_FAILED: () => 'Publishing to the User Portal failed. Publish again.',
+  USER_PORTAL_PUBLISH_UNDOING: (env) => `An earlier publish is still being undone in ${env}. Publish again in a minute.`,
   USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED: () => 'The workflow is unpublished, but switching it back to the console failed. Unpublish again to finish.',
 };
 
