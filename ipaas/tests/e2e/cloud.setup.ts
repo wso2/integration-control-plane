@@ -20,10 +20,9 @@ import { expect, test as setup, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { waitForOTP } from './helpers/gmail.js';
 import { projectNameFor } from './helpers/journey-project.js';
 import { fillSecret, readSecret } from './helpers/secrets.js';
-import { parkSessionStorage } from './helpers/session-storage.js';
+import { parkSessionStorage, rejectCookieBanner } from './helpers/session-storage.js';
 import { msUntilNextWindow, totpCode } from './helpers/totp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -63,6 +62,8 @@ async function handleTwoFactor(page: Page, options: { totpSecret?: string; after
   }
 
   if (!options.totpSecret) {
+    // Loaded here so the runner image, which signs in with TOTP, need not ship googleapis.
+    const { waitForOTP } = await import('./helpers/gmail.js');
     const code = await waitForOTP({
       subjectPattern: /verify your device|device verification|sign-in attempt/i,
       afterMs: options.afterMs,
@@ -171,6 +172,12 @@ setup('authenticate cloud', async ({ page }) => {
   if (!username || !password) {
     throw new Error('E2E_GITHUB_USERNAME and E2E_GITHUB_PASSWORD must be set — see tests/e2e/README.md');
   }
+  // Without a TOTP secret GitHub's second factor is an emailed code, which needs the Gmail credentials to read.
+  if (!totpSecret && !(readSecret('GMAIL_CLIENT_ID') && readSecret('GMAIL_CLIENT_SECRET') && readSecret('GMAIL_REFRESH_TOKEN'))) {
+    throw new Error('Set E2E_GITHUB_TOTP_SECRET, or the GMAIL_* credentials for the emailed code — see tests/e2e/README.md');
+  }
+  // The console's OneTrust banner can cover the onboarding and terms dialogs this setup clicks through.
+  await rejectCookieBanner(page);
 
   // Only read verification mail that arrives after this point.
   const startedAt = Date.now();

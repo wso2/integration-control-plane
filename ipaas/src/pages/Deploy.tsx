@@ -36,6 +36,7 @@ import { identifyIntegration } from '../utils/identifyIntegration';
 import { getDisplayLabel } from '../constants/integrations';
 import { AUTO_DEPLOY_AVAILABLE } from '../constants/build';
 import { hasIntegrationTraces } from '../utils/integrationTraces';
+import { USER_PORTAL_TYPES } from '../constants/userPortal';
 
 export default function Deploy(scope: ComponentScope): JSX.Element {
   const isProjectUuid = UUID_RE.test(scope.project);
@@ -96,11 +97,14 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   const integrationType = identifyIntegration(component.displayType ?? '', component.componentSubType ?? null).type;
   // A workflow builds and runs as a Ballerina service, so it deploys like one.
   const isWorkflow = integrationType === 'workflow';
+  const isMcpServer = integrationType === 'mcp-server';
   const flags = getComponentTypeFlags(isWorkflow ? 'ballerinaService' : (component.displayType ?? ''), component.componentSubType);
   // File/event/AI-agent integrations share a service displayType but expose no
   // user-configurable endpoints — devant opens the endpoint-less
   // ConfigurationWizard for all three. Suppress the endpoint UI accordingly.
   const hideEndpoints = integrationType === 'file-integration' || integrationType === 'event-integration' || integrationType === 'ai-agent';
+  // The User Portal shows AI agents, automations and workflows; ipaas-service refuses to publish any other kind.
+  const publishesToUserPortal = USER_PORTAL_TYPES.has(integrationType);
 
   if (flags.isProxy) {
     return <ComingSoon title="Proxy deploy coming soon" description="Deploy management for REST API proxy integrations will be available in a future release." />;
@@ -140,6 +144,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
               displayType={component.displayType}
               hideEndpoints={hideEndpoints}
               isWorkflow={isWorkflow}
+              isMcpServer={isMcpServer}
             />
           </Box>
 
@@ -163,6 +168,9 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
                     hideEndpoints={hideEndpoints}
                     displayType={component.displayType}
                     isWorkflow={isWorkflow}
+                    isMcpServer={isMcpServer}
+                    publishesToUserPortal={publishesToUserPortal}
+                    scheduleKind={integrationType === 'rag-ingestion' ? 'ingestion' : 'automation'}
                     env={env}
                     branch={branch}
                     componentName={component.name}

@@ -5,17 +5,18 @@ https://claude.ai/artifact/Sm5CQNxFVUtw5SKLNm7bpi.
 
 | Process | Default address | Plays |
 |---|---|---|
-| `up-dp` | `:8080` | UP-DP: the Go BFF, which also serves the SPA. Reached only through the gateway |
+| `up-dp` | `:8080` | UP-DP: the Go BFF, which also serves the SPA, and verifies the portal's tokens |
 | `ipaas-mock` | `:9100` | the Platform IdP's token endpoint |
 | `ipaas-mock` | `:9090` | iPaaS-Service's portal route group |
-| `ipaas-mock` | `:9200` | the published environment's API gateway: UP-DP, agents and workflows |
+| `ipaas-mock` | `:9200` | the published environment's kgateway in front of UP-DP, and its API gateway for agents and workflows |
 | ThunderID | set by `OIDC_ISSUER` | the WIdP-DP that signs portal users in |
 
 ```
 browser ── discovery, auth code + PKCE, refresh ─────────────▶ ThunderID (WIdP-DP)
-   └──── WIdP-DP access token ──▶ API gateway (mock) ─┬─ agents, workflows
-                                    jwt-auth, token   └─▶ up-dp ── client credentials ──▶ Platform IdP (mock)
-                                    passed through          └──── bearer (portal client) ─▶ iPaaS-Service (mock)
+   └──── WIdP-DP access token ──▶ gateway (mock) ─┬─ agents, workflows (API gateway)
+                                    token passed  └─▶ up-dp ── client credentials ──▶ Platform IdP (mock)
+                                    through          │  └──── bearer (portal client) ─▶ iPaaS-Service (mock)
+                                                     └── discovery, JWKS ─▶ ThunderID (WIdP-DP)
 ```
 
 All bodies are JSON. Errors are `{"error": "..."}` (`shared/web`) with the status code, except on the
@@ -111,15 +112,38 @@ UP-DP takes no part. The SPA is the WIdP-DP's public client:
 
 ### Signed in
 
-Every route below needs `Authorization: Bearer <access_token>`. The gateway in front of UP-DP
-has verified it (below); UP-DP only reads its claims, without checking the signature: `sub`
-and `exp`, both required, and `scope`. A ThunderID access token carries no username, name, email
-or groups; the SPA shows the user from the ID token. A missing or unparseable token, one with
-no `sub` and one past its `exp` get 401. UP-DP logs `sub`, never the token, and sends
+Every route below needs `Authorization: Bearer <access_token>`. Nothing in front of UP-DP checks
+it: the published environment's kgateway routes the portal's host straight to UP-DP. UP-DP
+verifies the token itself:
+
+- a `typ` header of `at+jwt` (RFC 9068), which the WIdP-DP's ID tokens, refresh tokens and
+  ID-JAGs, signed with the same keys, don't have;
+- the signature, with the key the token's `kid` names (a token without one is refused), from
+  the JWKS the discovery document at `OIDC_ISSUER` names. The algorithm comes from the key, so
+  an HMAC token keyed with the public key fails. The keys are cached for 5 minutes; an unknown
+  `kid` reads them again, at most every 30 seconds, so a rotated key works within 30 seconds
+  of the issuer publishing it, and at once unless a read ran in those 30 seconds. A request
+  that joined a read begun before its key was published reads once more. One read serves
+  every request waiting on it, and a request whose key is held never waits. If the
+  issuer can't be reached, the keys UP-DP has keep serving for up to an hour;
+- `iss` equal to `OIDC_ISSUER`, `aud` containing `OIDC_RESOURCE`, and an `exp` in the future,
+  with 30 seconds of clock skew (`nbf` and `iat` too, when present);
+- `client_id` equal to `OIDC_CLIENT_ID`. Any app on the WIdP-DP can ask for the portal's
+  resource as its audience, so a token issued to another app is refused;
+- `grant_type` of `authorization_code`: a client-credentials token is not a user. The WIdP-DP
+  gives a refreshed token its original grant's `grant_type`;
+- no `cnf` claim: UP-DP checks no DPoP proof, so a sender-constrained token is refused rather
+  than taken as a bearer token;
+- a `sub`.
+
+It then reads `sub` and `scope`. A ThunderID access token carries no username, name, email or
+groups; the SPA shows the user from the ID token. A missing, unparseable or unverified token
+gets 401 with `WWW-Authenticate: Bearer error="invalid_token"`. If UP-DP has never read the
+issuer's keys and can't now, it answers 503. UP-DP logs `sub`, never the token, and sends
 iPaaS-Service neither.
 
-UP-DP enforces the portal's permissions itself, from the token's `scope`, and doesn't rely on the
-gateway for them: the scopes will get finer than a gateway policy can say.
+UP-DP enforces the portal's permissions itself, from the token's `scope`: they will get finer
+than a gateway policy could say.
 
 | Scope | Lets the caller |
 |---|---|
@@ -235,24 +259,13 @@ interface Execution {
 interface ExecutionPage { items: Execution[]; nextCursor?: string }  // `before=nextCursor` for older
 ```
 
-### The gateway in front of UP-DP
+### In front of UP-DP
 
-UP-DP runs in the published environment, behind that environment's APIP gateway, and only the
-gateway can reach it: a network policy outside this repository enforces that. The gateway's
-`jwt-auth` policy (v1.3.1) guards every `/api/v1` operation except `/api/v1/health` and
-`/api/v1/auth/scopes`:
-
-| Setting | Value |
-|---|---|
-| Signature, issuer and expiry | checked with the `ThunderKeyManager` key manager |
-| `audiences` | the portal's API resource, `OIDC_RESOURCE` |
-| `claims.anyOf` | `grant_type` is `authorization_code` or `refresh_token`, so a client-credentials token is refused |
-| `forwardToken` | `true` |
-| `forwardedTokenHeader` | `Authorization` |
-| `forwardTokenStripScheme` | `false` |
-
-So UP-DP receives the caller's `Authorization: Bearer <access_token>` unchanged. Locally, the
-mock gateway on `:9200` makes the same checks (see below).
+UP-DP runs in the published environment as a `wc-system` Resource. The environment's external
+kgateway routes the portal's host straight to UP-DP's Service, and a network policy outside
+this repository lets only kgateway reach the pod. kgateway terminates TLS and checks no token,
+so UP-DP receives the caller's `Authorization: Bearer <access_token>` unchanged and verifies it
+(see [Signed in](#signed-in)). Locally, the mock gateway on `:9200` stands in for kgateway.
 
 ## iPaaS-Service portal routes (`ipaas-mock`, `:9090`)
 
@@ -319,19 +332,16 @@ The access token is an RS256 JWT with `iss`, `sub` and `client_id` (the client I
 
 ## API gateway (`ipaas-mock`, `:9200`)
 
-The browser calls it directly with its WIdP-DP access token. When `GATEWAY_JWKS_URL` is set,
-the token's signature, expiry and (with `GATEWAY_ISSUER`) issuer are checked. Otherwise any
-bearer token is accepted and only read for `sub`, `username` and `roles` or `groups`.
+The browser calls it directly with its WIdP-DP access token. On agent and workflow routes, when
+`GATEWAY_JWKS_URL` is set, the token's signature, expiry and (with `GATEWAY_ISSUER`) issuer are
+checked. Otherwise any bearer token is accepted and only read for `sub`, `username` and `roles`
+or `groups`.
 
 ### UP-DP
 
 Every path that is not an agent's or a workflow's endpoint goes to UP-DP at `UP_DP_UPSTREAM`
-(default `http://localhost:8080`), with `Authorization` passed through unchanged. `/config.js`,
-`/api/v1/health`, `/api/v1/auth/scopes` and every path outside `/api` need no token. The rest of `/api` gets the
-`jwt-auth` checks above: the token as described, an `exp` in the future, an `aud` among
-`GATEWAY_AUDIENCES` when that is set, and a `grant_type` of `authorization_code` or
-`refresh_token`. It checks no scope: UP-DP does. A bad token gets 401, and an unreachable UP-DP
-502.
+(default `http://localhost:8080`), with `Authorization` passed through unchanged. Like the
+published environment's kgateway, it checks no token: UP-DP does. An unreachable UP-DP gets 502.
 
 ### Agents and workflows
 

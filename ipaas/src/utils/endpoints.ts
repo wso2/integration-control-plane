@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { EnvEndpoint } from '../types/component';
+import type { EndpointExposure, EnvEndpoint } from '../types/component';
 import type { EndpointOption } from '../types/consumers';
 
 /**
@@ -116,5 +116,97 @@ export function visibilityUrlOptions(ep: EnvEndpoint, externalUrlOverride?: stri
   return options;
 }
 
+// The exposure each URL row belongs to: a gateway host's own, and Project for an endpoint on neither.
+const exposureOfTier: Record<VisibilityKey, EndpointExposure> = { public: 'public', organization: 'organization', project: 'none' };
+
+/** Whether the gateway serves the endpoint on this host, or, while it can't confirm the host, whether the saved choice is this host. */
+function tierServed(ep: EnvEndpoint, key: VisibilityKey, label: string): boolean {
+  if (ep.networkVisibilities?.includes(label)) return true;
+  const status = key === 'public' ? ep.visibilityStatus?.public.status : ep.visibilityStatus?.organization.status;
+  return status === 'UNKNOWN' && !!ep.exposure && ep.exposure === exposureOfTier[key];
+}
+
+/**
+ * The Public row's URL: the API gateway's, never the component's raw OpenChoreo route, which skips
+ * the gateway's security and policies. An endpoint the BFF reports no gateway state for (one not
+ * exposed through the gateway at all) keeps its reported public URL.
+ */
+function gatewayPublicUrl(ep: EnvEndpoint, externalUrlOverride?: string): string {
+  if (externalUrlOverride) return externalUrlOverride;
+  if (ep.visibilityStatus) return ep.visibilityStatus.public.url ?? '';
+  return ep.publicUrl || ep.defaultPublicUrl || '';
+}
+
+/**
+ * The env card's URL row: the one host the endpoint is exposed on, chosen the way the visibility
+ * editor opens, so the card and the editor never disagree. An endpoint on a gateway host shows that
+ * host's URL; a Project-only endpoint shows its project URL. A chosen gateway host the endpoint isn't
+ * served on yet, or whose URL the gateway hasn't reported, gets an empty URL, which the card shows as
+ * '—', never another host's URL in its place: a Project URL under Public would read as publicly
+ * reachable.
+ */
+export function envCardUrlRows(ep: EnvEndpoint, externalUrlOverride?: string): EndpointVisibilityUrl[] {
+  const { exposure } = editorExposure(ep);
+  return VISIBILITY_URLS.filter(({ key }) => exposureOfTier[key] === exposure).map(({ key, label, getUrl }) => {
+    if (key !== 'project' && !tierServed(ep, key, label)) return { key, label, url: '' };
+    return { key, label, url: key === 'public' ? gatewayPublicUrl(ep, externalUrlOverride) : getUrl(ep) };
+  });
+}
+
+/**
+ * The card's rows for an MCP server on Agent Manager's AI gateway: the proxy URL as its Public URL, and nothing
+ * else. The AI gateway serves public callers only, so the endpoint's own routes, whatever their exposure, are
+ * no way in. Before the proxy has a URL there is none to list.
+ */
+export function aiGatewayUrlRows(aiGatewayUrl: string): EndpointVisibilityUrl[] {
+  return aiGatewayUrl ? [{ key: 'public', label: 'Public', url: aiGatewayUrl }] : [];
+}
+
 /** Only Public is callable from a browser; the others are in-cluster hosts. */
 export const isBrowserReachable = (key: VisibilityKey): boolean => key === 'public';
+
+const isOn = (status?: string) => status === 'ENABLED' || status === 'ENABLING';
+
+/**
+ * The exposure the visibility editor opens on. The saved choice wins: what the gateway reports can
+ * be UNKNOWN, and reading an unknown state as "not exposed" would make an unchanged save take the
+ * API off the gateway. Without a saved choice, the reported tiers decide, and an UNKNOWN host (the
+ * API is on the gateway, its host unconfirmed) opens as Public, the default every reconcile applies.
+ * An endpoint reported on both hosts predates single-host exposure and opens as Public, the choice
+ * the BFF migrates it to; `legacyBothHosts` lets the editor say so.
+ */
+export function editorExposure(ep: Pick<EnvEndpoint, 'exposure' | 'visibilityStatus' | 'networkVisibilities'>): { exposure: EndpointExposure; legacyBothHosts: boolean } {
+  const publicOn = isOn(ep.visibilityStatus?.public.status) || !!ep.networkVisibilities?.includes('Public');
+  const organizationOn = isOn(ep.visibilityStatus?.organization.status) || !!ep.networkVisibilities?.includes('Organization');
+  const legacyBothHosts = publicOn && organizationOn;
+  if (ep.exposure) return { exposure: ep.exposure, legacyBothHosts };
+  const unknown = ep.visibilityStatus?.public.status === 'UNKNOWN' || ep.visibilityStatus?.organization.status === 'UNKNOWN';
+  return { exposure: publicOn || (unknown && !organizationOn) ? 'public' : organizationOn ? 'organization' : 'none', legacyBothHosts };
+}
+
+/** The editor's label for one exposure, in the shape `updateEndpoint` takes. */
+export function exposureLabels(exposure: EndpointExposure): string[] {
+  return exposure === 'public' ? ['Public'] : exposure === 'organization' ? ['Organization'] : [];
+}
+
+/** Whether either host is still being added or removed; a switch between hosts moves both. */
+export function isExposureTransitioning(status?: EnvEndpoint['visibilityStatus']): boolean {
+  return [status?.public.status, status?.organization.status].some((s) => s === 'ENABLING' || s === 'DISABLING');
+}
+
+export type GatewayExposureState = 'enabled' | 'transitioning' | 'unknown' | 'failed' | 'none';
+
+/**
+ * What the gateway reports for an endpoint, collapsed for the env card. UNKNOWN means the API is
+ * deployed but the host it serves can't be confirmed, so it counts as exposed for consumers and
+ * security rather than as a failure.
+ */
+export function gatewayExposureState(status?: EnvEndpoint['visibilityStatus']): { state: GatewayExposureState; reason?: string } {
+  const tiers = [status?.public, status?.organization];
+  if (tiers.some((t) => t?.status === 'ENABLED')) return { state: 'enabled' };
+  if (tiers.some((t) => t?.status === 'ENABLING' || t?.status === 'DISABLING')) return { state: 'transitioning' };
+  const failed = tiers.find((t) => t?.status === 'FAILED' || t?.status === 'UNAVAILABLE');
+  if (failed) return { state: 'failed', reason: failed.reason };
+  if (tiers.some((t) => t?.status === 'UNKNOWN')) return { state: 'unknown' };
+  return { state: 'none' };
+}

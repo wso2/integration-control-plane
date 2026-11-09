@@ -78,7 +78,7 @@ export async function waitForBuildQuiet(page: Page, quietMs = BUILD_QUIET_MS): P
   for (let pass = 0; pass < 4; pass += 1) {
     status = await waitForBuildToSettle(page);
     if (!/^Completed/.test(status)) return status;
-    const restarted = await expect(buildCard(page).getByText(STARTING_STATUS))
+    const restarted = await expect(buildCard(page).getByRole('img', { name: STARTING_STATUS }))
       .toBeVisible({ timeout: quietMs })
       .then(() => true)
       .catch(() => false);
@@ -87,11 +87,60 @@ export async function waitForBuildQuiet(page: Page, quietMs = BUILD_QUIET_MS): P
   return status;
 }
 
+/**
+ * Auto deploy is held off for Ballerina integrations, so a finished build waits on the card's Deploy
+ * (DeployButton.tsx). The card renders Deploy only while auto deploy is off and the newest build is not
+ * running yet, so a card that shows its deployment status and no Deploy has nothing to deploy.
+ *
+ * Returning without a click is accepted as is: with auto deploy on, the platform owns the rollout, and a caller's
+ * Active check may briefly read the previous revision before it starts. The journey's fixtures are fresh
+ * integrations with no earlier revision, so that window does not arise there.
+ */
+export async function deployLatestBuild(page: Page): Promise<void> {
+  const deploy = envCard(page).getByRole('button', { name: 'Deploy', exact: true });
+  const status = deploymentStatus(page);
+  for (let pass = 0; pass < 2; pass += 1) {
+    // Either settles the card: an undeployed track shows only Deploy, a deployed one its status.
+    await deploy
+      .or(status)
+      .first()
+      .waitFor({ state: 'visible', timeout: 60_000 })
+      .catch(() => {});
+    // Deploy renders after the track's images load, which can trail the status by a moment.
+    const offered = await deploy
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (offered) {
+      // Disabled while a build is queued or running, because its image does not exist yet.
+      const enabled = await expect(deploy)
+        .toBeEnabled({ timeout: 2 * 60_000 })
+        .then(() => true)
+        .catch(() => false);
+      // An agent's builds list no releases, so its Deploy never enables; Agent Manager deploys it, and the card reports that status.
+      if (!enabled && (await status.isVisible())) return;
+      await expect(deploy, 'Deploy stayed disabled after the build settled').toBeEnabled({ timeout: 1_000 });
+      await deploy.click();
+      // The card's own alert, shown for four seconds (EnvCardShell.tsx); an error alert carries the BFF's reason instead.
+      await expect(envCard(page).getByText('Deployment started successfully'), 'the deploy request was refused').toBeVisible({ timeout: 60_000 });
+      // DeployButton hides once the deployment runs the latest image, so a status read after this is the new deployment's.
+      await expect(deploy, 'the card still offers Deploy, so the deployment does not run the latest build').toBeHidden({ timeout: 2 * 60_000 });
+      return;
+    }
+    if (pass > 0 || (await status.isVisible())) return;
+    // Neither rendered: the overview does not refetch the track's images when a build lands, so reload once.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(envCard(page), 'the environment card did not come back after the reload').toBeVisible({ timeout: 60_000 });
+  }
+}
+
+/** Fails unless the latest build completed and its deployment to the environment settled as Active. */
 export async function requireActiveDeployment(page: Page, name = SAMPLE): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
   const build = await waitForBuildQuiet(page);
   expect(build, `${name} build ended as ${build}`).toMatch(/^Completed/);
   await dismissStrayDialog(page);
+  await deployLatestBuild(page);
   const deployed = await waitForDeploymentSettled(page);
   expect(deployed, `${name} deployment to ${ENV} ended as ${deployed}`).toBe('Active');
 }
@@ -125,9 +174,10 @@ export async function requireAutomationReady(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
   const build = await waitForBuildQuiet(page);
   expect(build, `${AUTOMATION} build ended as ${build}`).toMatch(/^Completed/);
-  await expect(buildCard(page).getByText('Completed', { exact: true }), `${AUTOMATION}'s build card does not report Completed`).toBeVisible({ timeout: 60_000 });
+  await expect(buildCard(page).getByRole('img', { name: 'Completed', exact: true }), `${AUTOMATION}'s build card does not report Completed`).toBeVisible({ timeout: 60_000 });
 
   await dismissStrayDialog(page);
+  await deployLatestBuild(page);
   // Enabled, not merely visible: both actions are rendered but disabled while a build is running.
   await expect(
     envCard(page)
@@ -138,6 +188,58 @@ export async function requireAutomationReady(page: Page): Promise<void> {
   await expect(envCard(page).getByRole('button', { name: 'Test', exact: true }), `${AUTOMATION} offers no Test action, so it is not deployed`).toBeEnabled({ timeout: MI_DEPLOY_TIMEOUT_MS });
 }
 
+// proxyReconciliation.ts: the generic failure, or the wording codedApiError (apiSecurity.ts) gives a known code.
+const GATEWAY_FAILURE = /^(The API gateway could not be updated|Your organization has reached its API limit|This environment takes API changes only through promotion|.+ isn’t running this release’s API)/;
+
+/**
+ * The card's proxy reconciliation alert (EnvCardBody.tsx) when the API never reached the gateway.
+ * Retried once, as a user would; answers the alert's text if a failure remains, or null.
+ */
+export async function gatewayFailure(page: Page): Promise<string | null> {
+  const alerts = envCard(page).getByRole('alert');
+  const retryName = /^Retry(ing…)?$/;
+  // A failed retry replaces the alert's text with the retry's error but keeps its Retry action.
+  const failure = alerts
+    .filter({ hasText: GATEWAY_FAILURE })
+    .or(alerts.filter({ has: page.getByRole('button', { name: retryName }) }))
+    .first();
+  const retry = failure.getByRole('button', { name: retryName });
+  const updating = alerts.filter({ hasText: 'Updating the API gateway…' }).first();
+  const text = async () => (await failure.textContent())?.replace(/Retry(ing…)?$/, '').trim() || 'the API gateway could not be updated';
+
+  const shown = await failure
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return null;
+  if (!(await retry.isEnabled().catch(() => false))) return text();
+
+  const before = await text();
+  await retry.click();
+  // Accepted: the gateway update restarts, or clears at once. Refused: the alert names the retry's error instead.
+  const state = async (): Promise<string> => {
+    if (await updating.isVisible()) return 'updating';
+    if (!(await failure.isVisible())) return 'cleared';
+    return (await text()) !== before ? 'refused' : '';
+  };
+  let outcome = '';
+  await expect
+    .poll(async () => (outcome = await state()), { timeout: 60_000 })
+    .not.toBe('')
+    .catch(() => {});
+  if (outcome === 'cleared') return null;
+  if (outcome !== 'updating') return text();
+
+  // Wait for the reconciliation to end before reading its result.
+  await expect(updating, 'the API gateway update did not finish').toBeHidden({ timeout: 2 * 60_000 });
+  const failedAgain = await failure
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  return failedAgain ? text() : null;
+}
+
+/** A consumer's row on the env card, found from its name up to the row that carries Manage. */
 export function consumerRow(page: Page, name: string): Locator {
   return envCard(page).getByText(name, { exact: true }).locator('xpath=ancestor::*[.//button[normalize-space()="Manage"]][1]');
 }

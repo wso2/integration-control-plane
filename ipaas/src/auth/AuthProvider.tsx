@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 }
 
 function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Element {
-  const { isInitialized, isLoading, isSignedIn, getAccessToken, getDecodedIdToken, clearSession, signIn, signInSilently, signOut } = useThunderID();
+  const { isInitialized, isLoading, isSignedIn, getAccessToken, getDecodedIdToken, getGrantedPermissions, clearSession, signIn, signInSilently, signOut } = useThunderID();
   const [bff] = useState(isBffAuth);
   const [hasCode] = useState(sdkHasCode);
   const [status, setStatus] = useState<Status>({ kind: 'pending' });
@@ -169,8 +169,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    // getDecodedIdToken waits for the gateway's session and rejects when there is none. The SDK's own
-    // getAccessToken would ask the gateway for a token it never hands out.
+    // getDecodedIdToken waits for the gateway's session and rejects when there is none.
     const settleOnGateway = async (): Promise<void> => {
       const idClaims = await getDecodedIdToken().then(
         (claims) => claims as Record<string, unknown>,
@@ -180,10 +179,12 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       if (!idClaims || Object.keys(idClaims).length === 0) return setStatus({ kind: 'signedOut', error: null });
       const claimed = toSession(idClaims, idClaims);
       if (!claimed) return endSession(MISSING_ORG);
-      // The gateway keeps the access token, so the browser has no scopes to gate on.
-      const session = { ...claimed, scopes: [] };
+      // The gateway keeps the access token; its session reports the token's scope instead.
+      const scopes = await getGrantedPermissions().catch(() => []);
+      if (cancelled) return;
+      const session = { ...claimed, scopes };
 
-      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), checkSession: gatewaySignedIn });
+      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), checkSession: gatewaySignedIn, observabilityToken: getAccessToken });
       local.set(ORG_HANDLE_KEY, session.orgHandle);
       setStatus({ kind: 'signedIn', session });
     };
@@ -224,7 +225,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [status.kind, bff, hasCode, silent, isInitialized, isLoading, isSignedIn, recheck, waitFrom, getAccessToken, getDecodedIdToken, endSession]);
+  }, [status.kind, bff, hasCode, silent, isInitialized, isLoading, isSignedIn, recheck, waitFrom, getAccessToken, getDecodedIdToken, getGrantedPermissions, endSession]);
 
   const sdkSignedIn = useRef(false);
   useEffect(() => {

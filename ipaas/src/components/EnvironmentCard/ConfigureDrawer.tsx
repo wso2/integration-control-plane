@@ -26,15 +26,21 @@ import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
+import { useLinkedForm } from './useLinkedForm';
+import { savedValue } from '../../utils/savedConfig';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
-import { EndpointCard } from '../EndpointCard';
+import { EndpointCardList } from '../EndpointCardList';
+import { useAiGatewayUrls } from '../../hooks/useAiGatewayUrls';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
+import { addressableFields, linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
+import { useUserVisibleEndpoints } from '../../hooks/useUserVisibleEndpoints';
 
 // Keys the platform sets (a workflow integration's runtime connection), shown read-only.
 const managedConfigKeys = (configurations: SchemaConfigItem[] | undefined): ReadonlySet<string> => new Set((configurations ?? []).filter((c) => c.isManaged).map((c) => c.key));
@@ -293,9 +299,10 @@ interface AutomationConfigureDrawerProps {
   releaseMgtReleaseId?: string;
   releaseMgtDeploymentId?: string;
   buildId?: string;
+  continueWithoutChanges?: boolean;
 }
 
-function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId }: AutomationConfigureDrawerProps) {
+function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId, continueWithoutChanges = false }: AutomationConfigureDrawerProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -325,6 +332,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return null;
     }
   }, [data?.jsonSchema]);
+  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? linkableFields(parsedSchema) : [], parsedSchema ? addressableFields(parsedSchema) : []);
 
   // Seed values only on open; avoid clobbering edits on background refetches.
   const seededRef = useRef(false);
@@ -340,8 +348,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       const initSensitive = new Map<string, boolean>();
       const initLinking = new Map<string, LinkingInfo>();
       for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+        const val = savedValue(cfg);
+        if (val !== undefined) initValues.set(cfg.key, val);
         if (cfg.isSensitive) initSensitive.set(cfg.key, true);
         if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
           initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -364,8 +372,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -441,8 +449,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -460,6 +468,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       setSaveError(null);
       const configurations: SchemaConfigItem[] = [];
       valueMap.forEach((value, key) => {
+        // A link supplies it; a value of the form's own would compete with the link's.
+        if (linked.linkedKeys.has(key)) return;
         if (value !== '' && value !== undefined && value !== null) {
           const linking = linkingMap.get(key);
           const isSensitive = sensitiveMap.get(key) || false;
@@ -505,19 +515,26 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
         };
 
+        const done = () => {
+          onClose();
+          onSaved?.();
+        };
+        // A release is what carries the configuration and the links to the running integration,
+        // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
+        // OpenChoreo releases a changed Workload itself then.
+        //
+        // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
+        // hands back to it rather than releasing first: a deploy made here is one its Cancel
+        // cannot undo, and it would release the current Workload rather than that image.
         const afterSave = () => {
-          if (buildId) {
-            deployTrack
-              .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId, environmentId: actualEnvId, cronTimezone: '' })
-              .then(() => {
-                onClose();
-                onSaved?.();
-              })
-              .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
-          } else {
-            onClose();
-            onSaved?.();
+          if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
+            done();
+            return;
           }
+          deployTrack
+            .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId ?? '', environmentId: actualEnvId, cronTimezone: '' })
+            .then(done)
+            .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
         };
 
         if (certConfigs.length === 0 && !existingCertMappings?.mappingId) {
@@ -544,7 +561,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   };
 
   const renderConfigurations = () => {
-    if (isLoading) {
+    if (isLoading || linked.linksLoading) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress size={32} color="primary" />
@@ -555,11 +572,13 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Configuration schema is not available for this component.
+            {linked.unread ?? 'Configuration schema is not available for this component.'}
           </Typography>
         </Box>
       );
     }
+    // Without the links, linked fields would read as empty value boxes.
+    if (linked.linksMissing) return linked.top;
     if (!data?.jsonSchema || !parsedSchema) {
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
@@ -571,6 +590,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     }
     return (
       <>
+        {linked.top}
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -582,6 +602,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          groups={linked.groups}
+          fieldLinks={linked.fieldLinks}
           managedKeys={managedConfigKeys(data?.configurations)}
         />
         {saveError && (
@@ -596,12 +618,13 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   const renderCertificateMount = () => <CertificateMountStep projectId={projectId} componentId={componentId} envId={envId} deploymentTrackId={deploymentTrackId} open={open} linkedCerts={linkedCerts} onChange={setLinkedCerts} />;
 
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
-  const hasValidationErrors = Array.from(validationMap.values()).some((v) => !v);
+  // A field marked invalid before its link loaded is no longer the form's to fill.
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
   const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === 2 ? (isApplying ? 'Updating…' : 'Update') : 'Next';
-  const nextDisabled = step === 1 ? hasValidationErrors || isLoading : isApplying || hasCertPathErrors;
+  const nextDisabled = step === 1 ? hasValidationErrors || isLoading || linked.linksUnread : isApplying || hasCertPathErrors;
 
   return (
     <DrawerPanel open={open} onClose={handleClose}>
@@ -668,6 +691,10 @@ export interface ConfigureDrawerProps {
   isAutomation?: boolean;
   /** Hide the Endpoints step — file/event integrations have no endpoints. */
   hideEndpoints?: boolean;
+  /** A workflow integration, whose management endpoint the Endpoints step leaves out (see isUserVisibleEndpoint). */
+  isWorkflow?: boolean;
+  /** An MCP server, whose endpoints the AI gateway may front instead of the API Platform. */
+  isMcpServer?: boolean;
   envTemplateId?: string;
   buildId?: string;
   /**
@@ -716,6 +743,7 @@ export default function ConfigureDrawer(props: ConfigureDrawerProps) {
         releaseMgtReleaseId={props.releaseMgtReleaseId}
         releaseMgtDeploymentId={props.releaseMgtDeploymentId}
         buildId={props.buildId}
+        continueWithoutChanges={props.continueWithoutChanges}
       />
     );
   }
@@ -739,7 +767,11 @@ function GenericServiceConfigureDrawer({
   releaseMgtReleaseId: _releaseMgtReleaseId,
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
+  buildId,
+  continueWithoutChanges = false,
   hideEndpoints = false,
+  isWorkflow = false,
+  isMcpServer = false,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
   // File/event integrations have no endpoints (devant: they open the
@@ -770,9 +802,12 @@ function GenericServiceConfigureDrawer({
   const { data, isLoading, isError } = useSchemaConfig(projectId, componentId, schemaEnvId, versionId, commitHash);
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, schemaEnvId, versionId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
-  const { data: endpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
+  const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
+  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
+  const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId, envId, versionId }, open && isMcpServer && !hideEndpoints);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
+  const deployTrack = useDeployDeploymentTrack();
   const generateEp = useGenerateComponentEndpoints();
 
   const parsedSchema = useMemo<JSONSchema | null>(() => {
@@ -783,6 +818,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : [], parsedSchema ? addressableFields(parsedSchema) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {
@@ -798,8 +834,8 @@ function GenericServiceConfigureDrawer({
       const initSensitive = new Map<string, boolean>();
       const initLinking = new Map<string, LinkingInfo>();
       for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+        const val = savedValue(cfg);
+        if (val !== undefined) initValues.set(cfg.key, val);
         if (cfg.isSensitive) initSensitive.set(cfg.key, true);
         if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
           initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -823,8 +859,8 @@ function GenericServiceConfigureDrawer({
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -896,8 +932,8 @@ function GenericServiceConfigureDrawer({
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -912,6 +948,8 @@ function GenericServiceConfigureDrawer({
     setSaveError(null);
     const configurations: SchemaConfigItem[] = [];
     valueMap.forEach((value, key) => {
+      // A link supplies it; a value of the form's own would compete with the link's.
+      if (linked.linkedKeys.has(key)) return;
       if (value !== '' && value !== undefined && value !== null) {
         const linking = linkingMap.get(key);
         const isSensitive = sensitiveMap.get(key) || false;
@@ -954,11 +992,28 @@ function GenericServiceConfigureDrawer({
         configurations: certConfigs,
         ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
       };
-      const afterSave = () => {
+      const done = () => {
         queryClient.invalidateQueries({ queryKey: ['envEndpoints'] });
         queryClient.invalidateQueries({ queryKey: ['componentDeployment'] });
         onClose();
         onSaved?.();
+      };
+      // A release is what carries the configuration and the links to the running integration,
+      // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
+      // OpenChoreo releases a changed Workload itself then.
+      //
+      // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
+      // hands back to it rather than releasing first: a deploy made here is one its Cancel
+      // cannot undo, and it would release the current Workload rather than that image.
+      const afterSave = () => {
+        if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
+          done();
+          return;
+        }
+        deployTrack
+          .mutateAsync({ componentId, id: versionId, imageId: buildId ?? '', environmentId: envId, cronTimezone: '' })
+          .then(done)
+          .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to deploy the configuration'));
       };
       if (certConfigs.length === 0 && !existingCertMappings?.mappingId) {
         afterSave();
@@ -1014,7 +1069,7 @@ function GenericServiceConfigureDrawer({
   };
 
   const renderConfigurations = () => {
-    if (isLoading) {
+    if (isLoading || linked.linksLoading) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress size={32} color="primary" />
@@ -1025,11 +1080,13 @@ function GenericServiceConfigureDrawer({
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Configuration schema is not available for this component.
+            {linked.unread ?? 'Configuration schema is not available for this component.'}
           </Typography>
         </Box>
       );
     }
+    // Without the links, linked fields would read as empty value boxes.
+    if (linked.linksMissing) return linked.top;
     if (!data?.jsonSchema || !parsedSchema) {
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
@@ -1041,6 +1098,7 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
+        {linked.top}
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -1052,6 +1110,8 @@ function GenericServiceConfigureDrawer({
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          groups={linked.groups}
+          fieldLinks={linked.fieldLinks}
           managedKeys={managedConfigKeys(data?.configurations)}
         />
         {saveError && (
@@ -1078,23 +1138,18 @@ function GenericServiceConfigureDrawer({
         </Box>
       );
     }
-    return (
-      <Box>
-        {endpoints.map((ep, idx) => (
-          <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} onEdit={setManagingEp} onSettings={handleSettings} />
-        ))}
-      </Box>
-    );
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} aiGatewayUrls={aiGateway.urls} aiGatewayPending={aiGateway.pending} />;
   };
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
-  const hasValidationErrors = Array.from(validationMap.values()).some((v) => !v);
+  // A field marked invalid before its link loaded is no longer the form's to fill.
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
-  const isApplying = save.isPending || saveCertMappings.isPending;
+  const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === lastStep ? (isApplying ? 'Applying…' : 'Apply') : step === 1 && generateEp.isPending ? 'Loading…' : 'Next';
-  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
+  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
   const showFooter = !(step === lastStep && managingEp !== null);
 
   return (

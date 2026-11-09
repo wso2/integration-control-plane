@@ -6,7 +6,7 @@ The suite runs in two places:
 
 | Where                             | When                                 | Signs in with       |
 | --------------------------------- | ------------------------------------ | ------------------- |
-| **WSO2 Cloud release validation** | Automatically, for every new release | A platform token    |
+| **WSO2 Cloud release validation** | Automatically, for every new release | GitHub bot          |
 | **Your machine**                  | Whenever you run it                  | GitHub bot or token |
 
 > [!NOTE]
@@ -27,7 +27,6 @@ The suite runs in two places:
 
 | Group   | What it checks                                                                      |
 | ------- | ----------------------------------------------------------------------------------- |
-| 00      | Removes the suite's leftover project from older runs                                |
 | 01      | Creates the run's own fixture project                                               |
 | 02      | Empty project overview                                                              |
 | 03      | Browsing samples                                                                    |
@@ -70,7 +69,8 @@ flowchart TD
   List["Find suites<br/>(CronJobs labelled as integration tests)"]
   Other["Other suites<br/>platform · agent-manager · identity-platform-cloud · …"]
   IPaaS["🧪 ipaas-e2e Job<br/>(Dockerfile.e2e image)"]
-  Token["🔑 monitoring-token-provider"]
+  Secret["🔑 ipaas-e2e-test-secrets<br/>(GitHub bot, from Vault)"]
+  Thunder["🔐 Thunder sign-in through GitHub"]
   Console["🖥️ ipaas-console<br/>in the same environment"]
   S3["📦 Report, traces, videos → S3"]
   Exit["Resume deployments"]
@@ -81,7 +81,8 @@ flowchart TD
   WF --> Freeze --> Sync --> List
   List --> Other
   List --> IPaaS
-  IPaaS -- "1. fetch token<br/>(source=integration-platform)" --> Token
+  Secret -- "bot credentials" --> IPaaS
+  IPaaS -- "1. sign in as the bot" --> Thunder
   IPaaS -- "2. run the journey" --> Console
   IPaaS -- "3. upload artifacts" --> S3
   Other --> Exit
@@ -94,7 +95,7 @@ How it works:
 1. **Detect.** The `release-detector` CronJob checks every 30 minutes whether Flux has applied a commit that has not been validated yet. When it has, it starts a `release-validation` workflow for that commit.
 2. **Freeze.** The workflow freezes deployments and waits until the environment is in sync with the commit, so nothing changes under the tests.
 3. **Run.** It finds every suite (each one a suspended CronJob in the `tests` namespace) and runs them all in parallel as Jobs. `ipaas-e2e` is one of them.
-4. **Sign in with a token.** The `ipaas-e2e` Job runs in token mode. It fetches a token for the console's client from `monitoring-token-provider`, so no GitHub credentials ever reach the cluster.
+4. **Sign in as the GitHub bot.** The `ipaas-e2e` Job runs `setup-cloud`: it signs in on Thunder's page through GitHub with the bot's username, password and TOTP secret, read from the suite's own `ipaas-e2e-test-secrets` secret. A platform token cannot start a session on a console that signs in on the gateway, so token mode is for local runs only.
 5. **Report.** Playwright writes its report, a JUnit file (`junit/junit.xml`), traces and videos to `/artifacts`, and an uploader ships them to S3. When every suite has finished, deployments resume and a summary with a row per suite is posted to Google Chat.
 
 > [!IMPORTANT]
@@ -102,15 +103,12 @@ How it works:
 
 The Job's settings, from the `ipaas-e2e` CronJob in `wso2cloud-deployment`:
 
-| Variable                 | Value                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------- |
-| `E2E_TOKEN_MODE`         | `1`                                                                          |
-| `E2E_TOKEN_URL`          | The environment's `monitoring-token-provider`, `source=integration-platform` |
-| `E2E_TOKEN_AUTH`         | From the `test-secrets` secret                                               |
-| `E2E_TOKEN_TLS_INSECURE` | `1` (the internal gateway's certificate does not match its name)             |
-| `E2E_CLOUD_BASE_URL`     | The console in the same environment                                          |
-| `E2E_ARTIFACT_DIR`       | `/artifacts`                                                                 |
-| `PW_WORKERS`             | `2`                                                                          |
+| Variable                                                               | Value                                                                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_GITHUB_USERNAME`, `E2E_GITHUB_PASSWORD`, `E2E_GITHUB_TOTP_SECRET` | The bot's GitHub account, from the suite's own `ipaas-e2e-test-secrets` secret (Vault `application`, `ipaas-e2e-github-*`) |
+| `E2E_CLOUD_BASE_URL`                                                   | The console in the same environment                                                                                        |
+| `E2E_ARTIFACT_DIR`                                                     | `/artifacts`                                                                                                               |
+| `PW_WORKERS`                                                           | `2`                                                                                                                        |
 
 ---
 

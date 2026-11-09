@@ -49,7 +49,7 @@ const Projects = lazyPage(() => import('../pages/Projects'));
 const Project = lazyPage(() => import('../pages/Project'));
 const Component = lazyPage(() => import('../pages/Component'));
 const CreateProject = lazyPage(() => import('../pages/CreateProject'));
-const EditProject = lazyPage(() => import('../pages/EditProject'));
+const ProjectManageRedirect = lazyPage(() => import('../pages/ProjectManageRedirect'));
 const LinkRepository = lazyPage(() => import('../pages/LinkRepository'));
 const ImportProject = lazyPage(() => import('../pages/ImportProject'));
 const CreateIntegrationOptions = lazyPage(() => import('../pages/CreateIntegrationOptions'));
@@ -59,6 +59,7 @@ const McpProxyFromApi = lazyPage(() => import('../pages/McpProxyFromApi'));
 const ComponentTest = lazyPage(() => import('../pages/ComponentTest'));
 const OrgDataPlanes = lazyPage(() => import('../pages/OrgDataPlanes'));
 const OrgDatabases = lazyPage(() => import('../pages/OrgDatabases'));
+const UserPortal = lazyPage(() => import('../pages/UserPortal'));
 const CreateDatabaseServer = lazyPage(() => import('../pages/CreateDatabaseServer'));
 const DatabaseServerDetail = lazyPage(() => import('../pages/DatabaseServerDetail'));
 const TemporalServerDetail = lazyPage(() => import('../pages/TemporalServerDetail'));
@@ -68,6 +69,8 @@ const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
 const ComponentContainers = lazyPage(() => import('../pages/ComponentContainers'));
 const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChecks'));
 const ComponentScaling = lazyPage(() => import('../pages/ComponentScaling'));
+const ComponentWorkflows = lazyPage(() => import('../pages/ComponentWorkflows'));
+const ComponentHumanTasks = lazyPage(() => import('../pages/ComponentHumanTasks'));
 const ComponentDeploymentTracks = lazyPage(() => import('../pages/ComponentDeploymentTracks'));
 const ComponentSettings = lazyPage(() => import('../pages/ComponentSettings'));
 const OrgSettings = lazyPage(() => import('../pages/OrgSettings'));
@@ -154,6 +157,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/platform-services/temporal/:temporalId/:tab', element: createElement(RouteErrorBoundary, null, createElement(withScope(TemporalServerDetail, ['organizations']))) },
               { path: 'organizations/:orgHandler/settings', element: createElement(withScope(OrgSettings, ['organizations'])) },
               { path: 'organizations/:orgHandler/settings/package-registries', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgPackageRegistries, ['organizations']))) },
+              { path: 'organizations/:orgHandler/settings/user-portal', element: createElement(RouteErrorBoundary, null, createElement(withScope(UserPortal, ['organizations']))) },
               ...generateMatrixRoutes(MATRIX),
               { path: 'organizations/:orgHandler/projects/:projectHandler/deploy', element: createElement(withScope(ProjectDeploy, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/test', element: createElement(withScope(ProjectTest, ['projects'])) },
@@ -161,7 +165,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/metrics', element: <ComingSoon title="Coming soon" description="Metrics are currently under development." /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/runtimelogs', element: createElement(withScope(RuntimeLogsProject, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/metrics', element: <ComingSoon description="Throughput, latency and errors for every integration in the project." /> },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(EditProject, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(ProjectManageRedirect, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/link-repository', element: createElement(withScope(LinkRepository, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/redirect', element: <ProjectsRedirect /> },
               { path: 'organizations/:orgHandler/overview', element: createElement(withScope(OrgHome, ['organizations'])) },
@@ -218,6 +222,19 @@ const routes: AppRoute[] = [
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/traces',
                 element: createElement(RouteErrorBoundary, null, createElement(withScope(Traces, ['components']))),
+              },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/workflows',
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentWorkflows, ['components']))),
+              },
+              {
+                // A run's execution view, opened by its run id.
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/workflows/:runId',
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentWorkflows, ['components']))),
+              },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/human-tasks',
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentHumanTasks, ['components']))),
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/runtimes',

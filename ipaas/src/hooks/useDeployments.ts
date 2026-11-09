@@ -22,6 +22,8 @@ import { fetchApimSwagger } from '../api/apim';
 import { fetchComponentByHandler } from '../api/components';
 import { trackEvent } from '../services/tracking/tracking';
 import { identifyIntegration } from '../utils/identifyIntegration';
+import { isExposureTransitioning } from '../utils/endpoints';
+import { invalidateEndpointSettings } from './useConsumers';
 import { TYPE_TO_KIND } from '../constants/insights';
 import {
   fetchComponentDeployment,
@@ -33,13 +35,14 @@ import {
   deployDeploymentTrack,
   triggerBuild,
   promote,
+  retryProxyReconciliation,
   stopDeployment,
   redeployDeployment,
   deployPrebuiltImage,
 } from '../api/deployments';
 import type { ComponentDeployment, BuildRun, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, RecentDeployment } from '../types/deployment';
 import type { DeployComponentInput } from '../types/build';
-import type { ComponentDetail } from '../types/component';
+import type { ComponentDetail, EnvEndpoint } from '../types/component';
 import type { IntegrationKind } from '../types/insights';
 
 const TERMINAL_CONCLUSIONS = new Set(['success', 'failure', 'cancelled', 'timed_out', 'neutral', 'skipped']);
@@ -73,21 +76,29 @@ export function useComponentDeployments(orgHandler: string, orgUuid: string, com
   });
 }
 
+/** One release's endpoints, shared by the single- and multi-release hooks so they read one cache. */
+const envEndpointsQuery = (componentId: string, versionId: string | undefined, releaseId: string) => ({
+  queryKey: ['envEndpoints', componentId, versionId, releaseId],
+  queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
+  // The cloud endpoint request is release-scoped and does not use versionId. Newly created
+  // OpenChoreo components currently carry an empty version, so requiring it here prevents the
+  // request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
+  enabled: !!componentId && !!releaseId,
+  staleTime: 30_000,
+  retry: false,
+  refetchInterval: (query: Query<EnvEndpoint[]>) => {
+    const endpoints = query.state.data;
+    return endpoints?.some((endpoint) => isExposureTransitioning(endpoint.visibilityStatus)) ? 2_000 : false;
+  },
+});
+
 export function useEnvEndpoints(componentId: string, versionId: string | undefined, releaseId: string) {
-  return useQuery({
-    queryKey: ['envEndpoints', componentId, versionId, releaseId],
-    queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
-    // The cloud endpoint request is release-scoped and does not use versionId. Newly created
-    // OpenChoreo components currently carry an empty version, so requiring it here prevents the
-    // request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
-    enabled: !!componentId && !!releaseId,
-    staleTime: 30_000,
-    retry: false,
-    refetchInterval: (query) => {
-      const endpoints = query.state.data;
-      return endpoints?.some((endpoint) => ['ENABLING', 'DISABLING'].includes(endpoint.visibilityStatus?.public.status ?? '')) ? 2_000 : false;
-    },
-  });
+  return useQuery(envEndpointsQuery(componentId, versionId, releaseId));
+}
+
+/** Several releases' endpoints at once, in the order of `releaseIds`. */
+export function useEnvEndpointsOfReleases(componentId: string, versionId: string, releaseIds: string[]) {
+  return useQueries({ queries: releaseIds.map((releaseId) => envEndpointsQuery(componentId, versionId, releaseId)) });
 }
 
 export function useApiDefinition(apimRevisionId: string | null | undefined) {
@@ -111,7 +122,7 @@ export function useDeploymentStatus(componentId: string, versionId: string | und
       if (!data || data.length === 0) return 15000;
       const allTerminal = data.every((d) => d.status === 'completed' || TERMINAL_CONCLUSIONS.has((d.conclusionV2 ?? d.conclusion ?? '').toLowerCase()));
       if (allTerminal) return false;
-      // A running build drives the BuildCard stepper, so poll it tightly —
+      // A running build drives the BuildCard's status, so poll it tightly —
       // otherwise the card lags a quarter-minute behind each stage change.
       return data.some((d) => d.status === 'in_progress' || d.status === 'queued') ? 5000 : 15000;
     },
@@ -199,11 +210,28 @@ export function useTriggerBuild() {
 export function usePromote() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: ['promote'],
     mutationFn: (input: PromoteInput) => promote(input),
     onSuccess: (_data, input) => {
       trackEvent('component-promote');
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+      // The links report what the target's release carries; they follow it until it is the promoted one.
+      qc.invalidateQueries({ queryKey: ['integrationLinks'] });
+      // A promotion carries the source's API settings and visibility to the target.
+      qc.invalidateQueries({ queryKey: ['envEndpoints', input.componentId] });
+      invalidateEndpointSettings(qc, input.componentId, input.targetEnvironmentId);
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId] });
+    },
+  });
+}
+
+export function useRetryProxyReconciliation(componentId: string, environmentId: string, projectName: string, versionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => retryProxyReconciliation(componentId, environmentId, projectName, versionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+      qc.invalidateQueries({ queryKey: ['envEndpoints', componentId] });
     },
   });
 }

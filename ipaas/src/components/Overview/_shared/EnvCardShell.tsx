@@ -28,6 +28,7 @@ import type { EnvCardNotification, EnvCardSlotProps, IntegrationModule } from '.
 import { deploymentPollIntervalUntil, REQUESTED_POLL_WINDOW_MS } from '../../../utils/deploymentStatus';
 import DeployButton from './DeployButton';
 import EnvCardHeader from './EnvCardHeader';
+import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 
 interface EnvCardShellProps {
   component: Component;
@@ -44,8 +45,9 @@ interface EnvCardShellProps {
 
 // Per-env query keys invalidated by the generic Refresh — the union across
 // every migrated type's data. Invalidating a key a given type doesn't use is
-// harmless; adding a new type may mean adding its key here.
-const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionConfigs', 'taskExecutions', 'schemaConfig', 'component-logs'];
+// harmless; adding a new type may mean adding its key here. `wf` holds every
+// read from a workflow integration's engine (definitions and figures).
+const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionConfigs', 'taskExecutions', 'schemaConfig', 'component-logs', 'wf'];
 
 /**
  * The generic env-card frame. It owns ONLY what every type shares:
@@ -55,7 +57,7 @@ const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionCon
  *   - the Refresh control.
  *
  * Everything type-specific — status dot, Configure, action buttons, body
- * content, footer — is rendered by the module's slot components, which receive
+ * content — is rendered by the module's slot components, which receive
  * the shared deployment data + callbacks via `EnvCardSlotProps` and fetch any
  * type-specific data themselves. A module whose header differs entirely ships a
  * `CustomHeader`, rendered in place of the generic `EnvCardHeader`.
@@ -134,7 +136,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
     onTrigger,
   };
 
-  const { CustomHeader, HeaderStatus, EnvCardActions, EnvCardBody, EnvCardFooter, DeployAction = DeployButton } = module;
+  const { CustomHeader, HeaderStatus, EnvCardActions, EnvCardSharedAction, EnvCardBody, DeployAction = DeployButton } = module;
   // With auto deploy off a build reaches no environment by itself, so the first one offers to deploy it.
   const autoDeployEnabled = component.deploymentTracks?.find((t) => t.id === versionId)?.autoDeployEnabled ?? false;
   const deployAction = !prevEnv && !autoDeployEnabled && !loadingDeployment ? <DeployAction {...slotProps} /> : undefined;
@@ -182,7 +184,9 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
 
         {EnvCardBody && <EnvCardBody {...slotProps} pendingTriggerTime={pendingTriggerTime} pendingTriggerArgs={pendingTriggerArgs} onTriggerResolved={onTriggerResolved} />}
 
-        {EnvCardFooter && <EnvCardFooter {...slotProps} />}
+        <ReleaseLinks projectId={projectId} componentId={component.id} env={slotProps.envTemplateId} />
+
+        {EnvCardSharedAction && !loadingDeployment && <EnvCardSharedAction {...slotProps} />}
       </CardContent>
     </Card>
   );

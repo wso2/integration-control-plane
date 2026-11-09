@@ -16,30 +16,53 @@
  * under the License.
  */
 
-import { Divider, Typography } from '@wso2/oxygen-ui';
+import { Divider, Stack, Typography } from '@wso2/oxygen-ui';
+import { Workflow } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
 import type { EnvCardBodyProps } from '../../../types/integration';
+import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import WorkflowEnvCardContent from '../../Workflows/overview/WorkflowEnvCardContent';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
-import DeployedBody from '../webhook/EnvCardBody';
 
 const notDeployedSx = { textAlign: 'center', py: 2 } as const;
+const notActiveSx = { py: 3 } as const;
+const notActiveIconStyle = { opacity: 0.4 } as const;
 
 /**
- * Workflow body: a deployed environment shows its endpoints and insights, as a
- * webhook's does (a workflow publishes no API contract).
+ * Workflow body: a deployed environment shows its workflows alone. Its endpoints
+ * are not listed: the business ones are reached through the workflows, and the
+ * management API is the platform's own. The content needs the workflow runtime,
+ * so it shows only once the deployment is active; until then the card says so.
  */
 export default function EnvCardBody(props: EnvCardBodyProps): ReactNode {
-  const { hasDeployment, loadingDeployment, deploymentStatusV2 } = props;
+  const { component, env, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 } = props;
 
   if (loadingDeployment) return <EnvCardSkeleton />;
-  if (hasDeployment || deploymentStatusV2 === 'IN_PROGRESS') return <DeployedBody {...props} />;
+  if (!hasDeployment) {
+    return (
+      <>
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="body2" color="text.secondary" sx={notDeployedSx}>
+          This integration has not been deployed to this environment yet.
+        </Typography>
+      </>
+    );
+  }
 
   return (
     <>
       <Divider sx={{ my: 2 }} />
-      <Typography variant="body2" color="text.secondary" sx={notDeployedSx}>
-        This integration has not been deployed to this environment yet.
-      </Typography>
+      {isDeploymentHealthy(deploymentStatusV2) ? (
+        <WorkflowEnvCardContent target={{ componentId: component.id, environmentId: env.id, trackId: versionId, deployment: { releaseId, deploymentStatusV2 }, isDeploymentLoading: false }} />
+      ) : (
+        // A deployment rolling out, stopped or failed is still a deployment: its workflows come once it is active.
+        <Stack alignItems="center" gap={1} sx={notActiveSx} data-testid="workflow-env-card-inactive">
+          <Workflow size={24} style={notActiveIconStyle} />
+          <Typography variant="body2" color="text.secondary">
+            The workflows show here once the deployment is active.
+          </Typography>
+        </Stack>
+      )}
     </>
   );
 }

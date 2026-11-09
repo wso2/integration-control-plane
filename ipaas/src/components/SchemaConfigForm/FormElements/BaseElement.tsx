@@ -21,6 +21,9 @@ import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack
 import { Eye, EyeOff, Link2, Link2Off, Lock, Pencil, Unlock } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
 import { type LinkingInfo, isNumberType, typeDisplayName } from '../schemaUtils';
+import { FieldLinkPicker } from '../FieldLinkPicker';
+import { LinkedElement } from '../LinkedElement';
+import { type FieldLinkPicker as Picker, useFieldLink } from '../linkedFrom';
 import { ManagedConfigContext } from '../managedConfig';
 
 interface ConfigGroup {
@@ -50,7 +53,14 @@ interface BaseElementProps {
   setSensitiveMap?: Dispatch<SetStateAction<Map<string, boolean>>>;
 }
 
-export function BaseElement({
+const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
+
+export function BaseElement(props: BaseElementProps) {
+  const link = useFieldLink(props.jsonPath);
+  return link?.source ? <LinkedElement title={props.title} source={link.source} picker={link.picker} /> : <EditableElement {...props} picker={link?.picker} busy={link?.busy} />;
+}
+
+function EditableElement({
   type,
   title,
   jsonPath,
@@ -68,11 +78,14 @@ export function BaseElement({
   setLinkingMap,
   sensitiveMap,
   setSensitiveMap,
-}: BaseElementProps) {
+  picker,
+  busy,
+}: BaseElementProps & { picker?: Picker; busy?: boolean }) {
   const numberRegex = /^-?\d+(\.\d+)?$/;
-  // The Optional section already labels its fields, so only optional fields nested in the Required section get the suffix.
-  const isOptional = !isRequired && isRequiredAtRequiredLevel;
-  const labelText = isOptional ? `${title} (Optional)` : title;
+  const isOptional = isRequired === false;
+  const labelText = title;
+  const optionalChip = isOptional && <Chip label="optional" size="small" variant="outlined" sx={chipSx} />;
+  const pickerIcon = picker && <FieldLinkPicker field={title} picker={picker} />;
   const [showContent, setShowContent] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const [error, setError] = useState('');
@@ -294,7 +307,8 @@ export function BaseElement({
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
               {labelText}
             </Typography>
-            <Chip label={typeDisplayName(type)} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
+            <Chip label={typeDisplayName(type)} size="small" variant="outlined" sx={chipSx} />
+            {optionalChip}
           </Stack>
         )}
         <TextField
@@ -303,11 +317,19 @@ export function BaseElement({
           size="small"
           value={String(valueMap.get(jsonPath) ?? '')}
           onChange={(e) => handleChange(e.target.value)}
-          disabled={!!linked}
+          disabled={!!linked || !!busy}
           error={isEdited && !linked && validationMap.get(jsonPath) === false}
           helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
           inputProps={{ 'aria-required': Boolean(isRequired) }}
-          InputProps={{ endAdornment: linkAdornment ? <InputAdornment position="end">{linkAdornment}</InputAdornment> : undefined }}>
+          InputProps={{
+            endAdornment:
+              linkAdornment || pickerIcon ? (
+                <InputAdornment position="end">
+                  {linkAdornment}
+                  {pickerIcon}
+                </InputAdornment>
+              ) : undefined,
+          }}>
           <MenuItem value="">
             <em>Select an option</em>
           </MenuItem>
@@ -330,17 +352,19 @@ export function BaseElement({
               {labelText}
             </Typography>
           )}
-          <Chip label="boolean" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
+          <Chip label="boolean" size="small" variant="outlined" sx={chipSx} />
+          {optionalChip}
           <Switch
             size="small"
             checked={valueMap.get(jsonPath) === 'true' || valueMap.get(jsonPath) === true || false}
-            disabled={!!linked}
+            disabled={!!linked || !!busy}
             inputProps={{ 'aria-required': Boolean(isRequired) }}
             onChange={(e) => {
               handleValueChange(jsonPath, e.target.checked);
               handleValidationChange(jsonPath, true);
             }}
           />
+          {pickerIcon}
           {linkAdornment}
         </Stack>
       </Box>
@@ -401,7 +425,9 @@ export function BaseElement({
                     {labelText}
                   </Typography>
                 )}
-                <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
+                <Chip label="secret" size="small" variant="outlined" color="info" sx={chipSx} />
+                {optionalChip}
+                {pickerIcon}
               </Stack>
               <Button size="small" variant="text" startIcon={<Pencil size={13} />} onClick={(e) => setSecretAnchorEl(e.currentTarget as HTMLButtonElement)} sx={{ textTransform: 'none' }}>
                 Update secret content
@@ -417,6 +443,7 @@ export function BaseElement({
               type={showContent ? 'text' : 'password'}
               value={String(valueMap.get(jsonPath) ?? '')}
               onChange={(e) => handleChange(e.target.value)}
+              disabled={!!busy}
               error={isEdited && !linked && validationMap.get(jsonPath) === false}
               helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
               inputProps={{ 'aria-required': Boolean(isRequired) }}
@@ -430,6 +457,7 @@ export function BaseElement({
                       </IconButton>
                     </Tooltip>
                     {linkAdornment}
+                    {pickerIcon}
                   </InputAdornment>
                 ),
               }}
@@ -450,12 +478,14 @@ export function BaseElement({
               {labelText}
             </Typography>
           )}
-          <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
+          <Chip label="secret" size="small" variant="outlined" color="info" sx={chipSx} />
+          {optionalChip}
           <Tooltip title="Mark as non-sensitive (stored in database)">
             <IconButton aria-label="Mark as non-sensitive" size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
               <Lock size={14} />
             </IconButton>
           </Tooltip>
+          {pickerIcon}
         </Stack>
         <Button size="small" variant="text" startIcon={<Pencil size={13} />} onClick={() => setShowSensitiveInput(true)} sx={{ textTransform: 'none' }}>
           Update sensitive content
@@ -471,7 +501,8 @@ export function BaseElement({
           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
             {labelText}
           </Typography>
-          <Chip label={isSensitive ? 'secret' : typeDisplayName(type)} size="small" variant="outlined" color={isSensitive ? 'info' : 'default'} sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
+          <Chip label={isSensitive ? 'secret' : typeDisplayName(type)} size="small" variant="outlined" color={isSensitive ? 'info' : 'default'} sx={chipSx} />
+          {optionalChip}
         </Stack>
       )}
       <TextField
@@ -480,6 +511,7 @@ export function BaseElement({
         type={isSensitive && !showContent ? 'password' : 'text'}
         value={String(valueMap.get(jsonPath) ?? '')}
         onChange={(e) => handleChange(e.target.value)}
+        disabled={!!busy}
         placeholder="Enter a value"
         error={isEdited && !linked && validationMap.get(jsonPath) === false}
         helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
@@ -497,6 +529,7 @@ export function BaseElement({
                 </Tooltip>
               )}
               {linkAdornment}
+              {pickerIcon}
             </InputAdornment>
           ),
         }}

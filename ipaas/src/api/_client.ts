@@ -54,16 +54,39 @@ function readableMessage(status: number, body: string): string {
   return `HTTP ${status}: ${body}`;
 }
 
+// The BFF's coded error fields, parsed from the body once. `code` is stable across releases, so
+// callers branch on it rather than on message text; the environments name where a refused change
+// has to be made instead.
+interface BffErrorDetail {
+  code?: string;
+  entryEnvironment?: string;
+  sourceEnvironment?: string;
+}
+
+function errorDetail(body: string): BffErrorDetail {
+  try {
+    const parsed = JSON.parse(body) as BffErrorDetail | null;
+    if (parsed && typeof parsed === 'object') return { code: parsed.code || undefined, entryEnvironment: parsed.entryEnvironment || undefined, sourceEnvironment: parsed.sourceEnvironment || undefined };
+  } catch {
+    // Not JSON — no code to read.
+  }
+  return {};
+}
+
 /** `message` is the BFF's wording and reaches alerts unchanged — branch on `status`/`body`, never parse it. */
 export class BffError extends Error {
   readonly status: number;
   readonly body: string;
+  readonly code?: string;
+  readonly entryEnvironment?: string;
+  readonly sourceEnvironment?: string;
 
   constructor(status: number, body: string) {
     super(readableMessage(status, body));
     this.name = 'BffError';
     this.status = status;
     this.body = body;
+    Object.assign(this, errorDetail(body));
   }
 }
 
@@ -85,6 +108,13 @@ async function request<T>(method: string, path: string, body?: unknown, headers?
   if (!res.ok) throw new BffError(res.status, text || res.statusText);
   return text ? (JSON.parse(text) as T) : (undefined as unknown as T);
 }
+
+/**
+ * A BFF route as an absolute URL, and a fetch that sends to it under the console's session: for a client that
+ * makes its own requests to the BFF, such as the MCP SDK's transport on the Test page.
+ */
+export const bffAbsoluteUrl = (path: string): string => new URL(`${bffBaseUrl()}${path}`, window.location.origin).toString();
+export const bffFetch = (input: string | URL, init?: RequestInit): Promise<Response> => authenticatedFetch(String(input), init);
 
 export const bff = {
   get: <T>(path: string) => request<T>('GET', path),

@@ -18,6 +18,7 @@
 
 import type { JSONSchema } from './schema';
 import type { SchemaConfigItem } from './configuration';
+import type { ComponentCreation } from './component';
 
 export interface PrebuiltIntegration {
   displayName: string;
@@ -32,6 +33,9 @@ export interface PrebuiltIntegration {
   tags: string[];
   imageUrl: string;
 }
+
+/** The fields needed to create a component from a prebuilt image; prebuilt integrations and image-backed samples both provide them. */
+export type PrebuiltImageSource = Pick<PrebuiltIntegration, 'displayName' | 'description' | 'componentType' | 'buildPack' | 'repositoryUrl' | 'branch' | 'componentPath' | 'imageUrl'>;
 
 export interface PrebuiltIntegrationsData {
   prebuiltIntegrations: PrebuiltIntegration[];
@@ -57,10 +61,12 @@ export interface PrebuiltDiagramResult {
 }
 
 export interface DeployPrebuiltIntegrationInput {
-  integration: PrebuiltIntegration;
+  integration: PrebuiltImageSource;
   orgHandler: string;
   projectId: string;
   configValues?: SchemaConfigItem[];
+  /** How the integration was created, for usage analytics. Defaults to from-prebuilt with the integration's slug. */
+  creation?: ComponentCreation;
 }
 
 export interface DeployPrebuiltIntegrationState {

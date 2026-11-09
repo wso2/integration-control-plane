@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, MenuItem, PageContent, PageTitle, Select, Stack } from '@wso2/oxygen-ui';
+import { Alert, Box, CircularProgress, MenuItem, PageContent, PageTitle, Select, Stack } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import ComingSoon from './ComingSoon';
 import McpPlayground from '../components/McpPlayground/McpPlayground';
@@ -33,12 +33,17 @@ import type { ComponentScope } from '../nav';
 import type { EndpointRef } from '../types/consumers';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
+import { mcpTestEndpoints } from '../utils/mcpGateway';
+import { mcpRelayUrl } from '../api/consumers';
+import { bffFetch } from '../api/_client';
 import { PILL_SELECT_SX } from '../constants/styles';
 
 /**
  * MCP Server "Test" page: resolves the deployed MCP endpoint's gateway URL + a test
  * credential for the selected environment, then hands them to the in-house
  * {@link McpPlayground} (the interactive connect / list-tools / invoke / ping surface).
+ * An MCP server on Agent Manager's AI gateway takes no test key: the page shows its proxy
+ * URL and connects through ipaas-service's relay instead.
  */
 export default function McpTest(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
@@ -61,7 +66,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   const releaseId = deployment?.releaseId ?? '';
   const { data: endpoints = [] } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
 
-  const testableEndpoints = useMemo(() => endpoints.filter((e) => e.publicUrl), [endpoints]);
+  const testableEndpoints = useMemo(() => mcpTestEndpoints(endpoints), [endpoints]);
   const [selectedEndpointId, setSelectedEndpointId] = useState('');
 
   const activeEndpointId = testableEndpoints.some((e) => e.id === selectedEndpointId) ? selectedEndpointId : (testableEndpoints[0]?.id ?? '');
@@ -77,8 +82,10 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   const access = useEndpointTestAccess(accessRef, { enabled: !!accessRef && isActive });
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.
-  const baseUrl = access.gatewayUrl;
-  const mcpUrl = baseUrl ? `${baseUrl}/mcp` : '';
+  const mcpUrl = access.mcpUrl;
+  // The AI gateway gives the console no key, so the page talks to an MCP server there through ipaas-service's relay.
+  const onAiGateway = !!access.aiGateway;
+  const relay = useMemo(() => (onAiGateway && accessRef ? { url: mcpRelayUrl(accessRef), fetch: bffFetch } : undefined), [onAiGateway, accessRef]);
 
   const endpointSwitcher = { options: testableEndpoints.map((e) => ({ label: e.displayName, value: e.id })), value: activeEndpointId, onChange: setSelectedEndpointId };
 
@@ -114,6 +121,14 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
         </Stack>
         {!isActive ? (
           <NotDeployedAlert status={deployment?.deploymentStatusV2} />
+        ) : access.isResolving ? (
+          <Stack alignItems="center" sx={{ py: 6 }}>
+            <CircularProgress size={24} />
+          </Stack>
+        ) : relay ? (
+          // Keyed by where it connects: a session is to one environment's endpoint, and the environment can
+          // change while it is open, so a new target starts a new playground rather than reusing the old session.
+          <McpPlayground key={relay.url} url={mcpUrl} token={null} relay={relay} visibility="Public" endpointSwitcher={endpointSwitcher} />
         ) : !mcpUrl ? (
           // Deployed, but with no enforcing URL to call — a different state from "not deployed".
           <Alert severity="info">{access.isUnavailable ? 'This MCP server isn’t exposed as an API on the gateway yet, so it cannot be tested from here.' : 'No testable endpoint URL is available for this MCP server yet.'}</Alert>

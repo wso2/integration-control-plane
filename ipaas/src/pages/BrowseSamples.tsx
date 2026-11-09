@@ -20,17 +20,15 @@ import { Box, Button, CircularProgress, PageContent, Pagination, Typography } fr
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useCreateComponent } from '../hooks/useComponents';
-import { isQuotaError } from '../utils/apiErrors';
+import { useDeploySample } from '../hooks/useDeploySample';
 import FilterSection from '../components/FilterSection';
 import SampleGridCard from '../components/SampleGridCard';
 import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
-import { componentSubTypeFromSample, displayTypeFromSample, formatBuildPack, formatComponentType, normalizeComponentType, sampleId, samplePath } from '../constants/integrations';
+import { formatBuildPack, formatComponentType, normalizeComponentType } from '../constants/integrations';
 import { PAGE_SIZE, sampleKey } from '../constants/samples';
 import { useSamples } from '../hooks/useSamples';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
 import type { Sample } from '../types/samples';
-import { toHandler } from '../utils/string';
 import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
 import SearchField from '../components/SearchField';
@@ -68,33 +66,19 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
     setSelectedTags(new Set());
   };
 
-  const createComponent = useCreateComponent();
+  const sampleDeploy = useDeploySample();
 
   const handleDeploy = (sample: Sample) => {
     if (!projectId) return;
     trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
     setDeployingSample(sample);
-    createComponent.mutate(
-      {
-        displayName: sample.displayName,
-        name: toHandler(sample.displayName),
-        description: sample.description,
-        orgHandler: scope.org,
-        projectId,
-        displayType: displayTypeFromSample(sample.componentType, sample.buildPack),
-        componentSubType: componentSubTypeFromSample(sample.componentType, sample.buildPack),
-        srcGitRepoUrl: sample.repositoryUrl,
-        repositorySubPath: samplePath(sample),
-        repositoryBranch: sample.branch ?? 'main',
-        isPublicRepo: true,
-        enableAutoDeploy: true,
-        creation: { method: 'from-sample', sampleId: sampleId(sample) },
-      },
-      {
-        onSuccess: (component) => navigate(resourceUrl(narrow(scope, component.handler), 'overview')),
-        onError: () => setDeployingSample(null),
-      },
-    );
+    void sampleDeploy.deploy({
+      sample,
+      orgHandler: scope.org,
+      projectId,
+      onSuccess: (handler) => navigate(resourceUrl(narrow(scope, handler), 'overview')),
+      onError: () => setDeployingSample(null),
+    });
   };
 
   const filtered = useMemo(() => {
@@ -136,18 +120,20 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
     );
   }
 
-  if (createComponent.isPending || createComponent.isSuccess || createComponent.isError) {
+  if (sampleDeploy.isActive) {
     return (
       <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label="Integration"
           subLabel={deployingSample?.displayName}
-          isPending={createComponent.isPending}
-          isSuccess={createComponent.isSuccess}
-          error={createComponent.isError ? (createComponent.error?.message ?? 'Something went wrong. Please try again.') : null}
-          errorSeverity={isQuotaError(createComponent.error) ? 'warning' : 'error'}
+          isPending={sampleDeploy.isPending}
+          isSuccess={sampleDeploy.isSuccess}
+          error={sampleDeploy.error}
+          errorSeverity={sampleDeploy.errorSeverity}
+          progress={sampleDeploy.progress}
+          stepLabel={sampleDeploy.stepLabel}
           onBack={() => {
-            createComponent.reset();
+            sampleDeploy.reset();
             setDeployingSample(null);
           }}
         />

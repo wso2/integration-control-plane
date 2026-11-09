@@ -21,6 +21,7 @@ import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from './HeaderStatus';
 import EnvCardActions from './EnvCardActions';
 import EnvCardBody from './EnvCardBody';
+import ApiSecurityAction from './ApiSecurityAction';
 
 /**
  * Integration as API integration module. Covers REST API / GraphQL / WebSocket
@@ -29,13 +30,16 @@ import EnvCardBody from './EnvCardBody';
  *
  * Composes the shared `EnvCardShell` frame via `HeaderStatus` (status dot +
  * Configure), `EnvCardActions` (Test / View Logs / Stop / Start), and a
- * content-only `EnvCardBody` (endpoint URLs + swagger + service insights).
+ * content-only `EnvCardBody` (endpoint URLs + swagger + service insights +
+ * each environment's API security and consumers). API security is configured
+ * once, from the header, by `ApiSecurityAction`.
  */
 const integrationAsApiModule: IntegrationModule = {
   ...INTEGRATION_TYPE_INFO['integration-as-api'],
   HeaderStatus,
   EnvCardActions,
   EnvCardBody,
+  HeaderActions: ApiSecurityAction,
 };
 
 export default integrationAsApiModule;

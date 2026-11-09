@@ -19,6 +19,11 @@
 import { useEffect, useState } from 'react';
 import type { IntegrationModule, IntegrationType } from '../types/integration';
 import { integrationModuleLoaders } from '../components/Overview/registry';
+import UserPortalSharedAction from '../components/Overview/_shared/UserPortalSharedAction';
+import { USER_PORTAL_TYPES } from '../constants/userPortal';
+
+// The types the User Portal shows get its action in each env card's footer.
+const withUserPortal = (type: IntegrationType, module: IntegrationModule): IntegrationModule => (USER_PORTAL_TYPES.has(type) ? { ...module, EnvCardSharedAction: UserPortalSharedAction } : module);
 
 /**
  * Lazily loads the Overview module (one chunk per integration type) for a
@@ -42,7 +47,7 @@ export function useIntegrationModule(type: IntegrationType | null | undefined): 
     setModule(null);
     integrationModuleLoaders[type]()
       .then((loaded) => {
-        if (!cancelled) setModule(loaded.default);
+        if (!cancelled) setModule(withUserPortal(type, loaded.default));
       })
       .catch(() => {
         // The registry points every type at a real loader, so a failure means

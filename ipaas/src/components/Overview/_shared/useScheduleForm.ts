@@ -18,8 +18,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { type IntervalUnit, type CronField, intervalToCron, cronToInterval, parseCronParts, buildCronFromParts, describeCron } from '../../../utils/cronUtils';
-import { validateCronFields, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
+import { type PlanScheduleErrors, validateCronFields, validatePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
+import type { SchedulePolicy } from '../../../types/schedule';
 import type { ExecutionConfigs } from '../../../types/executions';
+import type { PlanAccess } from '../../../utils/billing';
 import type { DeployDeploymentTrackInput } from '../../../types/deployment';
 
 /** The assembled schedule values a caller submits (to `useDeployDeploymentTrack`). */
@@ -33,7 +35,13 @@ export interface ScheduleValues {
 
 export interface ScheduleFormErrors {
   timeout?: string;
+  /** Set when the timeout is over the org's plan's limit. */
+  timeoutLimit?: string;
   intervalCount?: string;
+  /** Set when the schedule runs more often than the org's plan allows. */
+  frequency?: string;
+  /** Set when overlapping runs are chosen and the org's plan does not allow them. */
+  overlap?: string;
   cron: Partial<Record<CronField, string>>;
 }
 
@@ -54,7 +62,13 @@ export interface ScheduleFormApi extends ScheduleValues {
   setTimeoutSeconds: (v: string) => void;
   setAllowConcurrency: (v: boolean) => void;
   description: string;
+  /** The org's plan, null while it loads. Anything but a paid plan gets the free plan's limits. */
+  plan: PlanAccess | null;
+  /** The limits and defaults of this kind of schedule. */
+  policy: SchedulePolicy;
 }
+
+const NO_PLAN_ERRORS: PlanScheduleErrors = {};
 
 /**
  * Owns the schedule form state (interval/cron, timezone, execution behaviour),
@@ -62,21 +76,23 @@ export interface ScheduleFormApi extends ScheduleValues {
  * the RAG ingestion Configure drawer's Schedule step — the single source of the
  * cron editing logic. Pair with the `ScheduleFields` presentational component.
  */
-export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined): ScheduleFormApi {
-  const [tab, setTab] = useState(0);
-  const [intervalCount, setIntervalCount] = useState<number | ''>(1);
-  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>('Minute');
-  const [cronFields, setCronFields] = useState<Record<CronField, string>>({ minute: '*/1', hour: '*', dom: '*', month: '*', dow: '*' });
+export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined, plan: PlanAccess | null, policy: SchedulePolicy): ScheduleFormApi {
+  const defaultInterval = cronToInterval(policy.defaultCron);
+  const [tab, setTab] = useState(defaultInterval ? 0 : 1);
+  const [intervalCount, setIntervalCount] = useState<number | ''>(defaultInterval?.count ?? 1);
+  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>(defaultInterval?.unit ?? 'Minute');
+  const [cronFields, setCronFields] = useState<Record<CronField, string>>(() => parseCronParts(policy.defaultCron));
   const [timezone, setTimezone] = useState('UTC');
   const [timeoutSeconds, setTimeoutSeconds] = useState('');
   const [allowConcurrency, setAllowConcurrency] = useState(false);
 
   useEffect(() => {
     if (!existingConfigs) return;
-    const freq = existingConfigs.cronjobFrequency || '*/1 * * * *';
+    const freq = existingConfigs.cronjobFrequency;
     setTimezone(existingConfigs.cronjobTimezone || 'UTC');
     if (existingConfigs.timeoutSeconds != null) setTimeoutSeconds(String(existingConfigs.timeoutSeconds));
     if (existingConfigs.cronjobAllowConcurrency != null) setAllowConcurrency(existingConfigs.cronjobAllowConcurrency);
+    if (!freq) return;
     const parsed = cronToInterval(freq);
     if (parsed) {
       setTab(0);
@@ -89,19 +105,58 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
   }, [existingConfigs]);
 
   const cron = tab === 0 ? intervalToCron(intervalCount || 1, intervalUnit) : buildCronFromParts(cronFields);
+  const free = plan?.state !== 'paid';
+  const limits = free ? policy.free : policy.paid;
+  const savedCron = existingConfigs?.cronjobFrequency ?? '';
+  const savedTimeout = existingConfigs?.timeoutSeconds ?? null;
+  const savedConcurrency = existingConfigs?.cronjobAllowConcurrency ?? null;
+
+  const planErrors = useMemo(
+    () => validatePlanSchedule(cron, timeoutSeconds, allowConcurrency, { cron: savedCron, timeoutSeconds: savedTimeout, allowConcurrency: savedConcurrency }, limits, free),
+    [cron, timeoutSeconds, allowConcurrency, savedCron, savedTimeout, savedConcurrency, limits, free],
+  );
+  // While the plan loads, a paid user would see free-plan errors, so none are shown; a schedule beyond
+  // the free limits still can't be saved until the plan says whether it is allowed.
+  const planLoading = plan === null;
+  const shownPlanErrors = planLoading ? NO_PLAN_ERRORS : planErrors;
 
   // Only the active tab's fields are validated: the other tab's state is not written.
   const errors = useMemo<ScheduleFormErrors>(
     () => ({
       timeout: validateTimeout(timeoutSeconds),
+      timeoutLimit: shownPlanErrors.timeout,
       intervalCount: tab === 0 ? validateIntervalCount(intervalCount) : undefined,
       cron: tab === 1 ? validateCronFields(cronFields) : {},
+      frequency: shownPlanErrors.frequency,
+      overlap: shownPlanErrors.overlap,
     }),
-    [timeoutSeconds, tab, intervalCount, cronFields],
+    [timeoutSeconds, tab, intervalCount, cronFields, shownPlanErrors],
   );
-  const isValid = !errors.timeout && !errors.intervalCount && Object.keys(errors.cron).length === 0;
+  const waitingForPlan = planLoading && Object.values(planErrors).some(Boolean);
+  const isValid = !waitingForPlan && !errors.timeout && !errors.timeoutLimit && !errors.intervalCount && !errors.frequency && !errors.overlap && Object.keys(errors.cron).length === 0;
 
-  return { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, timezone, setTimezone, timeoutSeconds, setTimeoutSeconds, allowConcurrency, setAllowConcurrency, cron, description: describeCron(cron), errors, isValid };
+  return {
+    tab,
+    setTab,
+    intervalCount,
+    setIntervalCount,
+    intervalUnit,
+    setIntervalUnit,
+    cronFields,
+    setCronFields,
+    timezone,
+    setTimezone,
+    timeoutSeconds,
+    setTimeoutSeconds,
+    allowConcurrency,
+    setAllowConcurrency,
+    cron,
+    description: describeCron(cron),
+    errors,
+    isValid,
+    plan,
+    policy,
+  };
 }
 
 /** Identifiers a schedule redeploy needs, alongside the {@link useScheduleForm} values. */

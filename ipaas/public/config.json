@@ -1,13 +1,17 @@
 {
-  "CHOREO_BASE_API_URL": "http://development-wso2cloud.openchoreoapis.localhost:19080/ipaas-service-ipaas-api-endpoint",
-  "VITE_AUTH_BASE_URL": "http://platform-idp.127.0.0.1.nip.io:19080",
-  "ASGARDEO_CLIENT_ID": "IPAAS_CONSOLE",
-  "ASGARDEO_SCOPE": "openid profile email",
-  "VITE_OBSERVABILITY_URL": "http://cloud-obs-proxy.127.0.0.1.nip.io:19080",
+  "AUTH_BFF_CONTEXT": "/_auth/integration",
+  "AUTH_BFF_SIGN_IN_URL": "/_auth/cloud/login?returnTo=%2F_auth%2Fintegration%2Fsignin",
+  "AUTH_BFF_PROXY_CONTEXT": "/_api",
+  "CHOREO_BASE_API_URL": "/_api/integration",
+  "BILLING_API_BASE_URL": "/_api/billing/api/v1",
+  "VITE_OBSERVABILITY_URL": "https://cloud-obs-proxy.obs.dp.dev.cloud.wso2.com",
   "SYSTEM_APIS_BASE_URL": "",
-  "BILLING_API_BASE_URL": "http://development-wso2cloud.openchoreoapis.localhost:19080/billing-api-service-user-api/api/v1",
   "ENABLE_BILLING_FEATURE": "true",
   "BILLING_CONSOLE_URL": "https://subscriptions.dv.wso2.com",
+  "CLOUD_CONSOLE_URL": "https://cloud-console-development.gateway.dev.cloud.wso2.com",
+  "AGENT_MANAGER_URL": "https://cloud-console-development.gateway.dev.cloud.wso2.com/agent-management",
+  "API_PLATFORM_URL": "https://cloud-console-development.gateway.dev.cloud.wso2.com/api-management/",
+  "IDENTITY_PLATFORM_URL": "https://cloud-console-development.gateway.dev.cloud.wso2.com/iam/",
   "GITHUB_APP_CLIENT_ID": "Iv1.f6cf2cd585148ee7",
   "GITHUB_APP_AUTH_REDIRECTION_URL": "",
   "GITHUB_APP_SLUG": "wso2-cloud-app-dev",
@@ -17,5 +21,5 @@
   "INTEGRATION_BUILDER_MAX_TOKENS": "1024",
   "INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL": "https://api.dev-central.ballerina.io/2.0/graphql",
   "MOESIF_APP_URL": "https://web-dev.moesif.com",
-  "TRACKING_ENV": "dev"
+  "TRACKING_ENV": "off"
 }

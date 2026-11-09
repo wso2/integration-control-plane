@@ -93,7 +93,16 @@ export default function OverviewShell({ component, identity, environments, versi
           />
           {i < environments.length - 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-              <PromoteButton orgHandler={orgHandler} componentId={component.id} versionId={versionId} deploymentPipelineId={deploymentPipelineId} sourceEnvId={env.id} targetEnvId={environments[i + 1].id} />
+              <PromoteButton
+                orgHandler={orgHandler}
+                projectId={projectId}
+                componentId={component.id}
+                versionId={versionId}
+                deploymentPipelineId={deploymentPipelineId}
+                sourceEnvId={env.id}
+                targetEnvId={environments[i + 1].id}
+                isWorkflow={identity.type === 'workflow'}
+              />
             </Box>
           )}
         </Fragment>

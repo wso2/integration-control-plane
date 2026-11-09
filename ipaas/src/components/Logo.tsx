@@ -22,11 +22,11 @@ export default function Logo() {
   const icpLogo = (
     <ColorSchemeImage
       src={{
-        light: `${import.meta.env.BASE_URL}assets/images/logo/WSO2-Integration-Platform-Black.svg`,
-        dark: `${import.meta.env.BASE_URL}assets/images/logo/WSO2-Integration-Platform-White.svg`,
+        light: `${import.meta.env.BASE_URL}assets/images/logo/WSO2-Integration-Black.svg`,
+        dark: `${import.meta.env.BASE_URL}assets/images/logo/WSO2-Integration-White.svg`,
       }}
-      alt={{ light: 'WSO2 Integration Platform logo', dark: 'WSO2 Integration Platform logo' }}
-      sx={{ height: 20, width: 'auto', aspectRatio: '616 / 55' }}
+      alt={{ light: 'WSO2 Integration logo', dark: 'WSO2 Integration logo' }}
+      sx={{ height: 20, width: 'auto', aspectRatio: '400 / 55' }}
     />
   );
 

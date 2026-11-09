@@ -23,8 +23,12 @@ import type { McpErrorKind } from '../../types/mcp';
 const ERROR_TITLES: Record<McpErrorKind, string> = {
   auth: 'Not authorized (401)',
   blocked: 'Response blocked by the browser',
+  redirect: 'Redirect not followed',
   other: 'Could not connect',
 };
+
+/** Through ipaas-service's relay no key is involved: a refusal is the integration platform's, for this user. */
+const KEYLESS_AUTH_HINT = 'The integration platform refused the call. Your role may not be allowed to test endpoints, or your session may have ended.';
 
 const ERROR_HINTS: Record<'auth' | 'blocked', string> = {
   auth: 'The test key was rejected — it may have expired or been replaced. Get a new key and connect again.',
@@ -37,11 +41,38 @@ interface ConnectionAlertProps {
   isTokenFetching?: boolean;
   /** Mint a fresh token; offered only for the failures a new key can fix. */
   onGetTestKey?: () => void;
+  /** The connection takes no key, so no failure is put down to one. */
+  keyless?: boolean;
 }
 
 /** Names what a failed connect means, since a rejected or withheld response reads the same to the transport. */
-export default function ConnectionAlert({ error, errorKind, isTokenFetching, onGetTestKey }: ConnectionAlertProps): JSX.Element | null {
+/**
+ * A failure's own message. Through the relay a refusal is ipaas-service's, which the MCP SDK reports with the
+ * response body appended ("… (HTTP 502): {\"code\":…,\"message\":…}"); its message is the readable part.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function relayErrorMessage(error: string): string {
+  const start = error.indexOf('{');
+  if (start < 0) return error;
+  try {
+    const body = JSON.parse(error.slice(start)) as { message?: unknown; error?: unknown };
+    const message = typeof body.message === 'string' ? body.message : typeof body.error === 'string' ? body.error : '';
+    return message || error;
+  } catch {
+    return error;
+  }
+}
+
+export default function ConnectionAlert({ error, errorKind, isTokenFetching, onGetTestKey, keyless = false }: ConnectionAlertProps): JSX.Element | null {
   if (!error) return null;
+  if (keyless) {
+    return (
+      <Alert severity={errorKind === 'auth' ? 'warning' : 'error'}>
+        <AlertTitle>{errorKind === 'auth' ? 'Not permitted' : ERROR_TITLES[errorKind ?? 'other']}</AlertTitle>
+        {errorKind === 'auth' ? KEYLESS_AUTH_HINT : relayErrorMessage(error)}
+      </Alert>
+    );
+  }
   const keyMayHelp = errorKind === 'auth' || errorKind === 'blocked';
   return (
     <Alert

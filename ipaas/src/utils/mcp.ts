@@ -16,8 +16,54 @@
  * under the License.
  */
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
+import type { JsonSchemaType as SdkJsonSchema, JsonSchemaValidator, jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation';
 import type { JsonSchemaType, JsonValue, McpErrorKind, McpTool, McpToolContent, McpToolParameter, McpToolResult } from '../types/mcp';
+
+// Keywords whose value is a subschema or a list of them, and keywords whose value maps names to subschemas.
+const SUBSCHEMA_KEYWORDS = new Set(['additionalItems', 'additionalProperties', 'allOf', 'anyOf', 'contains', 'else', 'if', 'items', 'not', 'oneOf', 'prefixItems', 'propertyNames', 'then', 'unevaluatedItems', 'unevaluatedProperties']);
+const SUBSCHEMA_MAP_KEYWORDS = new Set(['$defs', 'definitions', 'dependencies', 'dependentSchemas', 'patternProperties', 'properties']);
+
+/**
+ * A copy of the schema where OpenAPI's `nullable: true` next to a `type` adds `'null'` to that type,
+ * which is how Ajv reads it. Plain JSON Schema has no `nullable`.
+ */
+export function withNullableTypes(schema: unknown): unknown {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
+  const entries = Object.entries(schema).map(([key, value]): [string, unknown] => {
+    if (SUBSCHEMA_KEYWORDS.has(key)) return [key, Array.isArray(value) ? value.map(withNullableTypes) : withNullableTypes(value)];
+    if (SUBSCHEMA_MAP_KEYWORDS.has(key) && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return [key, Object.fromEntries(Object.entries(value).map(([name, sub]) => [name, withNullableTypes(sub)]))];
+    }
+    return [key, value];
+  });
+  const copy = Object.fromEntries(entries);
+  if (copy.nullable === true && copy.type !== undefined) {
+    const types: unknown[] = Array.isArray(copy.type) ? copy.type : [copy.type];
+    if (!types.includes('null')) copy.type = [...types, 'null'];
+  }
+  return copy;
+}
+
+class NoEvalJsonSchemaValidator implements jsonSchemaValidator {
+  private readonly inner = new CfWorkerJsonSchemaValidator();
+
+  getValidator<T>(schema: SdkJsonSchema): JsonSchemaValidator<T> {
+    return this.inner.getValidator<T>(withNullableTypes(schema) as SdkJsonSchema);
+  }
+}
+
+/**
+ * An MCP client that checks tool output schemas without eval. The SDK's default
+ * validator, Ajv, compiles each schema with `new Function`, which the console's
+ * Content-Security-Policy does not allow. CfWorker does not compile, and
+ * `withNullableTypes` keeps Ajv's reading of OpenAPI `nullable`.
+ */
+export function createMcpClient(name: string): Client {
+  return new Client({ name, version: '1.0.0' }, { capabilities: {}, jsonSchemaValidator: new NoEvalJsonSchemaValidator() });
+}
 
 /** Whether an MCP/transport error is a 401/403 — a permissions issue, not a transient failure. */
 export function isMcpForbiddenError(error: unknown): boolean {
@@ -38,8 +84,20 @@ export function isMcpBlockedError(error: unknown): boolean {
   return /failed to fetch|load failed|networkerror|network error/i.test(raw);
 }
 
+export const MCP_REDIRECT_MESSAGE = "The MCP server answered with a redirect, which the console doesn't follow. Make the server answer at its MCP URL directly. A trailing-slash redirect is a common cause.";
+
+/**
+ * A 3xx the SDK's transport refused to follow. In browsers it follows none, so that the
+ * API key header never reaches another origin; retrying or a new key cannot help.
+ */
+export function isMcpRedirectError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : String(error);
+  return /\bredirect\b.*\bnot followed\b/i.test(raw);
+}
+
 /** What went wrong, at the granularity the UI can act on. */
 export function classifyMcpError(error: unknown): McpErrorKind {
+  if (isMcpRedirectError(error)) return 'redirect';
   if (isMcpForbiddenError(error)) return 'auth';
   if (isMcpBlockedError(error)) return 'blocked';
   return 'other';
@@ -150,6 +208,7 @@ export function formatMcpError(error: unknown): string {
       /* not JSON — fall through */
     }
   }
+  if (isMcpRedirectError(error)) return MCP_REDIRECT_MESSAGE;
   if (/\b(401|403)\b|unauthor|forbidden/i.test(raw)) return 'Not authorized. Check the token and its permissions.';
   if (isMcpBlockedError(error)) return 'The browser blocked the response, so its status is unknown.';
   const cleaned = raw

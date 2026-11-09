@@ -28,6 +28,8 @@ export interface SchemaConfigItem {
   valueType?: string;
   isRequired?: boolean;
   isSensitive?: boolean;
+  /** Saved: a secret's value comes back empty, so this says it has one. */
+  isSet?: boolean;
   configGroupId?: string;
   configKeyId?: string;
   isDynamic?: boolean;
@@ -130,4 +132,133 @@ export interface PostConfigMgtInput {
   moduleName: string;
   commitHash: string;
   configs: ConfigMgtSaveItem[];
+}
+
+/** A key of a resource, as the source of one target. */
+export interface KeyRef {
+  ref: string;
+  key: string;
+}
+
+/** A resource the integration can link: its keys, and the environments where it has values. */
+export interface LinkableResource {
+  id: string;
+  displayName: string;
+  /** The Ballerina package its preset is for. */
+  package?: string;
+  keys: { name: string; secret: boolean }[];
+  valuesIn: string[];
+}
+
+/** A connection in the Workload's build: its link, the resources that suit it, and the key the link gives each of its configurables. */
+export interface LinkConnection {
+  id: string;
+  link?: string;
+  suggestions: string[];
+  fields: { configurable: string; key?: string }[];
+}
+
+/** A link whose target the Workload's build lacks. */
+export interface OrphanedLink {
+  target: string;
+  kind: 'configurable' | 'connection' | 'endpoint';
+  ref: string;
+  key?: string;
+}
+
+/**
+ * An integration of the organization this one may call, and the environments it may be called in.
+ * `project` scope is an integration of this project, reached directly; `organization` scope is one of
+ * another project, reached with an API key. `ref` is the connection standing for it already, absent
+ * until the first link to it makes one.
+ */
+export interface ConnectableEndpoint {
+  project: string;
+  component: string;
+  endpoint: string;
+  displayName: string;
+  scope: 'project' | 'organization';
+  ref?: string;
+  /**
+   * What a link to it feeds the target, on an endpoint of another project. A link names one of them,
+   * since nothing else says which of several values fills the target. An endpoint of this project
+   * carries none: reached directly, it has only its address to give.
+   */
+  outputs?: ConnectableEndpointOutput[];
+  environments: ConnectableEndpointEnvironment[];
+}
+
+/** One value a connection to the endpoint feeds, and whether it must be delivered as a secret. */
+export interface ConnectableEndpointOutput {
+  name: string;
+  secret: boolean;
+}
+
+/** Whether an endpoint can be connected in one environment, and why not when it cannot. */
+export interface ConnectableEndpointEnvironment {
+  name: string;
+  connectable: boolean;
+  reason?: string;
+  detail?: string;
+}
+
+/**
+ * An endpoint as a link target: `<project>/<component>/<endpoint>`. The project is part of it because
+ * the same field takes either kind — this project's endpoint fills a configurable directly, another
+ * project's is reached as a connection — and the BFF tells them apart by the project.
+ */
+export const endpointId = (e: Pick<ConnectableEndpoint, 'project' | 'component' | 'endpoint'>): string => `${e.project}/${e.component}/${e.endpoint}`;
+
+/** What one environment's release uses. */
+export interface EnvironmentLinks {
+  name: string;
+  deployed: boolean;
+  resources: { ref: string; state: 'in_use' | 'needs_restart' }[];
+  valuesChanged: boolean;
+  /** First environment only: the integration's links differ from its release's. */
+  linksNeedDeploy: boolean;
+  connections: Record<string, string>;
+  /** Configurable id → the key it receives, by any source. */
+  configurables: Record<string, KeyRef>;
+  env: Record<string, KeyRef>;
+}
+
+/**
+ * An integration's links. A configurable is `<org>/<module>:<name>`, a connection `<org>/<module>:<connection>`.
+ * `used` is `<resource>|<KEY>` → the target it feeds; `usedByOrphaned` → the orphaned configurable link holding it,
+ * which a write taking the key moves.
+ */
+export interface IntegrationLinks {
+  kind: 'ballerina' | 'mi';
+  resources: LinkableResource[];
+  used: Record<string, string>;
+  usedByOrphaned: Record<string, string>;
+  connections: LinkConnection[];
+  fieldLinks: Record<string, KeyRef>;
+  /** Configurable id → the endpoint of this project filling it, `<project>/<component>/<endpoint>`. */
+  endpointLinks: Record<string, string>;
+  orphaned: OrphanedLink[];
+  env: Record<string, KeyRef>;
+  environments: EnvironmentLinks[];
+  /** The repository's workload.yaml declares the integration's resources: links are ignored, and writes refused. */
+  sourceDefined?: boolean;
+  /** With sourceDefined: configurable id (or MI env var name) → the key workload.yaml gives it. */
+  declared?: Record<string, KeyRef>;
+}
+
+/**
+ * One link change: a target, and its source; without a source the target's own link goes.
+ * A configurable takes one value, so `ref`/`key` and `endpoint` are alternatives.
+ */
+export type LinkTarget = { connection: string; ref?: string } | { configurable: string; ref?: string; key?: string; endpoint?: string } | { env: string; ref?: string; key?: string; endpoint?: string };
+
+export interface LinkWriteInput {
+  projectId: string;
+  componentId: string;
+  target: LinkTarget;
+}
+
+/** What a link change did to the Workload: `updated` (development gets it now), `next_deploy`, `unchanged` or `no_workload`. */
+export interface LinkWrite {
+  workload: 'updated' | 'next_deploy' | 'unchanged' | 'no_workload';
 }

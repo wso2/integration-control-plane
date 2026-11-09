@@ -25,7 +25,7 @@
  */
 
 import { bff, q, seg } from './_client';
-import type { CertGroup, CertMapping, SchemaConfigData, ConfigMgtData, SchemaConfigItem, SaveSchemaConfigInput, ConfigMgtSaveItem } from '../types/configuration';
+import type { CertGroup, CertMapping, SchemaConfigData, ConfigMgtData, SchemaConfigItem, SaveSchemaConfigInput, ConfigMgtSaveItem, IntegrationLinks, LinkWrite, LinkWriteInput, ConnectableEndpoint } from '../types/configuration';
 
 export interface PostConfigMgtInput {
   orgHandler: string;
@@ -48,6 +48,12 @@ export const saveSchemaConfig = (input: SaveSchemaConfigInput): Promise<{ config
       ...(input.commitHash ? { commitHash: input.commitHash } : {}),
     })
     .then((r) => ({ configurations: r?.configurations ?? input.configurations }));
+
+export const fetchIntegrationLinks = (projectId: string, componentId: string): Promise<IntegrationLinks> => bff.get<IntegrationLinks>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`);
+
+export const writeLink = ({ projectId, componentId, target }: LinkWriteInput): Promise<LinkWrite> => bff.put<LinkWrite>(`/components/${seg(componentId)}/link${q({ projectName: projectId })}`, target);
+
+export const fetchConnectableEndpoints = (projectId: string, componentId: string): Promise<ConnectableEndpoint[]> => bff.get<ConnectableEndpoint[]>(`/components/${seg(componentId)}/connectable-endpoints${q({ projectName: projectId })}`);
 
 // --- Choreo-v2 concepts not present on the OpenChoreo stack: safe defaults. ---
 export const fetchCertificateGroups = (_projectId: string, _componentId: string): Promise<CertGroup[]> => Promise.resolve([]);

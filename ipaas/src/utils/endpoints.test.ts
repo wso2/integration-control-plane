@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getEndpointLabel, isBrowserReachable, resolveEndpointInvokeUrl, trimEndpointName, visibilityUrlOptions } from './endpoints';
+import { aiGatewayUrlRows, editorExposure, envCardUrlRows, exposureLabels, gatewayExposureState, getEndpointLabel, isBrowserReachable, isExposureTransitioning, resolveEndpointInvokeUrl, trimEndpointName, visibilityUrlOptions } from './endpoints';
 import type { EnvEndpoint } from '../types/component';
 
 const ep = (partial: Partial<EnvEndpoint>): EnvEndpoint => ({ id: 'e', releaseId: 'r', environmentId: 'env', displayName: 'ep', type: 'GraphQL', visibility: 'Public', ...partial }) as EnvEndpoint;
@@ -158,5 +158,104 @@ describe('isBrowserReachable', () => {
     expect(isBrowserReachable('public')).toBe(true);
     expect(isBrowserReachable('organization')).toBe(false);
     expect(isBrowserReachable('project')).toBe(false);
+  });
+});
+
+const tiers = (publicStatus: string, organizationStatus: string) => ({ public: { status: publicStatus }, organization: { status: organizationStatus } }) as EnvEndpoint['visibilityStatus'];
+
+describe('editorExposure', () => {
+  it('opens on the saved choice even while the gateway state is unknown', () => {
+    expect(editorExposure({ exposure: 'organization', visibilityStatus: tiers('UNKNOWN', 'UNKNOWN'), networkVisibilities: [] })).toEqual({ exposure: 'organization', legacyBothHosts: false });
+  });
+
+  it('falls back to the reported tiers without a saved choice', () => {
+    expect(editorExposure({ visibilityStatus: tiers('DISABLED', 'ENABLED') }).exposure).toBe('organization');
+    expect(editorExposure({ visibilityStatus: tiers('DISABLED', 'DISABLED') }).exposure).toBe('none');
+  });
+
+  it('never opens an API on the gateway as not exposed when neither its host nor a saved choice is known', () => {
+    expect(editorExposure({ visibilityStatus: tiers('UNKNOWN', 'UNKNOWN'), networkVisibilities: ['Project'] }).exposure).toBe('public');
+  });
+
+  it('opens an endpoint reported on both hosts as Public and flags it', () => {
+    expect(editorExposure({ visibilityStatus: tiers('ENABLED', 'ENABLED') })).toEqual({ exposure: 'public', legacyBothHosts: true });
+  });
+});
+
+describe('exposureLabels', () => {
+  it.each([
+    { exposure: 'public' as const, labels: ['Public'] },
+    { exposure: 'organization' as const, labels: ['Organization'] },
+    { exposure: 'none' as const, labels: [] },
+  ])('maps $exposure to the editor label', ({ exposure, labels }) => {
+    expect(exposureLabels(exposure)).toEqual(labels);
+  });
+});
+
+describe('gatewayExposureState', () => {
+  it.each([
+    { status: tiers('ENABLED', 'DISABLED'), state: 'enabled' },
+    { status: tiers('DISABLED', 'ENABLING'), state: 'transitioning' },
+    { status: tiers('UNKNOWN', 'UNKNOWN'), state: 'unknown' },
+    { status: tiers('FAILED', 'DISABLED'), state: 'failed' },
+    { status: tiers('DISABLED', 'DISABLED'), state: 'none' },
+    { status: undefined, state: 'none' },
+  ])('reads $status as $state', ({ status, state }) => {
+    expect(gatewayExposureState(status).state).toBe(state);
+  });
+
+  it('polls while either host moves, including a switch between them', () => {
+    expect(isExposureTransitioning(tiers('ENABLED', 'ENABLING'))).toBe(true);
+    expect(isExposureTransitioning(tiers('DISABLING', 'ENABLED'))).toBe(true);
+    expect(isExposureTransitioning(tiers('ENABLED', 'DISABLED'))).toBe(false);
+  });
+});
+
+describe('envCardUrlRows', () => {
+  const urls = { publicUrl: 'https://gw.example/api', organizationUrl: 'http://apip-internal:8080/api', projectUrl: 'http://svc.dp:8090' };
+  const rows = (partial: Partial<EnvEndpoint>, override?: string) => Object.fromEntries(envCardUrlRows(ep({ ...urls, ...partial }), override).map((row) => [row.key, row.url]));
+
+  it('shows only the host the endpoint is exposed on, never the project URL', () => {
+    expect(rows({ networkVisibilities: ['Project', 'Organization'] })).toEqual({ organization: urls.organizationUrl });
+    expect(rows({ networkVisibilities: ['Project', 'Public'] })).toEqual({ public: urls.publicUrl });
+  });
+
+  it('shows the project URL only for a project-only endpoint', () => {
+    expect(rows({ networkVisibilities: ['Project'] })).toEqual({ project: urls.projectUrl });
+    expect(rows({ networkVisibilities: ['Project', 'Public'], exposure: 'none' })).toEqual({ project: urls.projectUrl });
+  });
+
+  it('never puts the project or invoke URL in a gateway row', () => {
+    expect(rows({ networkVisibilities: [], exposure: 'public', publicUrl: '', invokeUrl: urls.projectUrl })).toEqual({ public: '' });
+  });
+
+  it('shows the gateway URL for Public when the API is served there', () => {
+    expect(rows({ networkVisibilities: ['Public'] }, 'https://apip.example/api').public).toBe('https://apip.example/api');
+  });
+
+  it('never shows the raw route as the public URL of a gateway-managed endpoint', () => {
+    expect(rows({ networkVisibilities: [], exposure: 'public', visibilityStatus: tiers('UNKNOWN', 'UNKNOWN') }).public).toBe('');
+    const reported = { public: { status: 'ENABLED' as const, url: 'https://apip.example/api' }, organization: { status: 'DISABLED' as const } };
+    expect(rows({ networkVisibilities: ['Public'], visibilityStatus: reported }).public).toBe('https://apip.example/api');
+  });
+
+  it('follows the saved choice while the gateway cannot confirm the host', () => {
+    expect(rows({ networkVisibilities: [], exposure: 'organization', visibilityStatus: tiers('UNKNOWN', 'UNKNOWN') })).toEqual({ organization: urls.organizationUrl });
+  });
+
+  it('shows the saved host as pending while the gateway still serves the other one', () => {
+    expect(rows({ networkVisibilities: ['Public'], exposure: 'organization' })).toEqual({ organization: '' });
+  });
+});
+
+describe('aiGatewayUrlRows', () => {
+  const proxyUrl = 'https://gw.example.com/default/orders-mcp/mcp';
+
+  it('shows only the AI gateway proxy URL, as Public', () => {
+    expect(aiGatewayUrlRows(proxyUrl)).toEqual([{ key: 'public', label: 'Public', url: proxyUrl }]);
+  });
+
+  it('lists nothing while the proxy has no URL', () => {
+    expect(aiGatewayUrlRows('')).toEqual([]);
   });
 });

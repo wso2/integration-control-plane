@@ -78,7 +78,7 @@ export function isSupportedIntegration(displayType: string, componentSubType: st
 }
 
 export function getNonIntegrationPlatform(originCloud?: string): string {
-  return originCloud === 'bijira' ? 'WSO2 API Platform' : 'WSO2 Developer Platform';
+  return originCloud === 'bijira' ? 'API Management' : 'WSO2 Developer Platform';
 }
 
 /**

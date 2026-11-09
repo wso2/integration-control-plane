@@ -17,11 +17,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { KEY_ACTIVATION_ATTEMPTS, KEY_ACTIVATION_DELAY_MS } from '../constants/mcp';
-import { classifyMcpError, formatMcpError, formatToolResult, isMcpBlockedError, isMcpUnauthorizedError } from '../utils/mcp';
+import { classifyMcpError, createMcpClient, formatMcpError, formatToolResult, isMcpBlockedError, isMcpUnauthorizedError } from '../utils/mcp';
 import type { JsonValue, McpConnectionStatus, McpErrorKind, McpHistoryEvent, McpHistoryEventType, McpPingResult, McpTool, McpToolResult } from '../types/mcp';
 
 /** Per-request timeout, matching the playground library. */
@@ -34,6 +34,11 @@ interface UseMcpConnectionParams {
   token: string | null;
   /** Header carrying the token (e.g. `test-key`). */
   headerName: string;
+  /**
+   * Sends the transport's requests instead of the browser's fetch, for a `url` on ipaas-service's MCP relay,
+   * which authenticates the console's session: the connection then needs no token.
+   */
+  fetch?: (input: string | URL, init?: RequestInit) => Promise<Response>;
 }
 
 export interface UseMcpConnectionResult {
@@ -57,7 +62,7 @@ export interface UseMcpConnectionResult {
  * playground. The connection targets the deployed data-plane endpoint (an external system),
  * so it lives in a hook that the playground drives imperatively rather than a React Query cache.
  */
-export function useMcpConnection({ url, token, headerName }: UseMcpConnectionParams): UseMcpConnectionResult {
+export function useMcpConnection({ url, token, headerName, fetch: relayFetch }: UseMcpConnectionParams): UseMcpConnectionResult {
   const [status, setStatus] = useState<McpConnectionStatus>('disconnected');
   const [error, setError] = useState<string | null>(null);
   const [errorKind, setErrorKind] = useState<McpErrorKind | null>(null);
@@ -87,7 +92,7 @@ export function useMcpConnection({ url, token, headerName }: UseMcpConnectionPar
   }, [addHistoryEvent]);
 
   const connect = useCallback(async () => {
-    if (!url || !token) return;
+    if (!url || (!token && !relayFetch)) return;
     const generation = (generationRef.current += 1);
     const isStale = () => generation !== generationRef.current;
     await clientRef.current?.close().catch(() => undefined);
@@ -101,8 +106,8 @@ export function useMcpConnection({ url, token, headerName }: UseMcpConnectionPar
       try {
         const endpoint = new URL(url);
         if (!endpoint.searchParams.has('transportType')) endpoint.searchParams.set('transportType', 'streamable-http');
-        const transport = new StreamableHTTPClientTransport(endpoint, { requestInit: { headers: { [headerName]: token } } });
-        client = new Client({ name: 'ipaas-console-mcp-playground', version: '1.0.0' }, { capabilities: {} });
+        const transport = new StreamableHTTPClientTransport(endpoint, { requestInit: token ? { headers: { [headerName]: token } } : undefined, fetch: relayFetch });
+        client = createMcpClient('ipaas-console-mcp-playground');
         await client.connect(transport);
         if (isStale()) {
           await client.close().catch(() => undefined);
@@ -117,7 +122,8 @@ export function useMcpConnection({ url, token, headerName }: UseMcpConnectionPar
         await client?.close().catch(() => undefined);
         if (isStale()) return;
         // Blocked counts as pending too: a 401 carrying no CORS headers reaches us as a network error.
-        const pending = isMcpUnauthorizedError(err) || isMcpBlockedError(err);
+        // Only a fresh test key is pending: through the relay a 401 is the session's, and waiting won't change it.
+        const pending = !!token && (isMcpUnauthorizedError(err) || isMcpBlockedError(err));
         if (pending && attempt < KEY_ACTIVATION_ATTEMPTS) {
           if (attempt === 1) addHistoryEvent('info', 'connect', 'Test key not active on the gateway yet — retrying');
           await new Promise((resolve) => setTimeout(resolve, KEY_ACTIVATION_DELAY_MS));
@@ -132,7 +138,7 @@ export function useMcpConnection({ url, token, headerName }: UseMcpConnectionPar
         return;
       }
     }
-  }, [url, token, headerName, addHistoryEvent]);
+  }, [url, token, headerName, relayFetch, addHistoryEvent]);
 
   const listTools = useCallback(async (): Promise<McpTool[]> => {
     const client = clientRef.current;

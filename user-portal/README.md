@@ -9,7 +9,7 @@ https://claude.ai/artifact/Sm5CQNxFVUtw5SKLNm7bpi.
 |---|---|
 | `up-dp/` | The BFF. `/api/v1/*` is its API; every other path serves the SPA. |
 | `up-dp/web/` | The SPA: Vite, React 19.2.3, Oxygen UI. See its README for themes. |
-| `ipaas-mock/` | A stand-in for the cloud: the Platform IdP's token endpoint, iPaaS-Service's portal routes, and the API gateway in front of UP-DP and sample agents and workflows. |
+| `ipaas-mock/` | A stand-in for the cloud: the Platform IdP's token endpoint, iPaaS-Service's portal routes, a proxy in front of UP-DP standing in for kgateway, and an API gateway with sample agents and workflows. |
 | `shared/` | Copied unchanged from `main`, plus `external-services/ipaas-portal`, the one declaration of the portal contract. |
 | `docs/api.md` | Every route and shape the three processes speak. |
 
@@ -68,8 +68,7 @@ Register the portal app on the published environment's ThunderID:
   `{"allowedOrigins": ["http://localhost:5173", "http://localhost:9200"]}`, with an
   administrator's token that has the `system` scope.
 - Access tokens must be JWTs whose `aud` is the portal's API resource: set its identifier as
-  `OIDC_RESOURCE`, which the SPA sends as `resource`. The gateway checks the audience; on the
-  mock, set the same value as `GATEWAY_AUDIENCES`.
+  `OIDC_RESOURCE`, which the SPA sends as `resource`. UP-DP checks the audience.
 - Add the portal's own permissions to the portal's API resource and grant them to roles:
   `aiagent:view`, `automation:view` and `workflow:view` to see each kind of integration, and
   `automation:trigger` to run automations. UP-DP checks them itself; without a kind's view
@@ -86,9 +85,10 @@ Register the portal app on the published environment's ThunderID:
 
 Then set `OIDC_ISSUER` to ThunderID's issuer, byte for byte, and `OIDC_CLIENT_ID` to the app's
 client ID. A local ThunderID serves a self-signed certificate: open ThunderID once in the browser
-to accept it, or the SPA's calls to it fail, and set `GATEWAY_INSECURE_TLS=true` on the mock. To
-have the mock gateway verify tokens as the real one does, set `GATEWAY_JWKS_URL`,
-`GATEWAY_ISSUER` and `GATEWAY_AUDIENCES` on the mock.
+to accept it, or the SPA's calls to it fail. Set `OIDC_INSECURE_TLS=true` on UP-DP, which reads
+ThunderID's signing keys to verify tokens, and `GATEWAY_INSECURE_TLS=true` on the mock. To have
+the mock gateway verify agent and workflow tokens, set `GATEWAY_JWKS_URL` and `GATEWAY_ISSUER`
+on the mock.
 
 ## Custom domains
 

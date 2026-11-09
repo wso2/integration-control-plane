@@ -16,11 +16,35 @@
  * under the License.
  */
 
-import { Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
+import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, Link, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
+import { cloudConsoleSubscriptionsUrl } from '../../../paths';
 import type { ScheduleFormApi } from './useScheduleForm';
+
+const UPGRADE = 'Upgrade';
+
+/** A plan limit the value goes over. Its "Upgrade …" sentence, if any, links "Upgrade" to the subscriptions page. */
+function PlanLimitWarning({ message, sx }: { message: string; sx?: object }): JSX.Element {
+  const at = message.lastIndexOf(`. ${UPGRADE} `);
+  if (at < 0)
+    return (
+      <Alert severity="warning" sx={sx}>
+        {message}
+      </Alert>
+    );
+  const upgradeAt = at + 2;
+  return (
+    <Alert severity="warning" sx={sx}>
+      {message.slice(0, upgradeAt)}
+      <Link href={cloudConsoleSubscriptionsUrl()} target="_blank" rel="noopener noreferrer" color="inherit" underline="always">
+        {UPGRADE}
+      </Link>
+      {message.slice(upgradeAt + UPGRADE.length)}
+    </Alert>
+  );
+}
 
 /**
  * Presentational cron editor bound to a {@link useScheduleForm} instance.
@@ -29,21 +53,34 @@ import type { ScheduleFormApi } from './useScheduleForm';
  */
 export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors } = form;
+  const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan, policy } = form;
+  // The warning says what the plan allows, so "Executes every minute" would contradict it.
+  const frequencyError = errors.frequency && <PlanLimitWarning message={errors.frequency} />;
 
   return (
     <Stack gap={2}>
+      {plan?.state === 'unavailable' && (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={plan.retry}>
+              Retry
+            </Button>
+          }>
+          Couldn&apos;t check your plan. Schedules beyond the free plan&apos;s limits are unavailable until it loads.
+        </Alert>
+      )}
       <Tabs value={tab} onChange={(_e, v: number) => setTab(v)}>
         <Tab label="BY INTERVAL" />
         <Tab label="BY CRON" />
       </Tabs>
 
       {tab === 0 ? (
-        <Stack gap={1.5}>
+        <Stack gap={1}>
           <Typography variant="body2" color="text.secondary">
             Repeat beginning of every
           </Typography>
-          {/* Top-aligned: the count's reserved helper line would otherwise stretch the unit select. */}
+          {/* Top-aligned: the count's error line would otherwise stretch the unit select. */}
           <Stack direction="row" gap={2} alignItems="flex-start">
             <TextField
               inputMode="numeric"
@@ -56,7 +93,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                 if (typeof intervalCount !== 'number' || intervalCount < 1) setIntervalCount(1);
               }}
               error={!!errors.intervalCount}
-              helperText={errors.intervalCount || ' '}
+              helperText={errors.intervalCount}
               sx={{ width: 120 }}
             />
             <Select value={intervalUnit} onChange={(e) => setIntervalUnit(e.target.value as IntervalUnit)} sx={{ flex: 1 }}>
@@ -67,22 +104,24 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
               ))}
             </Select>
           </Stack>
-          {description && (
+          {description && !errors.frequency && (
             <Typography variant="body2" color="text.secondary">
               {description}
             </Typography>
           )}
+          {frequencyError}
         </Stack>
       ) : (
         <Stack gap={1.5}>
           <Typography variant="body1" sx={{ fontFamily: 'monospace', textAlign: 'center', py: 0.5 }}>
             {cron}
           </Typography>
-          {description && (
+          {description && !errors.frequency && (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
               {description}
             </Typography>
           )}
+          {frequencyError}
           {CRON_FIELD_LABELS.map(({ key, label, placeholder }) => (
             <Box key={key}>
               <Typography variant="caption" color="text.secondary">
@@ -109,7 +148,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
         <Button variant="text" size="small" endIcon={advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />} onClick={() => setAdvancedOpen((v) => !v)} sx={{ px: 0 }}>
           Advanced settings
         </Button>
-        <Collapse in={advancedOpen}>
+        <Collapse in={advancedOpen || !!errors.timeout || !!errors.timeoutLimit || !!errors.overlap}>
           <Stack gap={2} sx={{ mt: 1.5 }}>
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
@@ -130,9 +169,22 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     Job Timeout (in seconds) (Optional)
                   </Typography>
-                  <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout || ' '} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    value={form.timeoutSeconds}
+                    onChange={(e) => form.setTimeoutSeconds(e.target.value)}
+                    placeholder={`Default: ${policy.defaultTimeoutSeconds}`}
+                    error={!!errors.timeout}
+                    helperText={errors.timeout}
+                  />
+                  {errors.timeoutLimit && <PlanLimitWarning message={errors.timeoutLimit} sx={{ mt: 1 }} />}
                 </Box>
-                <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow overlapping executions" />
+                <Box>
+                  <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow overlapping executions" />
+                  {errors.overlap && <PlanLimitWarning message={errors.overlap} sx={{ mt: 1 }} />}
+                </Box>
               </>
             )}
           </Stack>

@@ -43,8 +43,8 @@
  * workstream) rather than adding a query here.
  */
 
-import type { ComponentDeployment, BuildRun, ReleaseMgtDeployment, DeploymentTrackImage, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, ByoiImage } from '../types/deployment';
-import type { EnvEndpoint } from '../types/component';
+import type { ComponentDeployment, BuildRun, ReleaseMgtDeployment, DeploymentTrackImage, DeployDeploymentTrackInput, PromoteInput, PromoteResult, ProxyReconciliationStatus, StopDeploymentInput, DeployPrebuiltImageInput, ByoiImage } from '../types/deployment';
+import type { EndpointExposure, EnvEndpoint } from '../types/component';
 import type { DeployComponentInput } from '../types/build';
 import { bff, items, q, seg, type ListResponse, type MessageResponse } from './_client';
 import { getEndpointLabel } from '../utils/endpoints';
@@ -77,7 +77,7 @@ interface BffEndpointResources {
   basePath?: string;
   visibility?: string[];
   visibilityStatus?: EnvEndpoint['visibilityStatus'];
-  displayProjectUrl?: boolean;
+  exposure?: EndpointExposure;
   urls?: { external?: BffEndpointURL; internal?: BffEndpointURL };
   schemaContent?: string;
 }
@@ -91,20 +91,20 @@ function buildUrl(u?: BffEndpointURL): string {
 }
 
 export function toEnvEndpoint(ep: BffEndpointResources, releaseId: string): EnvEndpoint {
-  const displayProjectUrl = ep.displayProjectUrl === true;
   const effectiveLabels = (ep.visibility ?? []).map(toVisibilityLabel).filter((label) => label !== 'Project');
   const publicStatus = ep.visibilityStatus?.public.status;
   const organizationStatus = ep.visibilityStatus?.organization.status;
   if ((publicStatus === 'ENABLING' || publicStatus === 'ENABLED') && !effectiveLabels.includes('Public')) effectiveLabels.push('Public');
   if ((organizationStatus === 'ENABLING' || organizationStatus === 'ENABLED') && !effectiveLabels.includes('Organization')) effectiveLabels.push('Organization');
-  const networkVisibilities = Array.from(new Set([...(displayProjectUrl ? ['Project'] : []), ...effectiveLabels]));
+  // Project access is always on, so its URL is always listed.
+  const networkVisibilities = Array.from(new Set(['Project', ...effectiveLabels]));
   const publicUrl = buildUrl(ep.urls?.external);
   const internalUrl = buildUrl(ep.urls?.internal);
   // The BFF resolves this from the environment's internal gateway host, not a urls.* field like
   // publicUrl/projectUrl — organization has no OpenChoreo-level internal URL of its own, only an
   // apip-gateway one, which only visibilityStatus carries.
   const organizationUrl = ep.visibilityStatus?.organization.url ?? '';
-  const projectUrl = displayProjectUrl ? internalUrl : '';
+  const projectUrl = internalUrl;
   return {
     id: ep.name,
     releaseId,
@@ -112,10 +112,10 @@ export function toEnvEndpoint(ep: BffEndpointResources, releaseId: string): EnvE
     displayName: getEndpointLabel(ep),
     type: ep.type ?? '',
     port: ep.port ?? null,
-    visibility: networkVisibilities[0] ?? '',
+    visibility: effectiveLabels[0] ?? 'Project',
     networkVisibilities,
     visibilityStatus: ep.visibilityStatus,
-    displayProjectUrl,
+    exposure: ep.exposure,
     publicUrl,
     organizationUrl,
     projectUrl,
@@ -256,7 +256,12 @@ export const deployDeploymentTrack = (input: DeployDeploymentTrackInput): Promis
 export const triggerBuild = (input: DeployComponentInput): Promise<{ message: string; success: boolean }> =>
   bff.post<{ message: string; success: boolean }>(`/components/${seg(input.componentId)}/builds`, input).then((r) => r ?? { message: '', success: true });
 
-export const promote = (input: PromoteInput): Promise<string> => bff.post<MessageResponse>(`/components/${seg(input.componentId)}/deployments/promote`, input).then((r) => r?.message ?? '');
+export const promote = (input: PromoteInput): Promise<PromoteResult> => bff.post<PromoteResult | null>(`/components/${seg(input.componentId)}/deployments/promote`, input).then((r) => r ?? { message: '' });
+
+// Re-runs the API gateway reconciliation of one environment's release, e.g. after a failure the
+// background retry has given up on.
+export const retryProxyReconciliation = (componentId: string, environmentId: string, projectName: string, versionId: string): Promise<ProxyReconciliationStatus> =>
+  bff.post<ProxyReconciliationStatus>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/api-proxy-reconciliation/retry${q({ projectName, deploymentTrackId: versionId })}`);
 
 export const stopDeployment = (input: StopDeploymentInput): Promise<string> => bff.put<MessageResponse>(`/components/${seg(input.componentId)}/deployments/stop`, input).then((r) => r?.message ?? '');
 

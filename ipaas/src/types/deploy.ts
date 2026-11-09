@@ -20,6 +20,7 @@ import type { Commit } from './repository';
 import type { ComponentDeployment, DeploymentTrackImage, DeploymentStatus } from './deployment';
 import type { Environment } from './environment';
 import type { ComponentTypeFlags } from '../utils/componentType';
+import type { ScheduleKind } from './schedule';
 
 export interface BuildAreaProps {
   componentId: string;
@@ -47,6 +48,8 @@ export interface BuildAreaProps {
    */
   /** A workflow integration, which deploys only once the platform's workflow runtime is ready. */
   isWorkflow?: boolean;
+  /** An MCP server: the AI gateway may front its endpoints, which are then public only. */
+  isMcpServer?: boolean;
   hideEndpoints?: boolean;
 }
 
@@ -69,6 +72,12 @@ export interface DeployEnvironmentCardProps {
   displayType?: string;
   /** A workflow integration: shows the workflow runtime it runs on, and promotes only once the runtime is ready. */
   isWorkflow?: boolean;
+  /** An MCP server: the AI gateway may front its endpoints, which are then public only. */
+  isMcpServer?: boolean;
+  /** An AI agent, automation or workflow: shows whether it is published to the environment's User Portal, with Publish or Unpublish. */
+  publishesToUserPortal?: boolean;
+  /** Which limits a schedule set here is held to; an automation's unless set. */
+  scheduleKind?: ScheduleKind;
   env: Environment;
   branch: string;
   componentName: string;
@@ -111,6 +120,8 @@ export interface DeployEnvironmentCardBodyProps {
   endpointCount?: number;
   configurablesCount?: number;
   scaleToZeroEnabled?: boolean;
+  /** Why the environment can't start until configured; the card then offers "Configure to Continue". */
+  missingConfigsReason?: string;
   /** Absent when the user's role can't change configuration here: the card hides the control. */
   onConfigClick?: () => void;
   onJobConfigClick?: () => void;

@@ -89,7 +89,6 @@ function bffConfig(): ThunderIDProviderProps {
         signOut: `${authBffContext}/logout`,
         // The gateway's API root, under which each product's oauth2-session-proxy sits.
         proxy: authBffProxyContext ?? '/_api',
-        // No gateway operation answers it: the browser is never meant to hold a token, so a stray call 404s.
         token: `${authBffContext}/token`,
       },
     },

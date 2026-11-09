@@ -19,9 +19,10 @@
 import { Box, CircularProgress, DrawerPanel, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState } from 'react';
 import type { EnvEndpoint } from '../../../types/component';
-import { EndpointCard } from '../../EndpointCard';
+import { EndpointCardList } from '../../EndpointCardList';
 import ApiSettingsDrawer from '../../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../../utils/endpoints';
+import { useAiGatewayUrls } from '../../../hooks/useAiGatewayUrls';
 
 interface EndpointsDrawerProps {
   open: boolean;
@@ -32,12 +33,15 @@ interface EndpointsDrawerProps {
   // Scope for the API settings drawer.
   projectId: string;
   componentId?: string;
-  environmentId?: string;
+  environmentId: string;
   /** The deployment track whose endpoints these are; its APIs are its own. */
   versionId?: string;
+  /** An MCP server, whose endpoints the AI gateway may front instead of the API Platform. */
+  isMcpServer?: boolean;
 }
 
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId, versionId }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, projectId, componentId, environmentId, versionId, isMcpServer = false }: EndpointsDrawerProps) {
+  const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId: componentId ?? '', envId: environmentId, versionId: versionId ?? '' }, open && isMcpServer && !!componentId);
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -78,7 +82,7 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
               </Typography>
             </Box>
           ) : (
-            endpoints.map((ep, idx) => <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} readOnly onSettings={handleSettings} />)
+            <EndpointCardList endpoints={endpoints} projectId={projectId} envId={environmentId} onSettings={handleSettings} aiGatewayUrls={aiGateway.urls} aiGatewayPending={aiGateway.pending} />
           )}
         </DrawerPanel.Body>
       </DrawerPanel>
@@ -87,7 +91,7 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
         open={manageDrawerOpen}
         onClose={() => setManageDrawerOpen(false)}
         componentName={componentId ?? ''}
-        envName={environmentId ?? ''}
+        envName={environmentId}
         deploymentTrackId={versionId}
         endpoints={toEndpointOptions(endpoints)}
         activeEndpointName={selectedEndpoint?.id}

@@ -16,18 +16,23 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, DrawerPanel, IconButton, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, DrawerPanel, IconButton, InputAdornment, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
+import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
 import { useEnvEndpoints } from '../../hooks/useDeployments';
+import { useEnvironments } from '../../hooks/useEnvironments';
 import { useMiConfig, useSaveMiConfig } from '../../hooks/useMiConfig';
 import { navUrl, useScope } from '../../nav';
 import type { EnvEndpoint } from '../../types/component';
 import type { MiConfig, MiConfigDraft } from '../../types/envGroups';
 import { toEndpointOptions } from '../../utils/endpoints';
+import { formLinkView, type TargetView } from '../../utils/integrationLinks';
 import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, MI_SECRETS_GROUP, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
-import { EndpointCard } from '../EndpointCard';
+import { EndpointCardList } from '../EndpointCardList';
+import { FieldLinkPicker } from '../SchemaConfigForm/FieldLinkPicker';
+import { fromText } from '../SchemaConfigForm/linkedFrom';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
@@ -86,6 +91,20 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const [settingsEp, setSettingsEp] = useState<EnvEndpoint | null>(null);
   const nextId = useRef(0);
   const seededRef = useRef(false);
+  const linksRead = useIntegrationLinks(projectId, componentId, open);
+  const links = linksRead.data;
+  const linkWrite = useLinkWrite();
+  // Until the links read, rows can't be told linked or not; while a write is on its way, another could undo it.
+  const linksUnread = !links || linksRead.isError;
+  const linkBusy = linkWrite.isPending || linksUnread;
+  const { data: environments = [] } = useEnvironments('', projectId);
+  const envName = (id = '') => environments.find((e) => e.id === id)?.name ?? id;
+  const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
+  const linkOf = (name: string): TargetView => (name && linkView ? linkView.target(name) : {});
+  // Links apply to all environments: a linked name the form has no value for still gets a row; so does a declared one.
+  // The first environment edits the current links; another lists what its release runs.
+  const linkedNames = useMemo(() => Object.keys((linkView?.editable ? (links?.sourceDefined ? links.declared : links?.env) : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
+  const linkedOnly = linkedNames.filter((n) => ![...envVars, ...secrets].some((r) => r.key.trim() === n));
 
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
@@ -118,23 +137,29 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     setSaveError(null);
   }, [open]);
 
-  const draft: MiConfigDraft = useMemo(
+  const named: MiConfigDraft = useMemo(
     () => ({
       envVars: envVars.map(({ key, value }) => ({ key: key.trim(), value })),
       secrets: secrets.map(({ key, value }) => ({ key: key.trim(), value })),
     }),
     [envVars, secrets],
   );
+  // A linked name needs no value of its own; one it has, stored or typed, stays for when the link goes.
+  const draft = useMemo(() => {
+    const stored = new Map(data?.envVars.map((e) => [e.key, e.value]));
+    const envVars = named.envVars.flatMap((e) => (e.value !== '' || !linkedNames.includes(e.key) ? [e] : stored.has(e.key) ? [{ key: e.key, value: stored.get(e.key)! }] : []));
+    return { ...named, envVars };
+  }, [named, linkedNames, data]);
   // From the latest fetch, not the rows seeded on open: a secret removed elsewhere since
   // (e.g. on Configs & Secrets) has no value to keep, so its row needs a new one.
   const storedSecrets = useMemo(() => {
     const current = new Set(data?.secrets ?? []);
-    return secrets.filter((s) => s.stored && current.has(s.key)).map((s) => s.key);
-  }, [secrets, data]);
+    return [...secrets.filter((s) => s.stored && current.has(s.key)).map((s) => s.key), ...linkedNames];
+  }, [secrets, data, linkedNames]);
   // Rows hidden because their group is of the wrong kind are never saved, so they are not validated.
   const envVarsHidden = !!data?.envVarsGroupIsSecret;
   const secretsHidden = !!data?.secretsGroupIsPlain;
-  const errors = useMemo(() => validateMiConfigDraft({ envVars: envVarsHidden ? [] : draft.envVars, secrets: secretsHidden ? [] : draft.secrets }, storedSecrets, data), [draft, storedSecrets, data, envVarsHidden, secretsHidden]);
+  const errors = useMemo(() => validateMiConfigDraft({ envVars: envVarsHidden ? [] : named.envVars, secrets: secretsHidden ? [] : named.secrets }, storedSecrets, data), [named, storedSecrets, data, envVarsHidden, secretsHidden]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
   useUnsavedChanges(open && hasChanges);
@@ -184,25 +209,96 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   const configsUrl = navUrl(scope, 'configs-secrets');
 
+  const link = (env: string, pick: { resource: string; key: string } | null) => linkWrite.mutate({ projectId, componentId, target: pick ? { env, ref: pick.resource, key: pick.key } : { env } });
+
+  // The value box's link icon: Enter a value, or a resource key.
+  const renderValue = (name: string, view: TargetView, box: JSX.Element) => {
+    // An MI integration's env vars take resource keys only, which these two make true: the list is
+    // emptied so none is offered, and a pick carrying one is dropped rather than written.
+    // An MI env var takes a resource key only: both endpoint groups are emptied so none is offered,
+    // and a pick carrying one is dropped rather than taken for an unlink.
+    const picker = view.picker && name && (
+      <FieldLinkPicker
+        field={name}
+        picker={{ ...view.picker, endpoints: [], connections: [], disabled: linkBusy, onPick: (pick) => (pick && 'endpoint' in pick ? undefined : link(name, pick)) }}
+      />
+    );
+    if (!view.source)
+      return picker ? (
+        <Stack direction="row" alignItems="flex-start" sx={{ flex: 1 }}>
+          {box}
+          <Box sx={{ mt: 0.75 }}>{picker}</Box>
+        </Stack>
+      ) : (
+        box
+      );
+    return (
+      <Box sx={{ flex: 1 }}>
+        <TextField
+          fullWidth
+          size="small"
+          disabled
+          value={fromText({ resource: view.source.name, key: view.source.key, declared: view.source.declared })}
+          inputProps={{ 'aria-label': `${name} is supplied by ${view.source.name}` }}
+          InputProps={{ endAdornment: picker && <InputAdornment position="end">{picker}</InputAdornment> }}
+        />
+        {view.source.noValues && (
+          <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+            No {envName(envId)} values. Add them in WSO2 Cloud.
+          </Typography>
+        )}
+      </Box>
+    );
+  };
+
   const renderRows = (rows: Row[], setRows: typeof setEnvVars, kind: 'env' | 'secret') =>
     rows.map((r, i) => {
       const keyErr = errorFor(`${kind}:${i}`, r.key);
+      const name = r.key.trim();
+      const rowLink = keyErr ? {} : linkOf(name);
       return (
         <Stack key={r.id} direction="row" gap={1} alignItems="flex-start">
           <TextField size="small" placeholder="Key" value={r.key} disabled={r.stored} autoComplete="off" onChange={(e) => updateRow(setRows, r.id, { key: e.target.value })} error={!!keyErr} helperText={keyErr || ' '} sx={{ flex: 1 }} />
-          <TextField
+          {renderValue(
+            name,
+            rowLink,
+            <TextField
+              size="small"
+              placeholder={r.stored ? 'Unchanged' : 'Value'}
+              type={kind === 'secret' ? 'password' : 'text'}
+              // A key field followed by a password field looks like a login form: without this,
+              // a password manager fills in the user's own password and Save stores it as the secret.
+              autoComplete={kind === 'secret' ? 'new-password' : 'off'}
+              value={r.value}
+              onChange={(e) => updateRow(setRows, r.id, { value: e.target.value })}
+              helperText={r.stored ? 'Enter a value to replace the secret' : ' '}
+              sx={{ flex: 1 }}
+            />,
+          )}
+          <IconButton
             size="small"
-            placeholder={r.stored ? 'Unchanged' : 'Value'}
-            type={kind === 'secret' ? 'password' : 'text'}
-            // A key field followed by a password field looks like a login form: without this,
-            // a password manager fills in the user's own password and Save stores it as the secret.
-            autoComplete={kind === 'secret' ? 'new-password' : 'off'}
-            value={r.value}
-            onChange={(e) => updateRow(setRows, r.id, { value: e.target.value })}
-            helperText={r.stored ? 'Enter a value to replace the secret' : ' '}
-            sx={{ flex: 1 }}
-          />
-          <IconButton size="small" color="error" aria-label={`Remove ${r.key || 'row'}`} onClick={() => removeRow(setRows, r.id)} sx={{ mt: 0.5 }}>
+            color="error"
+            aria-label={`Remove ${r.key || 'row'}`}
+            disabled={!!rowLink.source && (!rowLink.picker || linkBusy)}
+            onClick={() => {
+              if (rowLink.source) link(name, null);
+              removeRow(setRows, r.id);
+            }}
+            sx={{ mt: 0.5 }}>
+            <Trash2 size={16} />
+          </IconButton>
+        </Stack>
+      );
+    });
+
+  const renderLinkedOnly = () =>
+    linkedOnly.map((name) => {
+      const l = linkOf(name);
+      return (
+        <Stack key={name} direction="row" gap={1} alignItems="flex-start" sx={{ mb: 2.5 }}>
+          <TextField size="small" value={name} disabled sx={{ flex: 1 }} />
+          {renderValue(name, l, <></>)}
+          <IconButton size="small" color="error" aria-label={`Remove ${name}`} disabled={!l.picker || linkBusy} onClick={() => link(name, null)} sx={{ mt: 0.5 }}>
             <Trash2 size={16} />
           </IconButton>
         </Stack>
@@ -217,7 +313,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
         {description}
       </Typography>
-      {rows.length === 0 ? (
+      {kind === 'env' && renderLinkedOnly()}
+      {rows.length === 0 && (kind === 'secret' || linkedOnly.length === 0) ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           None added.
         </Typography>
@@ -227,6 +324,16 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       <Button size="small" startIcon={<Plus size={14} />} onClick={() => addRow(setRows)}>
         {addLabel}
       </Button>
+      {kind === 'env' && !linkView?.sourceDefined && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+          {linkView?.editable === false ? `Links apply to all environments. Change links in ${envName(links?.environments[0]?.name)}.` : 'Links apply to all environments; values are per environment.'}
+        </Typography>
+      )}
+      {kind === 'env' && linkWrite.isError && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {linkWrite.error instanceof Error ? linkWrite.error.message : "Linking didn't finish."}
+        </Alert>
+      )}
     </Box>
   );
 
@@ -241,20 +348,14 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         </Typography>
       );
     }
-    return (
-      <Box>
-        {endpoints.map((ep, idx) => (
-          <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} onEdit={setManagingEp} onSettings={setSettingsEp} />
-        ))}
-      </Box>
-    );
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={setSettingsEp} />;
   };
 
   const renderContent = () => {
     if (!isDeployed) {
       return <Alert severity="info">{continueWithoutChanges ? 'Configurations can be set once the integration is deployed to this environment. Continue to deploy it.' : 'Deploy the integration to this environment to set its configurations.'}</Alert>;
     }
-    if (isLoading) {
+    if (isLoading || linksRead.isLoading) {
       return (
         <Stack gap={1.5}>
           {[0, 1, 2].map((i) => (
@@ -279,8 +380,23 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         </Alert>
       );
     }
+    const linksError = linksRead.isError && (
+      <Alert
+        severity="error"
+        sx={{ mb: 3 }}
+        action={
+          <Button color="inherit" size="small" disabled={linksRead.isFetching} onClick={() => void linksRead.refetch()}>
+            Try again
+          </Button>
+        }>
+        {links ? "Couldn't refresh this integration's links. These are from the last read." : "Couldn't read this integration's links."}
+      </Alert>
+    );
+    // Without the links, linked rows would read as rows without values.
+    if (!links) return linksError;
     return (
       <>
+        {linksError}
         <Alert severity="info" sx={{ mb: 3 }}>
           The integration reads these as <code>{'${configs.<key>}'}</code>. To mount files, go to{' '}
           {configsUrl ? (
@@ -292,6 +408,11 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           )}
           .
         </Alert>
+        {linkView?.sourceDefined && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Links come from workload.yaml in the repository.
+          </Typography>
+        )}
         {data.envVarsGroupIsSecret ? (
           // Its values can't be read back, and saving variables here would replace them.
           <Alert severity="warning" sx={{ mb: 3 }}>
@@ -316,7 +437,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   // The last step saves when something changed. With nothing to save it continues the
   // Configure & Deploy flow, closes the Endpoints step (whose edits apply on their own), or waits.
   const finishLabel = save.isPending ? 'Saving…' : hasChanges ? 'Save' : continueWithoutChanges ? 'Continue' : step === 2 ? 'Done' : 'Save';
-  const finishDisabled = save.isPending || (!hasChanges && !continueWithoutChanges && step !== 2);
+  const finishDisabled = save.isPending || (isDeployed && linksUnread) || (!hasChanges && !continueWithoutChanges && step !== 2);
   const showFinish = isDeployed || continueWithoutChanges;
 
   return (

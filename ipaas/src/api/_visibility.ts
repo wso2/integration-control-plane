@@ -35,3 +35,13 @@ const VISIBILITY_WIRE: Record<string, string> = Object.fromEntries(Object.entrie
 export const toVisibilityWire = (label: string): string => VISIBILITY_WIRE[label] ?? label;
 
 export const toVisibilityLabel = (wire: string): string => VISIBILITY_LABEL[wire] ?? wire;
+
+/**
+ * The visibility PUT body for the editor's labels. Project access is always on, so `project` is
+ * always sent. The gateway serves an endpoint on one host, so at most one of Public and
+ * Organization is sent, Public first, as the BFF does for an endpoint saved with both.
+ */
+export function visibilityRequestBody(labels: string[]): { visibility: string[] } {
+  const tier = labels.includes('Public') ? 'Public' : labels.includes('Organization') ? 'Organization' : null;
+  return { visibility: ['project', ...(tier ? [toVisibilityWire(tier)] : [])] };
+}

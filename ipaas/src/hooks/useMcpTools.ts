@@ -17,18 +17,18 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { KEY_ACTIVATION_ATTEMPTS, KEY_ACTIVATION_DELAY_MS } from '../constants/mcp';
-import { isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError } from '../utils/mcp';
+import { createMcpClient, isMcpBlockedError, isMcpForbiddenError, isMcpRedirectError, isMcpUnauthorizedError } from '../utils/mcp';
+import { mcpTransportUrlOf } from '../utils/mcpGateway';
 import type { McpTool } from '../types/mcp';
 
 /** APIM gateways read the test key from this header; cloud uses the api-key-auth header. */
 const DEFAULT_AUTH_HEADER = 'test-key';
 
 interface UseMcpToolsParams {
-  /** Deployed endpoint base URL — tools are listed from `${baseUrl}/mcp`. */
-  baseUrl: string;
+  /** The server's MCP URL on the gateway, MCP path included (`useEndpointTestAccess().mcpUrl`). */
+  mcpUrl: string;
   /**
    * Credential for the server, or `null` when it needs none (an open endpoint).
    * `enabled` — not this field — gates a connection while a key is still pending.
@@ -48,33 +48,36 @@ interface UseMcpToolsResult {
   isForbidden: boolean;
   /** 401 only: the credential was rejected, so a fresh one can help — a 403 cannot. */
   isUnauthorized: boolean;
+  /** The server answered with a redirect the transport won't follow, so a retry cannot help. */
+  isRedirect: boolean;
   refetch: () => void;
 }
 
 /**
  * Lists the tools a deployed MCP server exposes, over the MCP SDK's
- * StreamableHTTP transport (`${baseUrl}/mcp?transportType=streamable-http`,
+ * StreamableHTTP transport (`${mcpUrl}?transportType=streamable-http`,
  * credential in `authHeader`) — mirroring devant's `useMCPTools`. The connection
  * is to the deployed data-plane endpoint, not the console API, so this is an
  * external system: the connect/listTools lives in an effect, not in render.
  */
-export function useMcpTools({ baseUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER, enabled }: UseMcpToolsParams): UseMcpToolsResult {
+export function useMcpTools({ mcpUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER, enabled }: UseMcpToolsParams): UseMcpToolsResult {
   const [tools, setTools] = useState<McpTool[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isForbidden, setIsForbidden] = useState(false);
   const [isUnauthorized, setIsUnauthorized] = useState(false);
+  const [isRedirect, setIsRedirect] = useState(false);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   useEffect(() => {
-    if (!enabled || !baseUrl) return undefined;
+    if (!enabled || !mcpUrl) return undefined;
     let cancelled = false;
 
     const listOnce = async (): Promise<McpTool[]> => {
-      const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl.replace(/\/+$/, '')}/mcp?transportType=streamable-http`), {
+      const transport = new StreamableHTTPClientTransport(mcpTransportUrlOf(mcpUrl), {
         requestInit: { headers: apiKey ? { [authHeader]: apiKey } : {} },
       });
-      const client = new Client({ name: 'ipaas-console', version: '1.0.0' }, { capabilities: {} });
+      const client = createMcpClient('ipaas-console');
       try {
         await client.connect(transport);
         if (!client.getServerCapabilities()?.tools) throw new Error('MCP server does not support the tools capability');
@@ -90,6 +93,7 @@ export function useMcpTools({ baseUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER,
       setError(null);
       setIsForbidden(false);
       setIsUnauthorized(false);
+      setIsRedirect(false);
 
       for (let attempt = 1; !cancelled; attempt += 1) {
         try {
@@ -107,6 +111,7 @@ export function useMcpTools({ baseUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER,
           setError(err instanceof Error ? err.message : 'Failed to load tools');
           if (isMcpForbiddenError(err)) setIsForbidden(true);
           if (isMcpUnauthorizedError(err)) setIsUnauthorized(true);
+          if (isMcpRedirectError(err)) setIsRedirect(true);
           break;
         }
       }
@@ -116,8 +121,8 @@ export function useMcpTools({ baseUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER,
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, apiKey, authHeader, enabled, refetchTrigger]);
+  }, [mcpUrl, apiKey, authHeader, enabled, refetchTrigger]);
 
   const refetch = useCallback(() => setRefetchTrigger((t) => t + 1), []);
-  return { tools, isLoading, error, isForbidden, isUnauthorized, refetch };
+  return { tools, isLoading, error, isForbidden, isUnauthorized, isRedirect, refetch };
 }
