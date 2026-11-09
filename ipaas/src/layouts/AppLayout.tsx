@@ -831,7 +831,7 @@ export default function AppLayout(): JSX.Element {
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
                           </Sidebar.Item>
-                        ) : mcpType || !isGenericService || runtimeLogsType ? (
+                        ) : workflowType ? null : mcpType || !isGenericService || runtimeLogsType ? (
                           <Sidebar.Item id="test">
                             <Sidebar.ItemIcon>
                               <FlaskConical size={20} />

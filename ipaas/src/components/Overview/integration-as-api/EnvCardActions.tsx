@@ -30,6 +30,11 @@ import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import ServiceLogsDrawer from './ServiceLogsDrawer';
 
+export interface ApiEnvCardActionsProps extends EnvCardActionsProps {
+  /** Types with no Test surface of their own (workflows) keep the rest of the actions. */
+  hideTest?: boolean;
+}
+
 /**
  * Integration-as-API's right-header slot: Test, View Logs, and Stop/Start —
  * gated on the deployment status. Stop/Start ask the shell to poll briefly via
@@ -51,7 +56,8 @@ export default function EnvCardActions({
   releaseMgtDeploymentId,
   onNotify,
   requestPoll,
-}: EnvCardActionsProps): ReactNode {
+  hideTest = false,
+}: ApiEnvCardActionsProps): ReactNode {
   const navigate = useAppNavigate();
   const location = useLocation();
   const [logsOpen, setLogsOpen] = useState(false);
@@ -97,7 +103,7 @@ export default function EnvCardActions({
 
   return (
     <>
-      {hasDeployment && !env.critical && (
+      {hasDeployment && !env.critical && !hideTest && (
         <Button
           variant="text"
           size="small"

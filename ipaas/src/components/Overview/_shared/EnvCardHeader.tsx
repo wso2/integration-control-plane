@@ -59,7 +59,7 @@ export default function EnvCardHeader({ envName, deployedCommit, hasDeployment, 
       </Stack>
 
       {/* Right: type action slot + Refresh */}
-      <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" justifyContent="flex-end" sx={{ flexShrink: 0, maxWidth: '100%' }}>
         {actions}
         <Tooltip title="Refresh">
           <IconButton size="small" disabled={isRefreshing} aria-label="Refresh" onClick={onRefresh}>

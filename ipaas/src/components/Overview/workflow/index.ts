@@ -19,7 +19,7 @@
 import { INTEGRATION_TYPE_INFO } from '../../../constants/integrationTypes';
 import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from '../integration-as-api/HeaderStatus';
-import EnvCardActions from '../integration-as-api/EnvCardActions';
+import EnvCardActions from './EnvCardActions';
 import EnvCardBody from './EnvCardBody';
 import DeployAction from './DeployAction';
 
@@ -27,7 +27,8 @@ import DeployAction from './DeployAction';
  * Workflow integration module. Resolves from the `ballerinaWorkflow` display type.
  *
  * A deployed workflow runs like a service (its engine serves the Workflow Management
- * API over HTTP), so it reuses integration-as-API's status and actions slots.
+ * API over HTTP), so it reuses integration-as-API's status slot and its actions minus Test,
+ * with the User Portal switch leading the header actions.
  */
 const workflowModule: IntegrationModule = {
   ...INTEGRATION_TYPE_INFO.workflow,
