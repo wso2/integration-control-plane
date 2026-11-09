@@ -33,7 +33,7 @@ const KB_DATA_SOURCE_STEPS: ConfigureStep[] = ['envVars', 'schedule'];
  * Variables, Configuration File, Schedule, Update Image) — matching devant.
  * A knowledge base's data source gets only the steps it can use.
  */
-export default function HeaderStatus({ component, env, projectId, versionId, orgHandler, deploymentPipelineId, hasDeployment, deploymentStatusV2 }: HeaderStatusProps): ReactNode {
+export default function HeaderStatus({ component, env, projectId, versionId, orgHandler, hasDeployment, deploymentStatusV2 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
 
   return (
@@ -50,7 +50,6 @@ export default function HeaderStatus({ component, env, projectId, versionId, org
             versionId={versionId}
             orgHandler={orgHandler}
             projectId={projectId}
-            deploymentPipelineId={deploymentPipelineId}
             steps={component.componentSubType === KB_INGESTION_SUBTYPE ? KB_DATA_SOURCE_STEPS : undefined}
           />
         </>

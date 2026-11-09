@@ -31,9 +31,6 @@ export interface ScheduleButtonProps {
   componentId: string;
   orgHandler: string;
   releaseId: string;
-  buildId?: string;
-  versionId: string;
-  deploymentPipelineId: string;
   hasSchedule: boolean;
   disabled?: boolean;
   /** Why the action is unavailable — shown as a tooltip while `disabled`. */

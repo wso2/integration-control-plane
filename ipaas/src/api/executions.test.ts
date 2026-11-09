@@ -31,7 +31,7 @@ vi.mock('./_client', async (importOriginal) => {
   return { ...actual, bff: { ...actual.bff, get, post } };
 });
 
-import { executionLogWindow, fetchExecutionConfigs, fetchExecutionLogs, fetchTaskExecutions, podBelongsToJob, stopSchedule, toExecutionLogEntry, toTaskExecution } from './executions';
+import { executionLogWindow, fetchExecutionConfigs, fetchExecutionLogs, fetchTaskExecutions, podBelongsToJob, stopSchedule, toExecutionLogEntry, toTaskExecution, upsertSchedule } from './executions';
 import { formatExecutionLogLine, spansMultipleContainers } from '../utils/logs';
 import { HttpError } from '../types/http';
 import type { ObsLogEntry } from './logs';
@@ -283,6 +283,24 @@ describe('scheduled tasks by release', () => {
     post.mockResolvedValue(undefined);
     await stopSchedule({ componentId: 'hello', envId: 'development', orgHandler: 'acme', releaseId: 'hello-next-r1' });
     expect(post).toHaveBeenCalledWith('/components/hello/schedules?releaseId=hello-next-r1', { environment: 'development', cronExpression: '' });
+  });
+
+  it("saves a schedule onto the release's binding, never deploying", async () => {
+    post.mockResolvedValue(undefined);
+    await upsertSchedule({ componentId: 'hello', envId: 'production', releaseId: 'hello-next-r1', cron: '0 9 * * *', timezone: 'Asia/Colombo', timeoutSeconds: 600, allowConcurrency: true });
+    expect(post).toHaveBeenCalledWith('/components/hello/schedules?releaseId=hello-next-r1', {
+      environment: 'production',
+      cronExpression: '0 9 * * *',
+      cronTimezone: 'Asia/Colombo',
+      activeDeadlineSeconds: 600,
+      concurrencyPolicy: 'Allow',
+    });
+  });
+
+  it('keeps the timeout when none is given, and forbids overlap unless allowed', async () => {
+    post.mockResolvedValue(undefined);
+    await upsertSchedule({ componentId: 'hello', envId: 'development', releaseId: 'hello-r1', cron: '*/5 * * * *', timezone: 'UTC', allowConcurrency: false });
+    expect(post).toHaveBeenCalledWith('/components/hello/schedules?releaseId=hello-r1', { environment: 'development', cronExpression: '*/5 * * * *', cronTimezone: 'UTC', concurrencyPolicy: 'Forbid' });
   });
 
   it("lists the release's runs, and the environment's without a release", async () => {

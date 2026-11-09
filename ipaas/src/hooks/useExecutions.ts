@@ -17,8 +17,8 @@
  */
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
-import { fetchExecutionConfigs, fetchTaskExecutions, fetchRuntimeArguments, fetchExecutionArguments, fetchExecutionLogs, fetchTaskExecutionCount, updateJobConfigs, stopSchedule, triggerTask, triggerComponentRun } from '../api/executions';
-import type { StopScheduleInput, TaskExecution, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
+import { fetchExecutionConfigs, fetchTaskExecutions, fetchRuntimeArguments, fetchExecutionArguments, fetchExecutionLogs, fetchTaskExecutionCount, updateJobConfigs, stopSchedule, upsertSchedule, triggerTask, triggerComponentRun } from '../api/executions';
+import type { StopScheduleInput, UpsertScheduleInput, TaskExecution, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
 
 export function useExecutionConfigs(componentId: string, releaseId: string, envId = '') {
@@ -102,6 +102,17 @@ export function useUpdateJobConfigs() {
     mutationFn: (input: UpdateJobConfigsInput) => updateJobConfigs(input),
     onSuccess: (_data, input) => {
       qc.invalidateQueries({ queryKey: ['executionConfigs', input.componentId] });
+    },
+  });
+}
+
+export function useUpsertSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpsertScheduleInput) => upsertSchedule(input),
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({ queryKey: ['executionConfigs', input.componentId] });
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
     },
   });
 }

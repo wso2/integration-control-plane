@@ -20,11 +20,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { type IntervalUnit, type CronField, intervalToCron, cronToInterval, parseCronParts, buildCronFromParts, describeCron } from '../../../utils/cronUtils';
 import { type PlanScheduleErrors, validateCronFields, validatePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
 import type { SchedulePolicy } from '../../../types/schedule';
-import type { ExecutionConfigs } from '../../../types/executions';
+import type { ExecutionConfigs, UpsertScheduleInput } from '../../../types/executions';
 import type { PlanAccess } from '../../../utils/billing';
-import type { DeployDeploymentTrackInput } from '../../../types/deployment';
 
-/** The assembled schedule values a caller submits (to `useDeployDeploymentTrack`). */
+/** The assembled schedule values a caller submits (to `useUpsertSchedule`). */
 export interface ScheduleValues {
   cron: string;
   timezone: string;
@@ -159,32 +158,21 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
   };
 }
 
-/** Identifiers a schedule redeploy needs, alongside the {@link useScheduleForm} values. */
-export interface ScheduleDeployIds {
+/** Identifiers of the binding a schedule is saved onto, alongside the {@link useScheduleForm} values. */
+export interface ScheduleTarget {
   componentId: string;
-  versionId: string;
-  /** Build/image id to redeploy with. */
-  imageId: string;
   envId: string;
-  deploymentPipelineId: string;
+  releaseId: string;
 }
 
-/**
- * Assemble the `useDeployDeploymentTrack` payload from the schedule form values.
- * Shared by the standalone Schedule drawer and the RAG ingestion Configure
- * drawer's Schedule step so the deploy schema stays in sync across both.
- */
-export function buildScheduleDeployInput(form: ScheduleValues, ids: ScheduleDeployIds): DeployDeploymentTrackInput {
+/** Assemble the `useUpsertSchedule` payload, shared by the Schedule drawer and the RAG ingestion Configure drawer's Schedule step. */
+export function buildScheduleInput(form: ScheduleValues, target: ScheduleTarget): UpsertScheduleInput {
   const timeoutSeconds = parseInt(form.timeoutSeconds, 10);
   return {
-    componentId: ids.componentId,
-    id: ids.versionId,
-    imageId: ids.imageId,
-    environmentId: ids.envId,
-    deploymentPipelineId: ids.deploymentPipelineId,
+    ...target,
     cron: form.cron,
-    cronTimezone: form.timezone,
-    ...(Number.isFinite(timeoutSeconds) ? { jobTimeoutSeconds: timeoutSeconds } : {}),
-    cronJobAllowConcurrency: form.allowConcurrency,
+    timezone: form.timezone,
+    ...(Number.isFinite(timeoutSeconds) ? { timeoutSeconds } : {}),
+    allowConcurrency: form.allowConcurrency,
   };
 }

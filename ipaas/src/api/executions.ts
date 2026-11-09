@@ -26,7 +26,7 @@
 
 import { bff, q, seg } from './_client';
 import { queryObsLogEntries, resolveComponentProject, type ObsLogEntry } from './logs';
-import type { StopScheduleInput, ExecutionConfigs, TaskExecution, ExecutionLogEntry, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, TriggerRunResult, RuntimeArgument } from '../types/executions';
+import type { StopScheduleInput, UpsertScheduleInput, ExecutionConfigs, TaskExecution, ExecutionLogEntry, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, TriggerRunResult, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
 import { HttpError } from '../types/http';
 
@@ -301,6 +301,18 @@ export const updateJobConfigs = (input: UpdateJobConfigsInput): Promise<boolean>
 // Empty cron = stop firing; the BFF substitutes the never-fires expression and leaves deployment state alone.
 // releaseId names the deployment track whose schedule stops.
 export const stopSchedule = (input: StopScheduleInput): Promise<void> => bff.post<void>(`/components/${seg(input.componentId)}/schedules${q({ releaseId: input.releaseId })}`, { environment: input.envId, cronExpression: '' }).then(() => undefined);
+
+// Only the binding's schedule changes: the BFF keeps its release and state, and refuses an environment with nothing deployed.
+export const upsertSchedule = (input: UpsertScheduleInput): Promise<void> =>
+  bff
+    .post<void>(`/components/${seg(input.componentId)}/schedules${q({ releaseId: input.releaseId })}`, {
+      environment: input.envId,
+      cronExpression: input.cron,
+      cronTimezone: input.timezone,
+      ...(input.timeoutSeconds !== undefined ? { activeDeadlineSeconds: input.timeoutSeconds } : {}),
+      concurrencyPolicy: input.allowConcurrency ? 'Allow' : 'Forbid',
+    })
+    .then(() => undefined);
 
 // MI artifact trigger — no API Manager / MI runtime on the OpenChoreo stack.
 export const triggerTask = (_input: TriggerTaskInput): Promise<{ status: string; message: string; successCount: number; failedCount: number; details: string[] }> =>

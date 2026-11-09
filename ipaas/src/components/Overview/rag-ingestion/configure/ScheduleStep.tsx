@@ -18,36 +18,31 @@
 
 import { Button, CircularProgress, Stack } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { useExecutionConfigs } from '../../../../hooks/useExecutions';
+import { useExecutionConfigs, useUpsertSchedule } from '../../../../hooks/useExecutions';
 import { usePlanAccess } from '../../../../hooks/useBillingOrg';
 import { SCHEDULE_POLICIES } from '../../../../constants/scheduleLimits';
-import { useDeployDeploymentTrack } from '../../../../hooks/useDeployments';
 import ScheduleFields from '../../_shared/ScheduleFields';
-import { buildScheduleDeployInput, useScheduleForm } from '../../_shared/useScheduleForm';
+import { buildScheduleInput, useScheduleForm } from '../../_shared/useScheduleForm';
 
 interface ScheduleStepProps {
   componentId: string;
-  versionId: string;
   envId: string;
   releaseId: string;
-  deploymentPipelineId: string;
-  /** Build id of the current deployment — required to redeploy with the schedule. */
-  buildId: string;
   onNotify: (message: string, severity: 'success' | 'error') => void;
 }
 
 /**
  * The Configure-drawer Schedule step. Reuses the shared `ScheduleFields` cron
- * editor (same as the standalone Schedule drawer) and saves by redeploying the
- * deployment track with the cron fields via `useDeployDeploymentTrack`.
+ * editor (same as the standalone Schedule drawer) and saves onto the
+ * environment's binding via `useUpsertSchedule`.
  */
-export default function ScheduleStep({ componentId, versionId, envId, releaseId, deploymentPipelineId, buildId, onNotify }: ScheduleStepProps): JSX.Element {
+export default function ScheduleStep({ componentId, envId, releaseId, onNotify }: ScheduleStepProps): JSX.Element {
   const { data: existingConfigs, isLoading } = useExecutionConfigs(componentId, releaseId, envId);
-  const deployTrack = useDeployDeploymentTrack();
+  const saveSchedule = useUpsertSchedule();
   const form = useScheduleForm(existingConfigs, usePlanAccess(), SCHEDULE_POLICIES.ingestion);
 
   const save = () => {
-    deployTrack.mutate(buildScheduleDeployInput(form, { componentId, versionId, imageId: buildId, envId, deploymentPipelineId }), {
+    saveSchedule.mutate(buildScheduleInput(form, { componentId, envId, releaseId }), {
       onSuccess: () => onNotify('Schedule updated.', 'success'),
       onError: (e) => onNotify(e instanceof Error ? e.message : 'Failed to update the schedule.', 'error'),
     });
@@ -59,8 +54,8 @@ export default function ScheduleStep({ componentId, versionId, envId, releaseId,
     <Stack gap={2}>
       <ScheduleFields form={form} />
       <Stack direction="row" justifyContent="flex-end">
-        <Button variant="contained" onClick={save} disabled={deployTrack.isPending || !buildId || !form.isValid} startIcon={deployTrack.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-          {deployTrack.isPending ? 'Updating…' : 'Update schedule'}
+        <Button variant="contained" onClick={save} disabled={saveSchedule.isPending || !releaseId || !form.isValid} startIcon={saveSchedule.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
+          {saveSchedule.isPending ? 'Updating…' : 'Update schedule'}
         </Button>
       </Stack>
     </Stack>

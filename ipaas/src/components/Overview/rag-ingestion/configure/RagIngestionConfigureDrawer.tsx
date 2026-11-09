@@ -53,7 +53,6 @@ interface RagIngestionConfigureDrawerProps {
   versionId: string;
   orgHandler: string;
   projectId: string;
-  deploymentPipelineId: string;
   /** Which steps to show. Defaults to the full RAG ingestion set; other BYOI
    * types can drop the external (schedule/image) steps via this prop. */
   steps?: ConfigureStep[];
@@ -67,7 +66,7 @@ interface RagIngestionConfigureDrawerProps {
  * its own surface; the stepper is navigation only. Supports an enlarge toggle
  * since the configuration surfaces can get dense.
  */
-export default function RagIngestionConfigureDrawer({ open, onClose, component, env, versionId, orgHandler, projectId, deploymentPipelineId, steps = RAG_INGESTION_STEPS }: RagIngestionConfigureDrawerProps): JSX.Element {
+export default function RagIngestionConfigureDrawer({ open, onClose, component, env, versionId, orgHandler, projectId, steps = RAG_INGESTION_STEPS }: RagIngestionConfigureDrawerProps): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
   const [stepIndex, setStepIndex] = useState(0);
   const [enlarged, setEnlarged] = useState(false);
@@ -149,7 +148,7 @@ export default function RagIngestionConfigureDrawer({ open, onClose, component, 
           <>
             {activeStep === 'envVars' && <ConfigStep ctx={ctx} kind="envVars" emptyText="No environment variables configured." onNotify={notify} />}
             {activeStep === 'fileMount' && <ConfigStep ctx={ctx} kind="fileMount" emptyText="No configuration files mounted." onNotify={notify} />}
-            {activeStep === 'schedule' && <ScheduleStep componentId={component.id} versionId={versionId} envId={env.id} releaseId={releaseId} deploymentPipelineId={deploymentPipelineId} buildId={deployment?.build?.buildId ?? ''} onNotify={notify} />}
+            {activeStep === 'schedule' && <ScheduleStep componentId={component.id} envId={env.id} releaseId={releaseId} onNotify={notify} />}
             {activeStep === 'image' && <ImageStep componentId={component.id} releaseId={releaseId} currentImage={deployment?.imageUrl || ragIngestionImage()} onNotify={notify} />}
           </>
         )}

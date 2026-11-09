@@ -17,11 +17,10 @@
  */
 
 import { Box, Button, CircularProgress, DrawerPanel } from '@wso2/oxygen-ui';
-import { useExecutionConfigs } from '../../../hooks/useExecutions';
+import { useExecutionConfigs, useUpsertSchedule } from '../../../hooks/useExecutions';
 import { usePlanAccess } from '../../../hooks/useBillingOrg';
-import { useDeployDeploymentTrack } from '../../../hooks/useDeployments';
 import ScheduleFields from './ScheduleFields';
-import { buildScheduleDeployInput, useScheduleForm } from './useScheduleForm';
+import { buildScheduleInput, useScheduleForm } from './useScheduleForm';
 import type { ScheduleKind } from '../../../types/schedule';
 import { SCHEDULE_POLICIES } from '../../../constants/scheduleLimits';
 
@@ -34,27 +33,22 @@ interface ScheduleDialogProps {
   envName: string;
   componentId: string;
   releaseId: string;
-  buildId?: string;
-  versionId: string;
-  deploymentPipelineId: string;
-  /** Save with no build: the BFF then releases the current workload. For image-only components such as knowledge base data sources. */
-  allowWithoutBuild?: boolean;
   /** A knowledge base data source is an ingestion, with its own timeout limit. */
   kind?: ScheduleKind;
 }
 
-export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, buildId, versionId, deploymentPipelineId, allowWithoutBuild = false, kind = 'automation' }: ScheduleDialogProps) {
+export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, kind = 'automation' }: ScheduleDialogProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
   };
 
   const { data: existingConfigs, isLoading: loadingConfigs } = useExecutionConfigs(componentId, releaseId, envId);
-  const deployTrack = useDeployDeploymentTrack();
+  const saveSchedule = useUpsertSchedule();
   const form = useScheduleForm(existingConfigs, usePlanAccess(), SCHEDULE_POLICIES[kind]);
 
   const handleSave = () => {
-    deployTrack.mutate(buildScheduleDeployInput(form, { componentId, versionId, imageId: buildId ?? '', envId, deploymentPipelineId }), {
+    saveSchedule.mutate(buildScheduleInput(form, { componentId, envId, releaseId }), {
       onSuccess: () => {
         onClose();
         onSaveSuccess?.();
@@ -88,8 +82,8 @@ export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveErr
 
       <DrawerPanel.Footer>
         <Button onClick={onClose}>Back</Button>
-        <Button variant="contained" onClick={handleSave} disabled={deployTrack.isPending || (!buildId && !allowWithoutBuild) || !form.isValid} startIcon={deployTrack.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
-          {deployTrack.isPending ? 'Updating…' : 'Update'}
+        <Button variant="contained" onClick={handleSave} disabled={saveSchedule.isPending || !releaseId || !form.isValid} startIcon={saveSchedule.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+          {saveSchedule.isPending ? 'Updating…' : 'Update'}
         </Button>
       </DrawerPanel.Footer>
     </DrawerPanel>

@@ -58,7 +58,7 @@ interface EnvironmentProps {
   isBuildInProgress?: boolean;
 }
 
-export default function Environment({ env, prevEnv, componentId, projectId, componentType: _componentType, displayType, componentHandler, projectHandler, orgHandler, versionId, deploymentPipelineId, apiId, isBuildInProgress }: EnvironmentProps) {
+export default function Environment({ env, prevEnv, componentId, projectId, componentType: _componentType, displayType, componentHandler, projectHandler, orgHandler, versionId, apiId, isBuildInProgress }: EnvironmentProps) {
   const isAutomation = (displayType ?? '').toLowerCase() === 'scheduledtask';
   const isGenericService = GENERIC_SERVICE_TYPES.has(displayType ?? '');
   const queryClient = useQueryClient();
@@ -252,9 +252,6 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
                   componentId,
                   orgHandler,
                   releaseId: envReleaseId,
-                  buildId: envDeployment?.build?.buildId,
-                  versionId,
-                  deploymentPipelineId,
                   hasSchedule: !!scheduleConfig?.cronjobFrequency,
                   onSaveSuccess: () => setNotification({ text: 'Schedule updated successfully', severity: 'success' }),
                   onSaveError: () => setNotification({ text: 'Failed to save schedule. Please try again.', severity: 'error' }),

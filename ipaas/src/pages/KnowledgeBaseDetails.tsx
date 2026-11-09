@@ -338,7 +338,7 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
         </>
       )}
 
-      {/* The automations Schedule drawer, saved without a build: a data source has none. */}
+      {/* The automations Schedule drawer: a data source's schedule is saved onto its binding. */}
       {scheduling && (
         <ScheduleDialog
           open
@@ -352,9 +352,6 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
           envName={kb.environment}
           componentId={scheduling.name}
           releaseId={scheduling.releaseName}
-          versionId=""
-          deploymentPipelineId=""
-          allowWithoutBuild
           kind="ingestion"
         />
       )}

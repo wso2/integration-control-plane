@@ -417,20 +417,7 @@ export default function DeployEnvironmentCard({
         hideEndpoints={hideEndpoints}
       />
 
-      {flags.isAutomation && hasRelease && scheduleOpen && (
-        <ScheduleDialog
-          open={scheduleOpen}
-          onClose={() => setScheduleOpen(false)}
-          envId={env.id}
-          envName={env.name}
-          componentId={componentId}
-          releaseId={releaseId}
-          buildId={deployedBuildId ?? undefined}
-          versionId={versionId}
-          deploymentPipelineId={deploymentPipelineId}
-          kind={scheduleKind}
-        />
-      )}
+      {flags.isAutomation && hasRelease && scheduleOpen && <ScheduleDialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} envId={env.id} envName={env.name} componentId={componentId} releaseId={releaseId} kind={scheduleKind} />}
 
       <DeploymentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} orgUuid={orgUuid} projectId={projectId} componentId={componentId} versionId={versionId} environmentId={env.id} envName={env.name} />
 

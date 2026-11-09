@@ -42,8 +42,6 @@ export default function EnvCardActions({
   versionId,
   orgHandler,
   releaseId,
-  buildId,
-  deploymentPipelineId,
   envTemplateId,
   deployedCommitSha,
   isBuildInProgress,
@@ -103,9 +101,6 @@ export default function EnvCardActions({
         componentId={component.id}
         orgHandler={orgHandler}
         releaseId={releaseId}
-        buildId={buildId}
-        versionId={versionId}
-        deploymentPipelineId={deploymentPipelineId}
         hasSchedule={!!scheduleConfig?.cronjobFrequency}
         kind={scheduleKind}
         disabled={actionsDisabled}

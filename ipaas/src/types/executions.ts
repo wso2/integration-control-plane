@@ -68,6 +68,19 @@ export interface UpdateJobConfigsInput {
 }
 
 /** Identifies the schedule to stop: `releaseId` names its deployment track. `orgHandler` is unused by cloud. */
+/** A schedule saved onto an environment's existing binding; its release and state are kept. */
+export interface UpsertScheduleInput {
+  componentId: string;
+  envId: string;
+  /** Names the deployment track whose binding is scheduled. */
+  releaseId: string;
+  cron: string;
+  timezone: string;
+  /** Omitted keeps the binding's current timeout. */
+  timeoutSeconds?: number;
+  allowConcurrency: boolean;
+}
+
 export interface StopScheduleInput {
   componentId: string;
   envId: string;
