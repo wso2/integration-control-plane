@@ -19,6 +19,7 @@
 import { Box } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import type { EnvCardSharedActionProps } from '../../../types/integration';
+import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import UserPortalAction from '../../UserPortal/UserPortalAction';
 
 // The action renders nothing where ipaas-service serves no User Portal; the footer then takes no
@@ -29,10 +30,10 @@ const footerSx = { mt: 2, '&:empty': { display: 'none' } } as const;
  * The env card's User Portal action, in the card's footer: Publish, Unpublish, or
  * "User Portal off" while the environment has none. For the types the portal shows.
  */
-export default function UserPortalSharedAction({ component, env, orgHandler, onNotify }: EnvCardSharedActionProps): JSX.Element {
+export default function UserPortalSharedAction({ component, env, orgHandler, projectId, onNotify }: EnvCardSharedActionProps): JSX.Element {
   return (
     <Box sx={footerSx}>
-      <UserPortalAction orgHandler={orgHandler} componentId={component.id} environment={env.id} envName={env.name} onNotify={onNotify} />
+      <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={component.id} environment={env.id} envName={env.name} onNotify={onNotify} isWorkflow={isWorkflowIntegration(component)} />
     </Box>
   );
 }

@@ -50,11 +50,14 @@ const MESSAGES: Record<string, (env: string) => string> = {
   USER_PORTAL_NO_PUBLIC_ENDPOINT: (env) => `Expose the endpoint the User Portal calls publicly in ${env}.`,
   USER_PORTAL_NO_MANAGEMENT_API: (env) => `The workflow has no ${WORKFLOW_MANAGEMENT_API_TITLE} endpoint deployed in ${env}.`,
   USER_PORTAL_API_KEY: () => 'An endpoint the User Portal calls is secured with an API key. Secure it with JWT.',
+  USER_PORTAL_SECURED_BY_PROMOTION: (env) => `The Workflow Management API doesn't take JWT in ${env}, or isn't known to, and ${env} gets its security only by promotion. Publish the workflow in the environment it is promoted from, then promote it to ${env}.`,
   USER_PORTAL_AUDIENCE_MISSING: () => "An endpoint checks token audiences without the User Portal's. Add the User Portal to its audiences, or clear them.",
   USER_PORTAL_TOKEN_NOT_FORWARDED: () => `An endpoint the User Portal calls doesn't forward the caller's token. Turn token forwarding on, in the ${DEFAULT_FORWARDED_TOKEN_HEADER} header.`,
-  USER_PORTAL_REDEPLOY_REQUIRED: (env) => `Deploy the workflow to ${env} again, then publish it. It was deployed before the User Portal's sign-in was ready there.`,
   USER_PORTAL_PUBLISH_LIMIT: (env) => `The User Portal in ${env} holds as many integrations as it can. Unpublish one first.`,
   USER_PORTAL_SCOPES_NOT_SYNCED: () => "The User Portal's scopes could not be updated. Try again.",
+  USER_PORTAL_SIGN_IN_NOT_READY: (env) => `The User Portal's sign-in isn't ready in ${env} yet. Publish again once it is.`,
+  USER_PORTAL_REDEPLOY_FAILED: () => "The workflow couldn't be redeployed for the User Portal's sign-in, so it isn't published. Publish again.",
+  USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED: () => 'The workflow is unpublished, but switching it back to the console failed. Unpublish again to finish.',
 };
 
 /**
@@ -67,7 +70,7 @@ export const refusalText = ({ code, message }: UserPortalRefusal, env: string): 
 export const userPortalErrorText = (error: unknown, env: string): string => MESSAGES[httpCodeOf(error)]?.(env) ?? apiErrorMessage(error, 'Something went wrong.');
 
 // The rules about what runs in the environment. With nothing deployed there they all fail, and deploying is the fix.
-const NEEDS_A_DEPLOYMENT = new Set(['USER_PORTAL_NO_PUBLIC_ENDPOINT', 'USER_PORTAL_NO_MANAGEMENT_API', 'USER_PORTAL_API_KEY', 'USER_PORTAL_AUDIENCE_MISSING', 'USER_PORTAL_TOKEN_NOT_FORWARDED', 'USER_PORTAL_REDEPLOY_REQUIRED']);
+const NEEDS_A_DEPLOYMENT = new Set(['USER_PORTAL_NO_PUBLIC_ENDPOINT', 'USER_PORTAL_NO_MANAGEMENT_API', 'USER_PORTAL_API_KEY', 'USER_PORTAL_SECURED_BY_PROMOTION', 'USER_PORTAL_AUDIENCE_MISSING', 'USER_PORTAL_TOKEN_NOT_FORWARDED']);
 
 /** The refusals to show: an integration not deployed in the environment shows that, not what follows from it. */
 export const shownRefusals = (reasons: UserPortalRefusal[]): UserPortalRefusal[] => (reasons.some((r) => r.code === USER_PORTAL_NOT_DEPLOYED) ? reasons.filter((r) => !NEEDS_A_DEPLOYMENT.has(r.code)) : reasons);

@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { testKeyNotice, testKeyReasonOf, workflowRequestHeaders } from './workflowCredential';
+import { humanTasksComingSoon, testKeyNotice, testKeyReasonOf, workflowRequestHeaders } from './workflowCredential';
 
 /** A failed BFF read, as `httpStatusOf` sees it. */
 const failed = (status: number) => Object.assign(new Error(`HTTP ${status}`), { status });
@@ -31,6 +31,7 @@ const access = (patch: Partial<Parameters<typeof testKeyReasonOf>[0]> = {}) => (
   canCreateKey: true,
   needsApiKeyAuth: false,
   canSwitch: true,
+  managedIn: null as string | null,
   ...patch,
 });
 
@@ -68,6 +69,8 @@ describe('testKeyReasonOf', () => {
     expect(testKeyReasonOf(access({ isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true }))).toBe('needs-api-key');
     // ipaas-service refused a key for an endpoint the security read calls api-key.
     expect(testKeyReasonOf(access({ isAuthorized: false, needsApiKeyAuth: true }))).toBe('needs-api-key');
+    // Where the security comes by promotion, it can't be switched here.
+    expect(testKeyReasonOf(access({ isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, canSwitch: false, managedIn: 'development' }))).toBe('secured-by-promotion');
     expect(testKeyReasonOf(access({ isAuthorized: false, keyError: 'Could not mint a test key.' }))).toBe('mint-failed');
   });
 
@@ -94,10 +97,25 @@ describe('testKeyNotice', () => {
     expect(testKeyNotice('needs-api-key', access({ mode: 'jwt', canSwitch: false })).text).toContain('Your role can’t switch it to API key.');
   });
 
+  it('says where an environment that takes its security by promotion gets it, and the ways out of it', () => {
+    const notice = testKeyNotice('secured-by-promotion', access({ mode: 'jwt', canSwitch: false, managedIn: 'development' }));
+    expect(notice.severity).toBe('info');
+    expect(notice.text).toContain('takes the Workflow Management API’s security from development by promotion');
+    expect(notice.text).toContain('Publish the workflow to the User Portal here');
+    expect(notice.text).toContain('put the API back on API key in development');
+  });
+
   it('passes the mint failure through in the words the hook chose', () => {
     expect(testKeyNotice('mint-failed', access({ keyError: 'Your session has expired. Sign in again and retry.' }))).toEqual({
       severity: 'warning',
       text: 'Your session has expired. Sign in again and retry.',
     });
+  });
+});
+
+describe('humanTasksComingSoon', () => {
+  it('points to the User Portal only where ipaas-service serves one', () => {
+    expect(humanTasksComingSoon(true)).toContain('publish this workflow to the User Portal');
+    expect(humanTasksComingSoon(false)).toBe('Human tasks are coming to the console.');
   });
 });

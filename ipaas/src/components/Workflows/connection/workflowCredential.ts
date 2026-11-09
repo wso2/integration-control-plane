@@ -40,6 +40,14 @@ import { endpointLoadNotice } from '../../../utils/apiSecurity';
  */
 export const CALLS_CARRY_ROLES = false;
 
+/**
+ * What the views say of human tasks until calls carry roles (`CALLS_CARRY_ROLES`), pointing to the User Portal only
+ * where ipaas-service serves one (`useUserPortalServed`).
+ */
+export function humanTasksComingSoon(portalServed: boolean): string {
+  return portalServed ? 'Human tasks are coming to the console. Until then, publish this workflow to the User Portal and work on its human tasks there.' : 'Human tasks are coming to the console.';
+}
+
 /** What gets a call past the gateway: the test key, in its header, or none for an open API. */
 export interface GatewayCredential {
   authHeader: string;
@@ -59,9 +67,10 @@ export function workflowRequestHeaders({ authHeader, apiKey }: GatewayCredential
  * configuration of the API could not be read. `no-gateway-url`: it is exposed, but no invoke URL
  * is known. `key-refused`: the role may not create test keys. `needs-api-key`: the endpoint uses
  * another auth mode, so ipaas-service issues no test key until it is switched to API key, which
- * changes every caller's auth and so is the person's choice. `mint-failed`: minting the key failed.
+ * changes every caller's auth and so is the person's choice. `secured-by-promotion`: the same, in an environment that
+ * takes the API's security only by promotion, where it can't be switched. `mint-failed`: minting the key failed.
  */
-export type TestKeyReason = 'not-exposed' | 'gateway-unavailable' | 'security-unreadable' | 'no-gateway-url' | 'key-refused' | 'needs-api-key' | 'mint-failed';
+export type TestKeyReason = 'not-exposed' | 'gateway-unavailable' | 'security-unreadable' | 'no-gateway-url' | 'key-refused' | 'needs-api-key' | 'secured-by-promotion' | 'mint-failed';
 
 /** What a notice says, and how loudly. */
 export interface WorkflowNotice {
@@ -69,7 +78,7 @@ export interface WorkflowNotice {
   text: string;
 }
 
-type TestKeyAccess = Pick<EndpointTestAccess, 'isUnavailable' | 'securityError' | 'mode' | 'isAuthorized' | 'keyError' | 'canCreateKey' | 'needsApiKeyAuth' | 'canSwitch'>;
+type TestKeyAccess = Pick<EndpointTestAccess, 'isUnavailable' | 'securityError' | 'mode' | 'isAuthorized' | 'keyError' | 'canCreateKey' | 'needsApiKeyAuth' | 'canSwitch' | 'managedIn'>;
 
 /** The reason the endpoint's test access leaves the management API out of reach, or null. */
 export function testKeyReasonOf(access: TestKeyAccess): TestKeyReason | null {
@@ -82,7 +91,7 @@ export function testKeyReasonOf(access: TestKeyAccess): TestKeyReason | null {
   }
   if (access.isAuthorized || access.mode === null) return null;
   if (!access.canCreateKey) return 'key-refused';
-  if (access.needsApiKeyAuth) return 'needs-api-key';
+  if (access.needsApiKeyAuth) return access.managedIn ? 'secured-by-promotion' : 'needs-api-key';
   return access.keyError ? 'mint-failed' : null;
 }
 
@@ -108,6 +117,16 @@ export function testKeyNotice(reason: TestKeyReason, access: TestKeyAccess): Wor
       const mode = access.mode ? SECURITY_MODE_LABEL[access.mode] : 'another';
       const choice = access.canSwitch ? 'Switching it to API key changes how every caller of this API authenticates.' : 'Your role can’t switch it to API key.';
       return { severity: 'info', text: `The Workflow Management API uses ${mode} authentication, so it can’t issue the test key the console calls it with. ${choice}` };
+    }
+    case 'secured-by-promotion': {
+      // Publishing a workflow in the environment its API's security is edited in switches it to JWT, and a promotion
+      // carries that here even where the workflow isn't published.
+      const mode = access.mode ? SECURITY_MODE_LABEL[access.mode] : 'another';
+      const entry = access.managedIn;
+      return {
+        severity: 'info',
+        text: `This environment takes the Workflow Management API’s security from ${entry} by promotion, and it uses ${mode} authentication here, so the console has no test key to call it with. Publish the workflow to the User Portal here to manage it there. To manage it from the console, put the API back on API key in ${entry}, as unpublishing the workflow from the User Portal there does, then promote it here again.`,
+      };
     }
     case 'mint-failed':
       return { severity: 'warning', text: access.keyError ?? 'Could not mint a test key.' };

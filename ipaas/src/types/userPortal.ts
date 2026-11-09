@@ -51,6 +51,18 @@ export interface UserPortalPublishability {
   publishable: boolean;
   /** Every rule it breaks there, in the order a publish checks them. Empty when publishable. */
   reasons: UserPortalRefusal[];
+  /**
+   * Publishing redeploys the workflow so its Workflow Management API takes only User Portal sign-ins, on the
+   * gateway and in the workflow itself. The console's workflow views stop working there: the User Portal is
+   * where its runs and tasks are managed.
+   */
+  redeploys: boolean;
+}
+
+/** The environments an integration is published to the User Portal in. */
+export interface UserPortalPublications {
+  /** The environments' slugs. */
+  environments: string[];
 }
 
 /** The outcome of a publish. */

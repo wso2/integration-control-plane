@@ -27,25 +27,32 @@ import { isUserPortalUnavailable } from '../../utils/apiErrors';
 import { DEPLOY_REFUSAL, rejectedScopesText, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import AboutUserPortalDialog from './AboutUserPortalDialog';
+import PublishWorkflowDialog from './PublishWorkflowDialog';
+import UnpublishNote from './UnpublishNote';
 import * as styles from './UserPortal.styles';
 import UserPortalReason from './UserPortalReason';
 
 interface UserPortalActionProps {
   orgHandler: string;
+  projectId: string;
   componentId: string;
   /** The environment's slug. */
   environment: string;
   envName: string;
   /** Reports a publish on the env card. */
   onNotify: (notification: EnvCardNotification) => void;
+  /** Unpublishing a workflow gives its Management API back to the console, where the environment's API security allows. */
+  isWorkflow?: boolean;
 }
 
 /**
  * The env card's User Portal action, in the card's footer. Its verb follows the state:
  * "User Portal off" explains the portal and how to turn it on; "Publish" confirms, then publishes, or
- * lists what to fix when ipaas-service's rules refuse; "Unpublish" confirms, then unpublishes.
+ * lists what to fix when ipaas-service's rules refuse; "Unpublish" confirms, then unpublishes. A publish that
+ * redeploys a workflow for the User Portal's sign-in says so in its confirmation, as an unpublish that redeploys it
+ * back does.
  */
-export default function UserPortalAction({ orgHandler, componentId, environment, envName, onNotify }: UserPortalActionProps): JSX.Element | null {
+export default function UserPortalAction({ orgHandler, projectId, componentId, environment, envName, onNotify, isWorkflow = false }: UserPortalActionProps): JSX.Element | null {
   const { data, isLoading, error, refetch } = useUserPortalPublishability(componentId, environment);
   const publish = usePublishToUserPortal();
   const unpublish = useUnpublishFromUserPortal();
@@ -92,7 +99,8 @@ export default function UserPortalAction({ orgHandler, componentId, environment,
         The dialog must stay open on its error through that.
       */}
       {open === 'about' && <AboutUserPortalDialog orgHandler={orgHandler} envName={envName} onClose={close} />}
-      {open === 'publish' && (
+      {open === 'publish' && data?.redeploys && <PublishWorkflowDialog envName={envName} onConfirm={startPublish} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} />}
+      {open === 'publish' && !data?.redeploys && (
         <Dialog open onClose={publish.isPending ? undefined : close} maxWidth="xs" fullWidth>
           <DialogTitle>Publish to the User Portal in {envName}?</DialogTitle>
           <DialogContent>
@@ -132,7 +140,7 @@ export default function UserPortalAction({ orgHandler, componentId, environment,
       )}
       {open === 'unpublish' && (
         <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={close} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
-          <Typography variant="body2">The User Portal&apos;s users no longer see this integration there. The integration keeps running.</Typography>
+          <UnpublishNote isWorkflow={isWorkflow} projectId={projectId} environment={environment} envName={envName} />
           {unpublish.isError && (
             <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
               {userPortalErrorText(unpublish.error, envName)}

@@ -65,6 +65,27 @@ describe('useEndpointTestAccess', () => {
     expect(createEndpointTestKey).not.toHaveBeenCalled();
   });
 
+  it('offers no switch where the security comes by promotion, and says where it is managed', async () => {
+    vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'jwt', publicUrl: 'https://gw.example/orders', editable: false, entryEnvironment: 'development' } as never);
+    const r = await renderWithScopes(<Selection />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+
+    expect(currentAccess?.needsApiKeyAuth).toBe(true);
+    expect(currentAccess?.canSwitch).toBe(false);
+    expect(currentAccess?.managedIn).toBe('development');
+    await act(async () => void (await currentAccess?.switchToApiKey()));
+    expect(setEndpointApiKeyAuth).not.toHaveBeenCalled();
+  });
+
+  it('switches where the security is managed', async () => {
+    const r = await renderWithScopes(<Selection />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    expect(currentAccess?.canSwitch).toBe(true);
+    expect(currentAccess?.managedIn).toBeNull();
+  });
+
   it.each([
     ['endpoint', { ...a, endpointName: 'admin' }],
     ['environment', { ...a, environmentName: 'production' }],

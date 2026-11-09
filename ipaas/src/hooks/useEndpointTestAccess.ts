@@ -63,10 +63,16 @@ export interface EndpointTestAccess {
   /** The endpoint uses another auth mode (jwt, or a refused test key says so), so it takes no test key until switched to API-key auth. */
   needsApiKeyAuth: boolean;
   /**
-   * The role may switch the endpoint to API-key auth. Never for an AI agent: its security comes from Agent Manager,
-   * while the switch edits the API Platform's API.
+   * The role may switch the endpoint to API-key auth, and the environment may change the API's security. Never for an AI
+   * agent: its security comes from Agent Manager, while the switch edits the API Platform's API. Never where the API's
+   * security comes only by promotion (`managedIn`): ipaas-service refuses the switch there.
    */
   canSwitch: boolean;
+  /**
+   * The environment the API's security is changed in, when this one takes it only by promotion from there; null when it
+   * is changed here.
+   */
+  managedIn: string | null;
   /** The endpoint is being switched to API-key auth. */
   isSwitching: boolean;
   /** Switch the endpoint to API-key auth, then mint. Resolves to the plaintext, or `null` on failure. */
@@ -182,13 +188,18 @@ async function mintHeldKey(mint: (target: EndpointRef) => Promise<ApiKeyResult>,
  */
 interface TestAccessOptions {
   enabled?: boolean;
+  /**
+   * Whether a test key may be minted for the endpoint yet. The security is read either way, so a caller that must
+   * settle something first loses no time reading it.
+   */
+  mint?: boolean;
   /** The gateway URL endpoint discovery returned, for when the security read carries none. */
   gatewayUrlFallback?: string;
   /** An AI agent's test key comes from Agent Manager, which also checks `amp:agent:api-key-manage`. */
   agent?: boolean;
 }
 
-export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
+export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError, isLoading: isSecurityLoading } = useEndpointSecurity(ref, enabled);
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
@@ -207,8 +218,9 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
 
   const aiGateway = aiGatewayAccessOf(security, securityError);
   // The test-key routes refuse an AI gateway endpoint, so none of the minting below applies to it.
-  const mintable = canCreateKey && !aiGateway;
-  const switchable = canSwitch && !aiGateway;
+  const mintable = canCreateKey && !aiGateway && mint;
+  const managedIn = security?.editable === false ? security.entryEnvironment || 'the first environment' : null;
+  const switchable = canSwitch && !aiGateway && managedIn === null;
   const mode = security?.mode ?? null;
 
   const held = useQuery({
@@ -326,6 +338,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     keyError,
     needsApiKeyAuth: mintable && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
     canSwitch: switchable,
+    managedIn,
     isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
     switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never

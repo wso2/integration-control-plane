@@ -33,6 +33,10 @@ vi.mock('../../api/userPortal', () => ({
   unpublishFromUserPortal: vi.fn(),
 }));
 
+// Whether the card's environment is where the project's API security is edited.
+const entry = vi.hoisted(() => ({ value: { isEntry: true, loading: false, entryEnvironmentName: 'Development' } }));
+vi.mock('../../hooks/useEntryEnvironment', () => ({ useEntryEnvironment: () => entry.value }));
+
 const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const portal = vi.mocked(api.fetchUserPortal);
 const publish = vi.mocked(api.publishToUserPortal);
@@ -43,6 +47,7 @@ const refused: UserPortalPublishability = {
   environment: 'production',
   published: false,
   publishable: false,
+  redeploys: false,
   reasons: [{ code: 'USER_PORTAL_PIPELINE', message: 'only integrations of projects on the "default" deployment pipeline can be published to the User Portal' }],
 };
 
@@ -51,16 +56,19 @@ const portalOff: UserPortalPublishability = {
   reasons: [...refused.reasons, { code: 'USER_PORTAL_NOT_ENABLED', message: 'the user portal is not enabled in this environment' }],
 };
 
-const publishable: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [] };
+const publishable: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: false };
 
 let unmount = () => {};
 afterEach(() => unmount());
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  entry.value = { isEntry: true, loading: false, entryEnvironmentName: 'Development' };
+});
 
-async function action(scopes: string[]) {
+async function action(scopes: string[], isWorkflow = false) {
   const r = await renderWithScopes(
     <MemoryRouter>
-      <UserPortalAction orgHandler="acme" componentId="orders" environment="production" envName="Production" onNotify={onNotify} />
+      <UserPortalAction orgHandler="acme" projectId="shop" componentId="orders" environment="production" envName="Production" onNotify={onNotify} isWorkflow={isWorkflow} />
     </MemoryRouter>,
     scopes,
   );
@@ -113,6 +121,18 @@ describe("the env card's User Portal action", () => {
     expect(publish).toHaveBeenCalledWith('orders', 'production');
     expect(dialog(container)).toBeNull();
     expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Published to the User Portal in Production.', severity: 'success', detail: expect.stringContaining('bad scope') }));
+  });
+
+  // Publishing redeploys the workflow to take only User Portal sign-ins, which turns the console's workflow views off.
+  it('warns of the redeploy in the confirmation of a publish that redeploys a workflow', async () => {
+    publishability.mockResolvedValue({ ...publishable, redeploys: true });
+    publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: [] });
+    const container = await action(DEVELOPER, true);
+    await act(async () => toggle(container)?.click());
+    expect(dialog(container)?.textContent).toContain('will be redeployed in Production');
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    expect(publish).toHaveBeenCalledWith('orders', 'production');
   });
 
   it('keeps the confirm dialog open on a refused publish, worded from its code', async () => {
@@ -183,6 +203,22 @@ describe("the env card's User Portal action", () => {
     await act(async () => dialogButton(container, 'Unpublish')?.click());
     await flush();
     expect(unpublish).toHaveBeenCalledWith('orders', 'production');
+  });
+
+  it('says unpublishing a workflow redeploys it, and where its security comes by promotion that the console stays off', async () => {
+    publishability.mockResolvedValue({ ...publishable, published: true });
+    for (const [isEntry, says] of [
+      [true, "The console's workflow views work there again."],
+      [false, 'Production takes its API security from Development by promotion'],
+    ] as const) {
+      entry.value = { isEntry, loading: false, entryEnvironmentName: 'Development' };
+      const container = await action(DEVELOPER, true);
+      await act(async () => toggle(container)?.click());
+      expect(dialog(container)?.textContent).toContain('The workflow is redeployed in Production');
+      expect(dialog(container)?.textContent).toContain(says);
+      expect(dialog(container)?.textContent).not.toContain('keeps running');
+      unmount();
+    }
   });
 
   it('shows nothing where the BFF serves no User Portal', async () => {

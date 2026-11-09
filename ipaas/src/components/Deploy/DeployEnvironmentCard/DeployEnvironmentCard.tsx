@@ -368,7 +368,7 @@ export default function DeployEnvironmentCard({
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
           <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
-          {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} componentId={componentId} environment={env.id} envName={env.name} />}
+          {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={env.id} envName={env.name} isWorkflow={isWorkflow} />}
         </CardContent>
 
         {showPromote && (
@@ -385,6 +385,7 @@ export default function DeployEnvironmentCard({
                     deploymentPipelineId={deploymentPipelineId}
                     sourceEnvId={env.id}
                     targetEnvId={nextEnvId}
+                    isWorkflow={isWorkflow}
                     icon={<ArrowRight size={14} />}
                     onPromoteStarted={onPromoteStarted}
                     onPromoteSettled={onPromoteSettled}

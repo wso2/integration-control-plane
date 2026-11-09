@@ -57,7 +57,15 @@ interface WorkflowRunDetailDrawerProps {
   run: WorkflowInstanceSummary | null;
   api: ReadyWorkflowApi;
   onClose: () => void;
+  /**
+   * What the run's views the console can't serve yet offer meanwhile: the way to them in the User Portal. Without one,
+   * the drawer doesn't point to the User Portal.
+   */
+  comingSoonAction?: ReactNode;
 }
+
+/** What the drawer says of the run's views the console can't serve yet; with a way to them, that the User Portal has them. */
+const RUN_VIEWS_COMING_SOON = 'The execution graph, activity tree and timeline are coming to the console.';
 
 const LIFECYCLE_ACTIONS: {
   action: WorkflowLifecycleAction;
@@ -159,7 +167,7 @@ function RailSkeleton(): JSX.Element {
  * step's executions and opens the first one's details. Picking a span highlights its step on the
  * rail and opens that span's details.
  */
-export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowRunDetailDrawerProps): JSX.Element {
+export default function WorkflowRunDetailDrawer({ run, api, onClose, comingSoonAction }: WorkflowRunDetailDrawerProps): JSX.Element {
   const { client } = api;
   const { scopeId } = api.connection;
   const maximized = useOpenMaximized(run?.runId);
@@ -504,9 +512,9 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
                 </Box>
               )}
 
-              {/* The flow and the timeline are drawn from the run's details. */}
+              {/* The flow and the timeline are drawn from the run's details, which the User Portal already shows. */}
               {!CALLS_CARRY_ROLES ? (
-                <ComingSoonInline description="The execution graph and the activity tree are currently under development." />
+                <ComingSoonInline description={comingSoonAction ? `${RUN_VIEWS_COMING_SOON} Until then, publish this workflow to the User Portal to see them there.` : RUN_VIEWS_COMING_SOON} action={comingSoonAction} />
               ) : (
                 <>
                   <Box sx={styles.flowHeader}>

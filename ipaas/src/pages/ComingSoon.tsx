@@ -18,7 +18,7 @@
 
 import { Box, Button, PageContent, Stack, Typography, type SxProps, type Theme } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { artSx, descriptionSx, inlineArtSx, inlineSx, pageSx, textStackSx } from './ComingSoon.styles';
 
@@ -73,8 +73,11 @@ function ClockArt({ sx }: { sx: SxProps<Theme> }): JSX.Element {
   );
 }
 
-/** "Coming soon" for a panel inside a page: smaller, and with no way back since the page stays. */
-export function ComingSoonInline({ title = HEADING, description }: { title?: string; description: string }): JSX.Element {
+/**
+ * "Coming soon" for a panel inside a page: smaller, and with no way back since the page stays. `action` offers what
+ * can be done meanwhile.
+ */
+export function ComingSoonInline({ title = HEADING, description, action }: { title?: string; description: string; action?: ReactNode }): JSX.Element {
   return (
     <Stack alignItems="center" gap={1.5} sx={inlineSx}>
       <ClockArt sx={inlineArtSx} />
@@ -84,6 +87,7 @@ export function ComingSoonInline({ title = HEADING, description }: { title?: str
       <Typography variant="body2" color="text.secondary" sx={descriptionSx}>
         {description}
       </Typography>
+      {action}
     </Stack>
   );
 }

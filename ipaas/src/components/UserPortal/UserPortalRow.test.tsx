@@ -32,6 +32,10 @@ vi.mock('../../api/userPortal', () => ({
   unpublishFromUserPortal: vi.fn(),
 }));
 
+// Whether the row's environment is where the project's API security is edited.
+const entry = vi.hoisted(() => ({ value: { isEntry: true, loading: false, entryEnvironmentName: 'Development' } }));
+vi.mock('../../hooks/useEntryEnvironment', () => ({ useEntryEnvironment: () => entry.value }));
+
 const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const publish = vi.mocked(api.publishToUserPortal);
 
@@ -39,11 +43,15 @@ const refused: UserPortalPublishability = {
   environment: 'production',
   published: false,
   publishable: false,
+  redeploys: false,
   reasons: [
     { code: 'USER_PORTAL_PIPELINE', message: 'only integrations of projects on the "default" deployment pipeline can be published to the User Portal' },
     { code: 'USER_PORTAL_AGENT_OAUTH_REQUIRED', message: 'turn on OAuth security for the agent' },
   ],
 };
+
+// The dialog's own button: the row behind it has one of the same name.
+const dialogButton = (container: HTMLElement, name: string): HTMLButtonElement | undefined => [...(container.ownerDocument.querySelector('[role="dialog"]')?.querySelectorAll('button') ?? [])].find((b) => b.textContent?.trim() === name);
 
 const portalOff: UserPortalPublishability = {
   ...refused,
@@ -52,12 +60,15 @@ const portalOff: UserPortalPublishability = {
 
 let unmount = () => {};
 afterEach(() => unmount());
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  entry.value = { isEntry: true, loading: false, entryEnvironmentName: 'Development' };
+});
 
-async function row(scopes: string[]) {
+async function row(scopes: string[], isWorkflow = false) {
   const r = await renderWithScopes(
     <MemoryRouter>
-      <UserPortalRow orgHandler="acme" componentId="orders" environment="production" envName="Production" />
+      <UserPortalRow orgHandler="acme" projectId="shop" componentId="orders" environment="production" envName="Production" isWorkflow={isWorkflow} />
     </MemoryRouter>,
     scopes,
   );
@@ -104,7 +115,7 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it('publishes when the rules pass, and reports scopes the portal could not take', async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false });
     publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: ['bad scope'] });
     const container = await row(DEVELOPER);
     const b = button(container, 'Publish');
@@ -115,8 +126,64 @@ describe("the deploy card's User Portal row", () => {
     expect(container.textContent).toContain('bad scope');
   });
 
+  // Publishing redeploys the workflow to take only User Portal sign-ins, which turns the console's workflow views off.
+  it('warns before a publish that redeploys a workflow, and publishes once confirmed', async () => {
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true });
+    publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: [] });
+    const container = await row(DEVELOPER);
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    expect(publish).not.toHaveBeenCalled();
+    const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Publish to the User Portal in Production?');
+    expect(dialog?.textContent).toContain('will be redeployed in Production');
+    expect(dialog?.textContent).toContain('Use the User Portal for all workflow management.');
+
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    expect(publish).toHaveBeenCalledWith('orders', 'production');
+    await vi.waitFor(() => expect(container.ownerDocument.querySelector('[role="dialog"]')).toBeNull());
+  });
+
+  it('clears what the last publish left on screen as soon as another is asked for', async () => {
+    const notPublished = { environment: 'production', published: false, publishable: true, reasons: [] };
+    publishability.mockResolvedValueOnce({ ...notPublished, redeploys: false }).mockResolvedValue({ ...notPublished, redeploys: true });
+    publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: ['bad scope'] });
+    const container = await row(DEVELOPER);
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    expect(container.textContent).toContain('bad scope');
+
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    expect(container.ownerDocument.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('bad scope');
+  });
+
+  it('publishes nothing when the redeploy warning is cancelled', async () => {
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true });
+    const container = await row(DEVELOPER);
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    await act(async () => button(container, 'Cancel')?.click());
+    await flush();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('keeps the redeploy warning open on a failed publish, saying why', async () => {
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true });
+    publish.mockRejectedValue(new BffError(503, '{"code":"USER_PORTAL_SIGN_IN_NOT_READY","message":"not ready"}'));
+    const container = await row(DEVELOPER);
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain("The User Portal's sign-in isn't ready in Production yet. Publish again once it is.");
+  });
+
   it("tells a role that can't deploy why it can't publish", async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false });
     const container = await row(VIEWER);
     const b = button(container, 'Publish');
     expect(b?.disabled).toBe(true);
@@ -131,12 +198,33 @@ describe("the deploy card's User Portal row", () => {
     expect(container.textContent).not.toContain('default deployment pipeline');
   });
 
+  // Unpublishing a workflow redeploys it to take the console's API key again; where its API security comes by promotion
+  // the gateway keeps the portal's sign-in, and the console stays off.
+  it('says what unpublishing does to the integration and the console', async () => {
+    publishability.mockResolvedValue({ ...refused, published: true });
+    for (const { isWorkflow, isEntry, says, not } of [
+      { isWorkflow: true, isEntry: true, says: ['redeployed in Production', "The console's workflow views work there again."], not: ['keeps running', 'by promotion'] },
+      { isWorkflow: true, isEntry: false, says: ['redeployed in Production', 'Production takes its API security from Development by promotion'], not: ['keeps running', 'work there again'] },
+      { isWorkflow: false, isEntry: false, says: ['The integration keeps running.'], not: ['redeployed', 'by promotion'] },
+    ]) {
+      entry.value = { isEntry, loading: false, entryEnvironmentName: 'Development' };
+      const container = await row(DEVELOPER, isWorkflow);
+      await act(async () => button(container, 'Unpublish')?.click());
+      await flush();
+      const dialog = container.ownerDocument.querySelector('[role="dialog"]')?.textContent ?? '';
+      for (const text of says) expect(dialog).toContain(text);
+      for (const text of not) expect(dialog).not.toContain(text);
+      unmount();
+    }
+  });
+
   // With nothing deployed, every rule about what runs there fails too; deploying is the one fix.
   it('asks for a deployment first, not for what follows from one', async () => {
     publishability.mockResolvedValue({
       environment: 'production',
       published: false,
       publishable: false,
+      redeploys: false,
       reasons: [
         { code: 'USER_PORTAL_NOT_DEPLOYED', message: 'the integration is not deployed in this environment; deploy it first' },
         { code: 'USER_PORTAL_NO_MANAGEMENT_API', message: 'the workflow has no Workflow Management API endpoint deployed in this environment' },
@@ -150,7 +238,7 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it('words a refused publish from its code', async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false });
     publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"the integration is not deployed in this environment; deploy it first"}'));
     const container = await row(DEVELOPER);
     await act(async () => button(container, 'Publish')?.click());
