@@ -169,16 +169,16 @@ describe('validatePlanSchedule', () => {
   it('holds an automation on a free plan to runs 5 minutes apart and 300 seconds', () => {
     expect(validatePlanSchedule('*/5 * * * *', '300', true, none, automationFree, true)).toEqual({});
     const errors = validatePlanSchedule('*/4 * * * *', '301', false, none, automationFree, true);
-    expect(errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan');
-    expect(errors.timeout).toBe('A timeout over 300 seconds (5 minutes) needs a paid plan');
+    expect(errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan.');
+    expect(errors.timeout).toBe('A timeout over 300 seconds (5 minutes) needs a paid plan.');
   });
 
   it('holds an ingestion on a free plan to one run a day, 1 hour, and no overlap', () => {
     expect(validatePlanSchedule('0 0 */1 * *', '3600', false, none, ingestionFree, true)).toEqual({});
     const errors = validatePlanSchedule('0 0,12 * * *', '3601', true, none, ingestionFree, true);
-    expect(errors.frequency).toBe('Running more often than every 1 day needs a paid plan');
-    expect(errors.timeout).toBe('A timeout over 3600 seconds (1 hour) needs a paid plan');
-    expect(errors.overlap).toBe('Overlapping executions need a paid plan');
+    expect(errors.frequency).toBe('Running more often than every 1 day needs a paid plan.');
+    expect(errors.timeout).toBe('A timeout over 3600 seconds (1 hour) needs a paid plan.');
+    expect(errors.overlap).toBe('Overlapping executions need a paid plan.');
   });
 
   it('lets a paid plan run an ingestion every minute, for any time, overlapping', () => {

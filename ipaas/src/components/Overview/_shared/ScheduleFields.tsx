@@ -20,20 +20,7 @@ import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel,
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
-import { describeMinutes, describeSeconds } from '../../../utils/scheduleValidation';
-import type { ScheduleLimits } from '../../../types/schedule';
 import type { ScheduleFormApi } from './useScheduleForm';
-
-/** What the free plan holds back, for the notice: "Schedules that run more often than …, … can only be configured on a paid plan." */
-function freePlanNotice(free: ScheduleLimits, paid: ScheduleLimits, executionSettings: boolean): string | null {
-  const held: string[] = [];
-  if (free.minRunIntervalMinutes > Math.max(paid.minRunIntervalMinutes, 1)) held.push(`schedules that run more often than every ${describeMinutes(free.minRunIntervalMinutes)}`);
-  if (executionSettings && free.maxTimeoutSeconds > 0) held.push(`job timeouts over ${describeSeconds(free.maxTimeoutSeconds)}`);
-  if (executionSettings && !free.allowOverlap && paid.allowOverlap) held.push('overlapping executions');
-  if (held.length === 0) return null;
-  const list = held.length === 1 ? held[0] : `${held.slice(0, -1).join(', ')}, and ${held[held.length - 1]}`;
-  return `${list.charAt(0).toUpperCase()}${list.slice(1)} can only be configured on a paid plan.`;
-}
 
 /**
  * Presentational cron editor bound to a {@link useScheduleForm} instance.
@@ -43,16 +30,10 @@ function freePlanNotice(free: ScheduleLimits, paid: ScheduleLimits, executionSet
 export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan, policy } = form;
-  const notice = freePlanNotice(policy.free, policy.paid, executionSettings);
-  const frequencyError = errors.frequency && (
-    <Typography variant="body2" color="error">
-      {errors.frequency}
-    </Typography>
-  );
+  const frequencyError = errors.frequency && <Alert severity="warning">{errors.frequency}</Alert>;
 
   return (
     <Stack gap={2}>
-      {plan?.state === 'free' && notice && <Alert severity="info">{notice}</Alert>}
       {plan?.state === 'unavailable' && (
         <Alert
           severity="warning"
@@ -70,11 +51,11 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
       </Tabs>
 
       {tab === 0 ? (
-        <Stack gap={1.5}>
+        <Stack gap={1}>
           <Typography variant="body2" color="text.secondary">
             Repeat beginning of every
           </Typography>
-          {/* Top-aligned: the count's reserved helper line would otherwise stretch the unit select. */}
+          {/* Top-aligned: the count's error line would otherwise stretch the unit select. */}
           <Stack direction="row" gap={2} alignItems="flex-start">
             <TextField
               inputMode="numeric"
@@ -87,7 +68,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                 if (typeof intervalCount !== 'number' || intervalCount < 1) setIntervalCount(1);
               }}
               error={!!errors.intervalCount}
-              helperText={errors.intervalCount || ' '}
+              helperText={errors.intervalCount}
               sx={{ width: 120 }}
             />
             <Select value={intervalUnit} onChange={(e) => setIntervalUnit(e.target.value as IntervalUnit)} sx={{ flex: 1 }}>
@@ -142,7 +123,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
         <Button variant="text" size="small" endIcon={advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />} onClick={() => setAdvancedOpen((v) => !v)} sx={{ px: 0 }}>
           Advanced settings
         </Button>
-        <Collapse in={advancedOpen || !!errors.timeout || !!errors.overlap}>
+        <Collapse in={advancedOpen || !!errors.timeout || !!errors.timeoutLimit || !!errors.overlap}>
           <Stack gap={2} sx={{ mt: 1.5 }}>
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
@@ -171,15 +152,20 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                     onChange={(e) => form.setTimeoutSeconds(e.target.value)}
                     placeholder={`Default: ${policy.defaultTimeoutSeconds}`}
                     error={!!errors.timeout}
-                    helperText={errors.timeout || ' '}
+                    helperText={errors.timeout}
                   />
+                  {errors.timeoutLimit && (
+                    <Alert severity="warning" sx={{ mt: 1 }}>
+                      {errors.timeoutLimit}
+                    </Alert>
+                  )}
                 </Box>
                 <Box>
                   <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow overlapping executions" />
                   {errors.overlap && (
-                    <Typography variant="body2" color="error">
+                    <Alert severity="warning" sx={{ mt: 1 }}>
                       {errors.overlap}
-                    </Typography>
+                    </Alert>
                   )}
                 </Box>
               </>
