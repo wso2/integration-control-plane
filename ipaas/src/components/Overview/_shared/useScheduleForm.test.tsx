@@ -125,9 +125,24 @@ describe('useScheduleForm plan limits', () => {
     expect(container.textContent).not.toContain('paid plan');
   });
 
-  it('applies the free limits while the plan loads', async () => {
+  it('shows no plan errors while the plan loads, but holds back a schedule beyond the free limits', async () => {
+    await render(null, null);
+    expect(form.isValid).toBe(true);
+    await act(() => form.setIntervalCount(1));
+    await act(() => form.setTimeoutSeconds('3600'));
+    expect(form.errors.frequency).toBeUndefined();
+    expect(form.errors.timeout).toBeUndefined();
+    expect(container.textContent).not.toContain('paid plan');
+    expect(form.isValid).toBe(false);
+  });
+
+  it('settles once the plan loads: allowed on a paid plan, an error on a free one', async () => {
     await render(null, null);
     await act(() => form.setIntervalCount(1));
+    await render(null, paid);
+    expect(form.isValid).toBe(true);
+    await render(null, free);
+    expect(form.errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan');
     expect(form.isValid).toBe(false);
   });
 

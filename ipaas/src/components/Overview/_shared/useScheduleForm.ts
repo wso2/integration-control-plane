@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { type IntervalUnit, type CronField, intervalToCron, cronToInterval, parseCronParts, buildCronFromParts, describeCron } from '../../../utils/cronUtils';
-import { validateCronFields, validatePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
+import { type PlanScheduleErrors, validateCronFields, validatePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
 import type { SchedulePolicy } from '../../../types/schedule';
 import type { ExecutionConfigs } from '../../../types/executions';
 import type { PlanAccess } from '../../../utils/billing';
@@ -66,6 +66,8 @@ export interface ScheduleFormApi extends ScheduleValues {
   policy: SchedulePolicy;
 }
 
+const NO_PLAN_ERRORS: PlanScheduleErrors = {};
+
 /**
  * Owns the schedule form state (interval/cron, timezone, execution behaviour),
  * seeded from an existing schedule. Shared by the standalone Schedule drawer and
@@ -107,18 +109,28 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
   const savedTimeout = existingConfigs?.timeoutSeconds ?? null;
   const savedConcurrency = existingConfigs?.cronjobAllowConcurrency ?? null;
 
+  const planErrors = useMemo(
+    () => validatePlanSchedule(cron, timeoutSeconds, allowConcurrency, { cron: savedCron, timeoutSeconds: savedTimeout, allowConcurrency: savedConcurrency }, limits, free),
+    [cron, timeoutSeconds, allowConcurrency, savedCron, savedTimeout, savedConcurrency, limits, free],
+  );
+  // While the plan loads, a paid user would see free-plan errors, so none are shown; a schedule beyond
+  // the free limits still can't be saved until the plan says whether it is allowed.
+  const planLoading = plan === null;
+  const shownPlanErrors = planLoading ? NO_PLAN_ERRORS : planErrors;
+
   // Only the active tab's fields are validated: the other tab's state is not written.
-  const errors = useMemo<ScheduleFormErrors>(() => {
-    const planErrors = validatePlanSchedule(cron, timeoutSeconds, allowConcurrency, { cron: savedCron, timeoutSeconds: savedTimeout, allowConcurrency: savedConcurrency }, limits, free);
-    return {
-      timeout: validateTimeout(timeoutSeconds) ?? planErrors.timeout,
+  const errors = useMemo<ScheduleFormErrors>(
+    () => ({
+      timeout: validateTimeout(timeoutSeconds) ?? shownPlanErrors.timeout,
       intervalCount: tab === 0 ? validateIntervalCount(intervalCount) : undefined,
       cron: tab === 1 ? validateCronFields(cronFields) : {},
-      frequency: planErrors.frequency,
-      overlap: planErrors.overlap,
-    };
-  }, [timeoutSeconds, tab, intervalCount, cronFields, cron, allowConcurrency, limits, free, savedCron, savedTimeout, savedConcurrency]);
-  const isValid = !errors.timeout && !errors.intervalCount && !errors.frequency && !errors.overlap && Object.keys(errors.cron).length === 0;
+      frequency: shownPlanErrors.frequency,
+      overlap: shownPlanErrors.overlap,
+    }),
+    [timeoutSeconds, tab, intervalCount, cronFields, shownPlanErrors],
+  );
+  const waitingForPlan = planLoading && Object.values(planErrors).some(Boolean);
+  const isValid = !waitingForPlan && !errors.timeout && !errors.intervalCount && !errors.frequency && !errors.overlap && Object.keys(errors.cron).length === 0;
 
   return {
     tab,
