@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { Accordion, AccordionDetails, AccordionSummary, FormControlLabel, IconButton, Link, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Accordion, AccordionDetails, AccordionSummary, Box, FormControlLabel, IconButton, Link, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, ExternalLink, Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { CUSTOM_VOICE_ID, STT_PROVIDERS, TTS_PROVIDERS } from '../../constants/voiceAgentProviders';
 import type { BargeInMode, EndpointingMode, TurnDetectionModel, VoiceAgentSettings } from '../../types/voiceAgent';
 import { withSttProvider, withTtsProvider, type StepErrors } from '../../utils/voiceAgent';
+import ProviderPicker from './ProviderPicker';
 
 export interface VoiceAgentStepProps {
   settings: VoiceAgentSettings;
@@ -98,39 +99,53 @@ export function LiveKitStep({ settings, errors, onChange }: VoiceAgentStepProps)
   );
 }
 
+const PROVIDER_FORM_SX = { maxWidth: 1040 } as const;
+const ROW_SX = (columns: number) => ({ display: 'grid', gridTemplateColumns: { xs: '1fr', md: `repeat(${columns}, 1fr)` }, gap: 2 }) as const;
+const LINK_SX = { display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: -1 } as const;
+
+interface OptionSelectProps {
+  label: string;
+  placeholder: string;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange: (value: string) => void;
+}
+
+function OptionSelect({ label, placeholder, value, options, onChange }: OptionSelectProps): JSX.Element {
+  return (
+    <TextField labelPlacement="top" select label={label} fullWidth disabled={options.length === 0} value={options.length ? value : ''} onChange={(e) => onChange(e.target.value)} slotProps={{ select: { displayEmpty: true, renderValue: (v) => (v ? options.find((o) => o.value === v)?.label : <Typography color="text.disabled">{placeholder}</Typography>) } }}>
+      <MenuItem value="" disabled>
+        {placeholder}
+      </MenuItem>
+      {options.map((o) => (
+        <MenuItem key={o.value} value={o.value}>
+          {o.label}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+}
+
+function ApiKeyDocsLink({ name, href }: { name: string; href: string }): JSX.Element {
+  return (
+    <Link href={href} target="_blank" rel="noopener noreferrer" variant="body2" sx={LINK_SX}>
+      How to get your {name} API key?
+      <ExternalLink size={14} />
+    </Link>
+  );
+}
+
 export function SttStep({ settings, errors, onChange, onReplace }: VoiceAgentStepProps): JSX.Element {
   const provider = STT_PROVIDERS.find((p) => p.id === settings.sttProvider);
   return (
-    <Stack gap={2} sx={FIELD_STACK_SX}>
-      <TextField labelPlacement="top" select label="Provider" fullWidth value={settings.sttProvider} onChange={(e) => onReplace(withSttProvider(settings, e.target.value))} error={!!errors.sttProvider} helperText={help(errors.sttProvider)}>
-        {STT_PROVIDERS.map((p) => (
-          <MenuItem key={p.id} value={p.id}>
-            {p.name}
-          </MenuItem>
-        ))}
-      </TextField>
-      {provider && (
-        <>
-          <TextField labelPlacement="top" select label="Model" fullWidth value={settings.sttModel} onChange={(e) => onChange({ sttModel: e.target.value })} helperText=" ">
-            {provider.models.map((m) => (
-              <MenuItem key={m.id} value={m.id}>
-                {m.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField labelPlacement="top" select label="Language" fullWidth value={settings.sttLanguage} onChange={(e) => onChange({ sttLanguage: e.target.value })} helperText=" ">
-            {provider.languages.map((l) => (
-              <MenuItem key={l.code} value={l.code}>
-                {l.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          <SecretField label={`${provider.name} API key`} value={settings.sttApiKey} onChange={(sttApiKey) => onChange({ sttApiKey })} error={errors.sttApiKey} hint="Stored as a secret. It cannot be read back." />
-          <Link href={provider.apiKeyDocsUrl} target="_blank" rel="noopener noreferrer" variant="body2">
-            Get a {provider.name} API key
-          </Link>
-        </>
-      )}
+    <Stack gap={3} sx={PROVIDER_FORM_SX}>
+      <ProviderPicker label="Speech-to-text provider" providers={STT_PROVIDERS} value={settings.sttProvider} onSelect={(id) => onReplace(withSttProvider(settings, id))} error={errors.sttProvider} />
+      <Box sx={ROW_SX(2)}>
+        <OptionSelect label="Model" placeholder="Select model" value={settings.sttModel} options={(provider?.models ?? []).map((m) => ({ value: m.id, label: m.label }))} onChange={(sttModel) => onChange({ sttModel })} />
+        <OptionSelect label="Language" placeholder="Select language" value={settings.sttLanguage} options={(provider?.languages ?? []).map((l) => ({ value: l.code, label: l.label }))} onChange={(sttLanguage) => onChange({ sttLanguage })} />
+      </Box>
+      <SecretField label={provider ? `${provider.name} API key` : 'API key'} value={settings.sttApiKey} onChange={(sttApiKey) => onChange({ sttApiKey })} error={errors.sttApiKey} hint="Stored as a secret. It cannot be read back." />
+      {provider && <ApiKeyDocsLink name={provider.name} href={provider.apiKeyDocsUrl} />}
     </Stack>
   );
 }
@@ -138,54 +153,26 @@ export function SttStep({ settings, errors, onChange, onReplace }: VoiceAgentSte
 export function TtsStep({ settings, errors, onChange, onReplace }: VoiceAgentStepProps): JSX.Element {
   const provider = TTS_PROVIDERS.find((p) => p.id === settings.ttsProvider);
   return (
-    <Stack gap={2} sx={FIELD_STACK_SX}>
-      <TextField labelPlacement="top" select label="Provider" fullWidth value={settings.ttsProvider} onChange={(e) => onReplace(withTtsProvider(settings, e.target.value))} error={!!errors.ttsProvider} helperText={help(errors.ttsProvider)}>
-        {TTS_PROVIDERS.map((p) => (
-          <MenuItem key={p.id} value={p.id}>
-            {p.name}
-          </MenuItem>
-        ))}
-      </TextField>
-      {provider && (
-        <>
-          <TextField labelPlacement="top" select label="Model" fullWidth value={settings.ttsModel} onChange={(e) => onChange({ ttsModel: e.target.value })} helperText=" ">
-            {provider.models.map((m) => (
-              <MenuItem key={m.id} value={m.id}>
-                {m.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField labelPlacement="top" select label="Voice" fullWidth value={settings.ttsVoiceId} onChange={(e) => onChange({ ttsVoiceId: e.target.value })} helperText=" ">
-            {provider.voices.map((v) => (
-              <MenuItem key={v.id} value={v.id}>
-                {v.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          {settings.ttsVoiceId === CUSTOM_VOICE_ID && (
-            <TextField
-              labelPlacement="top"
-              label="Voice ID"
-              fullWidth
-              value={settings.ttsCustomVoiceId}
-              onChange={(e) => onChange({ ttsCustomVoiceId: e.target.value })}
-              error={!!errors.ttsCustomVoiceId}
-              helperText={help(errors.ttsCustomVoiceId, `The voice's ID in ${provider.name}.`)}
-            />
-          )}
-          <TextField labelPlacement="top" select label="Language" fullWidth value={settings.ttsLanguage} onChange={(e) => onChange({ ttsLanguage: e.target.value })} helperText=" ">
-            {provider.languages.map((l) => (
-              <MenuItem key={l.code} value={l.code}>
-                {l.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          <SecretField label={`${provider.name} API key`} value={settings.ttsApiKey} onChange={(ttsApiKey) => onChange({ ttsApiKey })} error={errors.ttsApiKey} hint="Stored as a secret. It cannot be read back." />
-          <Link href={provider.apiKeyDocsUrl} target="_blank" rel="noopener noreferrer" variant="body2">
-            Get a {provider.name} API key
-          </Link>
-        </>
+    <Stack gap={3} sx={PROVIDER_FORM_SX}>
+      <ProviderPicker label="Text-to-speech provider" providers={TTS_PROVIDERS} value={settings.ttsProvider} onSelect={(id) => onReplace(withTtsProvider(settings, id))} error={errors.ttsProvider} />
+      <Box sx={ROW_SX(3)}>
+        <OptionSelect label="Model" placeholder="Select model" value={settings.ttsModel} options={(provider?.models ?? []).map((m) => ({ value: m.id, label: m.label }))} onChange={(ttsModel) => onChange({ ttsModel })} />
+        <OptionSelect label="Voice" placeholder="Select voice" value={settings.ttsVoiceId} options={(provider?.voices ?? []).map((v) => ({ value: v.id, label: v.label }))} onChange={(ttsVoiceId) => onChange({ ttsVoiceId })} />
+        <OptionSelect label="Language" placeholder="Select language" value={settings.ttsLanguage} options={(provider?.languages ?? []).map((l) => ({ value: l.code, label: l.label }))} onChange={(ttsLanguage) => onChange({ ttsLanguage })} />
+      </Box>
+      {provider && settings.ttsVoiceId === CUSTOM_VOICE_ID && (
+        <TextField
+          labelPlacement="top"
+          label="Voice ID"
+          fullWidth
+          value={settings.ttsCustomVoiceId}
+          onChange={(e) => onChange({ ttsCustomVoiceId: e.target.value })}
+          error={!!errors.ttsCustomVoiceId}
+          helperText={help(errors.ttsCustomVoiceId, `The voice's ID in ${provider.name}.`)}
+        />
       )}
+      <SecretField label={provider ? `${provider.name} API key` : 'API key'} value={settings.ttsApiKey} onChange={(ttsApiKey) => onChange({ ttsApiKey })} error={errors.ttsApiKey} hint="Stored as a secret. It cannot be read back." />
+      {provider && <ApiKeyDocsLink name={provider.name} href={provider.apiKeyDocsUrl} />}
     </Stack>
   );
 }
