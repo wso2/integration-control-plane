@@ -51,11 +51,11 @@ describe('ConnectionSidebar', () => {
     expect(connectButton()?.disabled).toBe(true);
   });
 
-  it('connects without a token when keyless, and says why no key is asked for', async () => {
+  it('connects without a token when keyless, and says the calls skip the AI gateway', async () => {
     const onConnect = vi.fn();
     await render({ keyless: true, visibility: 'Public', onConnect });
     expect(container.querySelector('[aria-label="Show token"]')).toBeNull();
-    expect(container.textContent).toContain('need no key');
+    expect(container.textContent).toContain('not through the AI gateway');
     expect((container.querySelector('input[value="Public"]') as HTMLInputElement | null)?.readOnly).toBe(true);
     expect((container.querySelector(`input[value="${proxyUrl}"]`) as HTMLInputElement | null)?.readOnly).toBe(true);
     const button = connectButton();

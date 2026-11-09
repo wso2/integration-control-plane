@@ -95,7 +95,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
 
       {keyless ? (
         <Typography variant="caption" color="text.secondary">
-          Calls from this page need no key: the integration platform passes them to the MCP server. Agents call it at this URL with keys Agent Manager gives them.
+          Calls from this page go straight to the MCP server, not through the AI gateway, so they need no key and the gateway's policies don't apply to them. Agents call this URL with keys Agent Manager gives them.
         </Typography>
       ) : (
         <TextField
