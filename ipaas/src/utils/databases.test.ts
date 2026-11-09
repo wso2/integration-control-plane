@@ -78,6 +78,11 @@ describe('toCreateDatabaseError', () => {
     expect(error.message).toBe('an instance named "orders" already exists');
   });
 
+  it('shows the plan limit the BFF reports', () => {
+    const error = toCreateDatabaseError(new BffError(402, JSON.stringify({ message: 'databases limit of 1 reached' })));
+    expect(error).toEqual({ title: 'Your plan does not allow another database', message: 'databases limit of 1 reached' });
+  });
+
   it('explains a suspended subscription', () => {
     expect(toCreateDatabaseError(new BffError(403, '{}')).title).toBe('Your subscription is suspended');
   });

@@ -36,6 +36,9 @@ export const PLATFORM_SERVICE_TYPES: PlatformServiceTypeOption[] = [
   { id: 'temporal', name: 'Temporal', description: 'A fully-managed Temporal server for durable, long-running workflows' },
 ];
 
+/** The only PaaS plan a free subscription may provision, for databases and Temporal servers alike. The BFF enforces it; the wizard only keeps the other plans from being picked. */
+export const FREE_PLAN_TIER = 'dev';
+
 export const POSTGRES_LOGO = `${DB_LOGO_BASE}postgresql.svg`;
 
 export const DATABASE_STATUS_LABELS: Record<DatabaseStatus, string> = {

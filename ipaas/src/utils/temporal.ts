@@ -59,6 +59,8 @@ export function toCreateTemporalError(error: unknown): { title: string; message:
     case 409:
     case 422:
       return { title: 'The Temporal server could not be created', message };
+    case 402:
+      return { title: 'Your plan does not allow another Temporal server', message: message || 'Upgrade your subscription to create more Temporal servers.' };
     case 403:
       return { title: 'Your subscription is suspended', message: 'Renew your subscription to create Temporal servers.' };
     case 503:
