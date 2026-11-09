@@ -76,7 +76,8 @@ export async function rejectCookieBanner(page: Page): Promise<void> {
 export async function newConsoleContext(browser: Browser, options: BrowserContextOptions): Promise<BrowserContext> {
   const context = await browser.newContext(options);
   await restoreSessionStorage(context);
-  context.on('page', (page) => void rejectCookieBanner(page));
+  // Caught: registering on a page that has already closed (an OAuth popup, a tab a teardown shut) rejects.
+  context.on('page', (page) => void rejectCookieBanner(page).catch(() => {}));
   return context;
 }
 

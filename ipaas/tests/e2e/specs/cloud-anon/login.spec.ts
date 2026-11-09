@@ -49,8 +49,9 @@ test.describe('cloud login @smoke', () => {
 
     await expect(terms).toBeVisible();
     await expect(privacy).toBeVisible();
-    // Thunder's page is shared across WSO2 Cloud products and points at a per-product terms page (agent-manager today).
-    await expect(terms).toHaveAttribute('href', /^https:\/\/wso2\.com\/cloud\/([\w-]+\/)?terms-of-use\/?$/);
+    // TODO: Thunder's shared sign-in page links Agent Manager's terms for every product. Expect the Integration
+    // Platform's own page once Thunder serves it; until then this fails loudly when the link changes.
+    await expect(terms).toHaveAttribute('href', 'https://wso2.com/cloud/agent-manager/terms-of-use/');
     await expect(privacy).toHaveAttribute('href', 'https://wso2.com/privacy-policy/');
   });
 

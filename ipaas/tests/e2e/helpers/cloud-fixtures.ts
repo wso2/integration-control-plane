@@ -69,7 +69,10 @@ async function bffAuthHeaders(page: Page): Promise<Record<string, string>> {
     const base = (window as unknown as { API_CONFIG?: { choreoBaseApiUrl?: string } }).API_CONFIG?.choreoBaseApiUrl;
     return !!base && new URL(base, window.location.href).origin === window.location.origin;
   });
-  return sameOrigin ? { 'X-Requested-With': 'XMLHttpRequest' } : {};
+  if (!sameOrigin) {
+    throw new Error('The session has no bearer token and the BFF is on another origin than the page, so the gateway session cookie cannot be sent');
+  }
+  return { 'X-Requested-With': 'XMLHttpRequest' };
 }
 
 // Resolves with the BFF's verdict rather than throwing, so a caller can record the handle first.

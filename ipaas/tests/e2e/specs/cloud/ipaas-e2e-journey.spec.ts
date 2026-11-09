@@ -13,7 +13,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { AUTH_STATE_PATH, getAuthContext } from '../../helpers/auth-context.js';
 import { expectPageRendered } from '../../helpers/cloud-fixtures.js';
-import { newConsoleContext } from '../../helpers/session-storage.js';
+import { newConsoleContext, rejectCookieBanner } from '../../helpers/session-storage.js';
 import { BUILD_TIMEOUT_MS, waitForBuildToSettle } from '../../helpers/build.js';
 import { cardFor, expandSidebar, expectNavItems, openIntegration, openNavGroup, openProject } from '../../helpers/console-nav.js';
 import { fillSecret, readSecret } from '../../helpers/secrets.js';
@@ -27,6 +27,7 @@ import {
   AUTOMATION,
   CLOUD_SECTIONS,
   CONSUMER,
+  DEPLOY_ACTION_MS,
   DEPLOY_TIMEOUT_MS,
   ENV,
   EXECUTE_ATTEMPTS,
@@ -108,6 +109,8 @@ test.beforeAll(async ({ browser }, testInfo) => {
     baseURL: testInfo.project.use.baseURL,
   });
   page = await context.newPage();
+  // Awaited for the journey's own page, so its first navigation is covered; the context listener covers pages it did not open.
+  await rejectCookieBanner(page);
 });
 
 test.afterAll(async () => {
@@ -358,8 +361,7 @@ test.describe('04b endpoint and consumers @smoke', () => {
   });
 
   test('TC_IP_DEPLOY_007 the deployment settles out of In Progress into Active', async () => {
-    // deployLatestBuild alone can take about five minutes (two waits for the button, a reload, the enable and the alert).
-    test.setTimeout(DEPLOY_TIMEOUT_MS + 7 * 60_000);
+    test.setTimeout(DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await expect(envCard(page), `no ${ENV} card on ${SAMPLE}`).toBeVisible({ timeout: 2 * 60_000 });
     await deployLatestBuild(page);
     await expect(deploymentStatus(page)).toHaveText(/^(Active|Error)$/, { timeout: DEPLOY_TIMEOUT_MS });
@@ -451,7 +453,7 @@ test.describe('04c test console @smoke', () => {
   });
 
   test('TC_IP_TEST_001 the build completed and the deployment is Active', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await requireActiveDeployment(page);
   });
 
@@ -587,6 +589,7 @@ test.describe('04d schedule an automation @smoke', () => {
   test('TC_IP_AUTO_002 Quick deploy provisions the automation and lands on its overview', async () => {
     test.setTimeout(4 * 60_000);
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
+    // Unscoped on purpose: TC_IP_AUTO_001 left the search narrowed to this one card, and serial mode keeps it so.
     await page.getByRole('button', { name: 'Quick deploy' }).click();
 
     // The deploy runs through a progress page before settling on the integration's overview.
@@ -594,7 +597,7 @@ test.describe('04d schedule an automation @smoke', () => {
   });
 
   test('TC_IP_AUTO_003 the build completed and the automation offers Schedule and Test', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + MI_DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + MI_DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await requireAutomationReady(page);
   });
 
@@ -692,7 +695,10 @@ test.describe('05 import an AI agent @smoke', () => {
 
   test('TC_IP_AGENT_004 the imported agent reports its source and type', async () => {
     await expect(page.getByText(AGENT_TYPE, { exact: true }).first()).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByRole('link', { name: new RegExp(AGENT_REPO_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toBeVisible();
+    // HeaderShell names the link by the repository path (repoPathOf) and keeps the full URL in its href.
+    const source = page.getByRole('link', { name: new RegExp(`^${new URL(AGENT_REPO_URL).pathname.slice(1)}(/|$)`) });
+    await expect(source).toBeVisible();
+    await expect(source).toHaveAttribute('href', new RegExp(`^${AGENT_REPO_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`));
   });
 
   test('TC_IP_AGENT_005 the build section collapses and expands', async () => {
@@ -723,7 +729,7 @@ test.describe('05 import an AI agent @smoke', () => {
   });
 
   test('TC_IP_AGENT_007 the build completed and the deployment is Active', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await requireActiveDeployment(page, agentName || AGENT_TYPE);
   });
 

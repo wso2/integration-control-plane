@@ -91,6 +91,10 @@ export async function waitForBuildQuiet(page: Page, quietMs = BUILD_QUIET_MS): P
  * Auto deploy is held off for Ballerina integrations, so a finished build waits on the card's Deploy
  * (DeployButton.tsx). The card renders Deploy only while auto deploy is off and the newest build is not
  * running yet, so a card that shows its deployment status and no Deploy has nothing to deploy.
+ *
+ * Returning without a click is accepted as is: with auto deploy on, the platform owns the rollout, and a caller's
+ * Active check may briefly read the previous revision before it starts. The journey's fixtures are fresh
+ * integrations with no earlier revision, so that window does not arise there.
  */
 export async function deployLatestBuild(page: Page): Promise<void> {
   const deploy = envCard(page).getByRole('button', { name: 'Deploy', exact: true });
@@ -109,7 +113,13 @@ export async function deployLatestBuild(page: Page): Promise<void> {
       .catch(() => false);
     if (offered) {
       // Disabled while a build is queued or running, because its image does not exist yet.
-      await expect(deploy, 'Deploy stayed disabled after the build settled').toBeEnabled({ timeout: 2 * 60_000 });
+      const enabled = await expect(deploy)
+        .toBeEnabled({ timeout: 2 * 60_000 })
+        .then(() => true)
+        .catch(() => false);
+      // An agent's builds list no releases, so its Deploy never enables; Agent Manager deploys it, and the card reports that status.
+      if (!enabled && (await status.isVisible())) return;
+      await expect(deploy, 'Deploy stayed disabled after the build settled').toBeEnabled({ timeout: 1_000 });
       await deploy.click();
       // The card's own alert, shown for four seconds (EnvCardShell.tsx); an error alert carries the BFF's reason instead.
       await expect(envCard(page).getByText('Deployment started successfully'), 'the deploy request was refused').toBeVisible({ timeout: 60_000 });
@@ -194,7 +204,7 @@ export async function gatewayFailure(page: Page): Promise<string | null> {
     .or(alerts.filter({ has: page.getByRole('button', { name: retryName }) }))
     .first();
   const retry = failure.getByRole('button', { name: retryName });
-  const updating = alerts.filter({ hasText: 'Updating the API gateway…' });
+  const updating = alerts.filter({ hasText: 'Updating the API gateway…' }).first();
   const text = async () => (await failure.textContent())?.replace(/Retry(ing…)?$/, '').trim() || 'the API gateway could not be updated';
 
   const shown = await failure

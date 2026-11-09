@@ -19,7 +19,10 @@
 /** What the cloud journey is written against: its fixtures, their copy, and its budgets. */
 
 export const SAMPLE = 'Hello World Service';
-/** An MI automation sample (integration-samples' samples.json); Quick deploy names the integration after it. */
+/**
+ * An MI automation sample in wso2/integration-samples (.metadata/samples.json), owned by the integration samples maintainers.
+ * Quick deploy names the integration after it, so a rename there breaks 04d.
+ */
 export const AUTOMATION = 'Person Lookup Automation';
 export const MI_TECHNOLOGY = 'WSO2 Integrator: MI';
 export const AGENT_TYPE = 'AI Agent';
@@ -50,6 +53,8 @@ export const REMOVAL_TIMEOUT_MS = 10 * 60_000;
 /** A project goes only once its integrations are gone, so it is given longer than any one of them. */
 export const PROJECT_REMOVAL_TIMEOUT_MS = 15 * 60_000;
 export const DEPLOY_TIMEOUT_MS = 7 * 60_000;
+/** deployLatestBuild's worst case: two card waits and a reload, the enable, the started alert and Deploy hiding (about 8.2 minutes). */
+export const DEPLOY_ACTION_MS = 9 * 60_000;
 /** MI deployments run longer than Ballerina ones. */
 export const MI_DEPLOY_TIMEOUT_MS = 10 * 60_000;
 /** The card reports the previous deployment for a moment after Apply, so the status waits it out. */
