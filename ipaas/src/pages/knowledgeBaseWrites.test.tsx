@@ -47,7 +47,7 @@ vi.mock('../hooks/useKnowledgeBases', () => ({
   useKnowledgeBase: () => ({ data: kb, refetch: vi.fn() }),
   useUpdateKnowledgeBase: () => idle,
   useDeleteKnowledgeBase: () => idle,
-  useRetrieveFromKnowledgeBase: () => idle,
+  useRetrieveFromKnowledgeBase: () => ({ retrieve: idle, access: { keyError: null, needsApiKeyAuth: false, isUnavailable: false, gatewayUrl: 'https://gw/docs', isAuthorized: true } }),
 }));
 vi.mock('../hooks/useExecutions', () => ({ useTriggerComponent: () => idle, useTaskExecutions: () => ({ data: [] }) }));
 vi.mock('../hooks/useComponents', () => ({ useDeleteComponent: () => idle }));
