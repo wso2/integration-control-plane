@@ -298,9 +298,10 @@ interface AutomationConfigureDrawerProps {
   releaseMgtReleaseId?: string;
   releaseMgtDeploymentId?: string;
   buildId?: string;
+  continueWithoutChanges?: boolean;
 }
 
-function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId }: AutomationConfigureDrawerProps) {
+function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId, continueWithoutChanges = false }: AutomationConfigureDrawerProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -520,8 +521,12 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
         // A release is what carries the configuration and the links to the running integration,
         // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
         // OpenChoreo releases a changed Workload itself then.
+        //
+        // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
+        // hands back to it rather than releasing first: a deploy made here is one its Cancel
+        // cannot undo, and it would release the current Workload rather than that image.
         const afterSave = () => {
-          if (AUTO_DEPLOY_AVAILABLE) {
+          if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
             done();
             return;
           }
@@ -735,6 +740,7 @@ export default function ConfigureDrawer(props: ConfigureDrawerProps) {
         releaseMgtReleaseId={props.releaseMgtReleaseId}
         releaseMgtDeploymentId={props.releaseMgtDeploymentId}
         buildId={props.buildId}
+        continueWithoutChanges={props.continueWithoutChanges}
       />
     );
   }
@@ -759,6 +765,7 @@ function GenericServiceConfigureDrawer({
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
   buildId,
+  continueWithoutChanges = false,
   hideEndpoints = false,
   isWorkflow = false,
 }: ConfigureDrawerProps) {
@@ -989,8 +996,12 @@ function GenericServiceConfigureDrawer({
       // A release is what carries the configuration and the links to the running integration,
       // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
       // OpenChoreo releases a changed Workload itself then.
+      //
+      // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
+      // hands back to it rather than releasing first: a deploy made here is one its Cancel
+      // cannot undo, and it would release the current Workload rather than that image.
       const afterSave = () => {
-        if (AUTO_DEPLOY_AVAILABLE) {
+        if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
           done();
           return;
         }
