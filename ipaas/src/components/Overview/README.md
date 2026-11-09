@@ -26,9 +26,9 @@ Overview/
 │   │                            "Configure to Continue" when required configs are unset
 │   ├── configStatus.ts          hasMissingRequiredConfigs() — shared by automation,
 │   │                            file/event, ai-agent (drives the button + Run/Schedule)
-│   ├── UserPortalFooter.tsx     EnvCardFooter: the User Portal row, shared with the
-│   │                            Deploy page. useIntegrationModule adds it to the
-│   │                            types in constants/userPortal.ts USER_PORTAL_TYPES
+│   ├── UserPortalSharedAction.tsx  EnvCardSharedAction: the User Portal's Publish /
+│   │                            Unpublish / "User Portal off" action. useIntegrationModule
+│   │                            adds it to the types in constants/userPortal.ts USER_PORTAL_TYPES
 │   ├── FileEventHeader.tsx      shared CustomHeader for file- + event-integration
 │   │                            (status dot + Configure + Stop/Start; logs are in the body)
 │   ├── HeaderShell.tsx          integration-level header rendered above the cards
@@ -77,19 +77,19 @@ Overview/
 ## The model in one line
 
 `EnvCardShell` (frame + shared state) renders each type's **slots**:
-`CustomHeader` **or** (`HeaderStatus` + `EnvCardActions`), then `EnvCardBody`, then an
-optional `EnvCardFooter`. A type with no env-card concept (e.g. Tailscale) exports
+`CustomHeader` **or** (`HeaderStatus` + `EnvCardActions`), then `EnvCardBody`, then the
+loader's `EnvCardSharedAction` in the footer. A type with no env-card concept (e.g. Tailscale) exports
 `CustomOverview` and bypasses the shell entirely.
 
-| Slot             | Who provides it               | Example                                                  |
-| ---------------- | ----------------------------- | -------------------------------------------------------- |
-| `EnvCardBody`    | every rendered type           | executions table / endpoints / runtime logs / agent chat |
-| `HeaderStatus`   | types with a status/Configure | service / ai-agent status dot + Configure                |
-| `EnvCardActions` | types with header actions     | Run/Schedule, Stop/Test/Logs                             |
-| `CustomHeader`   | header outliers               | file- + event-integration (shared `FileEventHeader`)     |
-| `EnvCardFooter`  | optional                      | User Portal row, added by the loader (USER_PORTAL_TYPES) |
-| `CustomOverview` | full-surface outliers         | Tailscale                                                |
-| `HeaderActions`  | integration-level actions     | integration-as-api's Configure security link             |
+| Slot                  | Who provides it               | Example                                                      |
+| --------------------- | ----------------------------- | ------------------------------------------------------------ |
+| `EnvCardBody`         | every rendered type           | executions table / endpoints / runtime logs / agent chat     |
+| `HeaderStatus`        | types with a status/Configure | service / ai-agent status dot + Configure                    |
+| `EnvCardActions`      | types with header actions     | Run/Schedule, Stop/Test/Logs                                 |
+| `CustomHeader`        | header outliers               | file- + event-integration (shared `FileEventHeader`)         |
+| `EnvCardSharedAction` | the loader, never a type      | User Portal action (USER_PORTAL_TYPES), in the card's footer |
+| `CustomOverview`      | full-surface outliers         | Tailscale                                                    |
+| `HeaderActions`       | integration-level actions     | integration-as-api's Configure security link                 |
 
 `ai-agent` uses the generic-frame slots (`HeaderStatus` + `EnvCardActions` + `EnvCardBody`)
 like integration-as-api — it's a generic service under the hood (`componentSubType: aiAgent`),
@@ -140,15 +140,15 @@ The page calls `useIntegrationIdentity`, then `IntegrationRenderer` dynamically 
 the matching module and hands it to the surface shell. **The shell owns only the generic
 frame + state every type shares; each type fills slots.** For Overview today:
 
-| Slot             | Purpose                                                              |
-| ---------------- | -------------------------------------------------------------------- |
-| `EnvCardBody`    | content-only body (no Card/header chrome)                            |
-| `HeaderStatus`   | left header slot (status dot, Configure)                             |
-| `EnvCardActions` | right header slot (action buttons)                                   |
-| `CustomHeader`   | full header override — escape hatch when the header differs a lot    |
-| `EnvCardFooter`  | optional footer                                                      |
-| `CustomOverview` | full-surface override (type has no env-card concept, e.g. Tailscale) |
-| `HeaderActions`  | actions under the page header's Open in Cloud Editor button          |
+| Slot                  | Purpose                                                              |
+| --------------------- | -------------------------------------------------------------------- |
+| `EnvCardBody`         | content-only body (no Card/header chrome)                            |
+| `HeaderStatus`        | left header slot (status dot, Configure)                             |
+| `EnvCardActions`      | right header slot (action buttons)                                   |
+| `CustomHeader`        | full header override — escape hatch when the header differs a lot    |
+| `EnvCardSharedAction` | an action the loader adds in the card's footer, below the body       |
+| `CustomOverview`      | full-surface override (type has no env-card concept, e.g. Tailscale) |
+| `HeaderActions`       | actions under the page header's Open in Cloud Editor button          |
 
 A type omits any slot it doesn't need — no null-returning placeholders. Bodies shared by
 two types live in `_shared/bodies/` and are parameterised by **behaviour props, not type

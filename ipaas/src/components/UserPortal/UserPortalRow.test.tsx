@@ -23,7 +23,7 @@ import UserPortalRow from './UserPortalRow';
 import { BffError } from '../../api/_client';
 import * as api from '../../api/userPortal';
 import { button, flush, reasonFor, renderWithScopes } from '../../test/renderWithScopes';
-import { DEVELOPER, VIEWER } from '../../test/roles';
+import { DEVELOPER, PLATFORM_ENGINEER, VIEWER } from '../../test/roles';
 import type { UserPortalPublishability } from '../../types/userPortal';
 
 vi.mock('../../api/userPortal', () => ({
@@ -41,8 +41,13 @@ const refused: UserPortalPublishability = {
   publishable: false,
   reasons: [
     { code: 'USER_PORTAL_PIPELINE', message: 'only integrations of projects on the "default" deployment pipeline can be published to the User Portal' },
-    { code: 'USER_PORTAL_NOT_ENABLED', message: 'the user portal is not enabled in this environment' },
+    { code: 'USER_PORTAL_AGENT_OAUTH_REQUIRED', message: 'turn on OAuth security for the agent' },
   ],
+};
+
+const portalOff: UserPortalPublishability = {
+  ...refused,
+  reasons: [...refused.reasons, { code: 'USER_PORTAL_NOT_ENABLED', message: 'the user portal is not enabled in this environment' }],
 };
 
 let unmount = () => {};
@@ -68,13 +73,34 @@ describe("the deploy card's User Portal row", () => {
     expect(button(container, 'Publish')?.disabled).toBe(true);
     // Each is worded from its code, not ipaas-service's sentence.
     expect(container.textContent).toContain('Only integrations of projects on the default deployment pipeline can be published to the User Portal.');
-    expect(container.textContent).toContain('The User Portal is not enabled in Production.');
+    expect(container.textContent).toContain('Turn on OAuth security for the agent.');
     for (const reason of refused.reasons) expect(container.textContent).not.toContain(reason.message);
-    // The portal itself is the fix for one of them, and that one links to it.
-    const link = container.querySelector('a');
-    expect(link?.textContent).toBe('Enable it');
-    expect(link?.getAttribute('href')).toBe('/organizations/acme/settings/user-portal');
     expect(publish).not.toHaveBeenCalled();
+  });
+
+  // No other rule can be met before the portal runs, so the row doesn't list them.
+  it('says only that the portal is off, with a link to turn it on', async () => {
+    publishability.mockResolvedValue(portalOff);
+    const container = await row(PLATFORM_ENGINEER);
+    expect(container.textContent).toContain('User Portal is off here');
+    expect(container.textContent).not.toContain('default deployment pipeline');
+    expect(container.textContent).not.toContain('Not published');
+    expect(button(container, 'Publish')).toBeUndefined();
+    const link = container.querySelector('a');
+    expect(link?.textContent).toBe('Enable');
+    expect(link?.getAttribute('href')).toBe('/organizations/acme/settings/user-portal');
+  });
+
+  it('explains the User Portal from the (i), and asks a role that cannot enable it to ask an admin', async () => {
+    publishability.mockResolvedValue(portalOff);
+    const container = await row(DEVELOPER);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toContain('Ask an admin to turn it on.');
+    await act(async () => button(container, 'About the User Portal')?.click());
+    const dialog = container.ownerDocument.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Turn it on in Production to publish this integration there.');
+    expect(dialog?.textContent).toContain('Ask an admin to turn it on.');
+    expect(button(container, 'Enable User Portal')).toBeUndefined();
   });
 
   it('publishes when the rules pass, and reports scopes the portal could not take', async () => {

@@ -24,7 +24,7 @@ const rowSx = { minWidth: 0, cursor: 'default' } as const;
 const iconSx = { display: 'inline-flex', color: 'text.primary', flexShrink: 0 } as const;
 const shaSx = { fontFamily: 'monospace', flexShrink: 0 } as const;
 // Measured in characters, so every card cuts the message at the same length.
-const messageSx = { maxWidth: '32ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
+const messageSx = { maxWidth: '20ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
 
 /** A card header's commit: icon, short SHA and the message cut to one line, the same on every card. */
 export default function CommitSummary({ sha, message, tooltip }: { sha: string; message?: string; tooltip?: string }): JSX.Element {

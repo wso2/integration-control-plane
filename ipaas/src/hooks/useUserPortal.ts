@@ -48,6 +48,20 @@ export function useUserPortals(environments: string[]) {
   });
 }
 
+/**
+ * One environment's User Portal, read only when `enabled`. It shares the cache with `useUserPortals`,
+ * so the User Portal page and the env cards agree on its state and address.
+ */
+export function useUserPortal(environment: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'portal', environment],
+    queryFn: () => fetchUserPortal(environment),
+    enabled: enabled && !!environment,
+    retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
+    staleTime: 60_000,
+  });
+}
+
 function useWritePortal(write: (environment: string) => Promise<UserPortal>) {
   const qc = useQueryClient();
   return useMutation({
