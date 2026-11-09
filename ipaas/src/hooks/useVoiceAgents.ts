@@ -18,7 +18,7 @@
 
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useComponents } from './useComponents';
-import { deleteComponent, fetchComponents } from '../api/components';
+import { deleteComponent, fetchComponents, updateComponent } from '../api/components';
 import { checkNameAvailability } from '../api/prebuilt';
 import { createVoiceAgentComponent, deployVoiceAgent, VOICE_AGENT_COMPONENT_TYPE } from '../api/voiceAgents';
 import type { Component } from '../types/component';
@@ -62,7 +62,14 @@ export function useCreateVoiceAgent() {
     mutationFn: async ({ orgHandler, projectId, settings }: CreateVoiceAgentInput): Promise<Component> => {
       const name = await checkNameAvailability(projectId, effectiveVoiceAgentHandler(settings));
       const labels = settings.targetMode === 'platform' && settings.targetAgentHandler ? [voiceTargetLabel(settings.targetAgentHandler)] : [];
-      const component = await createVoiceAgentComponent({ projectId, name, displayName: settings.displayName.trim(), description: settings.description.trim(), labels });
+      const component = await createVoiceAgentComponent({ projectId, name, displayName: settings.displayName.trim(), description: settings.description.trim() });
+      if (labels.length > 0) {
+        try {
+          await updateComponent({ id: component.id, handler: component.handler, projectId, displayName: component.displayName, description: component.description, version: component.version, labels });
+        } catch (err) {
+          console.warn('Failed to link the voice agent to its AI agent', { componentId: component.id, projectId }, err);
+        }
+      }
       try {
         await deployVoiceAgent(component.id, buildVoiceAgentDeployment(settings));
       } catch (err) {
