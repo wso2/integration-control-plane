@@ -212,8 +212,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const link = (env: string, pick: { resource: string; key: string } | null) => linkWrite.mutate({ projectId, componentId, target: pick ? { env, ref: pick.resource, key: pick.key } : { env } });
 
   // The value box's link icon: Enter a value, or a resource key.
-  const renderValue = (name: string, view: TargetView, box: JSX.Element) => {
-    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, disabled: linkBusy, onPick: (pick) => link(name, pick) }} />;
+  const renderValue = (name: string, view: TargetView, box: JSX.Element, onPick = (pick: { resource: string; key: string } | null) => link(name, pick)) => {
+    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, disabled: linkBusy, onPick }} />;
     if (!view.source)
       return picker ? (
         <Stack direction="row" alignItems="flex-start" sx={{ flex: 1 }}>
@@ -288,7 +288,11 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       return (
         <Stack key={name} direction="row" gap={1} alignItems="flex-start" sx={{ mb: 2.5 }}>
           <TextField size="small" value={name} disabled sx={{ flex: 1 }} />
-          {renderValue(name, l, <></>)}
+          {renderValue(name, l, <></>, (pick) => {
+            // "Enter a value" keeps the variable: it gets a row of its own to fill in.
+            if (!pick) setEnvVars((rows) => [...rows, { id: nextId.current++, key: name, value: '' }]);
+            link(name, pick);
+          })}
           <IconButton size="small" color="error" aria-label={`Remove ${name}`} disabled={!l.picker || linkBusy} onClick={() => link(name, null)} sx={{ mt: 0.5 }}>
             <Trash2 size={16} />
           </IconButton>
