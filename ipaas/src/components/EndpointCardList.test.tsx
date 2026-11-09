@@ -86,11 +86,18 @@ describe('EndpointCardList', () => {
     expect(container.textContent).toContain('Not published on the AI gateway yet.');
   });
 
-  it('offers neither while it is not yet known whether the AI gateway fronts the endpoint', async () => {
+  it('offers neither, and shows no URL, while it is not yet known whether the AI gateway fronts the endpoint', async () => {
     entry.isEntry = true;
     await render({}, true);
     expect(button('Edit endpoint')).toBeNull();
     expect(button('API settings')).toBeNull();
+    expect(container.textContent).not.toContain('raw-route.example.com');
+  });
+
+  it("shows the endpoint's own URLs once the AI gateway is known not to front it", async () => {
+    entry.isEntry = true;
+    await render({}, false);
+    expect(container.textContent).toContain('raw-route.example.com');
   });
 
   it('names no entry environment while it is not yet known whether the AI gateway fronts the endpoint', async () => {

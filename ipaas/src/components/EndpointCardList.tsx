@@ -57,6 +57,7 @@ export function EndpointCardList({ endpoints, projectId, envId, onEdit, onSettin
           onEdit={isEntry && !aiGatewayPending ? onEdit : undefined}
           onSettings={isEntry && !aiGatewayPending ? onSettings : undefined}
           aiGatewayUrl={aiGatewayUrls[ep.id]}
+          urlsPending={aiGatewayPending && !(ep.id in aiGatewayUrls)}
         />
       ))}
       {!isEntry && !loading && !aiGatewayPending && !allOnAiGateway && (onEdit || onSettings) && (

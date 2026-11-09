@@ -82,9 +82,14 @@ export interface EndpointCardProps {
    * for it, so the card offers neither and shows the proxy as the one way in.
    */
   aiGatewayUrl?: string;
+  /**
+   * Whether the AI gateway fronts the endpoint is still being read. Its URLs wait: shown now, an AI gateway
+   * endpoint's would be its own route, which callers are not meant to use.
+   */
+  urlsPending?: boolean;
 }
 
-export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, readOnly = false, aiGatewayUrl }: EndpointCardProps) {
+export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, readOnly = false, aiGatewayUrl, urlsPending = false }: EndpointCardProps) {
   const [open, setOpen] = useState(defaultExpanded);
   const onAiGateway = aiGatewayUrl !== undefined;
   const canEdit = !readOnly && !onAiGateway && !!onEdit;
@@ -183,7 +188,7 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
           </Box>
 
           {/* URLs box */}
-          {onAiGateway ? (
+          {urlsPending ? null : onAiGateway ? (
             <AiGatewayUrl url={aiGatewayUrl} />
           ) : (
             (visRows.length > 0 || fallbackUrl) && (
