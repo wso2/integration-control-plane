@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { EnvironmentLinks, IntegrationLinks, KeyRef, LinkableResource, LinkConnection, OrphanedLink } from '../types/configuration';
+import type { EnvironmentLinks, IntegrationLinks, KeyRef, LinkableResource, LinkConnection, LinkTarget, OrphanedLink } from '../types/configuration';
 
 /** `acme.ghdemo.githubAuthToken` → `acme/ghdemo:githubAuthToken`; a submodule joins its package with a dot. */
 export const configurableId = (configKey: string): string => {
@@ -155,6 +155,17 @@ export const sameLinks = (links: IntegrationLinks, source: string, target: strin
   const [s, t] = [source, target].map((name) => links.environments.find((e) => e.name === name));
   const uses = (e?: EnvironmentLinks) => JSON.stringify([e?.resources.map((r) => r.ref), e?.connections, e?.configurables, e?.env]);
   return uses(s) === uses(t);
+};
+
+/** The connection, configurable or env var a link write is for. */
+export const targetOf = (t: LinkTarget): string => ('connection' in t ? t.connection : 'configurable' in t ? t.configurable : t.env);
+
+/** Whether links show a write: its target linked as written, or, for an unlink, linked nowhere, not even as a lost link. */
+export const showsWrite = (links: IntegrationLinks, t: LinkTarget): boolean => {
+  const keyOf = (k?: KeyRef) => k && `${k.ref}|${k.key}`;
+  const held = 'connection' in t ? links.connections.find((c) => c.id === t.connection)?.link : keyOf('configurable' in t ? links.fieldLinks[t.configurable] : links.env[t.env]);
+  if (!t.ref) return !held && !links.orphaned.some((o) => o.target === targetOf(t));
+  return held === ('connection' in t ? t.ref : `${t.ref}|${t.key}`);
 };
 
 /** A connection's configurables among fields: those named after it (`github` → `githubAuthToken`), as ipaas-service groups them. */

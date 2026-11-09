@@ -19,12 +19,12 @@
 import { CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
 
 /** While a link write is on its way, the link actions wait for it: this says why they don't answer. */
-export function LinkingNote() {
+export function LinkingNote({ saving }: { saving: boolean }) {
   return (
     <Stack direction="row" alignItems="center" gap={1} role="status" sx={{ mb: 1.5 }}>
       <CircularProgress size={12} />
       <Typography variant="caption" color="text.secondary">
-        Linking…
+        {saving ? 'Still saving…' : 'Linking…'}
       </Typography>
     </Stack>
   );

@@ -48,7 +48,7 @@ const links: IntegrationLinks = {
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: false, connections: {}, configurables: {}, env: {} }],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0 }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, saving: false, readFailed: false, cached: true, refetches: 0 }));
 const failed = vi.hoisted(() => ({ current: undefined as { error: Error; variables: { target: unknown } } | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
   useIntegrationLinks: () => ({
@@ -58,7 +58,7 @@ vi.mock('../../hooks/useConfiguration', () => ({
     isFetching: false,
     refetch: async () => void answer.refetches++,
   }),
-  useLinkWrite: () => ({ isPending: answer.pending, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
+  useLinkWrite: () => ({ isPending: answer.pending, saving: answer.saving, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useEnvironments', () => ({ useEnvironments: () => ({ data: [{ id: 'development', name: 'Development' }] }) }));
 
@@ -110,7 +110,7 @@ beforeEach(async () => {
   writes.length = 0;
   failed.current = undefined;
   answer.links = undefined;
-  Object.assign(answer, { pending: false, readFailed: false, cached: true, refetches: 0 });
+  Object.assign(answer, { pending: false, saving: false, readFailed: false, cached: true, refetches: 0 });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -181,6 +181,15 @@ describe('the Configure form with links', () => {
     ]);
     expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
     expect(container.querySelector('[role="status"]')?.textContent).toBe('Linking…');
+  });
+
+  it('says it is still saving a write the gateway cut off, with no link action and no error until it gives up', async () => {
+    answer.saving = true;
+    failed.current = { error: new BffError(504, 'upstream request timeout'), variables: { target: { connection: id('github') } } };
+    await act(async () => root.render(<Form />));
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Still saving…');
+    expect(button('Unlink github').disabled).toBe(true);
+    expect(container.textContent).not.toContain('Try again');
   });
 
   it("says the links couldn't be read, with Try again, and offers no link action or save", async () => {

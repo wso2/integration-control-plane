@@ -97,7 +97,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const linkWrite = useLinkWrite();
   // Until the links read, rows can't be told linked or not; while a write is on its way, another could undo it.
   const linksUnread = !links || linksRead.isError;
-  const linkBusy = linkWrite.isPending || linksUnread;
+  const linkBusy = linkWrite.isPending || linkWrite.saving || linksUnread;
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id = '') => environments.find((e) => e.id === id)?.name ?? id;
   const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
@@ -325,8 +325,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           {linkView?.editable === false ? `Links apply to all environments. Change links in ${envName(links?.environments[0]?.name)}.` : 'Links apply to all environments; values are per environment.'}
         </Typography>
       )}
-      {kind === 'env' && linkWrite.isPending && <LinkingNote />}
-      {kind === 'env' && linkWrite.isError && (
+      {kind === 'env' && (linkWrite.isPending || linkWrite.saving) && <LinkingNote saving={linkWrite.saving} />}
+      {kind === 'env' && linkWrite.isError && !linkWrite.saving && !linkWrite.saved && (
         <Alert severity="error" sx={{ mt: 1 }}>
           {linkWrite.error instanceof Error ? linkWrite.error.message : "Linking didn't finish."}
         </Alert>

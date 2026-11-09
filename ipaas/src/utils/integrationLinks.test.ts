@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { EnvironmentLinks, IntegrationLinks } from '../types/configuration';
-import { configKey, configurableId, formLinkView } from './integrationLinks';
+import { configKey, configurableId, formLinkView, showsWrite } from './integrationLinks';
 
 // ipaas-service's answer for the mock's ghdemo: connection github; githubAuthToken is the connection's key, githubTimeout has none.
 const id = (name: string) => `acme/ghdemo:${name}`;
@@ -50,6 +50,22 @@ const base: IntegrationLinks = {
 const linked: IntegrationLinks = { ...base, connections: [{ ...base.connections[0], link: 'github-acme' }], used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken') } };
 const envName = (e: string) => e[0].toUpperCase() + e.slice(1);
 const ghdemoFields = [id('githubAuthToken'), id('githubTimeout')];
+
+describe('showsWrite', () => {
+  it('tells whether a read shows a link, an unlink or a move', () => {
+    expect(showsWrite(linked, { connection: id('github'), ref: 'github-acme' })).toBe(true);
+    expect(showsWrite(base, { connection: id('github'), ref: 'github-acme' })).toBe(false);
+    expect(showsWrite(linked, { connection: id('github') })).toBe(false);
+    expect(showsWrite(base, { connection: id('github') })).toBe(true);
+    const orders = { ...base, fieldLinks: { [id('ordersUrl')]: { ref: 'orders-db', key: 'URL' } } };
+    expect(showsWrite(orders, { configurable: id('ordersUrl'), ref: 'orders-db', key: 'URL' })).toBe(true);
+    expect(showsWrite(orders, { configurable: id('ordersUrl'), ref: 'orders-db', key: 'PASSWORD' })).toBe(false);
+    // Removing a lost link: shown once it is no longer listed as lost.
+    const lost = { ...base, orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable' as const, ref: 'orders-db', key: 'URL' }] };
+    expect(showsWrite(lost, { configurable: id('ordersDbUrl') })).toBe(false);
+    expect(showsWrite({ ...base, env: { GITHUB_TOKEN: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN' } } }, { env: 'GITHUB_TOKEN' })).toBe(false);
+  });
+});
 
 describe('configurableId', () => {
   it('names a configurable by its module and name, a submodule joined to its package', () => {
