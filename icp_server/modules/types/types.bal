@@ -18,6 +18,9 @@ import ballerina/log;
 import ballerina/sql;
 import ballerina/time;
 
+// Imported for its init(), so a config file that cannot be parsed fails startup before any module uses it.
+import icp_server.config_check as _;
+
 // === Enums ===
 
 public enum RuntimeType {

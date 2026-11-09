@@ -691,6 +691,7 @@ dependencies = [
 modules = [
 	{org = "wso2", packageName = "icp_server", moduleName = "icp_server"},
 	{org = "wso2", packageName = "icp_server", moduleName = "icp_server.auth"},
+	{org = "wso2", packageName = "icp_server", moduleName = "icp_server.config_check"},
 	{org = "wso2", packageName = "icp_server", moduleName = "icp_server.mi_management"},
 	{org = "wso2", packageName = "icp_server", moduleName = "icp_server.observability"},
 	{org = "wso2", packageName = "icp_server", moduleName = "icp_server.storage"},
