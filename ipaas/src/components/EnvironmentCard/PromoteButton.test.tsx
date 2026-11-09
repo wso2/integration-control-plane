@@ -20,6 +20,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PromoteButton from './PromoteButton';
+import { BffError } from '../../api/_client';
 import type { LinkableResource } from '../../types/configuration';
 
 const deployments: Record<string, { releaseId: string; build: { buildId: string } } | undefined> = {};
@@ -37,6 +38,17 @@ const answered = (resources: LinkableResource[] = [], uses: string[] = []) =>
     isSuccess: true,
     data: { kind: 'ballerina', resources, used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [{ name: 'development', resources: uses.map((ref) => ({ ref, state: 'in_use' })) }] },
   });
+// The read of where the integration is published to the User Portal, which the click makes for a workflow.
+const portal = vi.hoisted(() => ({ result: undefined as unknown, reads: 0 }));
+vi.mock('../../hooks/useUserPortal', () => ({
+  useUserPortalPublications: () => ({
+    refetch: () => {
+      portal.reads += 1;
+      return portal.result;
+    },
+  }),
+}));
+const publishedIn = (...environments: string[]) => Promise.resolve({ isSuccess: true, data: { environments }, error: null });
 vi.mock('../../hooks/useCan', () => ({ useCan: () => () => true }));
 vi.mock('@wso2/oxygen-ui', () => {
   const Plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
@@ -58,13 +70,15 @@ vi.mock('@wso2/oxygen-ui-icons-react', () => ({ ArrowDown: () => <span /> }));
 
 let container: HTMLDivElement;
 let root: Root;
-const render = () => act(async () => root.render(<PromoteButton orgHandler="acme" projectId="default" componentId="sftask" versionId="v" deploymentPipelineId="p" sourceEnvId="development" targetEnvId="production" />));
+const render = (isWorkflow = false) => act(async () => root.render(<PromoteButton orgHandler="acme" projectId="default" componentId="sftask" versionId="v" deploymentPipelineId="p" sourceEnvId="development" targetEnvId="production" isWorkflow={isWorkflow} />));
 const button = () => container.querySelector('button')!;
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mutate.mockClear();
   read.result = answered();
+  portal.result = publishedIn();
+  portal.reads = 0;
   deployments.development = { releaseId: 'sftask-784445f4b4', build: { buildId: 'b1' } };
   deployments.production = { releaseId: 'sftask-66d97f5f4d', build: { buildId: 'b1' } };
   container = document.createElement('div');
@@ -121,5 +135,47 @@ describe('PromoteButton', () => {
     await act(async () => button().click());
     expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Salesforce Marketing has no values in production.');
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it('warns before promoting a workflow published to the User Portal in the source but not the target', async () => {
+    portal.result = publishedIn('development');
+    await render(true);
+    await act(async () => button().click());
+    const dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).toContain('promoting carries that to production');
+    expect(dialog.textContent).toContain("the console's workflow views won't work there");
+    expect(mutate).not.toHaveBeenCalled();
+    await act(async () => dialog.querySelectorAll('button')[1].click());
+    expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('promotes a workflow published in the target too, or nowhere, without asking', async () => {
+    for (const environments of [['development', 'production'], []]) {
+      mutate.mockClear();
+      portal.result = publishedIn(...environments);
+      await render(true);
+      await act(async () => button().click());
+      expect(mutate).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('says it could not check where a workflow is published when that read fails, but not on a BFF without the User Portal', async () => {
+    portal.result = Promise.resolve({ isSuccess: false, data: undefined, error: new BffError(500, 'boom') });
+    await render(true);
+    await act(async () => button().click());
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain("Couldn't check where this workflow is published to the User Portal.");
+    expect(mutate).not.toHaveBeenCalled();
+
+    await act(async () => container.querySelector('[role="dialog"]')!.querySelectorAll('button')[0].click());
+    portal.result = Promise.resolve({ isSuccess: false, data: undefined, error: new BffError(404, '404 page not found') });
+    await act(async () => button().click());
+    expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads no publications for an integration that is not a workflow', async () => {
+    await render();
+    await act(async () => button().click());
+    expect(portal.reads).toBe(0);
+    expect(mutate).toHaveBeenCalledTimes(1);
   });
 });

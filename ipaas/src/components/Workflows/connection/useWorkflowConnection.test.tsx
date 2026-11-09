@@ -110,6 +110,7 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     keyError: null,
     needsApiKeyAuth: false,
     canSwitch: true,
+    managedIn: null,
     isSwitching: false,
     switchToApiKey: vi.fn(async () => null),
     isUnavailable: false,
@@ -329,6 +330,12 @@ describe('useWorkflowConnection', () => {
     access.reset(keyAccess({ apiKey: null, isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, canSwitch: false }));
     mount();
     await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'needs-api-key', action: null }));
+  });
+
+  it('says where an environment that takes its security by promotion gets it, and offers no switch there', async () => {
+    access.reset(keyAccess({ apiKey: null, isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, canSwitch: false, managedIn: 'development' }));
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'secured-by-promotion', action: null }));
   });
 
   it('says a role that may not create test keys cannot reach the API, and offers nothing to retry', async () => {

@@ -25,6 +25,7 @@ import DeploymentTrackBar from '../../DeploymentTrackBar';
 import EmptyListing from '../../EmptyListing';
 import NotDeployedAlert from '../../NotDeployedAlert';
 import NotFound from '../../NotFound';
+import UserPortalPrompt from '../../UserPortal/UserPortalPrompt';
 import EnvironmentSelect from '../../common/EnvironmentSelect';
 import { useComponentByHandler } from '../../../hooks/useComponents';
 import { useComponentDeployment } from '../../../hooks/useDeployments';
@@ -95,8 +96,12 @@ function RefreshControls({ scopeId }: { scopeId: string }): JSX.Element {
   );
 }
 
-/** What the page shows until the management API answers, or its content once it does. */
-function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose: WorkflowPageShellProps['purpose']; children: (api: ReadyWorkflowApi) => ReactNode }): ReactNode {
+/**
+ * What the page shows until the management API answers, or its content once it does. Where the API's security comes by
+ * promotion and takes no test key, the User Portal is the way left to manage the workflow here, so `portalPrompt` shows
+ * the next step towards it.
+ */
+function ConnectionBody({ api, purpose, portalPrompt, children }: { api: WorkflowApi; purpose: WorkflowPageShellProps['purpose']; portalPrompt: ReactNode; children: (api: ReadyWorkflowApi) => ReactNode }): ReactNode {
   if (api.client) return children(api);
   const { connection } = api;
   switch (connection.status) {
@@ -106,6 +111,14 @@ function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose:
       // Not a failure: say so, and what deploying is for, as the Test Console does.
       return <NotDeployedAlert status={connection.deploymentStatus} purpose={purpose} />;
     case 'unavailable':
+      if (connection.reason === 'secured-by-promotion') {
+        return (
+          <Stack gap={2}>
+            <TestKeyNotice notice={connection.notice} action={connection.action} />
+            <Stack alignItems="center">{portalPrompt}</Stack>
+          </Stack>
+        );
+      }
       return <TestKeyNotice notice={connection.notice} action={connection.action} />;
     case 'refused':
       return (
@@ -189,7 +202,7 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
     body = placeholder({ scope, component, environment, environments });
   } else {
     body = (
-      <ConnectionBody api={api} purpose={purpose}>
+      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} />}>
         {(ready) => children({ scope, component, environment, environments, api: ready })}
       </ConnectionBody>
     );

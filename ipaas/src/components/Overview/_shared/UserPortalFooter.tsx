@@ -18,12 +18,13 @@
 
 import type { JSX } from 'react';
 import type { EnvCardFooterProps } from '../../../types/integration';
+import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import UserPortalRow from '../../UserPortal/UserPortalRow';
 
 /**
  * The env card's User Portal row, as the Deploy page shows it: whether the integration is published
  * to this environment's portal, with Publish or Unpublish. For the types the portal shows.
  */
-export default function UserPortalFooter({ component, env, orgHandler }: EnvCardFooterProps): JSX.Element {
-  return <UserPortalRow orgHandler={orgHandler} componentId={component.id} environment={env.id} envName={env.name} />;
+export default function UserPortalFooter({ component, env, orgHandler, projectId }: EnvCardFooterProps): JSX.Element {
+  return <UserPortalRow orgHandler={orgHandler} projectId={projectId} componentId={component.id} environment={env.id} envName={env.name} isWorkflow={isWorkflowIntegration(component)} />;
 }

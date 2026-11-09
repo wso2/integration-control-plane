@@ -31,6 +31,7 @@ const access = (patch: Partial<Parameters<typeof testKeyReasonOf>[0]> = {}) => (
   canCreateKey: true,
   needsApiKeyAuth: false,
   canSwitch: true,
+  managedIn: null as string | null,
   ...patch,
 });
 
@@ -68,6 +69,8 @@ describe('testKeyReasonOf', () => {
     expect(testKeyReasonOf(access({ isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true }))).toBe('needs-api-key');
     // ipaas-service refused a key for an endpoint the security read calls api-key.
     expect(testKeyReasonOf(access({ isAuthorized: false, needsApiKeyAuth: true }))).toBe('needs-api-key');
+    // Where the security comes by promotion, it can't be switched here.
+    expect(testKeyReasonOf(access({ isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, canSwitch: false, managedIn: 'development' }))).toBe('secured-by-promotion');
     expect(testKeyReasonOf(access({ isAuthorized: false, keyError: 'Could not mint a test key.' }))).toBe('mint-failed');
   });
 
@@ -92,6 +95,14 @@ describe('testKeyNotice', () => {
       'The Workflow Management API uses OAuth authentication, so it can’t issue the test key the console calls it with. Switching it to API key changes how every caller of this API authenticates.',
     );
     expect(testKeyNotice('needs-api-key', access({ mode: 'jwt', canSwitch: false })).text).toContain('Your role can’t switch it to API key.');
+  });
+
+  it('says where an environment that takes its security by promotion gets it, and the ways out of it', () => {
+    const notice = testKeyNotice('secured-by-promotion', access({ mode: 'jwt', canSwitch: false, managedIn: 'development' }));
+    expect(notice.severity).toBe('info');
+    expect(notice.text).toContain('takes the Workflow Management API’s security from development by promotion');
+    expect(notice.text).toContain('Publish the workflow to the User Portal here');
+    expect(notice.text).toContain('put the API back on API key in development');
   });
 
   it('passes the mint failure through in the words the hook chose', () => {

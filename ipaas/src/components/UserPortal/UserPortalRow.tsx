@@ -20,6 +20,7 @@ import { Box, Button, Chip, Skeleton, Stack, Tooltip, Typography } from '@wso2/o
 import { useState, type JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
+import { useEntryEnvironment } from '../../hooks/useEntryEnvironment';
 import { useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
 import { shownRefusals, userPortalErrorText } from '../../utils/userPortal';
@@ -32,10 +33,13 @@ const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.
 
 interface UserPortalRowProps {
   orgHandler: string;
+  projectId: string;
   componentId: string;
   /** The environment's slug. */
   environment: string;
   envName: string;
+  /** Unpublishing a workflow gives its Management API back to the console, where the environment's API security allows. */
+  isWorkflow?: boolean;
 }
 
 /**
@@ -43,10 +47,14 @@ interface UserPortalRowProps {
  * Publish or Unpublish. Publish is offered only when ipaas-service's publishing rules all pass; when
  * they don't, the row lists each rule broken, worded from its code, so the user knows what to change.
  * A publish that redeploys a workflow for the User Portal's sign-in is confirmed first: it turns the
- * console's workflow management off in the environment.
+ * console's workflow management off in the environment. Unpublishing it turns that back on, except in an environment
+ * that takes its API security by promotion: the gateway there keeps taking only User Portal sign-ins until a promotion
+ * brings an API key, which the unpublish confirmation says.
  */
-export default function UserPortalRow({ orgHandler, componentId, environment, envName }: UserPortalRowProps): JSX.Element | null {
+export default function UserPortalRow({ orgHandler, projectId, componentId, environment, envName, isWorkflow = false }: UserPortalRowProps): JSX.Element | null {
   const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
+  const entry = useEntryEnvironment(projectId, environment);
+  const keepsPortalSignIn = isWorkflow && !entry.loading && !entry.isEntry;
   const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
@@ -140,6 +148,12 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
       {confirmUnpublish && (
         <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
           <Typography variant="body2">The User Portal&apos;s users no longer see this integration there. The integration keeps running.</Typography>
+          {keepsPortalSignIn && (
+            <Typography variant="body2" sx={styles.dialogBodySx}>
+              {envName} takes this workflow&apos;s API security from {entry.entryEnvironmentName} by promotion, so its Workflow Management API keeps taking only User Portal sign-ins here, and the console&apos;s workflow views stay off. To turn them on again,
+              put the API back on API key in {entry.entryEnvironmentName}, as unpublishing the workflow there does, then promote it here.
+            </Typography>
+          )}
           {unpublish.isError && (
             <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
               {userPortalErrorText(unpublish.error, envName)}

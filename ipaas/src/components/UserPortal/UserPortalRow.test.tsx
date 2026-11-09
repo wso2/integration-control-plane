@@ -32,6 +32,10 @@ vi.mock('../../api/userPortal', () => ({
   unpublishFromUserPortal: vi.fn(),
 }));
 
+// Whether the row's environment is where the project's API security is edited.
+const entry = vi.hoisted(() => ({ value: { isEntry: true, loading: false, entryEnvironmentName: 'Development' } }));
+vi.mock('../../hooks/useEntryEnvironment', () => ({ useEntryEnvironment: () => entry.value }));
+
 const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const publish = vi.mocked(api.publishToUserPortal);
 
@@ -51,12 +55,15 @@ const dialogButton = (container: HTMLElement, name: string): HTMLButtonElement |
 
 let unmount = () => {};
 afterEach(() => unmount());
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  entry.value = { isEntry: true, loading: false, entryEnvironmentName: 'Development' };
+});
 
-async function row(scopes: string[]) {
+async function row(scopes: string[], isWorkflow = false) {
   const r = await renderWithScopes(
     <MemoryRouter>
-      <UserPortalRow orgHandler="acme" componentId="orders" environment="production" envName="Production" />
+      <UserPortalRow orgHandler="acme" projectId="shop" componentId="orders" environment="production" envName="Production" isWorkflow={isWorkflow} />
     </MemoryRouter>,
     scopes,
   );
@@ -148,6 +155,23 @@ describe("the deploy card's User Portal row", () => {
     expect(container.textContent).toContain('Published');
     expect(button(container, 'Unpublish')?.disabled).toBe(false);
     expect(container.textContent).not.toContain('default deployment pipeline');
+  });
+
+  it('says unpublishing a workflow where its API security comes by promotion leaves the console off', async () => {
+    publishability.mockResolvedValue({ ...refused, published: true });
+    const kept = "Production takes this workflow's API security from Development by promotion";
+    for (const [isWorkflow, isEntry, says] of [
+      [true, false, true],
+      [true, true, false],
+      [false, false, false],
+    ] as const) {
+      entry.value = { isEntry, loading: false, entryEnvironmentName: 'Development' };
+      const container = await row(DEVELOPER, isWorkflow);
+      await act(async () => button(container, 'Unpublish')?.click());
+      await flush();
+      expect(container.ownerDocument.querySelector('[role="dialog"]')?.textContent?.includes(kept)).toBe(says);
+      unmount();
+    }
   });
 
   // With nothing deployed, every rule about what runs there fails too; deploying is the one fix.
