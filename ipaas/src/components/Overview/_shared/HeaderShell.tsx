@@ -39,6 +39,8 @@ import type { Environment } from '../../../types/environment';
 import { withBase } from '../../../utils/basePath';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
+import { useSamples } from '../../../hooks/useSamples';
+import { matchSample } from '../../../utils/samples';
 
 const REST_API_TYPES = new Set(['restApi', 'byocRestApi', 'miRestApi', 'buildRestApi', 'miApiService', 'ballerinaService', 'byocService', 'byoiService', 'graphql', 'buildpackService']);
 
@@ -201,8 +203,12 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const isExternal = component.serviceAccessMode?.toLowerCase() === 'external';
 
   // Open-in-Cloud editor entry: only for components with a source repo and types
-  // that don't opt out of it (e.g. MCP sets `hideOpenInEditor`).
-  const showOpenInEditor = hasSource && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
+  // that don't opt out of it (e.g. MCP sets `hideOpenInEditor`). Integrations created
+  // from a sample don't offer it. Prebuilt integrations live in the same repository but
+  // at their own paths, so they don't match a sample and keep it.
+  const { data: samplesData } = useSamples();
+  const isSample = !!matchSample(repository, samplesData?.samples);
+  const showOpenInEditor = hasSource && !isSample && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
   const HeaderActions = module?.HeaderActions;
 
   const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;
