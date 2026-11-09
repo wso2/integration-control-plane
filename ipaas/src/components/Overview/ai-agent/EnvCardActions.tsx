@@ -27,7 +27,7 @@ import { useEnvEndpoints, useRedeployDeployment, useStopDeployment } from '../..
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
-import { componentUrl } from '../../../paths';
+import { voiceAgentTestUrl } from '../../../paths';
 import { isVoiceEndpoint } from '../../../utils/voiceAgent';
 import { useSelectedAgentEndpoint } from './selectedEndpoint';
 import type { EnvCardActionsProps } from '../../../types/integration';
@@ -111,14 +111,9 @@ export default function EnvCardActions({
   return (
     <>
       {hasDeployment && !env.critical && voiceSelected && (
-        <Tooltip title={voiceAgent ? 'Talk to this AI agent through its voice agent.' : 'Enable the voice agent for this AI agent first.'}>
+        <Tooltip title={!voiceAgent ? 'Enable the voice agent for this AI agent first.' : canTest ? 'Talk to this AI agent through its voice agent.' : 'Deploy and start this AI agent to test it by voice.'}>
           <span>
-            <Button
-              variant="text"
-              size="small"
-              startIcon={<Mic size={14} />}
-              onClick={() => voiceAgent && navigate(`${componentUrl(orgHandler, projectHandler, voiceAgent.handler)}/test/voice-agent`)}
-              disabled={!voiceAgent || !canTest}>
+            <Button variant="text" size="small" startIcon={<Mic size={14} />} onClick={() => voiceAgent && navigate(voiceAgentTestUrl(orgHandler, projectHandler, voiceAgent.handler))} disabled={!voiceAgent || !canTest}>
               Test voice
             </Button>
           </span>

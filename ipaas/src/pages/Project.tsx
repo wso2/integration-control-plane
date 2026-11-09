@@ -151,31 +151,41 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
   const voiceDelete = useDeleteComponent();
   const confirmed = confirmation === component.displayName;
   const isAiAgent = identifyIntegration(component.displayType, component.componentSubType).type === 'ai-agent';
-  const { voiceAgent } = useLinkedVoiceAgent(scope.org, isAiAgent ? projectId : '', component.handler);
+  const voiceLookup = useLinkedVoiceAgent(scope.org, isAiAgent ? projectId : '', component.handler);
+  const { voiceAgent } = voiceLookup;
+  const [aiAgentDeleted, setAiAgentDeleted] = useState(false);
+  const busy = mutation.isPending || voiceDelete.isPending;
 
   // Escape and backdrop bypass the disabled Cancel button, so gate them too.
   const handleClose = () => {
-    if (!mutation.isPending) onClose();
+    if (!busy) onClose();
+  };
+
+  const deleteVoiceAgent = (target: Component) => {
+    const failed = (reason: string) => setDeleteError(`The AI agent was deleted, but its voice agent '${target.displayName}' was not: ${reason}`);
+    voiceDelete.mutate(
+      { orgHandler: scope.org, componentId: target.id, projectId },
+      {
+        onSuccess: (voiceResult) => (voiceResult.canDelete ? onDeleted() : failed(voiceResult.message || 'try again.')),
+        onError: (e) => failed(e instanceof Error ? e.message : 'try again.'),
+      },
+    );
   };
 
   const handleDelete = () => {
     setDeleteError(null);
+    if (aiAgentDeleted && voiceAgent) {
+      deleteVoiceAgent(voiceAgent);
+      return;
+    }
     mutation.mutate(
       { orgHandler: scope.org, componentId: component.id, projectId },
       {
         onSuccess: (result) => {
           if (result.canDelete) {
-            if (!voiceAgent) {
-              onDeleted();
-              return;
-            }
-            voiceDelete.mutate(
-              { orgHandler: scope.org, componentId: voiceAgent.id, projectId },
-              {
-                onSuccess: (voiceResult) => (voiceResult.canDelete ? onDeleted() : setDeleteError(`The AI agent was deleted, but its voice agent '${voiceAgent.displayName}' was not: ${voiceResult.message || 'delete it from its own page.'}`)),
-                onError: (e) => setDeleteError(`The AI agent was deleted, but its voice agent '${voiceAgent.displayName}' was not: ${e instanceof Error ? e.message : 'delete it from its own page.'}`),
-              },
-            );
+            setAiAgentDeleted(true);
+            if (voiceAgent) deleteVoiceAgent(voiceAgent);
+            else onDeleted();
             return;
           }
           // The backend blocks deletion (e.g. active API subscribers) without throwing — canDelete must be checked explicitly.
@@ -245,6 +255,18 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         Are you sure you want to remove the integration &lsquo;<strong>{component.displayName}</strong>&rsquo; ?
       </DialogTitle>
       <DialogContent>
+        {voiceLookup.isError && (
+          <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => voiceLookup.refetch()}>
+                Retry
+              </Button>
+            }>
+            Couldn&apos;t check whether this AI agent has a voice agent. Retry before deleting it.
+          </Alert>
+        )}
         {voiceAgent && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             This AI agent is connected to the voice agent <strong>{voiceAgent.displayName || voiceAgent.handler}</strong>. Deleting it will also delete the voice agent.
@@ -259,11 +281,11 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         <TextField autoFocus fullWidth placeholder="Enter integration name to confirm" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
       </DialogContent>
       <DialogActions>
-        <Button variant="outlined" color="inherit" onClick={handleClose} disabled={mutation.isPending}>
+        <Button variant="outlined" color="inherit" onClick={handleClose} disabled={busy}>
           Cancel
         </Button>
-        <Button variant="contained" color="error" disabled={!confirmed || mutation.isPending || voiceDelete.isPending} startIcon={mutation.isPending || voiceDelete.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
-          {mutation.isPending ? 'Deleting...' : 'Delete'}
+        <Button variant="contained" color="error" disabled={!confirmed || busy || voiceLookup.isLoading || voiceLookup.isError} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
+          {busy ? 'Deleting...' : aiAgentDeleted ? 'Delete voice agent' : 'Delete'}
         </Button>
       </DialogActions>
     </Dialog>

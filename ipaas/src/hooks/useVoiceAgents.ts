@@ -16,11 +16,12 @@
  * under the License.
  */
 
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { useComponents } from './useComponents';
-import { deleteComponent, fetchComponents } from '../api/components';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useComponents, useOrgComponents } from './useComponents';
+import { deleteComponent } from '../api/components';
 import { checkNameAvailability } from '../api/prebuilt';
-import { createVoiceAgentComponent, deployVoiceAgent, VOICE_AGENT_COMPONENT_TYPE } from '../api/voiceAgents';
+import { createVoiceAgentComponent, deployVoiceAgent } from '../api/voiceAgents';
+import { VOICE_AGENT_COMPONENT_TYPE } from '../constants/voiceAgent';
 import type { Component } from '../types/component';
 import type { Project } from '../types/project';
 import type { CreateVoiceAgentInput } from '../types/voiceAgent';
@@ -35,25 +36,18 @@ export interface VoiceAgentRow {
 const isVoiceAgent = (c: Component): boolean => c.componentType === VOICE_AGENT_COMPONENT_TYPE && !c.deleting;
 
 export function useOrgVoiceAgents(orgHandler: string, projects: Project[]) {
-  return useQueries({
-    queries: projects.map((project) => ({
-      queryKey: ['components', orgHandler, project.id],
-      queryFn: () => fetchComponents(orgHandler, project.id),
-      enabled: !!orgHandler,
-    })),
-    combine: (results) => ({
-      rows: results.flatMap((r, i) => {
-        const components = r.data ?? [];
-        return components.filter(isVoiceAgent).map((component) => {
-          const agentHandler = component.voiceTargetAgent;
-          return { component, project: projects[i], targetAgent: agentHandler ? components.find((c) => c.handler === agentHandler) : undefined };
-        });
-      }),
-      isLoading: results.some((r) => r.isLoading),
-      isError: results.some((r) => r.isError),
-      refetch: () => results.forEach((r) => r.refetch()),
-    }),
+  const { byProject, isLoading, isError, refetch } = useOrgComponents(
+    orgHandler,
+    projects.map((p) => p.id),
+  );
+  const rows = projects.flatMap((project) => {
+    const components = byProject.get(project.id) ?? [];
+    return components.filter(isVoiceAgent).map((component) => {
+      const agentHandler = component.voiceTargetAgent;
+      return { component, project, targetAgent: agentHandler ? components.find((c) => c.handler === agentHandler) : undefined };
+    });
   });
+  return { rows, isLoading, isError, refetch };
 }
 
 export function useCreateVoiceAgent() {
@@ -67,7 +61,8 @@ export function useCreateVoiceAgent() {
         await deployVoiceAgent(component.id, buildVoiceAgentDeployment(settings));
       } catch (err) {
         try {
-          await deleteComponent({ orgHandler, componentId: component.id, projectId });
+          const rollback = await deleteComponent({ orgHandler, componentId: component.id, projectId });
+          if (!rollback.canDelete) console.error('Failed to remove the voice agent after its deploy failed', { componentId: component.id, projectId }, rollback.message);
         } catch (rollbackErr) {
           console.error('Failed to remove the voice agent after its deploy failed', { componentId: component.id, projectId }, rollbackErr);
         }
@@ -80,7 +75,7 @@ export function useCreateVoiceAgent() {
 }
 
 export function useLinkedVoiceAgent(orgHandler: string, projectId: string, agentHandler: string) {
-  const { data, isLoading, isError } = useComponents(orgHandler, projectId);
+  const { data, isLoading, isError, refetch } = useComponents(orgHandler, projectId);
   const voiceAgent = data?.find((c) => isVoiceAgent(c) && c.voiceTargetAgent === agentHandler);
-  return { voiceAgent, isLoading, isError };
+  return { voiceAgent, isLoading, isError, refetch };
 }

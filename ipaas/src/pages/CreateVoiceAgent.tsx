@@ -16,26 +16,28 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Grid, PageContent, Skeleton, Stack, Step, StepLabel, Stepper, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Button, Grid, PageContent, PageTitle, Skeleton, Stack, Step, StepLabel, Stepper, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft, Mic } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ComponentType, type JSX } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { LiveKitStep, SttStep, TtsStep, TuningStep, type VoiceAgentStepProps } from '../components/VoiceAgent/VoiceAgentSteps';
 import VoiceAgentTargetStep, { AgentEndpointStatus } from '../components/VoiceAgent/VoiceAgentTargetStep';
+import EmptyListing from '../components/EmptyListing';
 import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
 import { VOICE_AGENT_CREATION_STEPS } from '../constants/integrationCreation';
 import { useLeaveGuard, useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { useAgentVoiceEndpoint } from '../hooks/useAgentVoiceEndpoint';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useComponentByHandler } from '../hooks/useComponents';
+import { useComponentByHandler, useComponents } from '../hooks/useComponents';
 import { useActiveProjects, useProjectByHandler } from '../hooks/useProjects';
 import { useCreateVoiceAgent } from '../hooks/useVoiceAgents';
-import { newComponentUrl, type ComponentScope, type OrgScope, type ProjectScope } from '../nav';
+import { newComponentUrl, newProjectUrl, type ComponentScope, type OrgScope, type ProjectScope } from '../nav';
 import { componentOverviewUrl, createVoiceAgentUrl, enableVoiceAgentUrl, voiceAgentsUrl } from '../paths';
 import type { Component } from '../types/component';
 import type { Project } from '../types/project';
 import type { VoiceAgentSettings } from '../types/voiceAgent';
 import PageNotFound from './PageNotFound';
+import { isLiveAiAgent } from '../utils/identifyIntegration';
 import { DEFAULT_VOICE_AGENT_SETTINGS, validateAgentStep, validateLiveKitStep, validateSttStep, validateTtsStep, validateTuningStep, type StepErrors } from '../utils/voiceAgent';
 
 type StepKey = 'agent' | 'livekit' | 'stt' | 'tts' | 'tune';
@@ -58,6 +60,7 @@ const ALL_STEPS: WizardStep[] = [
 
 const STEPPER_SX = { position: 'sticky', top: 24 } as const;
 const STATUS_SX = { mb: 3, maxWidth: 720 } as const;
+const PAGE_SX = { pt: 5 } as const;
 const LOADER_PAGE_SX = { pt: 5, minHeight: '60vh', display: 'flex', flexDirection: 'column' } as const;
 
 type GeneralHandoff = Pick<VoiceAgentSettings, 'displayName' | 'name' | 'description' | 'targetMode' | 'targetAgentHandler' | 'targetAgentWsUrl'> & { projectId: string };
@@ -80,7 +83,7 @@ type WizardMode = 'org' | 'project' | 'agent';
 
 function CreateVoiceAgentSkeleton(): JSX.Element {
   return (
-    <PageContent sx={{ pt: 5 }}>
+    <PageContent fullWidth sx={PAGE_SX}>
       <Skeleton variant="text" width={240} height={48} />
       <Grid container spacing={4} sx={{ mt: 2 }}>
         <Grid size={{ xs: 12, md: 3 }}>
@@ -94,25 +97,59 @@ function CreateVoiceAgentSkeleton(): JSX.Element {
   );
 }
 
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }): JSX.Element {
+  return (
+    <PageContent fullWidth sx={PAGE_SX}>
+      <Alert
+        severity="error"
+        action={
+          <Button color="inherit" size="small" onClick={onRetry}>
+            Retry
+          </Button>
+        }>
+        {message}
+      </Alert>
+    </PageContent>
+  );
+}
+
 export function CreateVoiceAgentOrg(scope: OrgScope): JSX.Element {
-  const { data: projects, isLoading } = useActiveProjects();
+  const navigate = useAppNavigate();
+  const { data: projects, isLoading, isError, refetch } = useActiveProjects();
   if (isLoading) return <CreateVoiceAgentSkeleton />;
-  if (!projects || projects.length === 0) return <PageNotFound title="No projects" />;
+  if (isError || !projects) return <LoadError message="Could not load your projects." onRetry={() => void refetch()} />;
+  if (projects.length === 0) {
+    return (
+      <PageContent fullWidth sx={PAGE_SX}>
+        <EmptyListing
+          icon={<Mic size={48} />}
+          title="No projects yet"
+          description="A voice agent belongs to a project. Create a project, then create the voice agent in it."
+          showAction
+          actionLabel="Create project"
+          onAction={() => navigate(newProjectUrl(scope))}
+        />
+      </PageContent>
+    );
+  }
   return <CreateVoiceAgentWizard org={scope.org} mode="org" projects={projects} project={projects[0]} />;
 }
 
 export default function CreateVoiceAgent(scope: ProjectScope): JSX.Element {
-  const { data: project, isLoading } = useProjectByHandler(scope.project);
+  const { data: project, isLoading, isError, refetch } = useProjectByHandler(scope.project);
   if (isLoading) return <CreateVoiceAgentSkeleton />;
+  if (isError) return <LoadError message="Could not load the project." onRetry={() => void refetch()} />;
   if (!project) return <PageNotFound title="Project not found" />;
   return <CreateVoiceAgentWizard org={scope.org} mode="project" projects={[project]} project={project} />;
 }
 
 export function EnableVoiceAgent(scope: ComponentScope): JSX.Element {
-  const { data: project, isLoading: loadingProject } = useProjectByHandler(scope.project);
-  const { data: agent, isLoading: loadingAgent } = useComponentByHandler(project?.id ?? '', scope.component);
+  const { data: project, isLoading: loadingProject, isError: projectFailed, refetch: refetchProject } = useProjectByHandler(scope.project);
+  const { data: agent, isLoading: loadingAgent, isError: agentFailed, refetch: refetchAgent } = useComponentByHandler(project?.id ?? '', scope.component);
   if (loadingProject || (project && loadingAgent)) return <CreateVoiceAgentSkeleton />;
+  if (projectFailed) return <LoadError message="Could not load the project." onRetry={() => void refetchProject()} />;
   if (!project) return <PageNotFound title="Project not found" />;
+  if (agentFailed) return <LoadError message="Could not load the AI agent." onRetry={() => void refetchAgent()} />;
   if (!agent) return <PageNotFound title="Integration not found" />;
   return <CreateVoiceAgentWizard org={scope.org} mode="agent" projects={[project]} project={project} agent={agent} />;
 }
@@ -148,9 +185,13 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
   const allowLeave = useUnsavedChanges(settings !== initialSettings && !create.isSuccess);
   const targetProject = projects.find((p) => p.id === projectId) ?? project;
 
-  const endpoint = useAgentVoiceEndpoint(org, targetProject.id, mode === 'agent' ? agent : undefined);
-  const resolvedSettings = mode === 'agent' && endpoint.status === 'ready' ? { ...settings, targetAgentWsUrl: endpoint.url } : settings;
-  const agentBlocked = mode === 'agent' && endpoint.status !== 'ready';
+  const { data: components } = useComponents(org, targetProject.id);
+  const platformTarget = settings.targetMode === 'platform';
+  const isTargetAgent = (c: Component): boolean => platformTarget && c.handler === settings.targetAgentHandler;
+  const targetAgent = agent && isTargetAgent(agent) ? agent : components?.find((c) => isTargetAgent(c) && isLiveAiAgent(c));
+  const endpoint = useAgentVoiceEndpoint(org, targetProject.id, targetAgent);
+  const resolvedSettings = platformTarget ? { ...settings, targetAgentWsUrl: endpoint.status === 'ready' ? endpoint.url : '' } : settings;
+  const agentBlocked = platformTarget && endpoint.status !== 'ready';
 
   const step = steps[activeStep];
   const stepErrors = step.validate(resolvedSettings);
@@ -198,31 +239,24 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
   };
 
   const exitUrl = mode === 'agent' && agent ? componentOverviewUrl(org, targetProject.handler, agent.handler) : mode === 'project' ? newComponentUrl({ org, project: targetProject.handler }) : voiceAgentsUrl(org);
-  const exitLabel = mode === 'agent' ? 'Back to the agent' : mode === 'project' ? 'Back to create an integration' : 'Back to voice agents';
+  const exitLabel = mode === 'agent' ? 'Back to AI agent' : mode === 'project' ? 'Back to create integration' : 'Back to voice agents';
 
   if (create.isPending || create.isSuccess) {
     return (
-      <PageContent sx={LOADER_PAGE_SX}>
-        <IntegrationCreationLoader
-          label="voice agent"
-          subLabel={resolvedSettings.displayName.trim()}
-          isPending={create.isPending}
-          isSuccess={create.isSuccess}
-          steps={VOICE_AGENT_CREATION_STEPS}
-          successText="Voice agent deployed!"
-        />
+      <PageContent fullWidth sx={LOADER_PAGE_SX}>
+        <IntegrationCreationLoader label="voice agent" subLabel={resolvedSettings.displayName.trim()} isPending={create.isPending} isSuccess={create.isSuccess} steps={VOICE_AGENT_CREATION_STEPS} successText="Voice agent created!" />
       </PageContent>
     );
   }
 
   return (
-    <PageContent sx={{ pt: 5 }}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => guardNavigation(() => navigate(exitUrl))} sx={{ mb: 3 }} disabled={create.isPending}>
+    <PageContent fullWidth sx={PAGE_SX}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => guardNavigation(() => navigate(exitUrl))} sx={{ mb: 3 }}>
         {exitLabel}
       </Button>
-      <Typography variant="h1" sx={{ mb: 4 }}>
-        Create a voice agent
-      </Typography>
+      <PageTitle sx={{ mb: 4 }}>
+        <PageTitle.Header>Create a voice agent</PageTitle.Header>
+      </PageTitle>
       <Grid container spacing={4}>
         <Grid size={{ xs: 12, md: 3 }}>
           <Stepper activeStep={activeStep} orientation="vertical" sx={STEPPER_SX}>
@@ -240,9 +274,9 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {step.description}
           </Typography>
-          {mode === 'agent' && agent && step.key !== 'agent' && endpoint.status !== 'ready' && endpoint.status !== 'loading' && (
+          {targetAgent && step.key !== 'agent' && endpoint.status !== 'ready' && endpoint.status !== 'loading' && (
             <Stack sx={STATUS_SX}>
-              <AgentEndpointStatus state={endpoint} agentName={agent.displayName || agent.handler} />
+              <AgentEndpointStatus state={endpoint} agentName={targetAgent.displayName || targetAgent.handler} />
             </Stack>
           )}
           {step.Form ? (
@@ -258,6 +292,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
               projectId={targetProject.id}
               onProjectChange={setProjectId}
               lockProject={mode !== 'org'}
+              agentEndpoint={endpoint}
             />
           )}
           {create.isError && (
@@ -266,11 +301,11 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
             </Alert>
           )}
           <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
-            <Button variant="outlined" onClick={back} disabled={create.isPending || (activeStep === 0 && !resumed)}>
+            <Button variant="outlined" onClick={back} disabled={activeStep === 0 && !resumed}>
               Back
             </Button>
-            <Button variant="contained" onClick={next} disabled={create.isPending || !stepComplete || (isLastStep && agentBlocked)} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-              {isLastStep ? (create.isPending ? 'Deploying' : 'Deploy voice agent') : 'Next'}
+            <Button variant="contained" onClick={next} disabled={!stepComplete || (isLastStep && agentBlocked)}>
+              {isLastStep ? 'Deploy voice agent' : 'Next'}
             </Button>
           </Stack>
         </Grid>

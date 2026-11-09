@@ -16,11 +16,11 @@
  * under the License.
  */
 
+import { VOICE_AGENT_COMPONENT_TYPE } from '../constants/voiceAgent';
 import type { Component } from '../types/component';
 import type { VoiceAgentDeployment } from '../types/voiceAgent';
+import { voiceAgentGetTokenUrl } from '../utils/voiceAgentConnect';
 import { bff, seg } from './_client';
-
-export const VOICE_AGENT_COMPONENT_TYPE = 'voiceAgent';
 
 interface CreateVoiceAgentComponentInput {
   projectId: string;
@@ -54,7 +54,7 @@ export const deployVoiceAgent = (componentName: string, deployment: VoiceAgentDe
 
 export async function fetchVoiceAgentRoomToken(tokenServiceUrl: string, roomName: string, participantName: string): Promise<{ token: string; url: string }> {
   const params = new URLSearchParams({ roomName, participantName });
-  const response = await fetch(`${tokenServiceUrl.replace(/\/+$/, '')}/getToken?${params}`);
+  const response = await fetch(`${voiceAgentGetTokenUrl(tokenServiceUrl)}?${params}`);
   if (!response.ok) throw new Error(`The token service answered ${response.status}.`);
   const body: { token?: unknown; url?: unknown } = await response.json();
   if (typeof body.token !== 'string' || typeof body.url !== 'string') throw new Error('The token service returned no room token.');

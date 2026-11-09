@@ -16,7 +16,7 @@
  * under the License.
  */
 
-export const TILE_SIZE = 72;
+const TILE_SIZE = 72;
 
 export const gridSx = { display: 'flex', flexWrap: 'wrap', gap: 6, rowGap: 2 } as const;
 
@@ -38,7 +38,7 @@ export const tileSx = (selected: boolean) =>
   ({
     width: TILE_SIZE,
     height: TILE_SIZE,
-    borderRadius: '12px',
+    borderRadius: 1,
     bgcolor: 'common.white',
     display: 'flex',
     alignItems: 'center',
@@ -54,3 +54,5 @@ export const tileSx = (selected: boolean) =>
 export const logoSx = { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' } as const;
 
 export const captionSx = { whiteSpace: 'nowrap', textAlign: 'center' } as const;
+
+export const errorSx = { display: 'block', mt: 1 } as const;

@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { VOICE_AGENT_COMPONENT_TYPE } from '../constants/voiceAgent';
+import type { Component } from '../types/component';
 import type { IntegrationIdentity, IntegrationRuntime } from '../types/integration';
 
 /**
@@ -90,7 +92,7 @@ export function identifyIntegration(displayType: string, componentSubType: strin
   }
 
   // displayType fallback for types whose identity lives entirely in displayType.
-  if (displayType === 'voiceAgent') {
+  if (displayType === VOICE_AGENT_COMPONENT_TYPE) {
     return { type: 'voice-agent', runtime: 'unknown', raw };
   }
 
@@ -121,4 +123,8 @@ export function identifyIntegration(displayType: string, componentSubType: strin
     default:
       return { type: 'unsupported', runtime: 'unknown', raw };
   }
+}
+
+export function isLiveAiAgent(component: Pick<Component, 'displayType' | 'componentSubType' | 'deleting'>): boolean {
+  return !component.deleting && identifyIntegration(component.displayType, component.componentSubType).type === 'ai-agent';
 }

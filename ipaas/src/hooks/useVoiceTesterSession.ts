@@ -25,7 +25,7 @@ const TRANSCRIPT_TOPIC = 'voice-text';
 
 export type VoiceTesterStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
-export function useVoiceTesterSession(tokenServiceUrl: string) {
+export function useVoiceTesterSession(tokenServiceUrl: string | null) {
   const [status, setStatus] = useState<VoiceTesterStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<VoiceTranscriptMessage[]>([]);
@@ -46,6 +46,7 @@ export function useVoiceTesterSession(tokenServiceUrl: string) {
   useEffect(() => teardown, [teardown]);
 
   const start = useCallback(async () => {
+    if (!tokenServiceUrl) return;
     teardown();
     setError(null);
     setTranscript([]);

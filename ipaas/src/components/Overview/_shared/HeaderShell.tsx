@@ -34,7 +34,6 @@ import { useAuth } from '../../../auth';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import { getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';
-import EnableVoiceAgentButton from '../ai-agent/EnableVoiceAgentButton';
 import type { IntegrationModule } from '../../../types/integration';
 import type { Environment } from '../../../types/environment';
 import { withBase } from '../../../utils/basePath';
@@ -213,9 +212,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const isSample = !!matchSample(repository, samplesData?.samples);
   const showOpenInEditor = hasSource && !isSamplesPending && !isSample && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
   const HeaderActions = module?.HeaderActions;
-  const isAiAgent = identifyIntegration(displayType, component.componentSubType ?? null).type === 'ai-agent';
 
-  const repoUrl = hasSource && repository ? buildRepoBrowseUrl(repository) : null;
+  const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;
   const ProviderIcon = getGitProviderIcon(repository?.gitProvider);
 
   const orgUuidFromToken = useOrgUuid() ?? '';
@@ -551,7 +549,6 @@ export default function ComponentHeader({ component, repository, latestCommit, o
           )}
 
           {HeaderActions && <HeaderActions component={component} environments={environments} versionId={versionId} projectId={projectId} orgHandler={orgHandler} />}
-          {isAiAgent && <EnableVoiceAgentButton component={component} orgHandler={orgHandler} projectId={projectId} />}
 
           {/* Prebuilt integrations expose a "How to setup this integration" guide. */}
           <SetupInstructionsButton repository={repository ?? null} />

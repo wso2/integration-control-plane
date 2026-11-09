@@ -59,7 +59,7 @@ export default function ProviderPicker({ label, providers, value, onSelect, erro
         })}
       </Box>
       {error && (
-        <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+        <Typography variant="caption" color="error" sx={styles.errorSx}>
           {error}
         </Typography>
       )}

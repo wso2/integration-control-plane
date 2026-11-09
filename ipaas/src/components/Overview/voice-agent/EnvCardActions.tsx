@@ -20,6 +20,8 @@ import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { Lightbulb, List, RotateCw, Square } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import ServiceLogsDrawer from '../integration-as-api/ServiceLogsDrawer';
@@ -31,6 +33,7 @@ export default function EnvCardActions({ component, env, versionId, releaseId, o
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
   const isActionPending = stopMutation.isPending || redeployMutation.isPending;
+  const canDeployHere = useCan()(Scopes.INTEGRATION_DEPLOY);
 
   const canStop = deploymentStatusV2 === 'ACTIVE';
   const canStart = deploymentStatusV2 === 'SUSPENDED';
@@ -73,7 +76,7 @@ export default function EnvCardActions({ component, env, versionId, releaseId, o
           View logs
         </Button>
       )}
-      {(canStop || isInProgress) && (
+      {canDeployHere && (canStop || isInProgress) && (
         <Tooltip title="Stop the voice agent">
           <span>
             <Button variant="outlined" size="small" color="error" startIcon={<Square size={14} />} onClick={handleStop} disabled={isActionPending || isInProgress}>
@@ -82,7 +85,7 @@ export default function EnvCardActions({ component, env, versionId, releaseId, o
           </span>
         </Tooltip>
       )}
-      {canStart && (
+      {canDeployHere && canStart && (
         <Tooltip title="Start the voice agent">
           <span>
             <Button variant="outlined" size="small" color="success" startIcon={<RotateCw size={14} />} onClick={handleRedeploy} disabled={isActionPending}>
@@ -91,7 +94,7 @@ export default function EnvCardActions({ component, env, versionId, releaseId, o
           </span>
         </Tooltip>
       )}
-      {hasError && (
+      {canDeployHere && hasError && (
         <Tooltip title="Redeploy the voice agent">
           <span>
             <Button variant="outlined" size="small" color="error" startIcon={<RotateCw size={14} />} onClick={handleRedeploy} disabled={isActionPending}>

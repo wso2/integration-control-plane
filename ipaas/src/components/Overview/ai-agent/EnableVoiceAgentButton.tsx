@@ -26,15 +26,9 @@ import { useSelectedTrack } from '../../../hooks/useSelectedTrack';
 import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
 import { useScope } from '../../../nav';
 import { componentOverviewUrl, enableVoiceAgentUrl } from '../../../paths';
-import type { Component } from '../../../types/component';
+import type { HeaderActionsProps } from '../../../types/integration';
 
-interface EnableVoiceAgentButtonProps {
-  component: Component;
-  orgHandler: string;
-  projectId: string;
-}
-
-export default function EnableVoiceAgentButton({ component, orgHandler, projectId }: EnableVoiceAgentButtonProps): JSX.Element | null {
+export default function EnableVoiceAgentButton({ component, orgHandler, projectId }: HeaderActionsProps): JSX.Element | null {
   const navigate = useAppNavigate();
   const scope = useScope();
   const { voiceAgent, isLoading, isError } = useLinkedVoiceAgent(orgHandler, projectId, component.handler);
@@ -62,22 +56,19 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
         ? 'Available once the running build succeeds.'
         : !buildSucceeded
           ? 'The latest build failed. Fix it and rebuild to enable the voice agent.'
-          : endpoint.status === 'loading'
-            ? "Checking the agent's endpoints…"
-            : endpoint.status === 'not-deployed' || endpoint.status === 'no-environment'
-              ? 'Deploy this AI agent to enable its voice agent.'
-              : endpoint.status === 'no-endpoint'
-                ? 'Add a WebSocket endpoint to this AI agent to enable its voice agent.'
-                : '';
+          : endpoint.status === 'error'
+            ? "Couldn't check this AI agent's endpoints. Reload the page to try again."
+            : endpoint.status === 'loading'
+              ? "Checking the agent's endpoints…"
+              : endpoint.status === 'not-deployed' || endpoint.status === 'no-environment'
+                ? 'Deploy this AI agent to enable its voice agent.'
+                : endpoint.status === 'no-endpoint'
+                  ? 'Add a WebSocket endpoint to this AI agent to enable its voice agent.'
+                  : '';
   return (
     <Tooltip title={blockedReason} placement="left">
       <span>
-        <Button
-          variant="text"
-          size="small"
-          startIcon={<Mic size={16} />}
-          disabled={!buildSucceeded || endpoint.status !== 'ready'}
-          onClick={() => navigate(enableVoiceAgentUrl(orgHandler, projectHandler, component.handler))}>
+        <Button variant="text" size="small" startIcon={<Mic size={16} />} disabled={!buildSucceeded || endpoint.status !== 'ready'} onClick={() => navigate(enableVoiceAgentUrl(orgHandler, projectHandler, component.handler))}>
           Enable voice agent
         </Button>
       </span>

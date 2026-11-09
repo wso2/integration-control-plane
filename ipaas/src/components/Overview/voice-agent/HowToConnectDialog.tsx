@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
@@ -48,7 +48,7 @@ function Section({ title, children }: { title: string; children: ReactNode }): J
 }
 
 export default function HowToConnectDialog({ open, onClose, envName, componentId, versionId, releaseId }: HowToConnectDialogProps): JSX.Element {
-  const { data: endpoints, isLoading, isError } = useEnvEndpoints(componentId, versionId, releaseId);
+  const { data: endpoints, isLoading, isError, refetch } = useEnvEndpoints(componentId, versionId, releaseId);
   const tokenServiceUrl = tokenServiceUrlOf(endpoints);
 
   return (
@@ -60,9 +60,11 @@ export default function HowToConnectDialog({ open, onClose, envName, componentId
             {envName}
           </Typography>
         </Stack>
-        <IconButton aria-label="Close" onClick={onClose}>
-          <X size={18} />
-        </IconButton>
+        <Tooltip title="Close">
+          <IconButton aria-label="Close" onClick={onClose}>
+            <X size={18} />
+          </IconButton>
+        </Tooltip>
       </DialogTitle>
       <DialogContent dividers>
         {isLoading ? (
@@ -72,13 +74,22 @@ export default function HowToConnectDialog({ open, onClose, envName, componentId
             <Skeleton variant="rounded" height={240} />
           </Stack>
         ) : isError ? (
-          <Alert severity="error">Couldn&apos;t load the token service endpoint.</Alert>
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => refetch()}>
+                Retry
+              </Button>
+            }>
+            Couldn&apos;t load the token service endpoint.
+          </Alert>
         ) : !tokenServiceUrl ? (
           <Alert severity="info">The token service isn&apos;t deployed in {envName} yet.</Alert>
         ) : (
           <Stack gap={3.5}>
             <Typography variant="body2" color="text.secondary">
-              Your application connects to this voice agent through your own backend. The backend requests a room token from the voice agent&apos;s token service and returns it to the application, which then joins the voice session directly. This keeps the token service URL out of your application.
+              Your application connects to this voice agent through your own backend. The backend requests a room token from the voice agent&apos;s token service and returns it to the application, which then joins the voice session directly. This keeps the
+              token service URL out of your application.
             </Typography>
 
             <Section title="Step 1: Set up your backend">

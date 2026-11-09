@@ -17,6 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { VOICE_AGENT_COMPONENT_TYPE } from '../constants/voiceAgent';
 import { identifyIntegration } from './identifyIntegration';
 
 describe('identifyIntegration — RAG types', () => {
@@ -50,5 +51,11 @@ describe('identifyIntegration — existing types still resolve', () => {
 describe('identifyIntegration — workflow', () => {
   it('resolves the workflow display type to a Ballerina workflow', () => {
     expect(identifyIntegration('ballerinaWorkflow', null)).toMatchObject({ type: 'workflow', runtime: 'ballerina' });
+  });
+});
+
+describe('identifyIntegration — voice agent', () => {
+  it('resolves the voice agent display type to a voice agent', () => {
+    expect(identifyIntegration(VOICE_AGENT_COMPONENT_TYPE, null)).toMatchObject({ type: 'voice-agent', runtime: 'unknown' });
   });
 });

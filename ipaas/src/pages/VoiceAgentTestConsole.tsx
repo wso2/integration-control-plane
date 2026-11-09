@@ -38,18 +38,30 @@ const CONTENT_SX = { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'col
 export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
   const { projectId } = useProjectId(scope.project);
-  const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
-  const { data: environments = [] } = useEnvironments(scope.org, projectId);
+  const componentQuery = useComponentByHandler(projectId, scope.component);
+  const { data: component, isLoading: loadingComponent } = componentQuery;
+  const envQuery = useEnvironments(scope.org, projectId);
+  const { data: environments = [], isLoading: loadingEnvs } = envQuery;
   const { trackId } = useSelectedTrack(component);
 
   const [pickedEnvId, setPickedEnvId] = useState('');
   const env = environments.find((e) => e.id === pickedEnvId) ?? environments[0];
 
-  const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', component?.id ?? '', trackId, env?.id ?? '');
+  const deploymentQuery = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', component?.id ?? '', trackId, env?.id ?? '');
+  const { data: deployment, isLoading: loadingDeployment } = deploymentQuery;
   const releaseId = deployment?.releaseId ?? '';
   const { data: endpoints, isLoading: loadingEndpoints, isError, refetch } = useEnvEndpoints(component?.id ?? '', trackId, releaseId);
 
   if (loadingComponent) return <VoiceAgentTestSkeleton />;
+  if (componentQuery.isError) {
+    return (
+      <PageContent fullWidth sx={CONTENT_SX}>
+        <Alert severity="error" action={<Button onClick={() => void componentQuery.refetch()}>Retry</Button>}>
+          Could not load the voice agent.
+        </Alert>
+      </PageContent>
+    );
+  }
   if (!component) return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
 
   const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
@@ -64,8 +76,23 @@ export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Elemen
   );
 
   const body = () => {
+    if (envQuery.isError) {
+      return (
+        <Alert severity="error" action={<Button onClick={() => void envQuery.refetch()}>Retry</Button>}>
+          Could not load the project&apos;s environments.
+        </Alert>
+      );
+    }
+    if (loadingEnvs) return <Skeleton variant="rounded" height={480} />;
     if (environments.length === 0) return <Alert severity="info">This project has no environments to test the voice agent in.</Alert>;
     if (loadingDeployment || (releaseId && loadingEndpoints)) return <Skeleton variant="rounded" height={480} />;
+    if (deploymentQuery.isError) {
+      return (
+        <Alert severity="error" action={<Button onClick={() => void deploymentQuery.refetch()}>Retry</Button>}>
+          Could not load the voice agent&apos;s deployment.
+        </Alert>
+      );
+    }
     if (!isActive) return <NotDeployedAlert status={deployment?.deploymentStatusV2} />;
     if (isError) {
       return (
@@ -75,14 +102,7 @@ export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Elemen
       );
     }
     const tokenServiceUrl = tokenServiceUrlOf(endpoints);
-    return (
-      <VoiceAgentTestPanel
-        key={env?.id}
-        agentName={component.displayName || component.name}
-        tokenServiceUrl={tokenServiceUrl}
-        unavailableReason={tokenServiceUrl ? undefined : 'The token service has no public URL in this environment yet.'}
-      />
-    );
+    return <VoiceAgentTestPanel key={env?.id} agentName={component.displayName || component.name} tokenServiceUrl={tokenServiceUrl} unavailableReason={tokenServiceUrl ? undefined : 'The token service has no public URL in this environment yet.'} />;
   };
 
   return (

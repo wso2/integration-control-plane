@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
+import { Box, CircularProgress, PageContent, Skeleton, Typography } from '@wso2/oxygen-ui';
 import { useEffect, type JSX } from 'react';
 import AgentChatConsole from './AgentChatConsole';
 import AutomationTest from './AutomationTest';
@@ -30,7 +30,7 @@ import { useProjectId } from '../hooks/useProjects';
 import { Navigate } from 'react-router';
 import { trackEvent } from '../services/tracking/tracking';
 import type { ComponentScope } from '../nav';
-import { componentUrl } from '../paths';
+import { componentTestUrl, componentUrl } from '../paths';
 import { isWorkflowIntegration } from '../utils/workflowIntegration';
 
 /**
@@ -119,6 +119,17 @@ function RouteLoading(): JSX.Element {
   );
 }
 
+const VOICE_TEST_SKELETON_SX = { mt: 3 } as const;
+
+function VoiceAgentTestSkeleton(): JSX.Element {
+  return (
+    <PageContent fullWidth>
+      <Skeleton variant="text" width={280} height={48} />
+      <Skeleton variant="rounded" height={480} sx={VOICE_TEST_SKELETON_SX} />
+    </PageContent>
+  );
+}
+
 export function VoiceAgentTestRoute(scope: ComponentScope): JSX.Element {
   const { projectId } = useProjectId(scope.project);
   const { data: comp, isPending } = useComponentByHandler(projectId, scope.component);
@@ -129,17 +140,9 @@ export function VoiceAgentTestRoute(scope: ComponentScope): JSX.Element {
     if (voiceAgentId) trackEvent('component-test');
   }, [voiceAgentId]);
 
-  if (projectId && isPending) {
-    return (
-      <PageContent fullWidth>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
-          <CircularProgress />
-        </Box>
-      </PageContent>
-    );
-  }
+  if (projectId && isPending) return <VoiceAgentTestSkeleton />;
 
-  if (comp && identity?.type !== 'voice-agent') return <Navigate to={`${componentUrl(scope.org, scope.project, scope.component)}/test`} replace />;
+  if (comp && identity?.type !== 'voice-agent') return <Navigate to={componentTestUrl(scope.org, scope.project, scope.component)} replace />;
 
   return <VoiceAgentTestConsole {...scope} />;
 }

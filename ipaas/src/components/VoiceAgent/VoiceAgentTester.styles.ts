@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { pulseSx, transcriptBaseSx } from './VoiceSession.styles';
+
 export const rowSx = {
   display: 'flex',
   alignItems: 'center',
@@ -33,15 +35,11 @@ export const orbSx = (live: boolean) =>
     bgcolor: live ? 'primary.main' : 'background.paper',
     color: live ? 'primary.contrastText' : 'text.disabled',
     boxShadow: 2,
-    animation: live ? 'voice-tester-pulse 1.6s ease-in-out infinite' : 'none',
-    '@keyframes voice-tester-pulse': {
-      '0%, 100%': { transform: 'scale(1)' },
-      '50%': { transform: 'scale(1.08)' },
-    },
+    ...pulseSx(live),
   }) as const;
 
 export const textSx = { flex: 1, minWidth: 0 } as const;
 
-export const transcriptSx = { maxHeight: 280, overflowY: 'auto', p: 2, mt: 1.5 } as const;
+export const transcriptSx = { ...transcriptBaseSx, mt: 1.5 } as const;
 
-export const hiddenSx = { display: 'none' } as const;
+export const errorSx = { mt: 1.5 } as const;

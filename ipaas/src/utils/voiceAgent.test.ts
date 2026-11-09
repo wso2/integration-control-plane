@@ -18,6 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { VoiceAgentSettings } from '../types/voiceAgent';
+import { notDeployedNotice } from './deploymentNotice';
 import {
   applyTranscriptEvent,
   buildVoiceAgentDeployment,
@@ -36,6 +37,7 @@ import {
   voiceAgentHandler,
   withSttProvider,
   withTtsProvider,
+  helperText,
 } from './voiceAgent';
 
 const complete: VoiceAgentSettings = withTtsProvider(
@@ -229,12 +231,17 @@ describe('voiceTesterUnavailableReason', () => {
   });
 
   it('says what to do for each state that blocks a session', () => {
-    expect(voiceTesterUnavailableReason({ ...ready, hasDeployment: false })).toBe('Deploy the voice agent to this environment to test it.');
-    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'IN_PROGRESS' })).toBe('The voice agent is starting. You can test it once it is active.');
-    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'ERROR' })).toBe('The voice agent failed to start. Check its logs, then redeploy it.');
-    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'SUSPENDED', tokenServiceUrl: null })).toBe('The voice agent is stopped. Start it to test it.');
+    expect(voiceTesterUnavailableReason({ ...ready, hasDeployment: false })).toBe(notDeployedNotice(null, 'test').message);
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'IN_PROGRESS' })).toBe(notDeployedNotice('IN_PROGRESS', 'test').message);
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'ERROR' })).toBe(notDeployedNotice('ERROR', 'test').message);
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'SUSPENDED', tokenServiceUrl: null })).toBe(notDeployedNotice('SUSPENDED', 'test').message);
     expect(voiceTesterUnavailableReason({ ...ready, endpointsFailed: true })).toBe("Couldn't load the voice agent's endpoints. Refresh the page to try again.");
     expect(voiceTesterUnavailableReason({ ...ready, tokenServiceUrl: null })).toBe('The voice agent is active, but its token service has no public URL yet.');
+  });
+
+  it('does not report an unknown status as stopped', () => {
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: null })).toBeUndefined();
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: null, endpointsFailed: true })).toBe("Couldn't load the voice agent's endpoints. Refresh the page to try again.");
   });
 });
 
@@ -254,7 +261,12 @@ describe('agentVoiceWsUrl', () => {
 
   it('finds nothing on an agent with only a chat endpoint, or none', () => {
     expect(agentVoiceWsUrl([{ type: 'HTTP', publicUrl: 'https://gw.example.com/agent' }])).toBeNull();
-    expect(agentVoiceWsUrl([{ type: 'REST', projectUrl: 'http://a' }, { type: 'REST', projectUrl: 'http://b' }])).toBeNull();
+    expect(
+      agentVoiceWsUrl([
+        { type: 'REST', projectUrl: 'http://a' },
+        { type: 'REST', projectUrl: 'http://b' },
+      ]),
+    ).toBeNull();
     expect(agentVoiceWsUrl([])).toBeNull();
     expect(agentVoiceWsUrl(undefined)).toBeNull();
   });
@@ -266,5 +278,13 @@ describe('isVoiceEndpoint', () => {
     expect(isVoiceEndpoint({ type: 'Websocket' })).toBe(true);
     expect(isVoiceEndpoint({ type: 'REST' })).toBe(false);
     expect(isVoiceEndpoint(undefined)).toBe(false);
+  });
+});
+
+describe('helperText', () => {
+  it('shows the error when there is one, otherwise the hint', () => {
+    expect(helperText('Required', 'A hint')).toBe('Required');
+    expect(helperText(undefined, 'A hint')).toBe('A hint');
+    expect(helperText(undefined)).toBe(' ');
   });
 });

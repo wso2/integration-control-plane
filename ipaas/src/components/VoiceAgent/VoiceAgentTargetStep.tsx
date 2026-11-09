@@ -16,16 +16,15 @@
  * under the License.
  */
 
-import { Alert, Box, Card, CardActionArea, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Card, CardActionArea, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Activity, Globe, Pencil } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useState, type JSX, type ReactNode } from 'react';
-import { useAgentVoiceEndpoint, type AgentVoiceEndpointState } from '../../hooks/useAgentVoiceEndpoint';
+import { useState, type JSX, type ReactNode } from 'react';
+import type { AgentVoiceEndpointState } from '../../hooks/useAgentVoiceEndpoint';
 import { useComponents } from '../../hooks/useComponents';
-import type { Component } from '../../types/component';
 import type { Project } from '../../types/project';
 import type { VoiceTargetMode } from '../../types/voiceAgent';
-import { identifyIntegration } from '../../utils/identifyIntegration';
-import { effectiveVoiceAgentHandler } from '../../utils/voiceAgent';
+import { isLiveAiAgent } from '../../utils/identifyIntegration';
+import { effectiveVoiceAgentHandler, helperText } from '../../utils/voiceAgent';
 import type { VoiceAgentStepProps } from './VoiceAgentSteps';
 import * as styles from './VoiceAgentTargetStep.styles';
 
@@ -35,16 +34,13 @@ export interface VoiceAgentTargetStepProps extends VoiceAgentStepProps {
   projectId: string;
   onProjectChange: (projectId: string) => void;
   lockProject: boolean;
+  agentEndpoint: AgentVoiceEndpointState;
 }
 
-const help = (error: string | undefined, hint = ' '): string => error ?? hint;
-
-const isAiAgent = (c: Component): boolean => !c.deleting && identifyIntegration(c.displayType, c.componentSubType).type === 'ai-agent';
-
-export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHandler, projects, projectId, onProjectChange, lockProject }: VoiceAgentTargetStepProps): JSX.Element {
+export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHandler, projects, projectId, onProjectChange, lockProject, agentEndpoint }: VoiceAgentTargetStepProps): JSX.Element {
   const [editingName, setEditingName] = useState(!!settings.name);
   const { data: components, isLoading: loadingAgents } = useComponents(orgHandler, projectId);
-  const agents = (components ?? []).filter(isAiAgent);
+  const agents = (components ?? []).filter(isLiveAiAgent);
   const selectedAgent = agents.find((a) => a.handler === settings.targetAgentHandler);
 
   const chooseMode = (targetMode: VoiceTargetMode) => {
@@ -126,7 +122,7 @@ export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHa
                 disabled={loadingAgents}
                 onChange={(e) => chooseAgent(e.target.value)}
                 error={!!errors.targetAgentHandler}
-                helperText={help(errors.targetAgentHandler, agents.length === 0 && !loadingAgents ? 'This project has no AI agents yet. Create one, or use an externally hosted agent.' : ' ')}
+                helperText={helperText(errors.targetAgentHandler, agents.length === 0 && !loadingAgents ? 'This project has no AI agents yet. Create one, or use an externally hosted agent.' : ' ')}
                 SelectProps={{ displayEmpty: true }}>
                 <MenuItem value="" disabled>
                   {loadingAgents ? 'Loading agents' : 'Select a deployed agent to add voice to'}
@@ -137,7 +133,7 @@ export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHa
                   </MenuItem>
                 ))}
               </TextField>
-              {selectedAgent && <AgentEndpoint orgHandler={orgHandler} projectId={projectId} agent={selectedAgent} url={settings.targetAgentWsUrl} onResolved={(targetAgentWsUrl) => onChange({ targetAgentWsUrl })} />}
+              {selectedAgent && <AgentEndpointStatus state={agentEndpoint} agentName={selectedAgent.displayName || selectedAgent.handler} />}
             </>
           ) : (
             <TextField
@@ -148,14 +144,14 @@ export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHa
               value={settings.targetAgentWsUrl}
               onChange={(e) => onChange({ targetAgentWsUrl: e.target.value })}
               error={!!errors.targetAgentWsUrl}
-              helperText={help(errors.targetAgentWsUrl)}
+              helperText={helperText(errors.targetAgentWsUrl)}
             />
           )}
         </Stack>
       </Card>
 
       <Box sx={styles.nameRowSx}>
-        <TextField labelPlacement="top" label="Display name" fullWidth value={settings.displayName} onChange={(e) => onChange({ displayName: e.target.value })} error={!!errors.displayName} helperText={help(errors.displayName)} />
+        <TextField labelPlacement="top" label="Display name" fullWidth value={settings.displayName} onChange={(e) => onChange({ displayName: e.target.value })} error={!!errors.displayName} helperText={helperText(errors.displayName)} />
         <TextField
           labelPlacement="top"
           label="Name"
@@ -164,7 +160,7 @@ export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHa
           disabled={!editingName}
           onChange={(e) => onChange({ name: e.target.value })}
           error={!!errors.name}
-          helperText={help(errors.name, editingName ? `Created as ${effectiveVoiceAgentHandler(settings) || '…'}` : 'Derived from the display name.')}
+          helperText={helperText(errors.name, editingName ? `Created as ${effectiveVoiceAgentHandler(settings) || '…'}` : 'Derived from the display name.')}
           InputProps={{
             endAdornment: !editingName && (
               <Tooltip title="Edit name">
@@ -213,27 +209,20 @@ function ModeCard({ selected, onSelect, icon, title, description }: ModeCardProp
   );
 }
 
-interface AgentEndpointProps {
-  orgHandler: string;
-  projectId: string;
-  agent: Component;
-  url: string;
-  onResolved: (url: string) => void;
-}
-
-function AgentEndpoint({ orgHandler, projectId, agent, url, onResolved }: AgentEndpointProps): JSX.Element {
-  const state = useAgentVoiceEndpoint(orgHandler, projectId, agent);
-  const resolved = state.status === 'ready' ? state.url : '';
-
-  useEffect(() => {
-    if (state.status !== 'loading' && resolved !== url) onResolved(resolved);
-  }, [state.status, resolved, url, onResolved]);
-
-  return <AgentEndpointStatus state={state} agentName={agent.displayName || agent.handler} />;
-}
-
 export function AgentEndpointStatus({ state, agentName }: { state: AgentVoiceEndpointState; agentName: string }): JSX.Element | null {
   switch (state.status) {
+    case 'error':
+      return (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={state.retry}>
+              Retry
+            </Button>
+          }>
+          {`Couldn't check whether ${agentName} is deployed with a WebSocket endpoint.`}
+        </Alert>
+      );
     case 'no-environment':
       return <Alert severity="warning">This project has no environment to deploy the voice agent to.</Alert>;
     case 'not-deployed':

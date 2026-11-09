@@ -16,14 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Card, Chip, Paper, Stack, Typography } from '@wso2/oxygen-ui';
-import { Mic, PhoneOff } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Card, Typography } from '@wso2/oxygen-ui';
+import { Mic } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { useVoiceTesterSession, type VoiceTesterStatus } from '../../hooks/useVoiceTesterSession';
+import { useVoiceTesterSession } from '../../hooks/useVoiceTesterSession';
+import { VoiceSessionButton, VoiceSessionStatusChip, VoiceTranscript } from './VoiceSession';
+import { hiddenSx } from './VoiceSession.styles';
 import * as styles from './VoiceAgentTestPanel.styles';
-
-const STATUS_LABEL: Record<VoiceTesterStatus, string> = { idle: 'Offline', connecting: 'Connecting', connected: 'Live', error: 'Failed' };
-const STATUS_COLOR: Record<VoiceTesterStatus, 'default' | 'warning' | 'success' | 'error'> = { idle: 'default', connecting: 'warning', connected: 'success', error: 'error' };
 
 interface VoiceAgentTestPanelProps {
   agentName: string;
@@ -32,8 +31,7 @@ interface VoiceAgentTestPanelProps {
 }
 
 export default function VoiceAgentTestPanel({ agentName, tokenServiceUrl, unavailableReason }: VoiceAgentTestPanelProps): JSX.Element {
-  const { status, error, transcript, start, stop, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl ?? '');
-  const inCall = status === 'connecting' || status === 'connected';
+  const { status, error, transcript, start, stop, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl);
   const canStart = !!tokenServiceUrl && !unavailableReason;
 
   return (
@@ -43,17 +41,9 @@ export default function VoiceAgentTestPanel({ agentName, tokenServiceUrl, unavai
         <Typography variant="subtitle1" fontWeight={600}>
           Voice agent tester
         </Typography>
-        <Chip size="small" variant="outlined" label={STATUS_LABEL[status]} color={STATUS_COLOR[status]} />
-        <Box sx={{ flex: 1 }} />
-        {inCall ? (
-          <Button variant="outlined" color="error" startIcon={<PhoneOff size={16} />} onClick={stop}>
-            End session
-          </Button>
-        ) : (
-          <Button variant="contained" startIcon={<Mic size={16} />} onClick={start} disabled={!canStart}>
-            Start session
-          </Button>
-        )}
+        <VoiceSessionStatusChip status={status} />
+        <Box sx={styles.spacerSx} />
+        <VoiceSessionButton status={status} canStart={canStart} onStart={start} onStop={stop} />
       </Box>
 
       <Box sx={styles.stageSx}>
@@ -67,23 +57,9 @@ export default function VoiceAgentTestPanel({ agentName, tokenServiceUrl, unavai
           {unavailableReason ?? (status === 'connected' ? `${agentName} is listening. Start speaking to see the conversation below.` : `Start a session to talk to ${agentName}.`)}
         </Typography>
         {error && <Alert severity="error">{error}</Alert>}
-        {transcript.length > 0 && (
-          <Paper variant="outlined" sx={styles.transcriptSx}>
-            <Stack gap={1}>
-              {transcript.map((m) => (
-                <Box key={m.id}>
-                  <Typography variant="caption" color="text.secondary">
-                    {m.role === 'user' ? 'You' : 'Agent'}
-                    {m.interrupted ? ' (interrupted)' : ''}
-                  </Typography>
-                  <Typography variant="body2">{m.text}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          </Paper>
-        )}
+        <VoiceTranscript messages={transcript} sx={styles.transcriptSx} />
       </Box>
-      <Box ref={audioContainerRef} sx={styles.hiddenSx} />
+      <Box ref={audioContainerRef} sx={hiddenSx} />
     </Card>
   );
 }

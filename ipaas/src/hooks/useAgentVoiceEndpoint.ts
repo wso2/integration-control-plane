@@ -26,6 +26,7 @@ import { useSelectedTrack } from './useSelectedTrack';
 
 export type AgentVoiceEndpointState =
   | { status: 'loading' }
+  | { status: 'error'; retry: () => void }
   | { status: 'no-environment' }
   | { status: 'not-deployed'; env: Environment }
   | { status: 'no-endpoint'; env: Environment }
@@ -33,13 +34,18 @@ export type AgentVoiceEndpointState =
 
 export function useAgentVoiceEndpoint(orgHandler: string, projectId: string, agent: Component | undefined): AgentVoiceEndpointState {
   const orgUuid = useOrgUuid() ?? '';
-  const { data: environments = [], isLoading: loadingEnvs } = useEnvironments(orgHandler, projectId);
+  const envQuery = useEnvironments(orgHandler, projectId);
+  const { data: environments = [], isLoading: loadingEnvs } = envQuery;
   const env = environments.find((e) => !e.critical) ?? environments[0];
   const { trackId } = useSelectedTrack(agent);
-  const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(orgHandler, orgUuid, agent?.id ?? '', trackId, env?.id ?? '');
+  const deploymentQuery = useComponentDeployment(orgHandler, orgUuid, agent?.id ?? '', trackId, env?.id ?? '');
+  const { data: deployment, isLoading: loadingDeployment } = deploymentQuery;
   const releaseId = deployment?.releaseId ?? '';
-  const { data: endpoints, isLoading: loadingEndpoints } = useEnvEndpoints(agent?.id ?? '', trackId, releaseId);
+  const endpointsQuery = useEnvEndpoints(agent?.id ?? '', trackId, releaseId);
+  const { data: endpoints, isLoading: loadingEndpoints } = endpointsQuery;
 
+  const failed = [envQuery, deploymentQuery, endpointsQuery].filter((q) => q.isError);
+  if (failed.length > 0) return { status: 'error', retry: () => failed.forEach((q) => q.refetch()) };
   if (!agent || loadingEnvs || loadingDeployment || (releaseId && loadingEndpoints)) return { status: 'loading' };
   if (!env) return { status: 'no-environment' };
   if (!releaseId) return { status: 'not-deployed', env };

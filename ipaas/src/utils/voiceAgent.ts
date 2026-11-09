@@ -17,6 +17,7 @@
  */
 
 import { CUSTOM_VOICE_ID, STT_PROVIDERS, TTS_PROVIDERS } from '../constants/voiceAgentProviders';
+import { notDeployedNotice } from './deploymentNotice';
 import type { TurnDetectionModel, VoiceAgentDeployment, VoiceAgentSettings } from '../types/voiceAgent';
 import { toHandler } from './string';
 
@@ -106,6 +107,8 @@ export function withTtsProvider(settings: VoiceAgentSettings, providerId: string
     ttsLanguage: provider.languages[0].code,
   };
 }
+
+export const helperText = (error: string | undefined, hint = ' '): string => error ?? hint;
 
 export type StepErrors = Partial<Record<keyof VoiceAgentSettings, string>>;
 
@@ -256,6 +259,8 @@ export function tokenServiceUrlOf(endpoints: readonly { id: string; publicUrl?: 
   return endpoints?.find((e) => e.id === VOICE_AGENT_TOKEN_ENDPOINT)?.publicUrl || null;
 }
 
+const BLOCKING_DEPLOYMENT_STATUSES = new Set(['IN_PROGRESS', 'ERROR', 'SUSPENDED']);
+
 interface VoiceTesterState {
   hasDeployment: boolean;
   deploymentStatus: string | null;
@@ -264,10 +269,8 @@ interface VoiceTesterState {
 }
 
 export function voiceTesterUnavailableReason({ hasDeployment, deploymentStatus, endpointsFailed, tokenServiceUrl }: VoiceTesterState): string | undefined {
-  if (!hasDeployment) return 'Deploy the voice agent to this environment to test it.';
-  if (deploymentStatus === 'IN_PROGRESS') return 'The voice agent is starting. You can test it once it is active.';
-  if (deploymentStatus === 'ERROR') return 'The voice agent failed to start. Check its logs, then redeploy it.';
-  if (deploymentStatus !== 'ACTIVE') return 'The voice agent is stopped. Start it to test it.';
+  if (!hasDeployment) return notDeployedNotice(null, 'test').message;
+  if (deploymentStatus && BLOCKING_DEPLOYMENT_STATUSES.has(deploymentStatus)) return notDeployedNotice(deploymentStatus, 'test').message;
   if (endpointsFailed) return "Couldn't load the voice agent's endpoints. Refresh the page to try again.";
   if (!tokenServiceUrl) return 'The voice agent is active, but its token service has no public URL yet.';
   return undefined;

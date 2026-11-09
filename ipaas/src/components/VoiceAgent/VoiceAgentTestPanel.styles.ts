@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { pulseSx, transcriptBaseSx } from './VoiceSession.styles';
+
 export const panelSx = {
   display: 'flex',
   flexDirection: 'column',
@@ -66,20 +68,14 @@ export const orbSx = (live: boolean) =>
     bgcolor: live ? 'primary.light' : 'action.hover',
     boxShadow: 4,
     transition: 'background-color 300ms',
-    animation: live ? 'voice-orb-pulse 1.6s ease-in-out infinite' : 'none',
-    '@keyframes voice-orb-pulse': {
-      '0%, 100%': { transform: 'scale(1)' },
-      '50%': { transform: 'scale(1.08)' },
-    },
+    ...pulseSx(live),
   }) as const;
 
+export const spacerSx = { flex: 1 } as const;
+
 export const transcriptSx = {
+  ...transcriptBaseSx,
   width: '100%',
   maxWidth: 720,
-  maxHeight: 280,
-  overflowY: 'auto',
-  p: 2,
   textAlign: 'left',
 } as const;
-
-export const hiddenSx = { display: 'none' } as const;

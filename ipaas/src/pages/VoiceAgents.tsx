@@ -25,12 +25,12 @@ import SearchField from '../components/SearchField';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useActiveProjects } from '../hooks/useProjects';
 import { useOrgVoiceAgents } from '../hooks/useVoiceAgents';
-import type { OrgScope } from '../nav';
+import { newProjectUrl, type OrgScope } from '../nav';
 import { componentOverviewUrl, newVoiceAgentUrl } from '../paths';
 import type { Project } from '../types/project';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
 
-const SEARCH_SX = { mb: 2, maxWidth: 360 } as const;
+const SEARCH_SX = { mb: 2 } as const;
 const NAME_CELL_SX = { display: 'flex', alignItems: 'center', gap: 1 } as const;
 
 function VoiceAgentsSkeleton(): JSX.Element {
@@ -44,10 +44,11 @@ function VoiceAgentsSkeleton(): JSX.Element {
 }
 
 export default function VoiceAgents(scope: OrgScope): JSX.Element {
+  const navigate = useAppNavigate();
   const { data: projects, isLoading, isError, refetch } = useActiveProjects();
 
   return (
-    <PageContent sx={{ pt: 5 }}>
+    <PageContent fullWidth sx={{ pt: 5 }}>
       <PageTitle>
         <PageTitle.Header>Voice agents</PageTitle.Header>
         <PageTitle.SubHeader>Let callers talk to your agents. Each voice agent turns speech into text for an agent and speaks its answers back.</PageTitle.SubHeader>
@@ -70,7 +71,7 @@ export default function VoiceAgents(scope: OrgScope): JSX.Element {
           Could not load the projects.
         </Alert>
       ) : projects.length === 0 ? (
-        <EmptyListing icon={<Mic size={48} />} title="No projects" description="Create a project first; voice agents live in a project." />
+        <EmptyListing icon={<Mic size={48} />} title="No projects" description="Create a project first; voice agents live in a project." showAction actionLabel="Create project" onAction={() => navigate(newProjectUrl(scope))} />
       ) : (
         <VoiceAgentList org={scope.org} projects={projects} />
       )}
@@ -88,6 +89,7 @@ function CreateVoiceAgentButton({ org }: { org: string }): JSX.Element {
 }
 
 function VoiceAgentList({ org, projects }: { org: string; projects: Project[] }): JSX.Element {
+  const navigate = useAppNavigate();
   const { rows, isLoading, isError, refetch } = useOrgVoiceAgents(org, projects);
   const [query, setQuery] = useState('');
 
@@ -104,13 +106,14 @@ function VoiceAgentList({ org, projects }: { org: string; projects: Project[] })
         Could not load the voice agents.
       </Alert>
     );
-  if (rows.length === 0) return <EmptyListing icon={<Mic size={48} />} title="No voice agents" description="Create a voice agent to let callers talk to one of your agents." />;
+  if (rows.length === 0)
+    return <EmptyListing icon={<Mic size={48} />} title="No voice agents" description="Create a voice agent to let callers talk to one of your agents." showAction actionLabel="Create voice agent" onAction={() => navigate(newVoiceAgentUrl(org))} />;
 
   const needle = query.trim().toLowerCase();
   const visible = needle ? rows.filter((r) => `${r.component.displayName} ${r.component.handler} ${r.project.name} ${r.targetAgent?.displayName ?? ''}`.toLowerCase().includes(needle)) : rows;
   return (
     <>
-      <SearchField value={query} onChange={setQuery} placeholder="Search voice agents" sx={SEARCH_SX} />
+      <SearchField value={query} onChange={setQuery} placeholder="Search voice agents" width="standard" sx={SEARCH_SX} />
       <ListingTable.Container>
         <ListingTable>
           <ListingTable.Head>

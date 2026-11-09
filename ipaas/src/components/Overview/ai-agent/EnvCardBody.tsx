@@ -22,7 +22,6 @@ import { useMemo, type ReactNode } from 'react';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
-import { useScope } from '../../../nav';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
@@ -30,13 +29,16 @@ import { isVoiceEndpoint } from '../../../utils/voiceAgent';
 import { useSelectedAgentEndpoint } from './selectedEndpoint';
 
 //AI Agent env-card body
-export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
+export default function EnvCardBody({ component, env, orgHandler, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
   const [selectedId, setSelectedId] = useSelectedAgentEndpoint(component.id, env.id);
-  const selectedEpIdx = Math.max(0, endpoints.findIndex((e) => e.id === selectedId));
+  const selectedEpIdx = Math.max(
+    0,
+    endpoints.findIndex((e) => e.id === selectedId),
+  );
   const selectedEndpoint = endpoints[selectedEpIdx];
-  const { voiceAgent } = useLinkedVoiceAgent(useScope().org, projectId, component.handler);
+  const { voiceAgent } = useLinkedVoiceAgent(orgHandler, projectId, component.handler);
 
   // The enforcing API Platform gateway URL for the selected endpoint. Shown in place of the raw OpenChoreo external route, as the
   // integration-as-api card does.
