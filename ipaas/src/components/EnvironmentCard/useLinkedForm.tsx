@@ -104,7 +104,8 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
         </Typography>
       )}
       {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending || linksUnread} change={change} />}
-      {write.data?.workload === 'next_deploy' && (
+      {/* An auto-deploy releases what a write answered `updated` for. */}
+      {links.environments.find((e) => e.name === env)?.linksNeedDeploy && write.data?.workload !== 'updated' && (
         <Alert severity="info" sx={{ mb: 1.5 }}>
           Deploy to apply.
         </Alert>

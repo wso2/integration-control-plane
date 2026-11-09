@@ -83,6 +83,11 @@ describe('formLinkView', () => {
     expect(view.target(id('ordersDbPassword')).picker?.resources.find((r) => r.id === 'orders-db')?.keys[1]).toEqual({ key: 'PASSWORD' });
   });
 
+  it("marks no override where a field's own link is the key its connection gives it", () => {
+    const links: IntegrationLinks = { ...linked, fieldLinks: { [id('githubAuthToken')]: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN' } } };
+    expect(formLinkView(links, 'development', envName).target(id('githubAuthToken')).source).toEqual({ ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN', name: 'GitHub Acme', noValues: false });
+  });
+
   it('shows another environment its release read-only, with the link now', () => {
     const links: IntegrationLinks = {
       ...base,
