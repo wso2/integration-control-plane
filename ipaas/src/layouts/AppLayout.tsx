@@ -115,15 +115,15 @@ import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
 import { expandedMenusFrom } from '../utils/sidebar';
 
-// Matches Agent Manager's level switcher arrow.
 // The theme's paper is 78% opaque and relies on a backdrop blur, which the trial usage panel (inside the header's own
 // blur) doesn't get, so the page showed through.
 const trialPanelSx = (theme: Theme) => ({
-  backgroundColor: '#ffffff',
+  backgroundColor: (theme.vars ?? theme).palette.common.white,
   backdropFilter: 'none',
-  ...theme.applyStyles('dark', { backgroundColor: '#0B1633' }),
+  ...theme.applyStyles('dark', { backgroundColor: (theme.vars ?? theme).palette.background.default }),
 });
 
+// Matches Agent Manager's level switcher arrow.
 const nextScopeArrowSx = {
   p: 1,
   color: 'text.primary',

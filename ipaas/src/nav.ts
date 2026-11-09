@@ -172,10 +172,6 @@ export function newProjectUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/create-project`;
 }
 
-export function editProjectUrl(scope: { org: string; project: string }): string {
-  return `/organizations/${scope.org}/projects/${scope.project}/edit`;
-}
-
 export function linkRepositoryUrl(scope: { org: string; project: string }): string {
   return `/organizations/${scope.org}/projects/${scope.project}/link-repository`;
 }

@@ -50,7 +50,7 @@ export default function PlatformSwitcher(): JSX.Element {
   const apps = useMemo<AppSwitcherAppItem[]>(
     () =>
       // A URL-less card shows as coming soon.
-      buildPlatformSwitcher(window.API_CONFIG, withBase('/')).map(({ id, name, url }) => ({ id, name, url, icon: <PulseIcon />, ...SAME_TAB })),
+      buildPlatformSwitcher(window.API_CONFIG, withBase('/')).map(({ id, name, url }) => ({ id, name, url, icon: <PulseIcon />, ...(url ? SAME_TAB : {}) })),
     [],
   );
   const manageLinks = useMemo(
