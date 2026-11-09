@@ -208,6 +208,16 @@ export function isManualSchedule(cronExpression: string): boolean {
   return cron === '' || cron === NEVER_FIRES_CRON;
 }
 
+/**
+ * Why a knowledge base takes no write yet, or null when it does: while its create runs it takes
+ * none, and once the create failed it can only be deleted. The BFF refuses these with 409 too.
+ */
+export function knowledgeBaseWriteBlockedReason(kb: Pick<KnowledgeBase, 'status'>, write: 'add-data-source' | 'save' | 'delete'): string | null {
+  if (kb.status === 'CREATING') return 'The knowledge base is still being created. Try again once it is.';
+  if (kb.status === 'FAILED' && write !== 'delete') return 'The knowledge base could not be created. Delete it and create it again.';
+  return null;
+}
+
 /** Why a knowledge base cannot be queried yet, or null when it can. */
 export function retrievalUnavailableReason(kb: Pick<KnowledgeBase, 'status'>): string | null {
   if (kb.status === 'CREATING') return 'The knowledge base is still being created. You can query it once it is active.';

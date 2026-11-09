@@ -59,7 +59,18 @@ import { useTriggerComponent } from '../hooks/useExecutions';
 import { knowledgeBasesUrl, newKnowledgeBaseDataSourceUrl, type OrgScope } from '../nav';
 import { componentOverviewUrl } from '../paths';
 import { describeCron } from '../utils/cronUtils';
-import { buildKnowledgeBaseSettings, chunkingFromConfig, dataSourceLabel, embeddingFromConfig, isEditedSettingsValid, isManualSchedule, knowledgeBaseSummary, secretsForUpdate, vectorStoreFromConfig } from '../utils/knowledgeBase';
+import {
+  buildKnowledgeBaseSettings,
+  chunkingFromConfig,
+  dataSourceLabel,
+  embeddingFromConfig,
+  isEditedSettingsValid,
+  isManualSchedule,
+  knowledgeBaseSummary,
+  knowledgeBaseWriteBlockedReason,
+  secretsForUpdate,
+  vectorStoreFromConfig,
+} from '../utils/knowledgeBase';
 import { isChunkingValid, vectorStoreEnvVars } from '../utils/ragIngestion';
 import type { KnowledgeBase, KnowledgeBaseDataSource } from '../types/knowledgeBase';
 import type { ChunkingConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
@@ -148,12 +159,20 @@ function KnowledgeBaseView({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }
         {canManage && (
           <PageTitle.Actions>
             <Stack direction="row" gap={1}>
-              <Button variant="outlined" color="error" startIcon={<Trash2 size={16} />} onClick={() => setDeleting(true)}>
-                Delete
-              </Button>
-              <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newKnowledgeBaseDataSourceUrl(scope, kb.name))}>
-                Add Data Source
-              </Button>
+              <Tooltip title={knowledgeBaseWriteBlockedReason(kb, 'delete') ?? ''}>
+                <span>
+                  <Button variant="outlined" color="error" startIcon={<Trash2 size={16} />} disabled={!!knowledgeBaseWriteBlockedReason(kb, 'delete')} onClick={() => setDeleting(true)}>
+                    Delete
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title={knowledgeBaseWriteBlockedReason(kb, 'add-data-source') ?? ''}>
+                <span>
+                  <Button variant="contained" startIcon={<Plus size={16} />} disabled={!!knowledgeBaseWriteBlockedReason(kb, 'add-data-source')} onClick={() => navigate(newKnowledgeBaseDataSourceUrl(scope, kb.name))}>
+                    Add Data Source
+                  </Button>
+                </span>
+              </Tooltip>
             </Stack>
           </PageTitle.Actions>
         )}
@@ -242,6 +261,7 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
   const [deleting, setDeleting] = useState<KnowledgeBaseDataSource | null>(null);
   const addDataSource = () => navigate(newKnowledgeBaseDataSourceUrl(scope, kb.name));
   const canManage = useCan()(Scopes.CONFIG_MANAGE);
+  const addBlocked = knowledgeBaseWriteBlockedReason(kb, 'add-data-source');
 
   const refresh = () => {
     refetch();
@@ -271,8 +291,8 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
         <EmptyListing
           icon={<Database size={40} />}
           title="No data sources"
-          description="Add a Google Drive folder or an Amazon S3 bucket to load documents into this knowledge base."
-          showAction={canManage}
+          description={addBlocked ?? 'Add a Google Drive folder or an Amazon S3 bucket to load documents into this knowledge base.'}
+          showAction={canManage && !addBlocked}
           actionLabel="Add Data Source"
           onAction={addDataSource}
         />
@@ -570,6 +590,7 @@ function KnowledgeBaseServiceTable({ scope, kb, onDelete }: { scope: OrgScope; k
                   <MenuItem
                     dense
                     sx={{ color: 'error.main' }}
+                    disabled={!!knowledgeBaseWriteBlockedReason(kb, 'delete')}
                     onClick={() => {
                       setMenuAnchor(null);
                       onDelete();
@@ -629,6 +650,7 @@ function DeleteDataSourceDialog({ kb, dataSource, orgHandler, onClose }: { kb: K
 function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: KnowledgeBase; saved: boolean; onSavedChange: (saved: boolean) => void }): JSX.Element {
   const update = useUpdateKnowledgeBase(kb.name);
   const canManage = useCan()(Scopes.CONFIG_MANAGE);
+  const saveBlocked = knowledgeBaseWriteBlockedReason(kb, 'save');
   const [displayName, setDisplayName] = useState(kb.displayName);
   const [description, setDescription] = useState(kb.description);
   const [vectorStore, setVectorStore] = useState<VectorStoreConfig | null>(() => vectorStoreFromConfig(kb.config));
@@ -680,9 +702,10 @@ function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: Knowledg
         <ChunkingStep value={chunking} onChange={setChunking} />
       </Box>
       {changesVectors && <Alert severity="warning">Documents already ingested were embedded with the current settings. Run each data source again after saving so retrieval finds them.</Alert>}
+      {canManage && saveBlocked && <Alert severity="info">{saveBlocked}</Alert>}
       {canManage && (
         <Stack direction="row" sx={wizardActionsSx}>
-          <Button variant="contained" disabled={!valid || update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={save}>
+          <Button variant="contained" disabled={!valid || update.isPending || !!saveBlocked} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={save}>
             {update.isPending ? 'Saving…' : 'Save'}
           </Button>
         </Stack>

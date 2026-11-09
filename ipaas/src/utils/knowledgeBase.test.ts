@@ -32,6 +32,7 @@ import {
   knowledgeBaseSummary,
   secretsForUpdate,
   retrievalAccessReason,
+  knowledgeBaseWriteBlockedReason,
   retrievalUnavailableReason,
   vectorStoreFromConfig,
 } from './knowledgeBase';
@@ -163,6 +164,21 @@ describe('isNameValid', () => {
     expect(isNameValid({ displayName: 'Docs', name: 'docs', description: '' })).toBe(true);
     expect(isNameValid({ displayName: '  ', name: 'docs', description: '' })).toBe(false);
     expect(isNameValid({ displayName: 'Docs', name: 'Docs', description: '' })).toBe(false);
+  });
+});
+
+describe('knowledgeBaseWriteBlockedReason', () => {
+  it.each([
+    ['ACTIVE', 'add-data-source', null],
+    ['IN_PROGRESS', 'save', null],
+    ['CREATING', 'add-data-source', 'The knowledge base is still being created. Try again once it is.'],
+    ['CREATING', 'save', 'The knowledge base is still being created. Try again once it is.'],
+    ['CREATING', 'delete', 'The knowledge base is still being created. Try again once it is.'],
+    ['FAILED', 'add-data-source', 'The knowledge base could not be created. Delete it and create it again.'],
+    ['FAILED', 'save', 'The knowledge base could not be created. Delete it and create it again.'],
+    ['FAILED', 'delete', null],
+  ] as const)('%s, %s', (status, write, reason) => {
+    expect(knowledgeBaseWriteBlockedReason({ status }, write)).toBe(reason);
   });
 });
 
