@@ -103,6 +103,12 @@ export function useDeploySample() {
     isSuccess: createComponent.isSuccess || prebuilt.isSuccess,
     error: createError ?? prebuilt.error,
     errorSeverity: createError ? (isQuotaError(createComponent.error) ? 'warning' : 'error') : prebuilt.errorSeverity,
+    /**
+     * The image deploy's real progress and step. A build from source has no
+     * comparable steps, so these are undefined and the loader times its own.
+     */
+    progress: prebuilt.isDeploying ? prebuilt.progress : undefined,
+    stepLabel: prebuilt.isDeploying ? prebuilt.stepLabel : undefined,
     /** True from the first deploy call until reset, so callers can swap in the progress view. */
     isActive: createComponent.isPending || createComponent.isSuccess || createComponent.isError || prebuilt.isDeploying || prebuilt.isSuccess || !!prebuilt.error,
   } as const;

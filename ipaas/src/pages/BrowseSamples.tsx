@@ -130,6 +130,8 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
           isSuccess={sampleDeploy.isSuccess}
           error={sampleDeploy.error}
           errorSeverity={sampleDeploy.errorSeverity}
+          progress={sampleDeploy.progress}
+          stepLabel={sampleDeploy.stepLabel}
           onBack={() => {
             sampleDeploy.reset();
             setDeployingSample(null);

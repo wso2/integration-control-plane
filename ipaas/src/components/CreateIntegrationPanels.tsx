@@ -207,6 +207,8 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
           isSuccess={sampleDeploy.isSuccess}
           error={sampleDeploy.error}
           errorSeverity={sampleDeploy.errorSeverity}
+          progress={sampleDeploy.progress}
+          stepLabel={sampleDeploy.stepLabel}
           onBack={() => {
             sampleDeploy.reset();
             setDeployingSample(null);

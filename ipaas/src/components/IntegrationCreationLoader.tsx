@@ -31,10 +31,17 @@ interface IntegrationCreationLoaderProps {
   /** A plan limit is a boundary rather than a malfunction, so callers pass 'warning' for quota. */
   errorSeverity?: 'error' | 'warning';
   onBack?: () => void;
+  /**
+   * The flow's own progress (0–100) and current step, for a caller that tracks them.
+   * Without them the loader steps through its standard creation stages on a timer.
+   */
+  progress?: number;
+  stepLabel?: string;
 }
 
-export default function IntegrationCreationLoader({ label, subLabel, isPending, isSuccess, error, errorSeverity = 'error', onBack }: IntegrationCreationLoaderProps): JSX.Element {
-  const [creationStep, setCreationStep] = useState<CreationStep>(CREATION_STEPS[0]);
+export default function IntegrationCreationLoader({ label, subLabel, isPending, isSuccess, error, errorSeverity = 'error', onBack, progress, stepLabel }: IntegrationCreationLoaderProps): JSX.Element {
+  const [timedStep, setCreationStep] = useState<CreationStep>(CREATION_STEPS[0]);
+  const creationStep: CreationStep = progress !== undefined && !isSuccess ? { progress, text: stepLabel || timedStep.text } : timedStep;
 
   useEffect(() => {
     if (!isPending) return;
