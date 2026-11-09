@@ -27,7 +27,7 @@ import type { MarketingConsent } from '../types/marketingConsent';
 vi.mock('../api/marketingConsent', () => ({ fetchMarketingConsent: vi.fn(), recordMarketingConsent: vi.fn() }));
 vi.mock('../auth', () => ({ useAuth: () => ({ userId: 'u1' }) }));
 
-const TITLE = 'Welcome to WSO2 Cloud!';
+const TITLE = 'Welcome to WSO2 Cloud';
 const unanswered: MarketingConsent = { optoutOfEmails: false, consentStatus: 'No Opt-in' };
 
 let unmount = () => {};
@@ -93,10 +93,10 @@ describe('MarketingConsentDialog', () => {
   it('disables both answers while one is being saved', async () => {
     vi.mocked(recordMarketingConsent).mockReturnValue(new Promise(() => {}));
     const c = await render();
-    await act(async () => button(c, 'Confirm')!.click());
+    await act(async () => button(c, 'Subscribe')!.click());
     await flush();
-    expect(button(c, 'Confirm')?.disabled).toBe(true);
-    expect(button(c, 'Decline')?.disabled).toBe(true);
+    expect(button(c, 'Subscribe')?.disabled).toBe(true);
+    expect(button(c, 'No thanks')?.disabled).toBe(true);
     expect(shown()).toBe(true);
   });
 
@@ -113,8 +113,8 @@ describe('MarketingConsentDialog', () => {
   });
 
   it.each([
-    ['Confirm', 'Confirmed'],
-    ['Decline', 'Unsubscribed'],
+    ['Subscribe', 'Confirmed'],
+    ['No thanks', 'Unsubscribed'],
   ])('records %s as %s and closes without asking again', async (label, decision) => {
     const c = await render();
     await act(async () => button(c, label)!.click());
@@ -127,7 +127,7 @@ describe('MarketingConsentDialog', () => {
 
   it('does not ask again after a reload once this session has answered', async () => {
     const c = await render();
-    await act(async () => button(c, 'Decline')!.click());
+    await act(async () => button(c, 'No thanks')!.click());
     await flush();
     unmount();
 
@@ -146,10 +146,10 @@ describe('MarketingConsentDialog', () => {
   it('stays open with an error when the answer cannot be saved', async () => {
     vi.mocked(recordMarketingConsent).mockRejectedValue(new BffError(502, '{"error":"pardot unreachable"}'));
     const c = await render();
-    await act(async () => button(c, 'Confirm')!.click());
+    await act(async () => button(c, 'Subscribe')!.click());
     await flush();
     expect(shown()).toBe(true);
     expect(document.body.textContent).toContain('Could not save your choice');
-    expect(button(c, 'Confirm')?.disabled).toBe(false);
+    expect(button(c, 'Subscribe')?.disabled).toBe(false);
   });
 });

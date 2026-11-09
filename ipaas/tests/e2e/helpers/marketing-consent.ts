@@ -36,7 +36,7 @@ export const MARKETING_CONSENT_PATH = '/marketing-consent';
 const MARKETING_CONSENT_ROUTE = `**${MARKETING_CONSENT_PATH}`;
 
 /** The prompt's title, which also names its dialog (MarketingConsentDialog). */
-export const CONSENT_DIALOG_TITLE = 'Welcome to WSO2 Cloud!';
+export const CONSENT_DIALOG_TITLE = 'Welcome to WSO2 Cloud';
 
 // The BFF is on another origin, so an answer made here needs the headers the real one carries.
 function corsHeaders(request: Request): Record<string, string> {
