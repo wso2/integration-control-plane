@@ -33,6 +33,7 @@ import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, MI_SECRETS_GROUP, planMiCon
 import { EndpointCardList } from '../EndpointCardList';
 import { FieldLinkPicker } from '../SchemaConfigForm/FieldLinkPicker';
 import { fromText } from '../SchemaConfigForm/linkedFrom';
+import { LinkingNote } from './LinkingNote';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
@@ -96,7 +97,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const linkWrite = useLinkWrite();
   // Until the links read, rows can't be told linked or not; while a write is on its way, another could undo it.
   const linksUnread = !links || linksRead.isError;
-  const linkBusy = linkWrite.isPending || linksUnread;
+  const linkBusy = linkWrite.isPending || linkWrite.saving || linksUnread;
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id = '') => environments.find((e) => e.id === id)?.name ?? id;
   const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
@@ -212,8 +213,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const link = (env: string, pick: { resource: string; key: string } | null) => linkWrite.mutate({ projectId, componentId, target: pick ? { env, ref: pick.resource, key: pick.key } : { env } });
 
   // The value box's link icon: Enter a value, or a resource key.
-  const renderValue = (name: string, view: TargetView, box: JSX.Element) => {
-    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, disabled: linkBusy, onPick: (pick) => link(name, pick) }} />;
+  const renderValue = (name: string, view: TargetView, box: JSX.Element, onPick = (pick: { resource: string; key: string } | null) => link(name, pick)) => {
+    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, disabled: linkBusy, onPick }} />;
     if (!view.source)
       return picker ? (
         <Stack direction="row" alignItems="flex-start" sx={{ flex: 1 }}>
@@ -288,7 +289,11 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       return (
         <Stack key={name} direction="row" gap={1} alignItems="flex-start" sx={{ mb: 2.5 }}>
           <TextField size="small" value={name} disabled sx={{ flex: 1 }} />
-          {renderValue(name, l, <></>)}
+          {renderValue(name, l, <></>, (pick) => {
+            // "Enter a value" keeps the variable: it gets a row of its own to fill in.
+            if (!pick) setEnvVars((rows) => [...rows, { id: nextId.current++, key: name, value: '' }]);
+            link(name, pick);
+          })}
           <IconButton size="small" color="error" aria-label={`Remove ${name}`} disabled={!l.picker || linkBusy} onClick={() => link(name, null)} sx={{ mt: 0.5 }}>
             <Trash2 size={16} />
           </IconButton>
@@ -320,7 +325,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           {linkView?.editable === false ? `Links apply to all environments. Change links in ${envName(links?.environments[0]?.name)}.` : 'Links apply to all environments; values are per environment.'}
         </Typography>
       )}
-      {kind === 'env' && linkWrite.isError && (
+      {kind === 'env' && (linkWrite.isPending || linkWrite.saving) && <LinkingNote saving={linkWrite.saving} />}
+      {kind === 'env' && linkWrite.isError && !linkWrite.saving && !linkWrite.saved && (
         <Alert severity="error" sx={{ mt: 1 }}>
           {linkWrite.error instanceof Error ? linkWrite.error.message : "Linking didn't finish."}
         </Alert>

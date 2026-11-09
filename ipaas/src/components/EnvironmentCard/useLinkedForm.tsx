@@ -24,6 +24,7 @@ import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration'
 import type { IntegrationLinks, LinkTarget } from '../../types/configuration';
 import { configKey, configurableId, formLinkView, targetName } from '../../utils/integrationLinks';
 import { ConnectionLink } from './ConnectionLink';
+import { LinkingNote } from './LinkingNote';
 import { OrphanedLinks } from './OrphanedLinks';
 import type { FormGroup } from '../SchemaConfigForm/ConfigForm';
 import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
@@ -41,6 +42,8 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   const ids = fields.map(configurableId).join();
   const view = useMemo(() => formLinkView(links, env, envName, ids ? ids.split(',') : []), [links, env, environments, ids]); // eslint-disable-line react-hooks/exhaustive-deps
   const write = useLinkWrite();
+  // After a cut-off write, ipaas-service may still be saving it: another change waits, as for one on its way.
+  const busy = write.isPending || write.saving || linksUnread;
   const change = (target: LinkTarget) => write.mutateAsync({ projectId, componentId, target }).catch(() => undefined);
 
   const linkable = new Set(fields);
@@ -51,7 +54,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
     const t = view.target(id);
     return {
       ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }), ...(t.source.declared && { declared: true }) } }),
-      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
+      ...(t.picker && { picker: { ...t.picker, disabled: busy, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
     };
   };
 
@@ -69,7 +72,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
         )}
       </Stack>
     ),
-    actions: view.editable && !view.sourceDefined && <ConnectionLink connection={c} links={links} busy={write.isPending || linksUnread} onLink={(ref) => change(ref ? { connection: c.id, ref } : { connection: c.id })} />,
+    actions: view.editable && !view.sourceDefined && <ConnectionLink connection={c} links={links} busy={busy} onLink={(ref) => change(ref ? { connection: c.id, ref } : { connection: c.id })} />,
     note: note && (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
         {note}
@@ -86,6 +89,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
 
   const top: ReactNode = (
     <>
+      {(write.isPending || write.saving) && <LinkingNote saving={write.saving} />}
       {read.isError && (
         <Alert
           severity="error"
@@ -103,13 +107,13 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
           Links come from workload.yaml in the repository.
         </Typography>
       )}
-      {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending || linksUnread} change={change} />}
+      {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={busy} change={change} />}
       {write.data?.workload === 'next_deploy' && (
         <Alert severity="info" sx={{ mb: 1.5 }}>
           Deploy to apply.
         </Alert>
       )}
-      {write.isError && (
+      {write.isError && !write.saving && !write.saved && (
         <Alert
           severity="error"
           sx={{ mb: 1.5 }}

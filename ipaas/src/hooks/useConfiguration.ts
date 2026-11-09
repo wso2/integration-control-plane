@@ -16,11 +16,13 @@
  * under the License.
  */
 
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings, fetchIntegrationLinks, writeLink } from '../api/configuration';
 import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, IntegrationLinks, LinkWrite, LinkWriteInput } from '../types/configuration';
 import type { PromoteInput } from '../types/deployment';
-import { sameLinks } from '../utils/integrationLinks';
+import { BffError } from '../api/_client';
+import { sameLinks, showsWrite, targetOf } from '../utils/integrationLinks';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -114,17 +116,69 @@ export function useIntegrationLinks(projectId: string, componentId: string, enab
   });
 }
 
+/** Reads the integration's links again when an environment's deployment changes, its release or its status: what the release uses, and whether its pods have the values saved, change with it. */
+export function useLinksFollowDeployment(projectId: string, componentId: string, deployment: string) {
+  const qc = useQueryClient();
+  const seen = useRef(deployment);
+  useEffect(() => {
+    if (seen.current === deployment) return;
+    seen.current = deployment;
+    void qc.invalidateQueries({ queryKey: ['integrationLinks', projectId, componentId] });
+  }, [qc, projectId, componentId, deployment]);
+}
+
+// After the gateway cuts a link write off (504), ipaas-service finishes it: the links are read again until they show it.
+const SAVE_READS_MS = [2000, 5000, 10_000, 20_000];
+
+/**
+ * A link write. `saving`: the gateway cut it off and the links are read again until they show it; `saved`: one did,
+ * so its error no longer stands.
+ */
 export function useLinkWrite() {
   const qc = useQueryClient();
-  return useMutation({
+  const [after504, setAfter504] = useState<'saving' | 'saved' | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => void (mounted.current = false);
+  }, []);
+  const applied = (vars: LinkWriteInput) => {
+    qc.invalidateQueries({ queryKey: ['integrationLinks', vars.projectId, vars.componentId] });
+    qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+  };
+  const follow = async (vars: LinkWriteInput, order: number) => {
+    setAfter504('saving');
+    for (const ms of SAVE_READS_MS) {
+      await new Promise((r) => setTimeout(r, ms));
+      if (!mounted.current || latestWrites.get(writeKey(vars)) !== order) return;
+      const links = await qc.fetchQuery({ queryKey: ['integrationLinks', vars.projectId, vars.componentId], queryFn: () => fetchIntegrationLinks(vars.projectId, vars.componentId), staleTime: 0 }).catch(() => undefined);
+      if (links && showsWrite(links, vars.target)) {
+        setAfter504('saved');
+        return void qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+      }
+    }
+    setAfter504(null);
+  };
+  const mutation = useMutation({
     mutationKey: ['linkWrite'],
     mutationFn: (input: LinkWriteInput) => writeLink(input),
-    onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ['integrationLinks', vars.projectId, vars.componentId] });
-      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+    onMutate: (vars) => {
+      setAfter504(null);
+      latestWrites.set(writeKey(vars), ++writes);
+      return writes;
+    },
+    onSuccess: (_, vars) => applied(vars),
+    onError: (error, vars, order) => {
+      if (error instanceof BffError && error.status === 504) void follow(vars, order ?? 0);
     },
   });
+  return { ...mutation, saving: after504 === 'saving', saved: after504 === 'saved' };
 }
+
+// The latest write to each target, by its order: a write replaces an earlier one to the same target.
+const latestWrites = new Map<string, number>();
+let writes = 0;
+const writeKey = (vars: LinkWriteInput) => `${vars.projectId}|${vars.componentId}|${targetOf(vars.target)}`;
 
 const ROLLOUT_POLL_MS = 3000;
 const ROLLOUT_WINDOW_MS = 120_000;

@@ -106,6 +106,19 @@ describe('the MI Configure form', () => {
     expect(writes).toEqual([{ env: 'DB_URL', ref: 'orders-db', key: 'URL' }]);
   });
 
+  it('keeps a linked variable as a row to fill in when its link icon gives "Enter a value"', async () => {
+    await render('development');
+    await act(async () => (document.querySelector('[aria-label="Link GITHUB_TOKEN"]') as HTMLElement).click());
+    await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of GITHUB_TOKEN"] li')).find((li) => li.textContent === 'Enter a value') as HTMLElement).click());
+    expect(writes).toEqual([{ env: 'GITHUB_TOKEN' }]);
+
+    answer.links = { ...links, env: {}, used: {}, environments: links.environments.map((e) => ({ ...e, env: {} })) };
+    await render('development');
+    const key = Array.from(document.querySelectorAll('input')).find((i) => i.value === 'GITHUB_TOKEN');
+    expect(key?.disabled).toBe(false);
+    expect(supplied('GITHUB_TOKEN')).toBeUndefined();
+  });
+
   it("removes a linked row's link", async () => {
     await render('development');
     await act(async () => (document.querySelector('[aria-label="Remove GITHUB_TOKEN"]') as HTMLElement).click());
@@ -148,11 +161,12 @@ describe('the MI Configure form', () => {
     expect(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Save')?.disabled).toBe(true);
   });
 
-  it('offers no link action while a link write is on its way', async () => {
+  it('offers no link action while a link write is on its way, and says it is linking', async () => {
     answer.pending = true;
     await render('development');
     const disabled = (label: string) => (document.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement).disabled;
     expect(['Link GITHUB_TOKEN', 'Link DB_URL', 'Remove GITHUB_TOKEN'].map(disabled)).toEqual([true, true, true]);
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Linking…');
   });
 
   it("says the links couldn't be read, with Try again, in place of the rows", async () => {

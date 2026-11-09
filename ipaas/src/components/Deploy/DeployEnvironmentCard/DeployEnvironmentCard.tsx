@@ -365,7 +365,7 @@ export default function DeployEnvironmentCard({
             onEndpointsClick={showEndpoints ? () => setEndpointsOpen(true) : undefined}
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
-          <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
+          <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} releaseId={releaseId} status={status} />
           {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} componentId={componentId} environment={env.id} envName={env.name} />}
         </CardContent>
 
