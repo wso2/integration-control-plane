@@ -49,7 +49,7 @@ const Projects = lazyPage(() => import('../pages/Projects'));
 const Project = lazyPage(() => import('../pages/Project'));
 const Component = lazyPage(() => import('../pages/Component'));
 const CreateProject = lazyPage(() => import('../pages/CreateProject'));
-const EditProject = lazyPage(() => import('../pages/EditProject'));
+const ProjectManageRedirect = lazyPage(() => import('../pages/ProjectManageRedirect'));
 const LinkRepository = lazyPage(() => import('../pages/LinkRepository'));
 const ImportProject = lazyPage(() => import('../pages/ImportProject'));
 const CreateIntegrationOptions = lazyPage(() => import('../pages/CreateIntegrationOptions'));
@@ -165,7 +165,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/metrics', element: <ComingSoon title="Coming soon" description="Metrics are currently under development." /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/runtimelogs', element: createElement(withScope(RuntimeLogsProject, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/metrics', element: <ComingSoon description="Throughput, latency and errors for every integration in the project." /> },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(EditProject, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(ProjectManageRedirect, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/link-repository', element: createElement(withScope(LinkRepository, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/redirect', element: <ProjectsRedirect /> },
               { path: 'organizations/:orgHandler/overview', element: createElement(withScope(OrgHome, ['organizations'])) },
