@@ -19,7 +19,7 @@ Run from `ipaas/`. Use Node.js 20 or later; the unit tests fail on Node 18.
 | One unit test file   | `pnpm exec vitest run src/utils/foo.test.ts` |
 | E2E suite            | `pnpm test:e2e` (see `tests/e2e/AGENTS.md`)  |
 
-There is no working local backend for `pnpm dev`. To try a change in a browser, deploy it to the local WSO2 Cloud stack described in the [local setup guide](https://docs.google.com/document/d/1El3uqR674ZDjLfbEP3VSQZgGxYjQMK0kfxQakc9Lh_s). Do not point the console at a shared environment to test.
+`pnpm dev` runs against the dev environment: it proxies `/_auth` and `/_api` to the deployed dev console's gateway and signs in with that console's session cookies, copied onto `https://localhost:3000`. [`docs/runtime-config.md`](docs/runtime-config.md) ("Running `pnpm dev`") has the steps, and `DEV_PROXY_TARGET` points it at another console. Every change made there is real, so test with your own projects and data. To try a change without touching a shared environment, deploy it to the local WSO2 Cloud stack described in the [local setup guide](https://docs.google.com/document/d/1El3uqR674ZDjLfbEP3VSQZgGxYjQMK0kfxQakc9Lh_s).
 
 ## Project map
 

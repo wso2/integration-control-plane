@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { toVisibilityLabel, toVisibilityWire } from './_visibility';
+import { toVisibilityLabel, toVisibilityWire, visibilityRequestBody } from './_visibility';
 
 describe('endpoint visibility mapping', () => {
   it('maps every label the endpoint editor offers to a wire value', () => {
@@ -32,5 +32,19 @@ describe('endpoint visibility mapping', () => {
     for (const label of ['Public', 'Organization', 'Project']) {
       expect(toVisibilityLabel(toVisibilityWire(label))).toBe(label);
     }
+  });
+});
+
+describe('visibilityRequestBody', () => {
+  it.each([
+    { labels: ['Public'], visibility: ['project', 'public'] },
+    { labels: ['Organization'], visibility: ['project', 'organization'] },
+    { labels: [], visibility: ['project'] },
+    // Project is always on; a stray label adds nothing.
+    { labels: ['Project'], visibility: ['project'] },
+    // The gateway serves one host; an endpoint saved with both keeps Public, as the BFF migrates it.
+    { labels: ['Public', 'Organization'], visibility: ['project', 'public'] },
+  ])('sends project and at most one gateway tier for $labels', ({ labels, visibility }) => {
+    expect(visibilityRequestBody(labels)).toEqual({ visibility });
   });
 });

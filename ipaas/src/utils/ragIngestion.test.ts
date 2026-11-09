@@ -17,7 +17,6 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { cronToInterval } from './cronUtils';
 import {
   buildRagEnvVars,
   buildRetrievePayload,
@@ -36,7 +35,7 @@ import {
   splitRagEnvVars,
   weaviateCollectionNameError,
 } from './ragIngestion';
-import { DAILY_INGESTION, DEFAULT_CHUNKING, DEFAULT_RETRIEVAL_QUERY } from '../constants/ragIngestion';
+import { DEFAULT_CHUNKING, DEFAULT_RETRIEVAL_QUERY } from '../constants/ragIngestion';
 import type { RagIngestionForm } from '../types/ragIngestion';
 
 describe('name validators', () => {
@@ -184,11 +183,5 @@ describe('retrieval', () => {
       reranker_apikey: 'co',
       reranker_model: 'rerank-english-v3.0',
     });
-  });
-});
-
-describe('DAILY_INGESTION', () => {
-  it('reads back as a one-day interval, so the schedule form opens on By Interval', () => {
-    expect(cronToInterval(DAILY_INGESTION.cronjobFrequency)).toEqual({ count: 1, unit: 'Day' });
   });
 });

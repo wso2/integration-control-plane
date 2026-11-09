@@ -20,6 +20,8 @@ package service
 
 import (
 	"github.com/wso2-enterprise/integration-user-portal-service/shared/external-services/ipaas-portal"
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/external-services/oidc"
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/httpclient"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/config"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/domain"
 )
@@ -35,8 +37,14 @@ func NewRegistry(cfg config.Config) *Registry {
 	ipaas := ipaasportal.NewClient(cfg.IPaaS)
 	scope := ipaasportal.Scope{OrgUUID: cfg.Org.UUID, EnvID: cfg.EnvironmentID}
 
+	var oidcOpts []httpclient.Option
+	if cfg.OIDC.InsecureTLS {
+		oidcOpts = append(oidcOpts, httpclient.WithInsecureTLS())
+	}
+
 	return &Registry{
-		TokenService: NewTokenService(),
+		TokenService: NewTokenService(TokenConfig{Issuer: cfg.OIDC.Issuer, Audience: cfg.OIDC.Resource, ClientID: cfg.OIDC.ClientID},
+			NewIssuerKeys(cfg.OIDC.Issuer, oidc.NewClient(oidcOpts...))),
 		CatalogService: NewCatalogService(ipaas, CatalogConfig{
 			Scope: scope,
 			TTL:   cfg.Cache.Catalog,

@@ -24,4 +24,7 @@ The `Databases` pages and components here are not the live Databases feature. Th
 3. Move the feature's files back to the matching place under `src/` with `git mv`, and fix the imports.
 4. Add its route in `src/config/routes.tsx` and its navigation entry in `nav.ts` (or settings section constants).
 5. Remove anything that only existed for the stubbed state, such as "unavailable" fallbacks.
-6. Run the definition of done in `ipaas/AGENTS.md`, and add the flow to the e2e journey.
+6. Bring its pages up to live conventions:
+   - Wrap every page, including its loading, error and not-found states, in `<PageContent fullWidth>`.
+   - Point every upgrade or billing link at WSO2 Cloud's subscriptions page, `cloudConsoleSubscriptionsUrl()` in `paths.ts`, as a link in the same tab. Several unported pages still open `${billingConsoleUrl}/cloud/devant/upgrade?orgId=…` in a new tab: replace those, and drop their `billingConsoleUrl` and `orgUuid` checks.
+7. Run the definition of done in `ipaas/AGENTS.md`, and add the flow to the e2e journey.

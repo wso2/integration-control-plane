@@ -19,6 +19,8 @@ Every call the console makes to a backend lives here, one file per domain (`proj
 
 Do not call `fetch` directly for BFF or observability requests. Plain `fetch` is only for public, unauthenticated sources, such as the samples and prebuilt catalogs on GitHub.
 
+The exception is a call to an endpoint an integration serves, through the API Platform gateway. It is not a BFF call: it carries the endpoint's test key (`useEndpointTestAccess`), never the user's bearer token in `Authorization`. Agent Chat makes such calls, and the workflow Management API client lives with its feature in `components/Workflows/api/`.
+
 ## Shape of an API file
 
 - **Exports:** functions only, typed with domain types from `src/types/`.

@@ -28,6 +28,7 @@ import type { EnvCardNotification, EnvCardSlotProps, IntegrationModule } from '.
 import { deploymentPollIntervalUntil, REQUESTED_POLL_WINDOW_MS } from '../../../utils/deploymentStatus';
 import DeployButton from './DeployButton';
 import EnvCardHeader from './EnvCardHeader';
+import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 
 interface EnvCardShellProps {
   component: Component;
@@ -44,8 +45,9 @@ interface EnvCardShellProps {
 
 // Per-env query keys invalidated by the generic Refresh — the union across
 // every migrated type's data. Invalidating a key a given type doesn't use is
-// harmless; adding a new type may mean adding its key here.
-const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionConfigs', 'taskExecutions', 'schemaConfig', 'component-logs'];
+// harmless; adding a new type may mean adding its key here. `wf` holds every
+// read from a workflow integration's engine (definitions and figures).
+const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionConfigs', 'taskExecutions', 'schemaConfig', 'component-logs', 'wf'];
 
 /**
  * The generic env-card frame. It owns ONLY what every type shares:
@@ -181,6 +183,8 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
         )}
 
         {EnvCardBody && <EnvCardBody {...slotProps} pendingTriggerTime={pendingTriggerTime} pendingTriggerArgs={pendingTriggerArgs} onTriggerResolved={onTriggerResolved} />}
+
+        <ReleaseLinks projectId={projectId} componentId={component.id} env={slotProps.envTemplateId} />
 
         {EnvCardFooter && <EnvCardFooter {...slotProps} />}
       </CardContent>

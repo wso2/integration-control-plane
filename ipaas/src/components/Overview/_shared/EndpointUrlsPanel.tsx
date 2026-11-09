@@ -20,7 +20,7 @@ import { IconButton, MenuItem, Select, Tooltip } from '@wso2/oxygen-ui';
 import { Download } from '@wso2/oxygen-ui-icons-react';
 import EndpointPanelLayout from './EndpointPanelLayout';
 import type { EnvEndpoint } from '../../../types/component';
-import { trimEndpointName, visibilityUrlOptions } from '../../../utils/endpoints';
+import { trimEndpointName, envCardUrlRows } from '../../../utils/endpoints';
 import EndpointUrlRows from './EndpointUrlRows';
 import { decodeBase64Spec, specFileType } from '../../../utils/openApiSpec';
 
@@ -51,7 +51,7 @@ export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, ex
   if (!ep) return null;
 
   // An exposed external endpoint lists the enforcing API Platform gateway URL as its Public URL, not the open raw route.
-  const urlOptions = visibilityUrlOptions(ep, externalUrlOverride);
+  const urlOptions = envCardUrlRows(ep, externalUrlOverride);
 
   // The spec arrives with the endpoint list, base64 in the apimRevisionId slot (see api/deployments.ts).
   const inlineSpec = decodeBase64Spec(ep.apimRevisionId);

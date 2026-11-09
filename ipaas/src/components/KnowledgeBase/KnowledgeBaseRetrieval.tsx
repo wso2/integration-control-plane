@@ -26,5 +26,5 @@ import { useCan } from '../../hooks/useCan';
 /** The retrieval test for a knowledge base, queried as `componentId`. */
 export default function KnowledgeBaseRetrieval({ knowledgeBase, componentId }: { knowledgeBase: KnowledgeBase; componentId: string }): ReactNode {
   const refusal = useCan()(Scopes.ENDPOINT_TEST) ? null : "Your role can't query knowledge bases.";
-  return <RetrievalChat knowledgeBase={knowledgeBase.name} componentId={componentId} unavailableReason={refusal ?? retrievalUnavailableReason(knowledgeBase)} />;
+  return <RetrievalChat knowledgeBase={knowledgeBase} componentId={componentId} unavailableReason={refusal ?? retrievalUnavailableReason(knowledgeBase)} />;
 }

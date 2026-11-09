@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { HeaderStatusProps } from '../../../types/integration';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import StatusDot from '../_shared/StatusDot';
 import ConfigureButton from '../_shared/ConfigureButton';
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
-import { hasMissingRequiredConfigs } from '../_shared/configStatus';
+import { useMissingRequiredConfigs } from '../_shared/configStatus';
 
 /**
  * MCP Server's left-header slot: a deployment status dot + Configure entry
@@ -54,7 +54,7 @@ export default function HeaderStatus({
   // Switch the Configure button to "Configure to Continue" when the schema has
   // required configs without values (tools can't be fetched until it's configured + deployed).
   const { data: schemaConfig } = useSchemaConfig(projectId, component.id, envTemplateId, versionId, deployedCommitSha);
-  const missingConfigs = useMemo(() => hasMissingRequiredConfigs(schemaConfig), [schemaConfig]);
+  const missingConfigs = useMissingRequiredConfigs(schemaConfig, projectId, component.id, envTemplateId);
 
   return (
     <>

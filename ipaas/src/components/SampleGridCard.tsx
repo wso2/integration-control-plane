@@ -22,7 +22,7 @@ import type { JSX } from 'react';
 import type { Sample } from '../types/samples';
 import { Scopes } from '../constants/permissions';
 import { useAgentRefusal, useCan } from '../hooks/useCan';
-import { formatBuildPack, formatComponentType } from '../constants/integrations';
+import { formatBuildPack, formatComponentType, sampleSourceUrl } from '../constants/integrations';
 
 const MAX_WORDS = 20;
 
@@ -36,7 +36,7 @@ export default function SampleGridCard({ sample, onDeploy, isDeploying }: { samp
   const agentRefusal = useAgentRefusal()(Scopes.AGENT_CREATE);
   const canCreate = useCan()(Scopes.INTEGRATION_CREATE);
   const refusal = !canCreate ? 'You do not have permission to create integrations.' : sample.componentType === 'ai-agent' ? agentRefusal : '';
-  const sourceUrl = `${sample.repositoryUrl}tree/${sample.branch ?? 'main'}${sample.subDirectory ?? ''}${sample.componentPath}`;
+  const sourceUrl = sampleSourceUrl(sample);
   const { display: descriptionDisplay, isTruncated: isDescriptionTruncated } = truncateWords(sample.description);
 
   return (

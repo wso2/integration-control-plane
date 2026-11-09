@@ -26,6 +26,9 @@ Overview/
 │   │                            "Configure to Continue" when required configs are unset
 │   ├── configStatus.ts          hasMissingRequiredConfigs() — shared by automation,
 │   │                            file/event, ai-agent (drives the button + Run/Schedule)
+│   ├── UserPortalFooter.tsx     EnvCardFooter: the User Portal row, shared with the
+│   │                            Deploy page. useIntegrationModule adds it to the
+│   │                            types in constants/userPortal.ts USER_PORTAL_TYPES
 │   ├── FileEventHeader.tsx      shared CustomHeader for file- + event-integration
 │   │                            (status dot + Configure + Stop/Start; logs are in the body)
 │   ├── HeaderShell.tsx          integration-level header rendered above the cards
@@ -45,6 +48,9 @@ Overview/
 ├── integration-as-api/          status dot + Configure / Test·Logs·Stop·Start /
 │   │                            endpoint URLs + swagger + service insights
 │   ├── HeaderStatus.tsx  EnvCardActions.tsx  EnvCardBody.tsx  (EndpointUrlsPanel is in _shared/)
+│   ├── ApiSecurityAction.tsx    HeaderActions: a "Configure security" link under Open in Cloud
+│   │                            Editor, for the entry environment; each card's SecuritySummary
+│   │                            shows what its env enforces
 │   └── ServiceInsights / ServiceLogsDrawer / SwaggerOperationsList
 ├── file-integration/            index.ts → shared FileEventHeader + FileEventBody
 ├── event-integration/           index.ts → shared FileEventHeader + FileEventBody
@@ -57,6 +63,9 @@ Overview/
 │   │                            tools list via the MCP SDK + Configure Policies action
 │   ├── HeaderStatus.tsx  EnvCardActions.tsx  EnvCardBody.tsx  OverviewHeaderActions.tsx
 │   └── McpToolTile.tsx / McpToolDrawer.tsx  (reuse _shared/bodies/OperationTile + OperationHeader)
+├── workflow/                    integration-as-api header slots; the webhook body (endpoints +
+│                                insights) with the workflow content between them once the
+│                                deployment is active (Workflows/overview/: definitions + figures)
 └── registry.ts                  IntegrationType → () => import('./<type>')  (one chunk per type)
 ```
 
@@ -78,8 +87,9 @@ optional `EnvCardFooter`. A type with no env-card concept (e.g. Tailscale) expor
 | `HeaderStatus`   | types with a status/Configure | service / ai-agent status dot + Configure                |
 | `EnvCardActions` | types with header actions     | Run/Schedule, Stop/Test/Logs                             |
 | `CustomHeader`   | header outliers               | file- + event-integration (shared `FileEventHeader`)     |
-| `EnvCardFooter`  | optional                      | — none today                                             |
+| `EnvCardFooter`  | optional                      | User Portal row, added by the loader (USER_PORTAL_TYPES) |
 | `CustomOverview` | full-surface outliers         | Tailscale                                                |
+| `HeaderActions`  | integration-level actions     | integration-as-api's Configure security link             |
 
 `ai-agent` uses the generic-frame slots (`HeaderStatus` + `EnvCardActions` + `EnvCardBody`)
 like integration-as-api — it's a generic service under the hood (`componentSubType: aiAgent`),
@@ -138,6 +148,7 @@ frame + state every type shares; each type fills slots.** For Overview today:
 | `CustomHeader`   | full header override — escape hatch when the header differs a lot    |
 | `EnvCardFooter`  | optional footer                                                      |
 | `CustomOverview` | full-surface override (type has no env-card concept, e.g. Tailscale) |
+| `HeaderActions`  | actions under the page header's Open in Cloud Editor button          |
 
 A type omits any slot it doesn't need — no null-returning placeholders. Bodies shared by
 two types live in `_shared/bodies/` and are parameterised by **behaviour props, not type

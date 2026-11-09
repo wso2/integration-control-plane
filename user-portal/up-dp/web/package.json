@@ -1,7 +1,7 @@
 {
   "name": "@wso2-enterprise/up-dp-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.5.0-SNAPSHOT",
   "type": "module",
   "packageManager": "pnpm@10.15.0",
   "scripts": {
@@ -11,14 +11,14 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
-    "@wso2/oxygen-ui": "^0.15.0",
-    "@wso2/oxygen-ui-icons-react": "^0.15.0",
+    "@wso2/oxygen-ui": "^0.20.0",
+    "@wso2/oxygen-ui-icons-react": "^0.20.0",
     "cron-parser": "^4.9.0",
     "cronstrue": "^2.52.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
-    "react-router": "7.9.4",
+    "react-router": "7.18.5",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {

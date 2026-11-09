@@ -20,11 +20,13 @@ import { Alert, Box, Button, CircularProgress, PageContent, PageTitle, Stack, Ty
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { usePlanAccess } from '../hooks/useBillingOrg';
+import { SCHEDULE_POLICIES } from '../constants/scheduleLimits';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
-import { DAILY_INGESTION, DATASOURCES, DEFAULT_CHUNKING } from '../constants/ragIngestion';
+import { DATASOURCES, DEFAULT_CHUNKING } from '../constants/ragIngestion';
 import { buildDataSourceSettings, buildKnowledgeBaseSettings, dataSourceNameFor, isNameValid, type NameFields } from '../utils/knowledgeBase';
 import { isChunkingValid, isDatasourceValid, isEmbeddingValid, isVectorStoreValid } from '../utils/ragIngestion';
 import type { ChunkingConfig, DatasourceConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
@@ -69,7 +71,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
   const [chunking, setChunking] = useState<ChunkingConfig>(DEFAULT_CHUNKING);
   const [datasource, setDatasource] = useState<DatasourceConfig | null>(null);
   const [mode, setMode] = useState<IngestionMode>('scheduled');
-  const schedule = useScheduleForm(DAILY_INGESTION);
+  const schedule = useScheduleForm(null, usePlanAccess(), SCHEDULE_POLICIES.ingestion);
 
   const stepValid = [isNameValid(names), isVectorStoreValid(vectorStore), isEmbeddingValid(embedding), isChunkingValid(chunking), isDatasourceValid(datasource), mode === 'once' || schedule.isValid];
 

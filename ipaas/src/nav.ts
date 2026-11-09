@@ -245,6 +245,26 @@ export function componentSettingsSectionUrl(scope: { org: string; project: strin
   return `/organizations/${scope.org}/projects/${scope.project}/components/${scope.component}/settings/${sectionPath}`;
 }
 
+/** The org's User Portal tab under Configure: a portal per environment, enabled and disabled there. */
+export function userPortalUrl(scope: { org: string }): string {
+  return orgSettingsSectionUrl(scope, 'user-portal');
+}
+
+// The workflow integration pages under Operate; their NAV entries use the same segments.
+const WORKFLOWS_SEGMENT = 'workflows';
+const HUMAN_TASKS_SEGMENT = 'human-tasks';
+
+/** A workflow integration's Workflows page, or one run's execution view on it (`runId`). */
+export function componentWorkflowsUrl(scope: { org: string; project: string; component: string }, runId?: string): string {
+  const base = `/organizations/${scope.org}/projects/${scope.project}/components/${scope.component}/${WORKFLOWS_SEGMENT}`;
+  return runId ? `${base}/${encodeURIComponent(runId)}` : base;
+}
+
+/** A workflow integration's Human Tasks page. */
+export function componentHumanTasksUrl(scope: { org: string; project: string; component: string }): string {
+  return `/organizations/${scope.org}/projects/${scope.project}/components/${scope.component}/${HUMAN_TASKS_SEGMENT}`;
+}
+
 export function newComponentUrl(scope: { org: string; project: string }): string {
   return `/organizations/${scope.org}/projects/${scope.project}/components/new`;
 }
@@ -320,6 +340,8 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'logs', navId: 'logs', segment: 'logs', parent: 'observability' },
     { key: 'metrics', navId: 'metrics', segment: 'metrics', parent: 'observability' },
     { key: 'traces', navId: 'traces', segment: 'traces', parent: 'observability' },
+    { key: 'workflows', navId: 'workflows', segment: WORKFLOWS_SEGMENT, parent: 'operate' },
+    { key: 'human-tasks', navId: 'human-tasks', segment: HUMAN_TASKS_SEGMENT, parent: 'operate' },
     { key: 'runtime', navId: 'runtime', segment: 'runtimes', parent: 'operate' },
     { key: 'containers', navId: 'containers', segment: 'admin/containers', parent: 'operate' },
     { key: 'configs-secrets', navId: 'configs-secrets', segment: 'admin/configs', parent: 'operate' },
@@ -332,6 +354,22 @@ const NAV: Record<Level, NavEntry[]> = {
 // Keys that exist only for generic (deployable) service types — switching to a
 // non-generic integration must fall back to overview instead of a dead tab.
 export const GENERIC_ONLY_COMPONENT_KEYS = new Set(['health-checks', 'scaling']);
+
+// Keys that exist only for workflow integrations: their runs and the tasks they wait on.
+export const WORKFLOW_ONLY_COMPONENT_KEYS = new Set(['workflows', 'human-tasks']);
+
+/** What a page needs of the integration being switched to, to know whether it exists there. */
+export interface ComponentSwitchTarget {
+  isGenericService: boolean;
+  isWorkflow: boolean;
+}
+
+/** Whether the page `key` names exists for the integration being switched to; else it lands on overview. */
+export function componentKeepsPage(key: string, target: ComponentSwitchTarget): boolean {
+  if (GENERIC_ONLY_COMPONENT_KEYS.has(key)) return target.isGenericService;
+  if (WORKFLOW_ONLY_COMPONENT_KEYS.has(key)) return target.isWorkflow;
+  return true;
+}
 
 /** The resource key a URL resolves to at its scope (for cross-scope guards). */
 export function resolveResourceKey(pathname: string, scope: Scope): string {

@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, regenerateConsumerToken, revokeConsumer, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
 import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
 
 /** Endpoint refs are only usable once every segment is known, the track included: one read before its track resolves would read the default track's API. */
-const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.componentName && !!ref.environmentName && !!ref.endpointName && ref.deploymentTrackId !== undefined;
+export const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.componentName && !!ref.environmentName && !!ref.endpointName && ref.deploymentTrackId !== undefined;
 
 // Each track's API has its own URL, security and consumers, so the track is part of the key.
 const refKey = (ref: EndpointRef | null | undefined) => [ref?.componentName ?? '', ref?.environmentName ?? '', ref?.endpointName ?? '', ref?.deploymentTrackId ?? ''] as const;
@@ -95,6 +95,9 @@ export function useDeleteConsumer(projectName: string | null | undefined, ref: E
 
 const securityKey = (ref: EndpointRef | null | undefined) => ['endpoint-security', ...refKey(ref)] as const;
 
+/** The query key of an endpoint's security read, for a view that reads it again on its own schedule. */
+export const endpointSecurityQueryKey = securityKey;
+
 /** Read the exposed API's active auth mode so the security drawer reflects real state. */
 export function useEndpointSecurity(ref: EndpointRef | null | undefined, enabled = true) {
   return useQuery<SecurityConfig>({
@@ -145,6 +148,12 @@ export function useEnableEndpointApiKeyAuth() {
 // ---------------------------------------------------------------------------
 
 const policiesKey = (ref: EndpointRef | null | undefined) => ['endpoint-policies', ...refKey(ref)] as const;
+
+/** Marks every endpoint's security and policies in one environment stale, e.g. after a promotion replaced them. */
+export function invalidateEndpointSettings(qc: QueryClient, componentName: string, environmentName: string): void {
+  qc.invalidateQueries({ queryKey: ['endpoint-security', componentName, environmentName] });
+  qc.invalidateQueries({ queryKey: ['endpoint-policies', componentName, environmentName] });
+}
 
 /** Read the exposed API's CORS and rate-limit configuration. */
 export function useEndpointPolicies(ref: EndpointRef | null | undefined, enabled = true) {

@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { apiErrorMessage, httpStatusOf, isNotFoundError, isPermissionError, isQuotaError, isUnsupportedError } from './apiErrors';
+import { apiErrorMessage, httpStatusOf, isNotFoundError, isPermissionError, isQuotaError, isUnsupportedError, isUserPortalUnavailable } from './apiErrors';
 
 describe('httpStatusOf', () => {
   it('prefers a structured status field over the message', () => {
@@ -130,6 +130,28 @@ describe('apiErrorMessage', () => {
     expect(apiErrorMessage(new TypeError('Failed to fetch'), FALLBACK)).toBe(FALLBACK);
     expect(apiErrorMessage(undefined, FALLBACK)).toBe(FALLBACK);
     expect(apiErrorMessage(null, FALLBACK)).toBe(FALLBACK);
+  });
+});
+
+describe('isUserPortalUnavailable', () => {
+  const answer = (status: number, code?: string) => Object.assign(new Error('refused'), { status, ...(code ? { code } : {}) });
+
+  it('is a 404: the routes are off', () => {
+    expect(isUserPortalUnavailable(answer(404))).toBe(true);
+  });
+
+  it('is a 503 that says the portal is not configured', () => {
+    expect(isUserPortalUnavailable(answer(503, 'USER_PORTAL_NOT_CONFIGURED'))).toBe(true);
+  });
+
+  // A gateway restart answers 503 too; reading it as "no User Portal" would hide the Publish row.
+  it('is not a 503 without that code', () => {
+    expect(isUserPortalUnavailable(answer(503))).toBe(false);
+  });
+
+  it('is not another failure', () => {
+    expect(isUserPortalUnavailable(answer(500))).toBe(false);
+    expect(isUserPortalUnavailable(new Error('Network request failed'))).toBe(false);
   });
 });
 

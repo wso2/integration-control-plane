@@ -37,12 +37,23 @@ export interface KnowledgeBase {
   status: string;
   /** Why the create FAILED; '' otherwise. */
   error: string;
-  /** The KB Service's external URL; '' until routed. */
+  /** The KB Service's URL on the API Platform gateway, which takes an API key; '' until it is exposed there. */
   serviceUrl: string;
+  /** How putting the KB Service's API on the gateway is going, while it has no `serviceUrl`; absent when unknown. */
+  apiStatus?: KnowledgeBaseApiStatus;
   dataSources: KnowledgeBaseDataSource[];
   createdAt: string;
   /** When the KB Service last changed state, which a redeploy does; absent from older BFFs. */
   updatedAt?: string;
+}
+
+/** The last run of the reconciliation that puts a KB Service's API on the gateway, as a deploy's is recorded. */
+export interface KnowledgeBaseApiStatus {
+  /** PENDING, RUNNING, SUCCEEDED, DEGRADED, FAILED, … */
+  status: string;
+  /** A stable code, such as GATEWAY_UNAVAILABLE or GATEWAY_PROVISIONING. */
+  error?: string;
+  nextRetryAt?: string;
 }
 
 /** An ingestion job that loads a Google Drive folder or S3 bucket into its knowledge base. */

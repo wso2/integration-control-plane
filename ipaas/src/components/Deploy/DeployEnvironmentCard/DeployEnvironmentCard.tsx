@@ -32,15 +32,19 @@ import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDepl
 import { nextCronRunMs, formatTimeUntil, describeCron } from '../../../utils/cronUtils';
 import { deploymentPollInterval } from '../../../utils/deploymentStatus';
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
+import { useMissingConfigsReason } from '../../Overview/_shared/configStatus';
 import ScheduleDialog from '../../Overview/_shared/ScheduleDialog';
 import PromoteButton from '../../EnvironmentCard/PromoteButton';
 import DeployEnvironmentCardHeader from './DeployEnvironmentCardHeader';
 import DeployEnvironmentCardBody from './DeployEnvironmentCardBody';
+import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 import DeploymentHistoryDrawer from './DeploymentHistoryDrawer';
 import EndpointsDrawer from './EndpointsDrawer';
 import WorkflowRuntimeRow from './WorkflowRuntimeRow';
+import UserPortalRow from '../../UserPortal/UserPortalRow';
 import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
+import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 
@@ -55,6 +59,7 @@ export default function DeployEnvironmentCard({
   hideEndpoints = false,
   displayType,
   isWorkflow = false,
+  publishesToUserPortal = false,
   env,
   componentName,
   projectHandler,
@@ -150,7 +155,8 @@ export default function DeployEnvironmentCard({
 
   const { data: trackImages = [] } = useDeploymentTrackImages(componentId, versionId);
   const { data: deploymentStatus = [] } = useDeploymentStatus(componentId, versionId);
-  const { data: endpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '');
+  const { data: allEndpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '');
+  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
 
   const deployedRunId = deployment?.build?.runId ?? null;
   const deployedBuildId = deployment?.build?.buildId ?? null;
@@ -213,7 +219,8 @@ export default function DeployEnvironmentCard({
   const envTemplateId = env.templateId ?? env.id;
   // Pre-warm cache so ConfigureDrawer opens instantly (result consumed there via shared query key).
   useGetConfigMgt(orgHandler, projectId, componentId, flags.isAutomation ? envTemplateId : env.id, versionId, componentName, configCommitHash, !!configCommitHash && !flags.isAutomation && !isMI);
-  useSchemaConfig(projectId, componentId, envTemplateId, versionId, configCommitHash, !isMI);
+  const { data: schemaConfig } = useSchemaConfig(projectId, componentId, envTemplateId, versionId, configCommitHash, !isMI);
+  const missingConfigsReason = useMissingConfigsReason(isMI ? null : schemaConfig, projectId, componentId, envTemplateId);
   // The full MI config, values included, though the count needs only keys: like the
   // Ballerina pre-warm above, it shares its query key with MiConfigureDrawer, which then opens instantly.
   const { data: miConfig } = useMiConfig(projectId, componentId, env.id, isMI && !!releaseId);
@@ -350,6 +357,7 @@ export default function DeployEnvironmentCard({
             envCritical={env.critical}
             endpointCount={endpoints.length}
             scaleToZeroEnabled={env.scaleToZeroEnabled}
+            missingConfigsReason={missingConfigsReason}
             onConfigClick={can(Scopes.CONFIG_MANAGE) ? () => setConfigureOpen(true) : undefined}
             onJobConfigClick={flags.isAutomation && can(Scopes.INTEGRATION_UPDATE) ? () => setScheduleOpen(true) : undefined}
             onHistoryClick={() => setHistoryOpen(true)}
@@ -357,6 +365,8 @@ export default function DeployEnvironmentCard({
             onEndpointsClick={showEndpoints ? () => setEndpointsOpen(true) : undefined}
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
+          <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
+          {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} componentId={componentId} environment={env.id} envName={env.name} />}
         </CardContent>
 
         {showPromote && (
@@ -367,6 +377,7 @@ export default function DeployEnvironmentCard({
                   <PromoteButton
                     blockedReason={workflowRuntimeBlocked ? 'Preparing workflow runtime' : undefined}
                     orgHandler={orgHandler}
+                    projectId={projectId}
                     componentId={componentId}
                     versionId={versionId}
                     deploymentPipelineId={deploymentPipelineId}
@@ -384,6 +395,7 @@ export default function DeployEnvironmentCard({
       </Card>
 
       <ConfigureDrawer
+        isWorkflow={isWorkflow}
         open={configureOpen}
         onClose={() => setConfigureOpen(false)}
         orgHandler={orgHandler}

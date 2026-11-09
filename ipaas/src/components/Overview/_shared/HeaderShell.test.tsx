@@ -34,7 +34,7 @@ let unmount = () => {};
 afterEach(() => unmount());
 
 async function openInCloudEditor(scopes: string[]) {
-  const r = await renderWithScopes(<HeaderShell component={component} repository={null} latestCommit={null} orgHandler="acme" projectId="default" />, scopes);
+  const r = await renderWithScopes(<HeaderShell component={component} repository={null} latestCommit={null} orgHandler="acme" projectId="default" environments={[]} versionId="v1" />, scopes);
   unmount = r.unmount;
   return button(r.container, 'Open in Cloud Editor');
 }

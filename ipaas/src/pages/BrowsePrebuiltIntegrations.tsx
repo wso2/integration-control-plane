@@ -104,7 +104,7 @@ function AppSlot({ app, isActiveTarget, onRemove }: AppSlotProps): JSX.Element {
           )}
         </>
       ) : isActiveTarget ? (
-        <Box sx={{ color: '#FF6B00', opacity: 0.85 }}>
+        <Box sx={{ color: 'primary.main', opacity: 0.85 }}>
           <Plus size={24} />
         </Box>
       ) : null}

@@ -30,6 +30,8 @@ interface ConfirmDeleteDialogProps {
   /** Disable the destructive action (e.g. until a confirmation gate passes). */
   confirmDisabled?: boolean;
   confirmLabel?: string;
+  /** The label of the button that backs out, when "Cancel" would read as the action itself. */
+  cancelLabel?: string;
   pendingLabel?: string;
   maxWidth?: 'xs' | 'sm' | 'md';
 }
@@ -40,14 +42,14 @@ interface ConfirmDeleteDialogProps {
  * Callers supply the title and body; confirmation logic (type-to-confirm,
  * eligibility checks) lives in the body they pass as children.
  */
-export default function ConfirmDeleteDialog({ title, children, onConfirm, onClose, isPending, confirmDisabled = false, confirmLabel = 'Delete', pendingLabel = 'Deleting…', maxWidth = 'sm' }: ConfirmDeleteDialogProps): JSX.Element {
+export default function ConfirmDeleteDialog({ title, children, onConfirm, onClose, isPending, confirmDisabled = false, confirmLabel = 'Delete', cancelLabel = 'Cancel', pendingLabel = 'Deleting…', maxWidth = 'sm' }: ConfirmDeleteDialogProps): JSX.Element {
   return (
     <Dialog open onClose={isPending ? undefined : onClose} maxWidth={maxWidth} fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>{children}</DialogContent>
       <DialogActions>
         <Button variant="outlined" color="inherit" onClick={onClose} disabled={isPending}>
-          Cancel
+          {cancelLabel}
         </Button>
         <Button variant="contained" color="error" onClick={onConfirm} disabled={confirmDisabled || isPending} startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
           {isPending ? pendingLabel : confirmLabel}

@@ -1,0 +1,110 @@
+/**
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { AppWindow, ExternalLink, RotateCcw } from '@wso2/oxygen-ui-icons-react';
+import type { JSX } from 'react';
+import type { Environment } from '../../types/environment';
+import type { UserPortal, UserPortalState } from '../../types/userPortal';
+import * as styles from './UserPortal.styles';
+
+const STATUS: Record<Exclude<UserPortalState, 'not-enabled'>, { label: string; color: 'success' | 'info' | 'error' | 'default' }> = {
+  active: { label: 'Active', color: 'success' },
+  'setting-up': { label: 'Setting up', color: 'info' },
+  failed: { label: 'Failed', color: 'error' },
+  removing: { label: 'Removing', color: 'default' },
+};
+
+interface UserPortalCardProps {
+  environment: Environment;
+  portal: UserPortal & { state: Exclude<UserPortalState, 'not-enabled'> };
+  /** Why the user can't enable portals; empty when they can. */
+  manageRefusal: string;
+  /** Whether an enable (a retry) is running for this portal. */
+  retrying: boolean;
+  onRetry: () => void;
+}
+
+/** One environment's User Portal: its status, a link to open it, and the actions on it. */
+export default function UserPortalCard({ environment, portal, manageRefusal, retrying, onRetry }: UserPortalCardProps): JSX.Element {
+  const { state } = portal;
+  const status = STATUS[state];
+  const busy = state === 'setting-up' || state === 'removing';
+
+  return (
+    <Card variant="outlined" sx={styles.cardSx}>
+      <CardContent sx={styles.cardContentSx}>
+        <Box sx={styles.cardHeadSx}>
+          <Box sx={{ ...styles.logoBoxSx, opacity: busy ? 0.4 : 1 }}>
+            <AppWindow size={32} />
+          </Box>
+          <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0, pt: 0.5 }}>
+            <Typography variant="h6" sx={{ overflowWrap: 'anywhere' }}>
+              {environment.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              The User Portal for integrations published in {environment.name}.
+            </Typography>
+          </Stack>
+        </Box>
+
+        {state === 'failed' && portal.error && (
+          <Alert severity="error" variant="outlined">
+            {portal.error}
+          </Alert>
+        )}
+
+        <Stack spacing={2} sx={styles.detailsSx}>
+          <Box sx={styles.detailRowSx}>
+            <Typography variant="body1" color="text.secondary">
+              Environment
+            </Typography>
+            <Chip label={environment.id} size="small" variant="outlined" />
+          </Box>
+          <Box sx={styles.detailRowSx}>
+            <Typography variant="body1" color="text.secondary">
+              Status
+            </Typography>
+            <Chip label={status.label} size="small" color={status.color} />
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1}>
+          {state === 'active' && portal.url ? (
+            <Button fullWidth size="small" sx={styles.actionButtonSx} variant="contained" component="a" href={portal.url} target="_blank" rel="noopener noreferrer" startIcon={<ExternalLink size={16} />}>
+              Open portal
+            </Button>
+          ) : state === 'failed' ? (
+            // Enabling a portal whose setup failed retries it; ipaas-service refuses a failure a retry can't repeat, and says so.
+            <Tooltip title={manageRefusal}>
+              <Box component="span" sx={{ display: 'inline-flex', flex: 1 }}>
+                <Button fullWidth size="small" sx={styles.actionButtonSx} variant="contained" onClick={onRetry} disabled={!!manageRefusal || retrying} startIcon={retrying ? <CircularProgress size={16} color="inherit" /> : <RotateCcw size={16} />}>
+                  {retrying ? 'Retrying…' : 'Retry setup'}
+                </Button>
+              </Box>
+            </Tooltip>
+          ) : (
+            <Button fullWidth size="small" sx={styles.actionButtonSx} variant="contained" disabled startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}>
+              {state === 'setting-up' ? 'Setting up portal…' : state === 'removing' ? 'Removing portal…' : 'Portal unavailable'}
+            </Button>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}

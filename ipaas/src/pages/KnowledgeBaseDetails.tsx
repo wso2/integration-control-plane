@@ -353,6 +353,7 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
           versionId=""
           deploymentPipelineId=""
           allowWithoutBuild
+          kind="ingestion"
         />
       )}
       {viewingLogs && <DataSourceExecutionsDrawer kb={kb} dataSource={viewingLogs} orgHandler={scope.org} onClose={() => setViewingLogs(null)} />}

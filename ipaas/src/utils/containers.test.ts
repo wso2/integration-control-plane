@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { containerImageName, containerToForm, cpuToMilli, encodeArrayItems, encodeBase64, formToWriteData, hasCustomImage, isMainContainer, isPrivateDpRelease, milliToCpu } from './containers';
+import { CPU_MAX, CPU_MIN, CPU_STEP, MEMORY_MAX, MEMORY_MIN, containerImageName, containerToForm, formatCpu, formToWriteData, hasCustomImage, isMainContainer } from './containers';
 import type { ReleaseContainer } from '../types/devopsConfigs';
 
 const baseContainer: ReleaseContainer = {
@@ -28,38 +28,18 @@ const baseContainer: ReleaseContainer = {
   cpu_limit: 500,
   memory: 350,
   memory_limit: 1024,
-  limit_disabled: false,
   image_pull_policy: 'IfNotPresent',
   command: ['some', 'one'],
   args: ['hiii'],
-  ports: [],
+  ports: [{ name: 'endpoint-9090', port: 9090, service_port: 9090, protocol: 'TCP' }],
 };
 
-describe('encodeBase64 / encodeArrayItems', () => {
-  it('encodes ASCII the same way btoa would', () => {
-    expect(encodeBase64('some')).toBe('c29tZQ==');
-    expect(encodeBase64('one')).toBe('b25l');
-    expect(encodeBase64('hiii')).toBe('aGlpaQ==');
-  });
-
-  it('round-trips UTF-8 through decodeURIComponent(escape(atob()))', () => {
-    const encoded = encodeBase64('café');
-    expect(decodeURIComponent(escape(atob(encoded)))).toBe('café');
-  });
-
-  it('encodes each item and tolerates non-arrays', () => {
-    expect(encodeArrayItems(['some', 'one'])).toEqual(['c29tZQ==', 'b25l']);
-    expect(encodeArrayItems([])).toEqual([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(encodeArrayItems(undefined as any)).toEqual([]);
-  });
-});
-
-describe('cpu conversions', () => {
-  it('converts milli-CPU to CPU and back', () => {
-    expect(milliToCpu(210)).toBe(0.21);
-    expect(cpuToMilli(0.21)).toBe(210);
-    expect(cpuToMilli(0.5)).toBe(500);
+describe('formatCpu', () => {
+  it('shows milli-CPU as whole CPUs', () => {
+    expect(formatCpu(210)).toBe('0.21');
+    expect(formatCpu(125)).toBe('0.125');
+    expect(formatCpu(2010)).toBe('2.01');
+    expect(formatCpu(4000)).toBe('4');
   });
 });
 
@@ -77,61 +57,80 @@ describe('image helpers', () => {
   });
 });
 
-describe('isPrivateDpRelease', () => {
-  it('is true only when choreo_env is private_dp', () => {
-    expect(isPrivateDpRelease({ ID: 'r', containers: [], metadata: { choreo_env: 'private_dp' } })).toBe(true);
-    expect(isPrivateDpRelease({ ID: 'r', containers: [], environment: { choreo_env: 'private_dp' } })).toBe(true);
-    expect(isPrivateDpRelease({ ID: 'r', containers: [], metadata: { choreo_env: 'dev' } })).toBe(false);
-    expect(isPrivateDpRelease(undefined)).toBe(false);
-  });
-});
-
 describe('containerToForm / formToWriteData', () => {
-  it('seeds the form from a container with limits enabled', () => {
-    const form = containerToForm(baseContainer);
-    expect(form).toMatchObject({
+  it('seeds the form in the wire units', () => {
+    expect(containerToForm(baseContainer)).toEqual({
       imagePullPolicy: 'IfNotPresent',
-      limitsEnabled: true,
-      cpuRequest: 0.21,
-      cpuLimit: 0.5,
+      cpuRequest: 210,
+      cpuLimit: 500,
       memRequest: 350,
       memLimit: 1024,
-      command: ['some', 'one'],
-      args: ['hiii'],
     });
   });
 
-  it('synthesises a limit one step above request when limits are disabled', () => {
-    const form = containerToForm({ ...baseContainer, limit_disabled: true, cpu: 100, cpu_limit: 0, memory: 350, memory_limit: 0 });
-    expect(form.limitsEnabled).toBe(false);
-    expect(form.cpuLimit).toBeCloseTo(0.11, 5);
-    expect(form.memLimit).toBe(360);
+  it('sends only the pull policy when only the pull policy changed', () => {
+    const initial = containerToForm(baseContainer);
+    const body = formToWriteData({ ...initial, imagePullPolicy: 'Always' }, initial);
+    expect(body).toEqual({ image_pull_policy: 'Always' });
   });
 
-  it('builds the PUT body, encoding command/args and scaling CPU to milli', () => {
-    const form = containerToForm(baseContainer);
-    const body = formToWriteData(form, []);
-    expect(body).toEqual({
-      image_pull_policy: 'IfNotPresent',
-      args: ['aGlpaQ=='],
-      command: ['c29tZQ==', 'b25l'],
-      ports: [],
-      cpu: 210,
-      cpu_limit: 500,
-      memory: 350,
-      memory_limit: 1024,
-      limit_disabled: false,
+  it('sends all four sizes when one changed, and leaves out an unchanged pull policy', () => {
+    const initial = containerToForm(baseContainer);
+    const body = formToWriteData({ ...initial, memLimit: 2048 }, initial);
+    expect(body).toEqual({ cpu: 210, cpu_limit: 500, memory: 350, memory_limit: 2048 });
+  });
+
+  it('sends the pull policy and the sizes when both changed', () => {
+    const initial = containerToForm(baseContainer);
+    const body = formToWriteData({ ...initial, imagePullPolicy: 'Always', cpuLimit: 1000 }, initial);
+    expect(body).toEqual({ image_pull_policy: 'Always', cpu: 210, cpu_limit: 1000, memory: 350, memory_limit: 1024 });
+  });
+
+  it('sends unedited sizes back exactly, even off the slider step', () => {
+    // A size set through the API or MCP need not be a multiple of 10m.
+    const initial = containerToForm({ ...baseContainer, cpu: 125, cpu_limit: 125 });
+    const body = formToWriteData({ ...initial, memLimit: 2048 }, initial);
+    expect(body).toMatchObject({ cpu: 125, cpu_limit: 125 });
+  });
+
+  it('sends integer milli-CPU for every slider step', () => {
+    const initial = containerToForm(baseContainer);
+    for (let milli = CPU_MIN; milli <= CPU_MAX; milli += CPU_STEP) {
+      const body = formToWriteData({ ...initial, cpuRequest: milli, cpuLimit: milli }, initial);
+      expect(Number.isInteger(body.cpu)).toBe(true);
+      expect(Number.isInteger(body.cpu_limit)).toBe(true);
+    }
+  });
+
+  it('never sends command, args or ports', () => {
+    const initial = containerToForm(baseContainer);
+    const body = formToWriteData({ ...initial, imagePullPolicy: 'Always', memLimit: 2048 }, initial);
+    expect(Object.keys(body).sort()).toEqual(['cpu', 'cpu_limit', 'image_pull_policy', 'memory', 'memory_limit']);
+  });
+
+  it('brings stored sizes above the range into it, so editing another size can be saved', () => {
+    const initial = containerToForm({ ...baseContainer, cpu: 64000, cpu_limit: 64000, memory: 262144, memory_limit: 262144 });
+    expect(initial).toMatchObject({ cpuRequest: CPU_MAX, cpuLimit: CPU_MAX, memRequest: MEMORY_MAX, memLimit: MEMORY_MAX });
+    const body = formToWriteData({ ...initial, memRequest: 512, memLimit: 1024 }, initial);
+    expect(body).toEqual({ cpu: CPU_MAX, cpu_limit: CPU_MAX, memory: 512, memory_limit: 1024 });
+  });
+
+  it('raises missing or zero sizes to the minimum', () => {
+    const { cpu: _cpu, cpu_limit: _cpuLimit, ...noCpu } = baseContainer;
+    expect(containerToForm({ ...noCpu, memory: 0, memory_limit: 0 })).toMatchObject({ cpuRequest: CPU_MIN, cpuLimit: CPU_MIN, memRequest: MEMORY_MIN, memLimit: MEMORY_MIN });
+  });
+
+  it('keeps the request no greater than the limit', () => {
+    expect(containerToForm({ ...baseContainer, cpu: 3000, cpu_limit: 2000, memory: 64000, memory_limit: 4096 })).toMatchObject({
+      cpuRequest: 2000,
+      cpuLimit: 2000,
+      memRequest: 4096,
+      memLimit: 4096,
     });
   });
 
-  it('zeroes the limits and sets limit_disabled when limits are off', () => {
-    const form = { ...containerToForm(baseContainer), limitsEnabled: false };
-    const body = formToWriteData(form, []);
-    expect(body.cpu_limit).toBe(0);
-    expect(body.memory_limit).toBe(0);
-    expect(body.limit_disabled).toBe(true);
-    // request values still sent
-    expect(body.cpu).toBe(210);
-    expect(body.memory).toBe(350);
+  it('still sends only the pull policy when the stored sizes are out of range', () => {
+    const initial = containerToForm({ ...baseContainer, cpu: 64000, cpu_limit: 64000 });
+    expect(formToWriteData({ ...initial, imagePullPolicy: 'Always' }, initial)).toEqual({ image_pull_policy: 'Always' });
   });
 });

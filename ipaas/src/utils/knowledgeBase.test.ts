@@ -31,6 +31,7 @@ import {
   knowledgeBaseNameFrom,
   knowledgeBaseSummary,
   secretsForUpdate,
+  retrievalAccessReason,
   retrievalUnavailableReason,
   vectorStoreFromConfig,
 } from './knowledgeBase';
@@ -167,15 +168,43 @@ describe('isNameValid', () => {
 
 describe('retrievalUnavailableReason', () => {
   it.each([
-    [{ status: 'ACTIVE', serviceUrl: 'https://kb' }, null],
-    [{ status: 'ACTIVE', serviceUrl: '' }, 'The knowledge base service has no public URL yet.'],
-    [{ status: 'IN_PROGRESS', serviceUrl: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
-    [{ status: 'CREATING', serviceUrl: '' }, 'The knowledge base is still being created. You can query it once it is active.'],
-    [{ status: 'FAILED', serviceUrl: '' }, 'The knowledge base could not be created, so it cannot be queried.'],
-    [{ status: '', serviceUrl: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
-    [{ status: 'ERROR', serviceUrl: 'https://kb' }, 'The knowledge base service failed to deploy, so it cannot be queried.'],
+    [{ status: 'ACTIVE' }, null],
+    [{ status: 'IN_PROGRESS' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
+    [{ status: 'CREATING' }, 'The knowledge base is still being created. You can query it once it is active.'],
+    [{ status: 'FAILED' }, 'The knowledge base could not be created, so it cannot be queried.'],
+    [{ status: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
+    [{ status: 'ERROR' }, 'The knowledge base service failed to deploy, so it cannot be queried.'],
   ])('%j', (kb, reason) => {
     expect(retrievalUnavailableReason(kb)).toBe(reason);
+  });
+});
+
+describe('retrievalAccessReason', () => {
+  const ready = { keyError: null, needsApiKeyAuth: false, securityError: null, mode: 'api-key' as const, gatewayUrl: 'https://gw/docs-kb', isAuthorized: true, isMinting: false };
+  const status = (code: number) => Object.assign(new Error(`HTTP ${code}`), { status: code });
+  it.each([
+    ['ready', ready, null],
+    ['a key error', { ...ready, keyError: 'Could not mint a test key.', isAuthorized: false }, 'Could not mint a test key.'],
+    ['another auth mode', { ...ready, needsApiKeyAuth: true, isAuthorized: false }, "The knowledge base's API takes another kind of credential, so it can't be queried with a test key."],
+    ['not exposed (409)', { ...ready, securityError: status(409), mode: null, gatewayUrl: '', isAuthorized: false }, 'The knowledge base is not on the API gateway yet. Saving its configuration again puts it there.'],
+    ['a failed read (502)', { ...ready, securityError: status(502), mode: null, gatewayUrl: '', isAuthorized: false }, "Could not check the knowledge base's API on the gateway. Trying again…"],
+    ['a failed read (network)', { ...ready, securityError: new TypeError('Failed to fetch'), mode: null, gatewayUrl: '', isAuthorized: false }, "Could not check the knowledge base's API on the gateway. Trying again…"],
+    ['the read not answered', { ...ready, mode: null, gatewayUrl: '', isAuthorized: false }, "Checking the knowledge base's API on the gateway…"],
+    ['exposed without a URL', { ...ready, gatewayUrl: '' }, 'The knowledge base is not on the API gateway yet. Saving its configuration again puts it there.'],
+    ['minting', { ...ready, isAuthorized: false, isMinting: true }, 'Getting a test key for the knowledge base…'],
+    ['a mint refused for the role (403)', { ...ready, isAuthorized: false }, "Your role can't create test keys for this knowledge base, so it can't be queried here."],
+  ])('%s', (_name, access, reason) => {
+    expect(retrievalAccessReason(access)).toBe(reason);
+  });
+
+  const off = { ...ready, securityError: status(409), mode: null, gatewayUrl: '', isAuthorized: false };
+  it.each([
+    [{ status: 'FAILED', error: 'GATEWAY_UNAVAILABLE' }, 'The API gateway for this environment is being set up. The knowledge base can be queried once it is published there.'],
+    [{ status: 'RUNNING', error: 'GATEWAY_PROVISIONING' }, 'The API gateway for this environment is being set up. The knowledge base can be queried once it is published there.'],
+    [{ status: 'FAILED', error: 'APIP_ERROR' }, 'Publishing the knowledge base on the API gateway failed. It is retried automatically.'],
+    [{ status: 'PENDING' }, 'The knowledge base is being published on the API gateway.'],
+  ])('says why it is not on the gateway: %j', (apiStatus, reason) => {
+    expect(retrievalAccessReason(off, apiStatus)).toBe(reason);
   });
 });
 

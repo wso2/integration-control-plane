@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { ComponentType, ConnectionType } from '@wso2/cell-diagram';
-import type { Project as DiagramProject, Component as DiagramComponent, Observations, Connection, Services } from '@wso2/cell-diagram';
+import { ComponentType, ConnectionType } from '@openchoreo/cell-diagram';
+import type { Project as DiagramProject, Component as DiagramComponent, Observations, Connection, Services } from '@openchoreo/cell-diagram';
 import type { Component } from '../../types/component';
 import type { ProjectMetricsLink, ProjectMetricsModel } from '../../types/observability';
 

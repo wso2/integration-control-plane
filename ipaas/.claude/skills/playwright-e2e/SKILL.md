@@ -23,7 +23,7 @@ playwright.config.ts                 projects, retries, artifact settings
 tests/e2e/
   cloud.setup.ts                     signs in through Thunder with the GitHub bot (setup-cloud)
   cloud-token.setup.ts               builds the session from a platform token (setup-cloud-token)
-  specs/cloud/ipaas-e2e-journey.spec.ts   the journey: numbered groups 00–09 (project cloud)
+  specs/cloud/ipaas-e2e-journey.spec.ts   the journey: numbered groups 01–09 (project cloud)
   specs/cloud-anon/login.spec.ts          sign-in page, no session (project cloud-anon)
   helpers/
     journey-session.ts               enterOrgHome / enterProject / enterProjectOrSkip, assertSignedIn, refreshSession
@@ -147,7 +147,7 @@ test.describe('07 page availability @smoke', () => {
 - **Org handle** comes from `getAuthContext()`.
 - **New browser contexts** go through `newConsoleContext(browser, { storageState: AUTH_STATE_PATH, baseURL })`.
 - **Unauthenticated tests** belong in `specs/cloud-anon/`, which runs with no session at all.
-- **Housekeeping is not a product assertion.** Sweeps (groups 00, 08b) skip with a reason when they cannot finish rather than fail.
+- **Housekeeping is not a product assertion.** The sweep (group 08b) skips with a reason when they cannot finish rather than fail.
 
 ## When not to write the test
 

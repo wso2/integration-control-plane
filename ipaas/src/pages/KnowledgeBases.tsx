@@ -38,7 +38,7 @@ const HEADERS = ['Name', 'Vector Store', 'Embedding Model', 'Data Sources', 'Sta
 
 export default function KnowledgeBases(scope: OrgScope): JSX.Element {
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
         <PageTitle.Header>Knowledge Bases</PageTitle.Header>
         <PageTitle.SubHeader>Documents from your data sources, chunked and embedded into a vector store, for AI agents and integrations to retrieve from.</PageTitle.SubHeader>

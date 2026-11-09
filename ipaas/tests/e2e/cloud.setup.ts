@@ -23,7 +23,7 @@ import { fileURLToPath } from 'url';
 import { waitForOTP } from './helpers/gmail.js';
 import { projectNameFor } from './helpers/journey-project.js';
 import { fillSecret, readSecret } from './helpers/secrets.js';
-import { parkSessionStorage } from './helpers/session-storage.js';
+import { parkSessionStorage, rejectCookieBanner } from './helpers/session-storage.js';
 import { msUntilNextWindow, totpCode } from './helpers/totp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -171,6 +171,12 @@ setup('authenticate cloud', async ({ page }) => {
   if (!username || !password) {
     throw new Error('E2E_GITHUB_USERNAME and E2E_GITHUB_PASSWORD must be set — see tests/e2e/README.md');
   }
+  // Without a TOTP secret GitHub's second factor is an emailed code, which needs the Gmail credentials to read.
+  if (!totpSecret && !(readSecret('GMAIL_CLIENT_ID') && readSecret('GMAIL_CLIENT_SECRET') && readSecret('GMAIL_REFRESH_TOKEN'))) {
+    throw new Error('Set E2E_GITHUB_TOTP_SECRET, or the GMAIL_* credentials for the emailed code — see tests/e2e/README.md');
+  }
+  // The console's OneTrust banner can cover the onboarding and terms dialogs this setup clicks through.
+  await rejectCookieBanner(page);
 
   // Only read verification mail that arrives after this point.
   const startedAt = Date.now();
