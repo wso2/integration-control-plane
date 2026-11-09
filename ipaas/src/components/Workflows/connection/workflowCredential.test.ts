@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { testKeyNotice, testKeyReasonOf, workflowRequestHeaders } from './workflowCredential';
+import { humanTasksComingSoon, testKeyNotice, testKeyReasonOf, workflowRequestHeaders } from './workflowCredential';
 
 /** A failed BFF read, as `httpStatusOf` sees it. */
 const failed = (status: number) => Object.assign(new Error(`HTTP ${status}`), { status });
@@ -110,5 +110,12 @@ describe('testKeyNotice', () => {
       severity: 'warning',
       text: 'Your session has expired. Sign in again and retry.',
     });
+  });
+});
+
+describe('humanTasksComingSoon', () => {
+  it('points to the User Portal only where ipaas-service serves one', () => {
+    expect(humanTasksComingSoon(true)).toContain('publish this workflow to the User Portal');
+    expect(humanTasksComingSoon(false)).toBe('Human tasks are coming to the console.');
   });
 });

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { act } from 'react';
+import { act, useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import UserPortalPrompt from './UserPortalPrompt';
@@ -27,12 +27,14 @@ import { DEVELOPER, PLATFORM_ENGINEER } from '../../test/roles';
 import type { UserPortal, UserPortalPublishability } from '../../types/userPortal';
 
 vi.mock('../../api/userPortal', () => ({
+  fetchUserPortalEnvironments: vi.fn(),
   fetchUserPortal: vi.fn(),
   enableUserPortal: vi.fn(),
   fetchUserPortalPublishability: vi.fn(),
   publishToUserPortal: vi.fn(),
 }));
 
+const portalEnvironments = vi.mocked(api.fetchUserPortalEnvironments);
 const portal = vi.mocked(api.fetchUserPortal);
 const enable = vi.mocked(api.enableUserPortal);
 const publishability = vi.mocked(api.fetchUserPortalPublishability);
@@ -48,7 +50,13 @@ const NOT_ENABLED: UserPortalPublishability = {
 
 let unmount = () => {};
 afterEach(() => unmount());
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  portalEnvironments.mockResolvedValue([
+    { id: 'development', name: 'Development', critical: false },
+    { id: 'production', name: 'Production', critical: true },
+  ]);
+});
 
 async function prompt(scopes: string[]) {
   const r = await renderWithScopes(
@@ -78,6 +86,53 @@ describe('the way to a workflow in the User Portal', () => {
     await flush();
     expect(enable.mock.calls[0]?.[0]).toBe('production');
     expect(button(container, 'Setting up User Portal…')?.disabled).toBe(true);
+  });
+
+  it('offers no Enable where the User Portal cannot run, and says so', async () => {
+    portalEnvironments.mockResolvedValue([{ id: 'development', name: 'Development', critical: false }]);
+    portal.mockResolvedValue({ environment: 'production', state: 'not-enabled' });
+    publishability.mockResolvedValue(NOT_ENABLED);
+    const container = await prompt(PLATFORM_ENGINEER);
+    expect(button(container, 'Enable User Portal')).toBeUndefined();
+    expect(container.textContent).toContain("The User Portal can't use Production.");
+  });
+
+  it('shows the scopes the portal could not hold once a publish from here goes through', async () => {
+    portal.mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValueOnce({ ...PUBLISHABLE, redeploys: false }).mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
+    publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: ['bad scope'] });
+    const container = await prompt(DEVELOPER);
+    await act(async () => button(container, 'Publish to User Portal')?.click());
+    await flush();
+    expect(container.textContent).toContain('bad scope');
+  });
+
+  it("leaves the last environment's failed publish behind when another is shown", async () => {
+    portal.mockImplementation(async (environment) => ({ ...ACTIVE, environment }));
+    publishability.mockImplementation(async (_component, environment) => ({ ...PUBLISHABLE, environment, redeploys: false }));
+    publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"not deployed"}'));
+    let show: (id: string) => void = () => {};
+    function Switching() {
+      const [env, setEnv] = useState('production');
+      show = setEnv;
+      return <UserPortalPrompt orgHandler="acme" componentId="orders" environment={{ id: env, name: env === 'production' ? 'Production' : 'Development', critical: false }} />;
+    }
+    const r = await renderWithScopes(
+      <MemoryRouter>
+        <Switching />
+      </MemoryRouter>,
+      DEVELOPER,
+    );
+    unmount = r.unmount;
+    await flush();
+    await act(async () => button(r.container, 'Publish to User Portal')?.click());
+    await flush();
+    expect(r.container.textContent).toContain('Deploy it to Production first.');
+
+    await act(async () => show('development'));
+    await flush();
+    expect(r.container.textContent).not.toContain('Deploy it to Production first.');
+    expect(button(r.container, 'Publish to User Portal')?.disabled).toBe(false);
   });
 
   it("tells a role that can't enable the User Portal why", async () => {

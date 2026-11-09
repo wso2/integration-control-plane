@@ -18,7 +18,8 @@
 
 import type { JSX } from 'react';
 import UserPortalPrompt from '../components/UserPortal/UserPortalPrompt';
-import { CALLS_CARRY_ROLES, HUMAN_TASKS_COMING_SOON } from '../components/Workflows/connection/workflowCredential';
+import { CALLS_CARRY_ROLES, humanTasksComingSoon } from '../components/Workflows/connection/workflowCredential';
+import { useUserPortalServed } from '../hooks/useUserPortal';
 import WorkflowPageShell, { type WorkflowPagePlaceholderProps } from '../components/Workflows/shared/WorkflowPageShell';
 import HumanTasksPage from '../components/Workflows/tasks/HumanTasksPage';
 import type { ComponentScope } from '../nav';
@@ -29,7 +30,8 @@ import { ComingSoonInline } from './ComingSoon';
  * Portal there: enable it, publish the workflow to it, or open it.
  */
 function HumanTasksComingSoon({ scope, component, environment }: WorkflowPagePlaceholderProps): JSX.Element {
-  return <ComingSoonInline description={HUMAN_TASKS_COMING_SOON} action={<UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} />} />;
+  const portalServed = useUserPortalServed(environment.id);
+  return <ComingSoonInline description={humanTasksComingSoon(portalServed)} action={portalServed && <UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} />} />;
 }
 
 /** The work queue of a workflow integration, under Operate at `.../human-tasks`: everything waiting on a person. */

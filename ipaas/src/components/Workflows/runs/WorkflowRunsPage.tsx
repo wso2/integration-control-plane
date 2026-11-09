@@ -37,6 +37,7 @@ import { WORKFLOW_STATUS_CHIP_COLOR, WORKFLOW_STATUS_LABEL, WORKFLOW_STATUS_OPTI
 import { WORKFLOW_TIME_RANGE_OPTIONS, workflowTimeRangeFrom, type WorkflowTimeRange } from '../shared/workflowTimeRangeFilter';
 import StartWorkflowDialog from './StartWorkflowDialog';
 import UserPortalPrompt from '../../UserPortal/UserPortalPrompt';
+import { useUserPortalServed } from '../../../hooks/useUserPortal';
 import WorkflowRunDetailDrawer from './WorkflowRunDetailDrawer';
 import * as styles from './WorkflowRunsPage.styles';
 
@@ -79,6 +80,7 @@ function MessageRow({ children }: { children: ReactNode }): JSX.Element {
  * overview figure links to them and the page follows a later link.
  */
 export default function WorkflowRunsPage({ scope, component, environment, api }: WorkflowPageSlotProps): JSX.Element {
+  const portalServed = useUserPortalServed(environment.id);
   const { client } = api;
   const { scopeId } = api.connection;
   const { goToWorkflowRuns } = useWorkflowRoutes();
@@ -415,7 +417,7 @@ export default function WorkflowRunsPage({ scope, component, environment, api }:
 
       <StartWorkflowDialog open={startOpen} api={client} scopeId={scopeId} definitions={definitions} onClose={() => setStartOpen(false)} onViewRun={({ workflowType, runId }) => goToWorkflowRuns({ workflowType, envId: environment.id, runId })} />
 
-      <WorkflowRunDetailDrawer run={shownRun} api={api} onClose={() => setSelectedRun(null)} comingSoonAction={<UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} />} />
+      <WorkflowRunDetailDrawer run={shownRun} api={api} onClose={() => setSelectedRun(null)} comingSoonAction={portalServed ? <UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} /> : undefined} />
     </Box>
   );
 }

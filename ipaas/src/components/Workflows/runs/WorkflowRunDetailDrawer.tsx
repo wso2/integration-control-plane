@@ -57,9 +57,15 @@ interface WorkflowRunDetailDrawerProps {
   run: WorkflowInstanceSummary | null;
   api: ReadyWorkflowApi;
   onClose: () => void;
-  /** What the run's views the console can't serve yet offer meanwhile: the way to them in the User Portal. */
+  /**
+   * What the run's views the console can't serve yet offer meanwhile: the way to them in the User Portal. Without one,
+   * the drawer doesn't point to the User Portal.
+   */
   comingSoonAction?: ReactNode;
 }
+
+/** What the drawer says of the run's views the console can't serve yet; with a way to them, that the User Portal has them. */
+const RUN_VIEWS_COMING_SOON = 'The execution graph, activity tree and timeline are coming to the console.';
 
 const LIFECYCLE_ACTIONS: {
   action: WorkflowLifecycleAction;
@@ -508,7 +514,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose, comingSoonA
 
               {/* The flow and the timeline are drawn from the run's details, which the User Portal already shows. */}
               {!CALLS_CARRY_ROLES ? (
-                <ComingSoonInline description="The execution graph, activity tree and timeline are coming to the console. Until then, publish this workflow to the User Portal to see them there." action={comingSoonAction} />
+                <ComingSoonInline description={comingSoonAction ? `${RUN_VIEWS_COMING_SOON} Until then, publish this workflow to the User Portal to see them there.` : RUN_VIEWS_COMING_SOON} action={comingSoonAction} />
               ) : (
                 <>
                   <Box sx={styles.flowHeader}>

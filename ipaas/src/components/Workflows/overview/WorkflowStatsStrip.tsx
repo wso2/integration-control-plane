@@ -23,7 +23,7 @@ import type { JSX, ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router';
 import type { WorkflowClient } from '../api/client';
 import { retryWorkflowRead } from '../api/http';
-import { CALLS_CARRY_ROLES, HUMAN_TASKS_COMING_SOON } from '../connection/workflowCredential';
+import { CALLS_CARRY_ROLES, humanTasksComingSoon } from '../connection/workflowCredential';
 import type { Page, WorkflowStatusFilter } from '../api/types';
 import type { WorkItemKind } from '../routing/useWorkflowRoutes';
 import { whenAutoRefresh } from '../shared/autoRefresh';
@@ -45,6 +45,8 @@ interface WorkflowStatsStripProps {
   runsLink: (status: WorkflowStatusFilter, closedWithin?: WorkflowTimeRange) => string;
   /** Human Tasks, filtered to the kind of work item a figure counts. */
   tasksLink: (kind: WorkItemKind) => string;
+  /** Whether ipaas-service serves the User Portal here, which the human task figures point to while the console has none. */
+  portalServed?: boolean;
 }
 
 interface Figure {
@@ -148,7 +150,7 @@ function FigureTile({ figure }: { figure: Figure }): JSX.Element {
  * Each figure links to the list behind it. Figures, not a list of runs: the Workflows page is where
  * individual runs are read.
  */
-export default function WorkflowStatsStrip({ client, scopeId, workflowType, runsLink, tasksLink }: WorkflowStatsStripProps): JSX.Element {
+export default function WorkflowStatsStrip({ client, scopeId, workflowType, runsLink, tasksLink, portalServed = true }: WorkflowStatsStripProps): JSX.Element {
   const running = useRunCount(client, scopeId, workflowType, 'RUNNING');
   const suspended = useRunCount(client, scopeId, workflowType, 'SUSPENDED');
   const failed = useRunCount(client, scopeId, workflowType, 'FAILED', CLOSED_WITHIN);
@@ -212,7 +214,7 @@ export default function WorkflowStatsStrip({ client, scopeId, workflowType, runs
       icon: <ClipboardCheck size={ICON_SIZE} />,
       tone: 'primary.main',
       count: reviews,
-      help: CALLS_CARRY_ROLES ? 'Approval gates and failed activities waiting for a decision. Opens Human Tasks.' : HUMAN_TASKS_COMING_SOON,
+      help: CALLS_CARRY_ROLES ? 'Approval gates and failed activities waiting for a decision. Opens Human Tasks.' : humanTasksComingSoon(portalServed),
       href: CALLS_CARRY_ROLES ? tasksLink('review') : undefined,
       notify: (reviews?.count ?? 0) > 0,
     },
@@ -222,7 +224,7 @@ export default function WorkflowStatsStrip({ client, scopeId, workflowType, runs
       icon: <ListTodo size={ICON_SIZE} />,
       tone: 'primary.main',
       count: tasks,
-      help: CALLS_CARRY_ROLES ? 'Human tasks you can act on, waiting for a person. Opens Human Tasks.' : HUMAN_TASKS_COMING_SOON,
+      help: CALLS_CARRY_ROLES ? 'Human tasks you can act on, waiting for a person. Opens Human Tasks.' : humanTasksComingSoon(portalServed),
       href: CALLS_CARRY_ROLES ? tasksLink('task') : undefined,
       notify: (tasks?.count ?? 0) > 0,
     },

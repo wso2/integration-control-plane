@@ -41,7 +41,7 @@ const MESSAGES: Record<string, (env: string) => string> = {
   USER_PORTAL_NO_PUBLIC_ENDPOINT: (env) => `Expose the endpoint the User Portal calls publicly in ${env}.`,
   USER_PORTAL_NO_MANAGEMENT_API: (env) => `The workflow has no ${WORKFLOW_MANAGEMENT_API_TITLE} endpoint deployed in ${env}.`,
   USER_PORTAL_API_KEY: () => 'An endpoint the User Portal calls is secured with an API key. Secure it with JWT.',
-  USER_PORTAL_SECURED_BY_PROMOTION: (env) => `The Workflow Management API doesn't take JWT in ${env}, which gets its security only by promotion. Publish the workflow in the environment it is promoted from, then promote it to ${env}.`,
+  USER_PORTAL_SECURED_BY_PROMOTION: (env) => `The Workflow Management API doesn't take JWT in ${env}, or isn't known to, and ${env} gets its security only by promotion. Publish the workflow in the environment it is promoted from, then promote it to ${env}.`,
   USER_PORTAL_AUDIENCE_MISSING: () => "An endpoint checks token audiences without the User Portal's. Add the User Portal to its audiences, or clear them.",
   USER_PORTAL_TOKEN_NOT_FORWARDED: () => `An endpoint the User Portal calls doesn't forward the caller's token. Turn token forwarding on, in the ${DEFAULT_FORWARDED_TOKEN_HEADER} header.`,
   USER_PORTAL_PUBLISH_LIMIT: (env) => `The User Portal in ${env} holds as many integrations as it can. Unpublish one first.`,

@@ -43,6 +43,8 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../../../nav', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../nav')>()), useScope: () => SCOPE }));
 vi.mock('../../../hooks/useAppNavigate', () => ({ useAppNavigate: () => state.navigate }));
+// Where the User Portal is served is read from its own route, which isn't under test here.
+vi.mock('../../../hooks/useUserPortal', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../hooks/useUserPortal')>()), useUserPortalServed: () => true }));
 // The card's task figures link to Human Tasks only once calls carry roles, which these tests are of.
 vi.mock('../connection/workflowCredential', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../connection/workflowCredential')>()),

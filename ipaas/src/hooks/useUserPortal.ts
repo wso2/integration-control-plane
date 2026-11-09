@@ -48,6 +48,15 @@ export function useUserPortals(environments: string[]) {
   });
 }
 
+/**
+ * Whether ipaas-service serves the User Portal for environment, so copy may point to it: false once reading its portal
+ * says there is no User Portal to read (a BFF without its routes), true until then. It shares `useUserPortals`' read.
+ */
+export function useUserPortalServed(environment: string): boolean {
+  const [portal] = useUserPortals(environment ? [environment] : []);
+  return !isUserPortalUnavailable(portal?.error);
+}
+
 function useWritePortal(write: (environment: string) => Promise<UserPortal>) {
   const qc = useQueryClient();
   return useMutation({

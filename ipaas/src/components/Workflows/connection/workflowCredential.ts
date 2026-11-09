@@ -40,8 +40,13 @@ import { endpointLoadNotice } from '../../../utils/apiSecurity';
  */
 export const CALLS_CARRY_ROLES = false;
 
-/** What the views say of human tasks until calls carry roles (`CALLS_CARRY_ROLES`). */
-export const HUMAN_TASKS_COMING_SOON = 'Human tasks are coming to the console. Until then, publish this workflow to the User Portal and work on its human tasks there.';
+/**
+ * What the views say of human tasks until calls carry roles (`CALLS_CARRY_ROLES`), pointing to the User Portal only
+ * where ipaas-service serves one (`useUserPortalServed`).
+ */
+export function humanTasksComingSoon(portalServed: boolean): string {
+  return portalServed ? 'Human tasks are coming to the console. Until then, publish this workflow to the User Portal and work on its human tasks there.' : 'Human tasks are coming to the console.';
+}
 
 /** What gets a call past the gateway: the test key, in its header, or none for an open API. */
 export interface GatewayCredential {

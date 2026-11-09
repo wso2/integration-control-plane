@@ -27,6 +27,7 @@ import { shownRefusals, userPortalErrorText } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import PublishButton, { DEPLOY_REFUSAL } from './PublishButton';
 import PublishRefusals from './PublishRefusals';
+import RejectedScopes from './RejectedScopes';
 import * as styles from './UserPortal.styles';
 import { usePublishFlow } from './usePublishFlow';
 
@@ -57,18 +58,7 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
   const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
-  // Scopes the last publish's endpoints require that the portal's users' tokens can't carry.
-  const [rejectedScopes, setRejectedScopes] = useState<string[]>([]);
-  const publish = usePublishFlow({
-    componentId,
-    environment,
-    envName,
-    onStart: () => {
-      setRejectedScopes([]);
-      unpublish.reset();
-    },
-    onPublished: (out) => setRejectedScopes(out.rejectedScopes),
-  });
+  const publish = usePublishFlow({ componentId, environment, envName, onStart: () => unpublish.reset() });
 
   if (isLoading) return <Skeleton variant="rounded" height={40} sx={styles.rowSx} />;
   // A BFF that serves no User Portal has nothing to publish to.
@@ -94,7 +84,6 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
   };
   const startUnpublish = () => {
     publish.reset();
-    setRejectedScopes([]);
     unpublish.mutate({ componentId, environment }, { onSuccess: () => setConfirmUnpublish(false) });
   };
 
@@ -130,11 +119,7 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
           {publish.error}
         </Typography>
       )}
-      {rejectedScopes.length > 0 && (
-        <Typography variant="caption" color="warning.main" component="p" sx={styles.rowNoteSx}>
-          The User Portal can&apos;t hold {rejectedScopes.length === 1 ? 'this scope' : 'these scopes'}, so its users&apos; tokens never carry {rejectedScopes.length === 1 ? 'it' : 'them'}: {rejectedScopes.join(', ')}.
-        </Typography>
-      )}
+      <RejectedScopes scopes={publish.rejectedScopes} sx={styles.rowNoteSx} />
 
       {publish.dialog}
 

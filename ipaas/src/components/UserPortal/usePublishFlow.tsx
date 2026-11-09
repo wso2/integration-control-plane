@@ -18,7 +18,6 @@
 
 import { useState, type ReactNode } from 'react';
 import { usePublishToUserPortal } from '../../hooks/useUserPortal';
-import type { UserPortalPublication } from '../../types/userPortal';
 import { userPortalErrorText } from '../../utils/userPortal';
 import PublishWorkflowDialog from './PublishWorkflowDialog';
 
@@ -29,7 +28,6 @@ interface PublishFlowOptions {
   envName: string;
   /** Runs as a publish is asked for, before it is confirmed, so what the last one left on screen goes. */
   onStart?: () => void;
-  onPublished?: (publication: UserPortalPublication) => void;
 }
 
 export interface PublishFlow {
@@ -39,6 +37,8 @@ export interface PublishFlow {
   dialog: ReactNode;
   /** Why the last publish failed, worded for the reader. A confirmed publish shows its failure in the dialog instead. */
   error: string | null;
+  /** Scopes the last publish's endpoints require that the User Portal couldn't hold (`RejectedScopes` says so). */
+  rejectedScopes: string[];
   isPending: boolean;
   /** Clears the last publish's outcome. */
   reset: () => void;
@@ -50,9 +50,10 @@ export interface PublishFlow {
  * management off in the environment, so it is confirmed first (`PublishWorkflowDialog`); any other publish goes
  * straight ahead.
  */
-export function usePublishFlow({ componentId, environment, envName, onStart, onPublished }: PublishFlowOptions): PublishFlow {
+export function usePublishFlow({ componentId, environment, envName, onStart }: PublishFlowOptions): PublishFlow {
   const publish = usePublishToUserPortal();
   const [confirming, setConfirming] = useState(false);
+  const [rejectedScopes, setRejectedScopes] = useState<string[]>([]);
 
   const start = () => {
     publish.mutate(
@@ -60,13 +61,14 @@ export function usePublishFlow({ componentId, environment, envName, onStart, onP
       {
         onSuccess: (out) => {
           setConfirming(false);
-          onPublished?.(out);
+          setRejectedScopes(out.rejectedScopes);
         },
       },
     );
   };
   const request = (redeploys: boolean) => {
     onStart?.();
+    setRejectedScopes([]);
     if (!redeploys) {
       start();
       return;
@@ -83,7 +85,11 @@ export function usePublishFlow({ componentId, environment, envName, onStart, onP
     request,
     dialog: confirming ? <PublishWorkflowDialog envName={envName} onConfirm={start} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} /> : null,
     error: publish.isError && !confirming ? userPortalErrorText(publish.error, envName) : null,
+    rejectedScopes,
     isPending: publish.isPending,
-    reset: publish.reset,
+    reset: () => {
+      publish.reset();
+      setRejectedScopes([]);
+    },
   };
 }

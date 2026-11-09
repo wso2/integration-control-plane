@@ -242,7 +242,9 @@ describe('WorkflowRunDetailDrawer without caller roles', () => {
     await renderDrawer(api);
     expect(text()).toContain('order-42');
     expect(text()).toContain('Coming soon');
-    expect(text()).toContain('The execution graph, activity tree and timeline are coming to the console. Until then, publish this workflow to the User Portal to see them there.');
+    // With no way to the User Portal offered, it isn't pointed to.
+    expect(text()).toContain('The execution graph, activity tree and timeline are coming to the console.');
+    expect(text()).not.toContain('User Portal');
     expect(instances.get).not.toHaveBeenCalled();
     expect(instances.history).not.toHaveBeenCalled();
     expect(instances.activityTree).not.toHaveBeenCalled();
@@ -253,6 +255,7 @@ describe('WorkflowRunDetailDrawer without caller roles', () => {
     const { api } = fakeApi();
     await renderDrawer(api, RUN, <button>Publish to User Portal</button>);
     expect(buttonLabels()).toContain('Publish to User Portal');
+    expect(text()).toContain('Until then, publish this workflow to the User Portal to see them there.');
   });
 
   it('does not say a completed run returned nothing, since its result is not read', async () => {

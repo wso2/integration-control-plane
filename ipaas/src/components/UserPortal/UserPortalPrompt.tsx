@@ -21,7 +21,7 @@ import { ExternalLink } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
-import { useEnableUserPortal, useUserPortalPublishability, useUserPortals } from '../../hooks/useUserPortal';
+import { useEnableUserPortal, useUserPortalEnvironments, useUserPortalPublishability, useUserPortals } from '../../hooks/useUserPortal';
 import type { Environment } from '../../types/environment';
 import type { UserPortalPublishability } from '../../types/userPortal';
 import { apiErrorMessage, isUserPortalUnavailable } from '../../utils/apiErrors';
@@ -29,12 +29,15 @@ import { shownRefusals, USER_PORTAL_NOT_ENABLED } from '../../utils/userPortal';
 import EnableUserPortalDialog from './EnableUserPortalDialog';
 import PublishButton from './PublishButton';
 import PublishRefusals from './PublishRefusals';
+import RejectedScopes from './RejectedScopes';
 import { usePublishFlow } from './usePublishFlow';
 
 const ENABLE_REFUSAL = "Your role can't enable the User Portal.";
 
 // Rules no User Portal settles: an integration that breaks them can't be published from here at all.
 const OUT_OF_REACH = new Set(['USER_PORTAL_NOT_PUBLISHABLE', 'USER_PORTAL_PIPELINE']);
+// An environment off the User Portal's pipeline, worded as ipaas-service's code for one it can't use.
+const NOT_A_PORTAL_ENVIRONMENT = { code: 'USER_PORTAL_INVALID_ENVIRONMENT', message: '' };
 
 interface UserPortalPromptProps {
   orgHandler: string;
@@ -47,8 +50,15 @@ interface UserPortalPromptProps {
  * User Portal in the environment, publish the workflow to it, or open it once the workflow is published there. A
  * publish follows the console's publishing rules, and is confirmed first when it redeploys the workflow.
  */
-export default function UserPortalPrompt({ orgHandler, componentId, environment }: UserPortalPromptProps): JSX.Element | null {
+export default function UserPortalPrompt(props: UserPortalPromptProps): JSX.Element {
+  // What an enable or a publish left on screen belongs to the environment it was made in.
+  return <EnvironmentPrompt key={props.environment.id} {...props} />;
+}
+
+function EnvironmentPrompt({ orgHandler, componentId, environment }: UserPortalPromptProps): JSX.Element | null {
   const [portalQuery] = useUserPortals([environment.id]);
+  // The environments a User Portal can run in. Where the read fails, Enable is still offered, and refused with the reason.
+  const portalEnvironments = useUserPortalEnvironments();
   const portalActive = portalQuery.data?.state === 'active';
   // ipaas-service can still answer from before the portal it waited for came up: read again until it catches up.
   const publishability = useUserPortalPublishability(componentId, environment.id, { rereadWhile: (report) => portalActive && notEnabledIn(report) });
@@ -67,7 +77,7 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
     if (staleReport) void rereadReport();
   }, [staleReport, rereadReport]);
 
-  if (portalQuery.isPending || publishability.isPending) return <Skeleton variant="rounded" width={200} height={36} />;
+  if (portalQuery.isPending || publishability.isPending || portalEnvironments.isPending) return <Skeleton variant="rounded" width={200} height={36} />;
   // A BFF that serves no User Portal has none to offer.
   if (isUserPortalUnavailable(portalQuery.error) || isUserPortalUnavailable(publishability.error)) return null;
   if (!portal || !report) {
@@ -95,6 +105,9 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
   switch (portal.state) {
     case 'not-enabled':
     case 'failed': {
+      if (portalEnvironments.data && !portalEnvironments.data.some((env) => env.id === environment.id)) {
+        return <PublishRefusals reasons={[NOT_A_PORTAL_ENVIRONMENT]} envName={environment.name} orgHandler={orgHandler} />;
+      }
       const refusal = can(Scopes.ENVIRONMENT_MANAGE) ? '' : ENABLE_REFUSAL;
       const openEnable = () => {
         enable.reset();
@@ -144,9 +157,12 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
 
   if (report.published) {
     return (
-      <Button variant="contained" component="a" href={portal.url} target="_blank" rel="noopener noreferrer" disabled={!portal.url} startIcon={<ExternalLink size={16} />}>
-        Open User Portal
-      </Button>
+      <Stack alignItems="center" gap={1}>
+        <Button variant="contained" component="a" href={portal.url} target="_blank" rel="noopener noreferrer" disabled={!portal.url} startIcon={<ExternalLink size={16} />}>
+          Open User Portal
+        </Button>
+        <RejectedScopes scopes={publish.rejectedScopes} />
+      </Stack>
     );
   }
 
@@ -161,6 +177,7 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
           {publish.error}
         </Typography>
       )}
+      <RejectedScopes scopes={publish.rejectedScopes} />
       {publish.dialog}
     </Stack>
   );
