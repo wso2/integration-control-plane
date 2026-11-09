@@ -190,8 +190,8 @@ export interface HeaderActionsProps {
  *   - escape hatch: provide `CustomHeader` to take over the whole header.
  *
  * `EnvCardBody` is the type's content (the shell wraps it in the Card frame).
- * The loader may add `EnvCardSharedAction`, rendered in the card's footer; it shows
- * only in the generic frame, not under a `CustomHeader`. A type may instead provide
+ * The loader may add `EnvCardSharedAction`, rendered in the card's footer under either
+ * header mode. A type may instead provide
  * `CustomOverview` to bypass the env-card concept entirely (Tailscale-style).
  *
  * Any slot a type doesn't need is omitted — no null-returning placeholders.

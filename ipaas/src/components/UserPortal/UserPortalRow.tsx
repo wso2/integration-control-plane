@@ -22,13 +22,11 @@ import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
 import { usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { shownRefusals, USER_PORTAL_NOT_ENABLED, userPortalErrorText } from '../../utils/userPortal';
+import { DEPLOY_REFUSAL, rejectedScopesText, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import * as styles from './UserPortal.styles';
 import UserPortalOffRow from './UserPortalOffRow';
 import UserPortalReason from './UserPortalReason';
-
-const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
 
 interface UserPortalRowProps {
   orgHandler: string;
@@ -69,7 +67,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   }
 
   // With no portal in the environment, none of the other rules can be met yet, so the row asks only for one.
-  if (!data.published && data.reasons.some((r) => r.code === USER_PORTAL_NOT_ENABLED)) return <UserPortalOffRow orgHandler={orgHandler} envName={envName} />;
+  if (userPortalIsOff(data)) return <UserPortalOffRow orgHandler={orgHandler} envName={envName} />;
 
   const reasons = shownRefusals(data.reasons);
   const pending = publish.isPending || unpublish.isPending;
@@ -134,7 +132,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
       )}
       {rejectedScopes.length > 0 && (
         <Typography variant="caption" color="warning.main" component="p" sx={styles.rowNoteSx}>
-          The User Portal can&apos;t hold {rejectedScopes.length === 1 ? 'this scope' : 'these scopes'}, so its users&apos; tokens never carry {rejectedScopes.length === 1 ? 'it' : 'them'}: {rejectedScopes.join(', ')}.
+          {rejectedScopesText(rejectedScopes)}
         </Typography>
       )}
 

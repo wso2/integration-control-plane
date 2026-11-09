@@ -23,7 +23,7 @@ import { useEffect, useState } from 'react';
 import { useDeploymentStatus } from '../hooks/useDeployments';
 import { useBuildLogs } from '../hooks/useBuilds';
 import { useStableStepperState } from '../hooks/useStableStepperState';
-import { buildStepperSteps, describeBuildStatus, failedStepPhrase, getBuildStatus } from '../utils/buildProgress';
+import { buildStepperSteps, describeBuildStatus, failedStepPhrase, getBuildStatus, isFailedConclusion } from '../utils/buildProgress';
 import { findCommitBySha } from '../utils/commits';
 import { isBuildLive } from '../utils/build';
 import type { Commit } from '../types/repository';
@@ -52,9 +52,12 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
     setShowLogs(false);
   }, [lastBuild?.id]);
 
-  // The logs are read whether or not they show: the status pill takes its stages from them.
+  // The status pill takes its stages, and a failure's step, from the logs, so they are read while the
+  // build runs or once it has failed, and whenever they show. A queued, successful or cancelled build's
+  // pill needs none of them.
+  const needsLogs = showLogs || status === 'in_progress' || isFailedConclusion(conclusion);
   const workflowName = lastBuild?.buildRef ?? String(lastBuild?.id ?? '');
-  const { data: logs, isLoading: queryLoading } = useBuildLogs(componentId, versionId, workflowName, true, { status, conclusion, keepFresh: showLogs });
+  const { data: logs, isLoading: queryLoading } = useBuildLogs(componentId, versionId, workflowName, needsLogs, { status, conclusion, keepFresh: showLogs });
 
   // Never feed the raw per-poll state straight to the pill — ratchet it so it
   // only moves forward and holds its error state.
@@ -100,8 +103,10 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
 
         {commitSha && <CommitSummary sha={commitSha} message={commitMessage} tooltip={commitTooltip} />}
 
-        {/* A stage state guessed before the logs arrive would mislead, so the stages wait for them. */}
-        <BuildStatusPill tone={tone} label={statusLabel} steps={isReadyToShow ? buildStepperSteps(stepperState) : undefined} />
+        {/* A stage state guessed before the logs arrive would mislead, so the stages wait for the first read
+            (`undefined` until then; `null` when the build has none). A running build is otherwise ready at once,
+            on stage 1. */}
+        <BuildStatusPill tone={tone} label={statusLabel} steps={isReadyToShow && logs !== undefined ? buildStepperSteps(stepperState) : undefined} />
 
         <Button variant="text" size="small" startIcon={<List size={14} />} onClick={() => setShowLogs(!showLogs)} aria-expanded={showLogs} sx={styles.logsButtonSx}>
           {showLogs ? 'Hide logs' : 'View logs'}

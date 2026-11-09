@@ -122,7 +122,7 @@ export function useDeploymentStatus(componentId: string, versionId: string | und
       if (!data || data.length === 0) return 15000;
       const allTerminal = data.every((d) => d.status === 'completed' || TERMINAL_CONCLUSIONS.has((d.conclusionV2 ?? d.conclusion ?? '').toLowerCase()));
       if (allTerminal) return false;
-      // A running build drives the BuildCard stepper, so poll it tightly —
+      // A running build drives the BuildCard's status, so poll it tightly —
       // otherwise the card lags a quarter-minute behind each stage change.
       return data.some((d) => d.status === 'in_progress' || d.status === 'queued') ? 5000 : 15000;
     },

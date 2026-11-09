@@ -24,13 +24,11 @@ import { useCan } from '../../hooks/useCan';
 import { usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import type { EnvCardNotification } from '../../types/integration';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { shownRefusals, USER_PORTAL_NOT_ENABLED, userPortalErrorText } from '../../utils/userPortal';
+import { DEPLOY_REFUSAL, rejectedScopesText, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import AboutUserPortalDialog from './AboutUserPortalDialog';
 import * as styles from './UserPortal.styles';
 import UserPortalReason from './UserPortalReason';
-
-const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
 
 interface UserPortalActionProps {
   orgHandler: string;
@@ -48,7 +46,7 @@ interface UserPortalActionProps {
  * lists what to fix when ipaas-service's rules refuse; "Unpublish" confirms, then unpublishes.
  */
 export default function UserPortalAction({ orgHandler, componentId, environment, envName, onNotify }: UserPortalActionProps): JSX.Element | null {
-  const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
+  const { data, isLoading, error, refetch } = useUserPortalPublishability(componentId, environment);
   const publish = usePublishToUserPortal();
   const unpublish = useUnpublishFromUserPortal();
   // The portal's address, for the link a published integration offers. Read only once published.
@@ -78,8 +76,7 @@ export default function UserPortalAction({ orgHandler, componentId, environment,
             text: `Published to the User Portal in ${envName}.`,
             severity: 'success',
             // Scopes the endpoints require that the portal's users' tokens can't carry.
-            detail:
-              rejectedScopes.length > 0 ? `The User Portal can't hold ${rejectedScopes.length === 1 ? 'this scope' : 'these scopes'}, so its users' tokens never carry ${rejectedScopes.length === 1 ? 'it' : 'them'}: ${rejectedScopes.join(', ')}.` : undefined,
+            detail: rejectedScopes.length > 0 ? rejectedScopesText(rejectedScopes) : undefined,
           });
         },
       },
@@ -148,9 +145,10 @@ export default function UserPortalAction({ orgHandler, componentId, environment,
 
   function action(): JSX.Element | null {
     if (isLoading) return <Skeleton variant="rounded" width={88} height={30} />;
-    // A BFF that serves no User Portal has nothing to publish to.
-    if (isError && isUserPortalUnavailable(error)) return null;
-    if (isError || !data) {
+    // A failed refetch keeps the last known state in `data`, so the switch stays while there is one.
+    if (!data) {
+      // A BFF that serves no User Portal has nothing to publish to.
+      if (isUserPortalUnavailable(error)) return null;
       return (
         <Tooltip title="Could not check the User Portal. Try again.">
           <Button variant="text" size="small" color="warning" startIcon={<CircleAlert size={14} />} onClick={() => refetch()}>
@@ -160,7 +158,7 @@ export default function UserPortalAction({ orgHandler, componentId, environment,
       );
     }
     // With no portal in the environment, none of the other rules can be met yet.
-    if (!data.published && data.reasons.some((r) => r.code === USER_PORTAL_NOT_ENABLED)) {
+    if (userPortalIsOff(data)) {
       return (
         <Button variant="text" size="small" color="inherit" startIcon={<Users size={14} />} endIcon={<Info size={12} />} onClick={() => openDialog('about')} sx={styles.offActionSx}>
           User Portal off
@@ -169,13 +167,15 @@ export default function UserPortalAction({ orgHandler, componentId, environment,
     }
     // One switch for both: on is published. Flipping it never publishes or unpublishes by itself;
     // it opens the confirm dialog (or, when the rules refuse, what to fix), and the switch follows the result.
+    // A publish or unpublish stays pending until the publishability is read again (useWritePublication
+    // awaits it), so the switch is never clickable on a stale state after one.
     const { published } = data;
     const toggle = () => openDialog(published ? 'unpublish' : data.publishable ? 'publish' : 'refusals');
     return (
       <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
         <Tooltip title={canDeploy ? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}` : DEPLOY_REFUSAL}>
           <FormControlLabel
-            control={<Switch size="small" checked={published} onChange={toggle} disabled={!canDeploy || publish.isPending || unpublish.isPending || isFetching} />}
+            control={<Switch size="small" checked={published} onChange={toggle} disabled={!canDeploy || publish.isPending || unpublish.isPending} />}
             label={
               published ? (
                 <Box component="span" sx={styles.publishedLabelSx}>
