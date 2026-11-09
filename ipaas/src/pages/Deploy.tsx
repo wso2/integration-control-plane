@@ -34,8 +34,6 @@ import type { ComponentScope } from '../nav';
 import { getComponentTypeFlags } from '../utils/componentType';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { getDisplayLabel } from '../constants/integrations';
-import { AUTO_DEPLOY_AVAILABLE } from '../constants/build';
-import { hasIntegrationTraces } from '../utils/integrationTraces';
 import { USER_PORTAL_TYPES } from '../constants/userPortal';
 
 export default function Deploy(scope: ComponentScope): JSX.Element {
@@ -137,7 +135,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
               firstEnvId={environments[0]?.id ?? ''}
               firstEnvTemplateId={environments[0]?.templateId ?? environments[0]?.id ?? ''}
               autoDeployEnabled={autoDeployEnabled}
-              autoDeployAvailable={AUTO_DEPLOY_AVAILABLE || !hasIntegrationTraces(component)}
+              autoDeployAvailable={!isWorkflow}
               componentName={component.name}
               projectHandler={project?.handler ?? ''}
               displayType={component.displayType}
