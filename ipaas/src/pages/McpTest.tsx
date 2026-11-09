@@ -122,7 +122,9 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
         {!isActive ? (
           <NotDeployedAlert status={deployment?.deploymentStatusV2} />
         ) : relay ? (
-          <McpPlayground url={mcpUrl} token={null} relay={relay} visibility="Public" endpointSwitcher={endpointSwitcher} />
+          // Keyed by where it connects: a session is to one environment's endpoint, and the environment can
+          // change while it is open, so a new target starts a new playground rather than reusing the old session.
+          <McpPlayground key={relay.url} url={mcpUrl} token={null} relay={relay} visibility="Public" endpointSwitcher={endpointSwitcher} />
         ) : !mcpUrl ? (
           // Deployed, but with no enforcing URL to call — a different state from "not deployed".
           <Alert severity="info">{access.isUnavailable ? 'This MCP server isn’t exposed as an API on the gateway yet, so it cannot be tested from here.' : 'No testable endpoint URL is available for this MCP server yet.'}</Alert>

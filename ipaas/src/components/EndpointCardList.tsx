@@ -59,7 +59,7 @@ export function EndpointCardList({ endpoints, projectId, envId, onEdit, onSettin
           aiGatewayUrl={aiGatewayUrls[ep.id]}
         />
       ))}
-      {!isEntry && !loading && !allOnAiGateway && (onEdit || onSettings) && (
+      {!isEntry && !loading && !aiGatewayPending && !allOnAiGateway && (onEdit || onSettings) && (
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
           Visibility and API settings are managed in {entryEnvironmentName}. Promote to apply them here.
         </Typography>

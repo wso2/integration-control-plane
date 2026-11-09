@@ -92,4 +92,10 @@ describe('EndpointCardList', () => {
     expect(button('Edit endpoint')).toBeNull();
     expect(button('API settings')).toBeNull();
   });
+
+  it('names no entry environment while it is not yet known whether the AI gateway fronts the endpoint', async () => {
+    entry.isEntry = false;
+    await render({}, true);
+    expect(container.textContent).not.toContain('Promote to apply them here');
+  });
 });
