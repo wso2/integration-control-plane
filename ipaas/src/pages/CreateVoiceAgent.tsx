@@ -22,6 +22,8 @@ import { useState, type ComponentType, type JSX } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { LiveKitStep, SttStep, TtsStep, TuningStep, type VoiceAgentStepProps } from '../components/VoiceAgent/VoiceAgentSteps';
 import VoiceAgentTargetStep, { AgentEndpointStatus } from '../components/VoiceAgent/VoiceAgentTargetStep';
+import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
+import { VOICE_AGENT_CREATION_STEPS } from '../constants/integrationCreation';
 import { useLeaveGuard, useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { useAgentVoiceEndpoint } from '../hooks/useAgentVoiceEndpoint';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -56,6 +58,7 @@ const ALL_STEPS: WizardStep[] = [
 
 const STEPPER_SX = { position: 'sticky', top: 24 } as const;
 const STATUS_SX = { mb: 3, maxWidth: 720 } as const;
+const LOADER_PAGE_SX = { pt: 5, minHeight: '60vh', display: 'flex', flexDirection: 'column' } as const;
 
 type GeneralHandoff = Pick<VoiceAgentSettings, 'displayName' | 'name' | 'description' | 'targetMode' | 'targetAgentHandler' | 'targetAgentWsUrl'> & { projectId: string };
 
@@ -196,6 +199,21 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
 
   const exitUrl = mode === 'agent' && agent ? componentOverviewUrl(org, targetProject.handler, agent.handler) : mode === 'project' ? newComponentUrl({ org, project: targetProject.handler }) : voiceAgentsUrl(org);
   const exitLabel = mode === 'agent' ? 'Back to the agent' : mode === 'project' ? 'Back to create an integration' : 'Back to voice agents';
+
+  if (create.isPending || create.isSuccess) {
+    return (
+      <PageContent sx={LOADER_PAGE_SX}>
+        <IntegrationCreationLoader
+          label="voice agent"
+          subLabel={resolvedSettings.displayName.trim()}
+          isPending={create.isPending}
+          isSuccess={create.isSuccess}
+          steps={VOICE_AGENT_CREATION_STEPS}
+          successText="Voice agent deployed!"
+        />
+      </PageContent>
+    );
+  }
 
   return (
     <PageContent sx={{ pt: 5 }}>
