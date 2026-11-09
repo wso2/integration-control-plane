@@ -20,7 +20,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useIntegrationLinks, useLinkWrite } from './useConfiguration';
+import { useIntegrationLinks, useLinksFollowDeployment, useLinkWrite } from './useConfiguration';
 import type { IntegrationLinks, LinkWrite } from '../types/configuration';
 
 // What ipaas-service answers: the stored link, and what development's release uses, which OpenChoreo changes after the write.
@@ -53,8 +53,9 @@ let container: HTMLDivElement;
 let root: Root;
 let write: ReturnType<typeof useLinkWrite>;
 
-function Form() {
+function Form({ deployment = 'sfdemo-1' }: { deployment?: string }) {
   const { data } = useIntegrationLinks('default', 'sfdemo', true);
+  useLinksFollowDeployment('default', 'sfdemo', deployment);
   write = useLinkWrite();
   return <span>{Object.keys(data?.environments[0].configurables ?? {}).join()}</span>;
 }
@@ -77,16 +78,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const open = async () => {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const qc = { current: new QueryClient() };
+const render = async (deployment?: string) => {
   await act(async () =>
     root.render(
-      <QueryClientProvider client={qc}>
-        <Form />
+      <QueryClientProvider client={qc.current}>
+        <Form deployment={deployment} />
       </QueryClientProvider>,
     ),
   );
   await wait(0);
+};
+const open = async () => {
+  qc.current = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await render();
 };
 
 describe('an open Configure form', () => {
@@ -149,5 +154,17 @@ describe('an open Configure form', () => {
     const reads = server.reads;
     await wait(30_000);
     expect(server.reads).toBe(reads);
+  });
+});
+
+describe('an environment card', () => {
+  it("reads the links again once development's deployment runs another release", async () => {
+    Object.assign(server, { linked: true, workload: 'next_deploy' });
+    await open();
+    expect(linkedFields()).toBe('');
+
+    server.inRelease = true;
+    await render('sfdemo-2');
+    expect(linkedFields()).toBe(target);
   });
 });

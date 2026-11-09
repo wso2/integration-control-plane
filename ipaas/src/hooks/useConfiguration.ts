@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings, fetchIntegrationLinks, writeLink } from '../api/configuration';
 import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, IntegrationLinks, LinkWrite, LinkWriteInput } from '../types/configuration';
@@ -112,6 +113,17 @@ export function useIntegrationLinks(projectId: string, componentId: string, enab
     retry: false,
     refetchInterval: (query) => (query.state.data && rollingOut(qc, query.state.data, projectId, componentId) ? ROLLOUT_POLL_MS : false),
   });
+}
+
+/** Reads the integration's links again when an environment's deployment changes: what its release uses changes with it. */
+export function useLinksFollowDeployment(projectId: string, componentId: string, deployment: string) {
+  const qc = useQueryClient();
+  const seen = useRef(deployment);
+  useEffect(() => {
+    if (seen.current === deployment) return;
+    seen.current = deployment;
+    void qc.invalidateQueries({ queryKey: ['integrationLinks', projectId, componentId] });
+  }, [qc, projectId, componentId, deployment]);
 }
 
 export function useLinkWrite() {

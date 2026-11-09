@@ -17,7 +17,7 @@
  */
 
 import { Chip, Stack, Typography } from '@wso2/oxygen-ui';
-import { useIntegrationLinks } from '../../hooks/useConfiguration';
+import { useIntegrationLinks, useLinksFollowDeployment } from '../../hooks/useConfiguration';
 
 const chipSx = { height: 20, fontSize: '0.7rem', borderRadius: 0.75 } as const;
 
@@ -26,8 +26,9 @@ const chipSx = { height: 20, fontSize: '0.7rem', borderRadius: 0.75 } as const;
  * values changed since its pods started. The Integration Platform has no restart for a running deployment, so the
  * values apply on Stop and Start.
  */
-export function ReleaseLinks({ projectId, componentId, env }: { projectId: string; componentId: string; env: string }) {
+export function ReleaseLinks({ projectId, componentId, env, releaseId }: { projectId: string; componentId: string; env: string; releaseId: string }) {
   const { data: links } = useIntegrationLinks(projectId, componentId, true);
+  useLinksFollowDeployment(projectId, componentId, releaseId);
   const release = links?.environments.find((e) => e.name === env);
   if (!links || !release?.deployed || (release.resources.length === 0 && !release.linksNeedDeploy)) return null;
   const name = (ref: string) => links.resources.find((r) => r.id === ref)?.displayName ?? ref;

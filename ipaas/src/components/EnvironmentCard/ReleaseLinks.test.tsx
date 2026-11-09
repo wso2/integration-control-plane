@@ -39,11 +39,11 @@ const links: IntegrationLinks = {
     environment('staging', { deployed: false }),
   ],
 };
-vi.mock('../../hooks/useConfiguration', () => ({ useIntegrationLinks: () => ({ data: links }) }));
+vi.mock('../../hooks/useConfiguration', () => ({ useIntegrationLinks: () => ({ data: links }), useLinksFollowDeployment: () => {} }));
 
 let container: HTMLDivElement;
 let root: Root;
-const render = (env: string) => act(async () => root.render(<ReleaseLinks projectId="default" componentId="ghdemo" env={env} />));
+const render = (env: string) => act(async () => root.render(<ReleaseLinks projectId="default" componentId="ghdemo" env={env} releaseId="r" />));
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
