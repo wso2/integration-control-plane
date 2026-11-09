@@ -17,7 +17,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { aiGatewayAccessOf, aiGatewayNotice, mcpTransportUrlOf, mcpUrlOf } from './mcpGateway';
+import type { EnvEndpoint } from '../types/component';
+import { aiGatewayAccessOf, aiGatewayNotice, mcpTestEndpoints, mcpTransportUrlOf, mcpUrlOf } from './mcpGateway';
 
 const coded = (status: number, code: string) => ({ status, code, body: JSON.stringify({ code }) });
 
@@ -75,5 +76,17 @@ describe('aiGatewayNotice', () => {
 
   it('has nothing to say about a deployed, open MCP server', () => {
     expect(aiGatewayNotice({ binding: { deploymentStatus: 'Deployed' } }, 'none')).toBeNull();
+  });
+});
+
+describe('mcpTestEndpoints', () => {
+  const ep = (id: string, publicUrl?: string) => ({ id, publicUrl }) as EnvEndpoint;
+
+  it('offers the endpoints with a public URL', () => {
+    expect(mcpTestEndpoints([ep('mcp', 'https://apip/orders/v1.0'), ep('admin')]).map((e) => e.id)).toEqual(['mcp']);
+  });
+
+  it('offers every endpoint when none has one, as on the AI gateway', () => {
+    expect(mcpTestEndpoints([ep('mcp-service'), ep('admin')]).map((e) => e.id)).toEqual(['mcp-service', 'admin']);
   });
 });

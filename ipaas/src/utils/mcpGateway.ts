@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import type { EnvEndpoint } from '../types/component';
 import type { AiGatewayBinding, SecurityConfig, SecurityMode } from '../types/consumers';
 import { httpCodeOf, httpStatusOf } from './apiErrors';
 
@@ -80,4 +81,14 @@ export function aiGatewayNotice(aiGateway: AiGatewayAccess, mode: SecurityMode |
   }
   if (mode === 'none') return null;
   return { text: "The AI gateway issues this MCP server's API keys only to the Agent Manager agents that use it, so its tools can't be tried from here yet.", severity: 'info' };
+}
+
+/**
+ * The endpoints an MCP server's Test page offers: those with a public URL, or every endpoint when none has
+ * one. An MCP server on the AI gateway is never exposed on the API Platform, so its endpoints carry no
+ * public URL; offering them lets the page read where the AI gateway stands instead of finding nothing.
+ */
+export function mcpTestEndpoints(endpoints: EnvEndpoint[]): EnvEndpoint[] {
+  const routed = endpoints.filter((e) => e.publicUrl);
+  return routed.length ? routed : endpoints;
 }

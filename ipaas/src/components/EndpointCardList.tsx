@@ -28,21 +28,25 @@ interface EndpointCardListProps {
   envId: string;
   onEdit?: (ep: EnvEndpoint) => void;
   onSettings?: (ep: EnvEndpoint) => void;
+  /** The endpoints Agent Manager's AI gateway fronts, by id, each with its public proxy URL (see `useAiGatewayUrls`). */
+  aiGatewayUrls?: Record<string, string>;
 }
 
 /**
  * An environment's endpoint cards. Visibility and API settings (CORS, rate limiting) are edited
  * only in the entry environment and reach later environments by promotion, which carries the
  * source's visibility with it, so elsewhere the cards offer neither and say where to go instead.
+ * An endpoint on the AI gateway has neither in any environment: it is public through the gateway.
  */
-export function EndpointCardList({ endpoints, projectId, envId, onEdit, onSettings }: EndpointCardListProps): JSX.Element {
+export function EndpointCardList({ endpoints, projectId, envId, onEdit, onSettings, aiGatewayUrls = {} }: EndpointCardListProps): JSX.Element {
   const { isEntry, loading, entryEnvironmentName } = useEntryEnvironment(projectId, envId);
+  const allOnAiGateway = endpoints.length > 0 && endpoints.every((ep) => ep.id in aiGatewayUrls);
   return (
     <Box>
       {endpoints.map((ep, idx) => (
-        <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} readOnly={!isEntry || !onEdit} onEdit={isEntry ? onEdit : undefined} onSettings={isEntry ? onSettings : undefined} />
+        <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} readOnly={!isEntry || !onEdit} onEdit={isEntry ? onEdit : undefined} onSettings={isEntry ? onSettings : undefined} aiGatewayUrl={aiGatewayUrls[ep.id]} />
       ))}
-      {!isEntry && !loading && (onEdit || onSettings) && (
+      {!isEntry && !loading && !allOnAiGateway && (onEdit || onSettings) && (
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
           Visibility and API settings are managed in {entryEnvironmentName}. Promote to apply them here.
         </Typography>

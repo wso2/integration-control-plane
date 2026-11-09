@@ -78,7 +78,7 @@ function VisibilityUrlRow({ option, note }: { option: EndpointVisibilityUrl; not
 }
 
 /** The endpoint's invoke URLs, one row per visibility it has; "—" when it has none. */
-export default function EndpointUrlRows({ options, gatewayUrl }: { options: EndpointVisibilityUrl[]; gatewayUrl?: string }): JSX.Element {
+export default function EndpointUrlRows({ options, gatewayUrl, gatewayName = 'API gateway' }: { options: EndpointVisibilityUrl[]; gatewayUrl?: string; gatewayName?: string }): JSX.Element {
   if (options.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -89,7 +89,7 @@ export default function EndpointUrlRows({ options, gatewayUrl }: { options: Endp
   return (
     <Stack gap={0.5}>
       {options.map((option) => (
-        <VisibilityUrlRow key={option.key} option={option} note={gatewayUrl && option.url && option.url === gatewayUrl ? 'through the API gateway' : undefined} />
+        <VisibilityUrlRow key={option.key} option={option} note={gatewayUrl && option.url && option.url === gatewayUrl ? `through the ${gatewayName}` : undefined} />
       ))}
     </Stack>
   );

@@ -33,7 +33,7 @@ import type { ComponentScope } from '../nav';
 import type { EndpointRef } from '../types/consumers';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
-import { aiGatewayNotice } from '../utils/mcpGateway';
+import { aiGatewayNotice, mcpTestEndpoints } from '../utils/mcpGateway';
 import { PILL_SELECT_SX } from '../constants/styles';
 
 /**
@@ -62,7 +62,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   const releaseId = deployment?.releaseId ?? '';
   const { data: endpoints = [] } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
 
-  const testableEndpoints = useMemo(() => endpoints.filter((e) => e.publicUrl), [endpoints]);
+  const testableEndpoints = useMemo(() => mcpTestEndpoints(endpoints), [endpoints]);
   const [selectedEndpointId, setSelectedEndpointId] = useState('');
 
   const activeEndpointId = testableEndpoints.some((e) => e.id === selectedEndpointId) ? selectedEndpointId : (testableEndpoints[0]?.id ?? '');

@@ -31,8 +31,8 @@ const endpoint = { id: 'http', releaseId: 'r1', environmentId: 'e', displayName:
 let container: HTMLDivElement;
 let root: Root;
 
-async function render(): Promise<void> {
-  await act(async () => root.render(<EndpointCardList endpoints={[endpoint]} projectId="p" envId="e" onEdit={() => {}} onSettings={() => {}} />));
+async function render(aiGatewayUrls?: Record<string, string>): Promise<void> {
+  await act(async () => root.render(<EndpointCardList endpoints={[{ ...endpoint, publicUrl: 'https://raw-route.example.com/orders' }]} projectId="p" envId="e" onEdit={() => {}} onSettings={() => {}} aiGatewayUrls={aiGatewayUrls} />));
 }
 
 const button = (label: string) => container.querySelector(`[aria-label="${label}"]`);
@@ -64,5 +64,23 @@ describe('EndpointCardList', () => {
     expect(button('Edit endpoint')).toBeNull();
     expect(button('API settings')).toBeNull();
     expect(container.textContent).toContain('managed in Development. Promote to apply them here.');
+  });
+
+  it('offers neither for an endpoint on the AI gateway, and shows its proxy as the only Public URL', async () => {
+    entry.isEntry = true;
+    await render({ http: 'https://gw.example.com/default/orders-mcp/mcp' });
+    expect(button('Edit endpoint')).toBeNull();
+    expect(button('API settings')).toBeNull();
+    expect(container.textContent).toContain('https://gw.example.com/default/orders-mcp/mcp');
+    expect(container.textContent).toContain('Served publicly through the AI gateway.');
+    expect(container.textContent).not.toContain('raw-route.example.com');
+    expect(container.textContent).not.toContain('Visibility');
+  });
+
+  it('names no entry environment for AI gateway endpoints, which no environment edits', async () => {
+    entry.isEntry = false;
+    await render({ http: '' });
+    expect(container.textContent).not.toContain('Promote to apply them here');
+    expect(container.textContent).toContain('Not published on the AI gateway yet.');
   });
 });
