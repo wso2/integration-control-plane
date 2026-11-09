@@ -61,6 +61,11 @@ describe('toCreateTemporalError', () => {
     expect(error).toEqual({ title: 'The Temporal server could not be created', message: 'an instance named "payments" already exists' });
   });
 
+  it('shows the plan limit the BFF reports', () => {
+    const error = toCreateTemporalError(new BffError(402, JSON.stringify({ message: 'Free plans can only create dev-tier Temporal clusters.' })));
+    expect(error).toEqual({ title: 'Your plan does not allow another Temporal server', message: 'Free plans can only create dev-tier Temporal clusters.' });
+  });
+
   it('explains a suspended subscription', () => {
     expect(toCreateTemporalError(new BffError(403, '{}')).title).toBe('Your subscription is suspended');
   });

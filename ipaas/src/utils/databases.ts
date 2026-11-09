@@ -122,6 +122,8 @@ export function toCreateDatabaseError(error: unknown): { title: string; message:
     case 409:
     case 422:
       return { title: 'The database could not be created', message };
+    case 402:
+      return { title: 'Your plan does not allow another database', message: message || 'Upgrade your subscription to create more databases.' };
     case 403:
       return { title: 'Your subscription is suspended', message: 'Renew your subscription to create databases.' };
     case 503:
