@@ -186,13 +186,18 @@ async function mintHeldKey(mint: (target: EndpointRef) => Promise<ApiKeyResult>,
  */
 interface TestAccessOptions {
   enabled?: boolean;
+  /**
+   * Whether a test key may be minted for the endpoint yet. The security is read either way, so a caller that must
+   * settle something first loses no time reading it.
+   */
+  mint?: boolean;
   /** The gateway URL endpoint discovery returned, for when the security read carries none. */
   gatewayUrlFallback?: string;
   /** An AI agent's test key comes from Agent Manager, which also checks `amp:agent:api-key-manage`. */
   agent?: boolean;
 }
 
-export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
+export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError } = useEndpointSecurity(ref, enabled);
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
@@ -211,7 +216,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
 
   const aiGateway = aiGatewayAccessOf(security, securityError);
   // The test-key routes refuse an AI gateway endpoint, so none of the minting below applies to it.
-  const mintable = canCreateKey && !aiGateway;
+  const mintable = canCreateKey && !aiGateway && mint;
   const managedIn = security?.editable === false ? security.entryEnvironment || 'the first environment' : null;
   const switchable = canSwitch && !aiGateway && managedIn === null;
   const mode = security?.mode ?? null;

@@ -134,6 +134,37 @@ describe('the way to a workflow in the User Portal', () => {
     expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
   });
 
+  it('keeps reading it every few seconds while it still says the portal is not enabled', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      portal.mockResolvedValue(ACTIVE);
+      publishability.mockResolvedValueOnce(NOT_ENABLED).mockResolvedValueOnce(NOT_ENABLED).mockResolvedValue(PUBLISHABLE);
+      const container = await prompt(DEVELOPER);
+      await flush();
+      expect(button(container, 'Publish to User Portal')?.disabled).toBe(true);
+      await act(async () => void (await vi.advanceTimersByTimeAsync(3_000)));
+      await flush();
+      expect(publishability).toHaveBeenCalledTimes(3);
+      expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('opens the User Portal a workflow is published to even when it now breaks a rule the portal could not settle', async () => {
+    portal.mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue({
+      ...PUBLISHABLE,
+      published: true,
+      publishable: false,
+      redeploys: false,
+      reasons: [{ code: 'USER_PORTAL_PIPELINE', message: 'only integrations of projects on the default pipeline' }],
+    });
+    const container = await prompt(DEVELOPER);
+    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'Open User Portal')).toBe(true);
+    expect(container.textContent).not.toContain('default deployment pipeline');
+  });
+
   it('offers nothing the User Portal could not settle', async () => {
     portal.mockResolvedValue({ environment: 'production', state: 'not-enabled' });
     publishability.mockResolvedValue({

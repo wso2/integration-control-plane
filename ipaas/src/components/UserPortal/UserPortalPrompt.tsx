@@ -23,14 +23,15 @@ import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
 import { useEnableUserPortal, useUserPortalPublishability, useUserPortals } from '../../hooks/useUserPortal';
 import type { Environment } from '../../types/environment';
+import type { UserPortalPublishability } from '../../types/userPortal';
 import { apiErrorMessage, isUserPortalUnavailable } from '../../utils/apiErrors';
 import { shownRefusals, USER_PORTAL_NOT_ENABLED } from '../../utils/userPortal';
 import EnableUserPortalDialog from './EnableUserPortalDialog';
+import PublishButton from './PublishButton';
 import PublishRefusals from './PublishRefusals';
 import { usePublishFlow } from './usePublishFlow';
 
 const ENABLE_REFUSAL = "Your role can't enable the User Portal.";
-const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
 
 // Rules no User Portal settles: an integration that breaks them can't be published from here at all.
 const OUT_OF_REACH = new Set(['USER_PORTAL_NOT_PUBLISHABLE', 'USER_PORTAL_PIPELINE']);
@@ -48,7 +49,9 @@ interface UserPortalPromptProps {
  */
 export default function UserPortalPrompt({ orgHandler, componentId, environment }: UserPortalPromptProps): JSX.Element | null {
   const [portalQuery] = useUserPortals([environment.id]);
-  const publishability = useUserPortalPublishability(componentId, environment.id);
+  const portalActive = portalQuery.data?.state === 'active';
+  // ipaas-service can still answer from before the portal it waited for came up: read again until it catches up.
+  const publishability = useUserPortalPublishability(componentId, environment.id, { rereadWhile: (report) => portalActive && notEnabledIn(report) });
   const can = useCan();
   const enable = useEnableUserPortal();
   const [enableOpen, setEnableOpen] = useState(false);
@@ -57,8 +60,8 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
   const portal = portalQuery.data;
   const report = publishability.data;
   // The report is kept a while after it is read, so it can still say the portal isn't enabled once the portal it was
-  // waiting for is up: read it again then.
-  const staleReport = portal?.state === 'active' && !!report?.reasons.some((r) => r.code === USER_PORTAL_NOT_ENABLED);
+  // waiting for is up: read it again then, and every few seconds after while it still says so.
+  const staleReport = portalActive && !!report && notEnabledIn(report);
   const { refetch: rereadReport } = publishability;
   useEffect(() => {
     if (staleReport) void rereadReport();
@@ -85,7 +88,8 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
     );
   }
 
-  const outOfReach = report.reasons.filter((r) => OUT_OF_REACH.has(r.code));
+  // A published workflow is managed in the User Portal whatever rule it breaks now, so it is still opened there.
+  const outOfReach = report.published ? [] : report.reasons.filter((r) => OUT_OF_REACH.has(r.code));
   if (outOfReach.length > 0) return <PublishRefusals reasons={outOfReach} envName={environment.name} orgHandler={orgHandler} />;
 
   switch (portal.state) {
@@ -148,20 +152,9 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
 
   // While a stale report is read again, the portal it says isn't enabled is not listed.
   const reasons = shownRefusals(report.reasons).filter((r) => !staleReport || r.code !== USER_PORTAL_NOT_ENABLED);
-  const deployRefusal = can(Scopes.INTEGRATION_DEPLOY) ? '' : DEPLOY_REFUSAL;
   return (
     <Stack alignItems="center" gap={1}>
-      <Tooltip title={deployRefusal || (report.publishable ? '' : 'Fix what is listed below to publish.')}>
-        <span>
-          <Button
-            variant="contained"
-            onClick={() => publish.request(report.redeploys)}
-            disabled={!!deployRefusal || !report.publishable || publish.isPending || publishability.isFetching}
-            startIcon={publish.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {publish.isPending ? 'Publishing…' : 'Publish to User Portal'}
-          </Button>
-        </span>
-      </Tooltip>
+      <PublishButton flow={publish} publishable={report.publishable} redeploys={report.redeploys} busy={publishability.isFetching} label="Publish to User Portal" variant="contained" size="medium" />
       {reasons.length > 0 && <PublishRefusals reasons={reasons} envName={environment.name} orgHandler={orgHandler} />}
       {publish.error && (
         <Typography variant="caption" color="error">
@@ -172,3 +165,5 @@ export default function UserPortalPrompt({ orgHandler, componentId, environment 
     </Stack>
   );
 }
+
+const notEnabledIn = (report: UserPortalPublishability): boolean => report.reasons.some((r) => r.code === USER_PORTAL_NOT_ENABLED);

@@ -119,6 +119,21 @@ describe("the deploy card's User Portal row", () => {
     await vi.waitFor(() => expect(container.ownerDocument.querySelector('[role="dialog"]')).toBeNull());
   });
 
+  it('clears what the last publish left on screen as soon as another is asked for', async () => {
+    const notPublished = { environment: 'production', published: false, publishable: true, reasons: [] };
+    publishability.mockResolvedValueOnce({ ...notPublished, redeploys: false }).mockResolvedValue({ ...notPublished, redeploys: true });
+    publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: ['bad scope'] });
+    const container = await row(DEVELOPER);
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    expect(container.textContent).toContain('bad scope');
+
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    expect(container.ownerDocument.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('bad scope');
+  });
+
   it('publishes nothing when the redeploy warning is cancelled', async () => {
     publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true });
     const container = await row(DEVELOPER);
@@ -157,19 +172,22 @@ describe("the deploy card's User Portal row", () => {
     expect(container.textContent).not.toContain('default deployment pipeline');
   });
 
-  it('says unpublishing a workflow where its API security comes by promotion leaves the console off', async () => {
+  // Unpublishing a workflow redeploys it to take the console's API key again; where its API security comes by promotion
+  // the gateway keeps the portal's sign-in, and the console stays off.
+  it('says what unpublishing does to the integration and the console', async () => {
     publishability.mockResolvedValue({ ...refused, published: true });
-    const kept = "Production takes this workflow's API security from Development by promotion";
-    for (const [isWorkflow, isEntry, says] of [
-      [true, false, true],
-      [true, true, false],
-      [false, false, false],
-    ] as const) {
+    for (const { isWorkflow, isEntry, says, not } of [
+      { isWorkflow: true, isEntry: true, says: ['redeployed in Production', "The console's workflow views work there again."], not: ['keeps running', 'by promotion'] },
+      { isWorkflow: true, isEntry: false, says: ['redeployed in Production', 'Production takes its API security from Development by promotion'], not: ['keeps running', 'work there again'] },
+      { isWorkflow: false, isEntry: false, says: ['The integration keeps running.'], not: ['redeployed', 'by promotion'] },
+    ]) {
       entry.value = { isEntry, loading: false, entryEnvironmentName: 'Development' };
       const container = await row(DEVELOPER, isWorkflow);
       await act(async () => button(container, 'Unpublish')?.click());
       await flush();
-      expect(container.ownerDocument.querySelector('[role="dialog"]')?.textContent?.includes(kept)).toBe(says);
+      const dialog = container.ownerDocument.querySelector('[role="dialog"]')?.textContent ?? '';
+      for (const text of says) expect(dialog).toContain(text);
+      for (const text of not) expect(dialog).not.toContain(text);
       unmount();
     }
   });

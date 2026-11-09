@@ -18,7 +18,7 @@
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublications, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
-import type { UserPortal } from '../types/userPortal';
+import type { UserPortal, UserPortalPublishability } from '../types/userPortal';
 import { isUserPortalUnavailable } from '../utils/apiErrors';
 
 const ROOT_KEY = 'userPortal';
@@ -65,14 +65,18 @@ export const useEnableUserPortal = () => useWritePortal(enableUserPortal);
 
 export const useDisableUserPortal = () => useWritePortal(disableUserPortal);
 
-/** Whether the integration is, and can be, published to the environment's User Portal. */
-export function useUserPortalPublishability(componentId: string, environment: string) {
+/**
+ * Whether the integration is, and can be, published to the environment's User Portal. While `rereadWhile` holds for the
+ * report read last, it is read again every few seconds, as a settling portal is.
+ */
+export function useUserPortalPublishability(componentId: string, environment: string, { rereadWhile }: { rereadWhile?: (report: UserPortalPublishability) => boolean } = {}) {
   return useQuery({
     queryKey: [ROOT_KEY, 'publishability', componentId, environment],
     queryFn: () => fetchUserPortalPublishability(componentId, environment),
     enabled: !!componentId && !!environment,
     retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
     staleTime: 30_000,
+    refetchInterval: (query) => (query.state.data && rereadWhile?.(query.state.data) ? SETTLING_POLL_MS : false),
   });
 }
 

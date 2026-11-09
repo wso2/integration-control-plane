@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -96,11 +96,11 @@ async function flush() {
   }
 }
 
-async function renderDrawer(api: ReadyWorkflowApi, run: WorkflowInstanceSummary = RUN) {
+async function renderDrawer(api: ReadyWorkflowApi, run: WorkflowInstanceSummary = RUN, comingSoonAction?: ReactNode) {
   await act(async () =>
     root.render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <WorkflowRunDetailDrawer run={run} api={api} onClose={vi.fn()} />
+        <WorkflowRunDetailDrawer run={run} api={api} onClose={vi.fn()} comingSoonAction={comingSoonAction} />
       </QueryClientProvider>,
     ),
   );
@@ -246,6 +246,13 @@ describe('WorkflowRunDetailDrawer without caller roles', () => {
     expect(instances.get).not.toHaveBeenCalled();
     expect(instances.history).not.toHaveBeenCalled();
     expect(instances.activityTree).not.toHaveBeenCalled();
+  });
+
+  it('offers the way to the views it lacks under the coming-soon flow', async () => {
+    roles.carried = false;
+    const { api } = fakeApi();
+    await renderDrawer(api, RUN, <button>Publish to User Portal</button>);
+    expect(buttonLabels()).toContain('Publish to User Portal');
   });
 
   it('does not say a completed run returned nothing, since its result is not read', async () => {

@@ -166,8 +166,9 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
     );
 
   const componentId = component?.id ?? '';
-  const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', componentId, trackId, environment?.id ?? '');
-  // A placeholder needs no connection: with no deployment to connect to, none is made.
+  // A placeholder needs no connection, so no deployment is read for one: with none to connect to, none is made.
+  const reads = !!component && !placeholder;
+  const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(reads ? scope.org : '', reads ? orgUuid : '', componentId, trackId, environment?.id ?? '');
   const api = useWorkflowApi({ componentId, environmentId: environment?.id ?? '', trackId, deployment: placeholder ? null : deployment, isDeploymentLoading: !placeholder && loadingDeployment });
 
   if (loadingProject || loadingComponent || loadingEnvironments) return <WorkflowPageSkeleton title={title} />;

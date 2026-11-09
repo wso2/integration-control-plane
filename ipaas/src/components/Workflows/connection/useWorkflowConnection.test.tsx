@@ -199,7 +199,7 @@ describe('useWorkflowConnection', () => {
     // The endpoint the test key is for, and its discovered public URL as the gateway URL fallback.
     expect(testAccessCalls.at(-1)).toEqual([
       { componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' },
-      { enabled: true, gatewayUrlFallback: GATEWAY_URL },
+      { enabled: true, mint: true, gatewayUrlFallback: GATEWAY_URL },
     ]);
   });
 
@@ -208,7 +208,7 @@ describe('useWorkflowConnection', () => {
     publications.environments = ['development'];
     mount();
     await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', notice: { severity: 'info' }, action: null }));
-    expect(testAccessCalls.every(([, options]) => (options as { enabled: boolean }).enabled === false)).toBe(true);
+    expect(testAccessCalls.every(([, options]) => (options as { mint: boolean }).mint === false)).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -230,12 +230,12 @@ describe('useWorkflowConnection', () => {
     await vi.waitFor(() => expect(status()).toBe('ready'));
   });
 
-  // Unread, a published workflow's views would offer to switch its API back to API key, which locks the User Portal out.
+  // Unread, a published workflow's views would offer to switch its API back to API key, which ipaas-service refuses there.
   it('stops on a failed read of where the workflow is published, asking for no test key, and reads it again on retry', async () => {
     publications.error = new BffError(500, '{"message":"boom"}');
     mount();
     await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'error', message: 'Could not check whether this workflow is published to the User Portal.' }));
-    expect(testAccessCalls.every(([, options]) => (options as { enabled: boolean }).enabled === false)).toBe(true);
+    expect(testAccessCalls.every(([, options]) => (options as { mint: boolean }).mint === false)).toBe(true);
     const { connection } = current();
     if (connection.status !== 'error') throw new Error('expected an error');
     connection.retry();

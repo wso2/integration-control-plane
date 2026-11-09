@@ -134,8 +134,8 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const endpointName = endpoint?.id ?? '';
 
   // A BFF that serves no User Portal publishes nothing: the views carry on as before. Any other failed read
-  // leaves it unknown, and the views wait for it: a published workflow's would offer to switch its API back
-  // to API key, which locks the User Portal out.
+  // leaves it unknown, and the views wait for it: a published workflow's would offer a switch back to API key,
+  // which ipaas-service refuses for it, instead of pointing to the User Portal it is managed in.
   const publications = useUserPortalPublications(componentId, { enabled: isActive });
   const publishedHere = publications.data?.environments.includes(environmentId) ?? false;
   const publicationsKnown = publications.data !== undefined || (publications.isError && isUserPortalUnavailable(publications.error));
@@ -145,8 +145,9 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
 
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
   // Release-scoped discovery already returns the gateway's public URL; the security read may too. A
-  // published workflow takes no test key, so none is read or minted for it.
-  const access = useEndpointTestAccess(ref, { enabled: !!ref && publicationsKnown && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
+  // published workflow takes no test key, so none is minted until it is known not to be one. Its
+  // security is read meanwhile, which changes nothing.
+  const access = useEndpointTestAccess(ref, { enabled: !!ref, mint: publicationsKnown && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
   const { authHeader, apiKey, mintKey, renewKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 
@@ -163,7 +164,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const probe = useQuery({
     queryKey: workflowKeys.runtime(scopeId),
     queryFn: () => client!.runtime.get(),
-    enabled: !!client && !!scopeId && access.isAuthorized && !publishedHere,
+    enabled: !!client && !!scopeId && access.isAuthorized && publicationsKnown && !publishedHere,
     staleTime: 5 * 60_000,
     retry: retryWorkflowRead,
   });

@@ -27,7 +27,7 @@ interface PublishFlowOptions {
   /** The environment's slug. */
   environment: string;
   envName: string;
-  /** Runs as a publish starts. */
+  /** Runs as a publish is asked for, before it is confirmed, so what the last one left on screen goes. */
   onStart?: () => void;
   onPublished?: (publication: UserPortalPublication) => void;
 }
@@ -55,7 +55,6 @@ export function usePublishFlow({ componentId, environment, envName, onStart, onP
   const [confirming, setConfirming] = useState(false);
 
   const start = () => {
-    onStart?.();
     publish.mutate(
       { componentId, environment },
       {
@@ -67,6 +66,7 @@ export function usePublishFlow({ componentId, environment, envName, onStart, onP
     );
   };
   const request = (redeploys: boolean) => {
+    onStart?.();
     if (!redeploys) {
       start();
       return;
