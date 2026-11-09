@@ -55,7 +55,7 @@ export default function PublishWorkflowDialog({ envName, onConfirm, onClose, isP
           Cancel
         </Button>
         <Button variant="contained" onClick={onConfirm} disabled={isPending} startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-          {isPending ? 'Publishing…' : 'Proceed'}
+          {isPending ? 'Publishing…' : 'Publish'}
         </Button>
       </DialogActions>
     </Dialog>

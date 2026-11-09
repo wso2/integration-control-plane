@@ -46,6 +46,9 @@ const refused: UserPortalPublishability = {
   ],
 };
 
+// The dialog's own button: the row behind it has one of the same name.
+const dialogButton = (container: HTMLElement, name: string): HTMLButtonElement | undefined => [...(container.ownerDocument.querySelector('[role="dialog"]')?.querySelectorAll('button') ?? [])].find((b) => b.textContent?.trim() === name);
+
 let unmount = () => {};
 afterEach(() => unmount());
 beforeEach(() => vi.clearAllMocks());
@@ -91,7 +94,7 @@ describe("the deploy card's User Portal row", () => {
   });
 
   // Publishing redeploys the workflow to take only User Portal sign-ins, which turns the console's workflow views off.
-  it('warns before a publish that redeploys a workflow, and publishes on Proceed', async () => {
+  it('warns before a publish that redeploys a workflow, and publishes once confirmed', async () => {
     publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true });
     publish.mockResolvedValue({ environment: 'production', published: true, rejectedScopes: [] });
     const container = await row(DEVELOPER);
@@ -103,7 +106,7 @@ describe("the deploy card's User Portal row", () => {
     expect(dialog?.textContent).toContain('will be redeployed in Production');
     expect(dialog?.textContent).toContain('Use the User Portal for all workflow management.');
 
-    await act(async () => button(container, 'Proceed')?.click());
+    await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
     expect(publish).toHaveBeenCalledWith('orders', 'production');
     await vi.waitFor(() => expect(container.ownerDocument.querySelector('[role="dialog"]')).toBeNull());
@@ -125,7 +128,7 @@ describe("the deploy card's User Portal row", () => {
     const container = await row(DEVELOPER);
     await act(async () => button(container, 'Publish')?.click());
     await flush();
-    await act(async () => button(container, 'Proceed')?.click());
+    await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
     const dialog = container.ownerDocument.querySelector('[role="dialog"]');
     expect(dialog?.textContent).toContain("The User Portal's sign-in isn't ready in Production yet. Publish again once it is.");

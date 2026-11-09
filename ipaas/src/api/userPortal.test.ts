@@ -20,7 +20,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { fetchDeploymentPipeline } from './deploymentPipelines';
 import { fetchAllEnvironments } from './environments';
-import { fetchUserPortalEnvironments, toUserPortal, toUserPortalPublishability } from './userPortal';
+import { fetchUserPortalEnvironments, toUserPortal, toUserPortalPublications, toUserPortalPublishability } from './userPortal';
 import type { DeploymentPipeline, PromotionTreeNode } from '../types/deploymentPipeline';
 import type { Environment } from '../types/environment';
 
@@ -100,5 +100,12 @@ describe('toUserPortalPublishability', () => {
   it('gives a publishable integration an empty reasons list', () => {
     expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true }).reasons).toEqual([]);
     expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true }).redeploys).toBe(false);
+  });
+});
+
+describe('toUserPortalPublications', () => {
+  it('reads an integration the BFF lists no environments for as published nowhere', () => {
+    expect(toUserPortalPublications({})).toEqual({ environments: [] });
+    expect(toUserPortalPublications({ environments: ['development'] })).toEqual({ environments: ['development'] });
   });
 });

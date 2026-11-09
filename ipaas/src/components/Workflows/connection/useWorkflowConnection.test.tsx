@@ -20,6 +20,7 @@ import { useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BffError } from '../../../api/_client';
 import type { EndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
 import type { EnvEndpoint } from '../../../types/component';
 import { workflowKeys } from '../api/queryKeys';
@@ -49,8 +50,8 @@ const access = vi.hoisted(() => {
 });
 const testAccessCalls = vi.hoisted(() => [] as unknown[][]);
 const endpoints = vi.hoisted(() => ({ list: [] as EnvEndpoint[], releaseIds: [] as string[] }));
-// The environments the integration is published to the User Portal in.
-const publications = vi.hoisted(() => ({ environments: [] as string[] }));
+// The environments the integration is published to the User Portal in, or what reading them failed with.
+const publications = vi.hoisted(() => ({ environments: [] as string[], error: null as unknown, refetch: vi.fn() }));
 
 vi.mock('../../../hooks/useDeployments', () => ({
   useEnvEndpoints: (_componentId: string, _trackId: string | undefined, releaseId: string) => {
@@ -59,7 +60,10 @@ vi.mock('../../../hooks/useDeployments', () => ({
   },
 }));
 vi.mock('../../../hooks/useUserPortal', () => ({
-  useUserPortalPublications: () => ({ data: { environments: publications.environments }, isPending: false, isFetched: true }),
+  useUserPortalPublications: () =>
+    publications.error
+      ? { data: undefined, isPending: false, isError: true, error: publications.error, refetch: publications.refetch }
+      : { data: { environments: publications.environments }, isPending: false, isError: false, error: null, refetch: publications.refetch },
 }));
 vi.mock('../../../hooks/useEndpointTestAccess', () => ({
   useEndpointTestAccess: (...args: unknown[]) => {
@@ -165,6 +169,8 @@ beforeEach(() => {
   endpoints.releaseIds = [];
   testAccessCalls.length = 0;
   publications.environments = [];
+  publications.error = null;
+  publications.refetch.mockReset();
   rendered = undefined;
   access.reset(keyAccess());
   fetchMock.mockReset();
@@ -205,6 +211,24 @@ describe('useWorkflowConnection', () => {
 
   it('connects as before to a workflow published to the User Portal only in another environment', async () => {
     publications.environments = ['production'];
+    mount();
+    await vi.waitFor(() => expect(status()).toBe('ready'));
+  });
+
+  // Unread, a published workflow's views would offer to switch its API back to API key, which locks the User Portal out.
+  it('stops on a failed read of where the workflow is published, asking for no test key, and reads it again on retry', async () => {
+    publications.error = new BffError(500, '{"message":"boom"}');
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'error', message: 'Could not check whether this workflow is published to the User Portal.' }));
+    expect(testAccessCalls.every(([, options]) => (options as { enabled: boolean }).enabled === false)).toBe(true);
+    const { connection } = current();
+    if (connection.status !== 'error') throw new Error('expected an error');
+    connection.retry();
+    expect(publications.refetch).toHaveBeenCalled();
+  });
+
+  it('connects as before when the BFF serves no User Portal', async () => {
+    publications.error = new BffError(404, '');
     mount();
     await vi.waitFor(() => expect(status()).toBe('ready'));
   });

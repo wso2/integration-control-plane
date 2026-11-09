@@ -23,6 +23,7 @@ import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
 import { useUserPortalPublications } from '../../../hooks/useUserPortal';
 import type { EndpointRef } from '../../../types/consumers';
 import type { ComponentDeployment } from '../../../types/deployment';
+import { isUserPortalUnavailable } from '../../../utils/apiErrors';
 import { createWorkflowClient, type WorkflowClient } from '../api/client';
 import { isWorkflowError, retryWorkflowRead } from '../api/http';
 import { isScopedWorkflowKey, workflowKeys } from '../api/queryKeys';
@@ -132,14 +133,17 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const endpoint = resolution.status === 'ready' ? resolution.endpoint : null;
   const endpointName = endpoint?.id ?? '';
 
-  // A BFF that serves no User Portal, or a read that fails, publishes nothing: the views carry on as before.
+  // A BFF that serves no User Portal publishes nothing: the views carry on as before. Any other failed read
+  // leaves it unknown, and the views wait for it: a published workflow's would offer to switch its API back
+  // to API key, which locks the User Portal out.
   const publications = useUserPortalPublications(componentId, { enabled: isActive });
   const publishedHere = publications.data?.environments.includes(environmentId) ?? false;
+  const publicationsKnown = publications.data !== undefined || (publications.isError && isUserPortalUnavailable(publications.error));
 
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
   // Release-scoped discovery already returns the gateway's public URL; the security read may too. A
   // published workflow takes no test key, so none is read or minted for it.
-  const access = useEndpointTestAccess(ref, { enabled: !!ref && publications.isFetched && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
+  const access = useEndpointTestAccess(ref, { enabled: !!ref && publicationsKnown && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
   const { authHeader, apiKey, mintKey, renewKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 
@@ -235,6 +239,9 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   if (publications.isPending) return LOADING;
   if (publishedHere) {
     return { status: 'unavailable', reason: 'published-to-user-portal', notice: PUBLISHED, action: null };
+  }
+  if (!publicationsKnown) {
+    return { status: 'error', message: 'Could not check whether this workflow is published to the User Portal.', retry: () => void publications.refetch() };
   }
   if (endpoints.isError) {
     return { status: 'error', message: 'Could not load this integration’s endpoints.', retry: () => void endpoints.refetch() };

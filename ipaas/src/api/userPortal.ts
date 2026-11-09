@@ -123,8 +123,10 @@ export const toUserPortalPublishability = (p: BffUserPortalPublishability): User
   redeploys: p.redeploys ?? false,
 });
 
+export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [] });
+
 /** The environments the integration is published to the User Portal in. */
-export const fetchUserPortalPublications = (componentId: string): Promise<UserPortalPublications> => bff.get<BffUserPortalPublications>(`/components/${seg(componentId)}/user-portal`).then((p) => ({ environments: p.environments ?? [] }));
+export const fetchUserPortalPublications = (componentId: string): Promise<UserPortalPublications> => bff.get<BffUserPortalPublications>(`/components/${seg(componentId)}/user-portal`).then(toUserPortalPublications);
 
 /** Runs a publish's rules without publishing: whether it is published there, and every rule it breaks. */
 export const fetchUserPortalPublishability = (componentId: string, environment: string): Promise<UserPortalPublishability> => bff.get<BffUserPortalPublishability>(publicationPath(componentId, environment)).then(toUserPortalPublishability);
