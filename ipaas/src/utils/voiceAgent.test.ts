@@ -241,11 +241,12 @@ describe('agentVoiceWsUrl', () => {
     ).toBe('ws://agent:8080');
   });
 
-  it('uses a lone endpoint whatever its type, falling back to the public URL', () => {
-    expect(agentVoiceWsUrl([{ type: 'HTTP', publicUrl: 'https://gw.example.com/agent' }])).toBe('wss://gw.example.com/agent');
+  it('falls back to the public URL of a WebSocket endpoint', () => {
+    expect(agentVoiceWsUrl([{ type: 'WS', publicUrl: 'https://gw.example.com/agent' }])).toBe('wss://gw.example.com/agent');
   });
 
-  it('gives up on several non-WebSocket endpoints, or none', () => {
+  it('finds nothing on an agent with only a chat endpoint, or none', () => {
+    expect(agentVoiceWsUrl([{ type: 'HTTP', publicUrl: 'https://gw.example.com/agent' }])).toBeNull();
     expect(agentVoiceWsUrl([{ type: 'REST', projectUrl: 'http://a' }, { type: 'REST', projectUrl: 'http://b' }])).toBeNull();
     expect(agentVoiceWsUrl([])).toBeNull();
     expect(agentVoiceWsUrl(undefined)).toBeNull();

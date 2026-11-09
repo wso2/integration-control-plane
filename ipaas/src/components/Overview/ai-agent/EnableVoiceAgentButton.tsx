@@ -19,6 +19,7 @@
 import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { CircleCheck, Mic } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
+import { useAgentVoiceEndpoint } from '../../../hooks/useAgentVoiceEndpoint';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useDeploymentStatus } from '../../../hooks/useDeployments';
 import { useSelectedTrack } from '../../../hooks/useSelectedTrack';
@@ -40,6 +41,7 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
   const { trackId } = useSelectedTrack(component);
   const { data: builds, isPending: loadingBuilds } = useDeploymentStatus(component.id, trackId);
   const latest = builds?.[0];
+  const endpoint = useAgentVoiceEndpoint(orgHandler, projectId, component);
 
   if (scope.level !== 'components' || isLoading || isError) return null;
   const projectHandler = scope.project;
@@ -59,8 +61,14 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
       : latest.status !== 'completed'
         ? 'Available once the running build succeeds.'
         : !buildSucceeded
-          ? "The latest build failed. Fix it and rebuild to enable voice agents."
-          : '';
+          ? 'The latest build failed. Fix it and rebuild to enable voice agents.'
+          : endpoint.status === 'loading'
+            ? "Checking the agent's endpoints…"
+            : endpoint.status === 'not-deployed' || endpoint.status === 'no-environment'
+              ? 'Deploy this AI agent to enable voice.'
+              : endpoint.status === 'no-endpoint'
+                ? 'Add a WebSocket endpoint to this AI Agent to enable voice.'
+                : '';
   return (
     <Tooltip title={blockedReason} placement="left">
       <span>
@@ -68,7 +76,7 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
           variant="text"
           size="small"
           startIcon={<Mic size={16} />}
-          disabled={!buildSucceeded}
+          disabled={!buildSucceeded || endpoint.status !== 'ready'}
           onClick={() => navigate(enableVoiceAgentUrl(orgHandler, projectHandler, component.handler))}>
           Enable voice agents
         </Button>

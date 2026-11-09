@@ -276,10 +276,8 @@ interface AgentEndpointLike {
 }
 
 export function agentVoiceWsUrl(endpoints: readonly AgentEndpointLike[] | undefined): string | null {
-  if (!endpoints?.length) return null;
-  const ws = endpoints.filter((e) => /^(ws|websocket)$/i.test(e.type));
-  const candidates = ws.length > 0 ? ws : endpoints.length === 1 ? endpoints : [];
-  const ep = candidates.find((e) => e.projectUrl) ?? candidates.find((e) => e.publicUrl || e.invokeUrl);
+  const ws = (endpoints ?? []).filter(isVoiceEndpoint);
+  const ep = ws.find((e) => e.projectUrl) ?? ws.find((e) => e.publicUrl || e.invokeUrl);
   const base = ep?.projectUrl || ep?.publicUrl || ep?.invokeUrl;
   return base ? base.replace(/^http/i, 'ws').replace(/\/+$/, '') : null;
 }
