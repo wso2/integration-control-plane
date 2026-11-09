@@ -269,7 +269,8 @@ export function TuningStep({ settings, errors, onChange }: VoiceAgentStepProps):
           fullWidth
           value={settings.corsAllowedOrigins}
           onChange={(e) => onChange({ corsAllowedOrigins: e.target.value })}
-          helperText="Comma-separated origins that may request a room token. * allows any."
+          error={!!errors.corsAllowedOrigins}
+          helperText={helperText(errors.corsAllowedOrigins, 'Comma-separated origins that may request a room token from a browser. * allows any.')}
         />
         {num('tokenTtl', 'Token time-to-live (TTL)', 's')}
       </Section>

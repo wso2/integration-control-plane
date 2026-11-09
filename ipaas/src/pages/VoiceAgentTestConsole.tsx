@@ -29,30 +29,22 @@ import NotDeployedAlert from '../components/NotDeployedAlert';
 import NotFound from '../components/NotFound';
 import VoiceAgentTestPanel from '../components/VoiceAgent/VoiceAgentTestPanel';
 import { PILL_SELECT_SX } from '../constants/styles';
-import { broaden, resourceUrl, type ComponentScope } from '../nav';
-import { tokenServiceUrlOf } from '../utils/voiceAgent';
+import { resourceUrl, type ComponentScope } from '../nav';
+import type { Component } from '../types/component';
+import type { Environment } from '../types/environment';
+import { tokenServiceUrlOf, voiceAgentEnvironment } from '../utils/voiceAgent';
 
 const ROOT_SX = { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } as const;
 const CONTENT_SX = { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 2 } as const;
+const ENV_SELECT_SX = { ...PILL_SELECT_SX, minWidth: 160 } as const;
 
 export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Element {
-  const orgUuid = useOrgUuid() ?? '';
+  const orgUuid = useOrgUuid();
   const { projectId } = useProjectId(scope.project);
   const componentQuery = useComponentByHandler(projectId, scope.component);
   const { data: component, isLoading: loadingComponent } = componentQuery;
-  const envQuery = useEnvironments(scope.org, projectId);
-  const { data: environments = [], isLoading: loadingEnvs } = envQuery;
-  const { trackId } = useSelectedTrack(component);
 
-  const [pickedEnvId, setPickedEnvId] = useState('');
-  const env = environments.find((e) => e.id === pickedEnvId) ?? environments[0];
-
-  const deploymentQuery = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', component?.id ?? '', trackId, env?.id ?? '');
-  const { data: deployment, isLoading: loadingDeployment } = deploymentQuery;
-  const releaseId = deployment?.releaseId ?? '';
-  const { data: endpoints, isLoading: loadingEndpoints, isError, refetch } = useEnvEndpoints(component?.id ?? '', trackId, releaseId);
-
-  if (loadingComponent) return <VoiceAgentTestSkeleton />;
+  if (loadingComponent || !orgUuid) return <VoiceAgentTestSkeleton />;
   if (componentQuery.isError) {
     return (
       <PageContent fullWidth sx={CONTENT_SX}>
@@ -62,18 +54,23 @@ export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Elemen
       </PageContent>
     );
   }
-  if (!component) return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
+  if (!component) return <NotFound message="Integration not found" backTo={resourceUrl({ level: 'projects', org: scope.org, project: scope.project }, 'overview')} backLabel="Back to project" />;
+  return <VoiceAgentTest org={scope.org} orgUuid={orgUuid} projectId={projectId} component={component} />;
+}
 
-  const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
-  const envSelector = environments.length > 0 && (
-    <Select size="small" value={env?.id ?? ''} onChange={(e) => setPickedEnvId(String(e.target.value))} inputProps={{ 'aria-label': 'Environment' }} sx={{ ...PILL_SELECT_SX, minWidth: 160 }}>
-      {environments.map((e) => (
-        <MenuItem key={e.id} value={e.id}>
-          {e.name}
-        </MenuItem>
-      ))}
-    </Select>
-  );
+interface VoiceAgentTestProps {
+  org: string;
+  orgUuid: string;
+  projectId: string;
+  component: Component;
+}
+
+function VoiceAgentTest({ org, orgUuid, projectId, component }: VoiceAgentTestProps): JSX.Element {
+  const envQuery = useEnvironments(org, projectId);
+  const { data: environments = [], isLoading: loadingEnvs } = envQuery;
+  const { trackId } = useSelectedTrack(component);
+  const [pickedEnvId, setPickedEnvId] = useState('');
+  const env = environments.find((e) => e.id === pickedEnvId) ?? voiceAgentEnvironment(environments);
 
   const body = () => {
     if (envQuery.isError) {
@@ -84,25 +81,8 @@ export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Elemen
       );
     }
     if (loadingEnvs) return <Skeleton variant="rounded" height={480} />;
-    if (environments.length === 0) return <Alert severity="info">This project has no environments to test the voice agent in.</Alert>;
-    if (loadingDeployment || (releaseId && loadingEndpoints)) return <Skeleton variant="rounded" height={480} />;
-    if (deploymentQuery.isError) {
-      return (
-        <Alert severity="error" action={<Button onClick={() => void deploymentQuery.refetch()}>Retry</Button>}>
-          Could not load the voice agent&apos;s deployment.
-        </Alert>
-      );
-    }
-    if (!isActive) return <NotDeployedAlert status={deployment?.deploymentStatusV2} />;
-    if (isError) {
-      return (
-        <Alert severity="error" action={<Button onClick={() => void refetch()}>Retry</Button>}>
-          Could not load the token service endpoint.
-        </Alert>
-      );
-    }
-    const tokenServiceUrl = tokenServiceUrlOf(endpoints);
-    return <VoiceAgentTestPanel key={env?.id} agentName={component.displayName || component.name} tokenServiceUrl={tokenServiceUrl} unavailableReason={tokenServiceUrl ? undefined : 'The token service has no public URL in this environment yet.'} />;
+    if (!env) return <Alert severity="info">This project has no environments to test the voice agent in.</Alert>;
+    return <EnvironmentTest key={env.id} org={org} orgUuid={orgUuid} component={component} trackId={trackId} env={env} />;
   };
 
   return (
@@ -113,12 +93,58 @@ export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Elemen
           <PageTitle>
             <PageTitle.Header>Test</PageTitle.Header>
           </PageTitle>
-          {envSelector}
+          {env && (
+            <Select size="small" value={env.id} onChange={(e) => setPickedEnvId(String(e.target.value))} inputProps={{ 'aria-label': 'Environment' }} sx={ENV_SELECT_SX}>
+              {environments.map((e) => (
+                <MenuItem key={e.id} value={e.id}>
+                  {e.name}
+                </MenuItem>
+              ))}
+            </Select>
+          )}
         </Stack>
         {body()}
       </PageContent>
     </Box>
   );
+}
+
+interface EnvironmentTestProps {
+  org: string;
+  orgUuid: string;
+  component: Component;
+  trackId: string | undefined;
+  env: Environment;
+}
+
+function EnvironmentTest({ org, orgUuid, component, trackId, env }: EnvironmentTestProps): JSX.Element {
+  const deploymentQuery = useComponentDeployment(org, orgUuid, component.id, trackId, env.id);
+  const { data: deployment, isLoading } = deploymentQuery;
+
+  if (isLoading) return <Skeleton variant="rounded" height={480} />;
+  if (deploymentQuery.isError) {
+    return (
+      <Alert severity="error" action={<Button onClick={() => void deploymentQuery.refetch()}>Retry</Button>}>
+        Could not load the voice agent&apos;s deployment.
+      </Alert>
+    );
+  }
+  if (!deployment || deployment.deploymentStatusV2 !== 'ACTIVE') return <NotDeployedAlert status={deployment?.deploymentStatusV2} />;
+  return <TokenServiceTest component={component} trackId={trackId} releaseId={deployment.releaseId} />;
+}
+
+function TokenServiceTest({ component, trackId, releaseId }: { component: Component; trackId: string | undefined; releaseId: string }): JSX.Element {
+  const { data: endpoints, isLoading, isError, refetch } = useEnvEndpoints(component.id, trackId, releaseId);
+  if (isLoading) return <Skeleton variant="rounded" height={480} />;
+  if (isError) {
+    return (
+      <Alert severity="error" action={<Button onClick={() => void refetch()}>Retry</Button>}>
+        Could not load the token service endpoint.
+      </Alert>
+    );
+  }
+  const tokenServiceUrl = tokenServiceUrlOf(endpoints);
+  return <VoiceAgentTestPanel agentName={component.displayName || component.name} tokenServiceUrl={tokenServiceUrl} unavailableReason={tokenServiceUrl ? undefined : 'The token service has no public URL in this environment yet.'} />;
 }
 
 function VoiceAgentTestSkeleton(): JSX.Element {

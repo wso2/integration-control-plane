@@ -21,7 +21,7 @@ import { Sparkles } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, type ReactNode } from 'react';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
-import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
+import { useLinkedVoiceAgents } from '../../../hooks/useVoiceAgents';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
@@ -38,7 +38,7 @@ export default function EnvCardBody({ component, env, orgHandler, projectId, ver
     endpoints.findIndex((e) => e.id === selectedId),
   );
   const selectedEndpoint = endpoints[selectedEpIdx];
-  const { voiceAgent } = useLinkedVoiceAgent(orgHandler, projectId, component.handler);
+  const voiceAgent = useLinkedVoiceAgents(orgHandler, projectId, component.handler).voiceAgents.at(0);
 
   // The enforcing API Platform gateway URL for the selected endpoint. Shown in place of the raw OpenChoreo external route, as the
   // integration-as-api card does.

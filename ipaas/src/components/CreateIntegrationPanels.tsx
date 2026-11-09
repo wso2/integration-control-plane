@@ -43,8 +43,6 @@ import { resourceUrl, narrow, type ProjectScope } from '../nav';
 import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl, createVoiceAgentUrl } from '../paths';
 import type { Sample } from '../types/samples';
 import { sampleKey } from '../constants/samples';
-
-const VOICE_AGENT_CARD_SX = { display: 'flex', alignItems: 'center', gap: 2, p: 2, '&:last-child': { pb: 2 } } as const;
 import { buildCloudEditorUrl } from '../utils/cloudEditor';
 import { useProjectId } from '../hooks/useProjects';
 import { useAccessControl } from '../contexts/AccessControlContext';
@@ -55,6 +53,8 @@ import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
 import { useSamples } from '../hooks/useSamples';
 import { trackEvent } from '../services/tracking/tracking';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
+
+const VOICE_AGENT_CARD_SX = { display: 'flex', alignItems: 'center', gap: 2, p: 2, '&:last-child': { pb: 2 } } as const;
 
 /** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
 const GET_STARTED_TABS = [{ label: 'Prebuilt integrations' }, { label: 'Samples' }];

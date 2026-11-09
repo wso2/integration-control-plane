@@ -128,7 +128,7 @@ function VoiceAgentList({ org, projects }: { org: string; projects: Project[] })
           </ListingTable.Head>
           <ListingTable.Body>
             {visible.map(({ component, project, targetAgent }) => {
-              const updated = component.updatedAt || component.createdAt;
+              const updated = component.lastBuildDate || component.createdAt;
               return (
                 <ListingTable.Row key={`${project.id}/${component.id}`}>
                   <ListingTable.Cell>

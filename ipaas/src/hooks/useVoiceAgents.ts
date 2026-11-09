@@ -74,8 +74,12 @@ export function useCreateVoiceAgent() {
   });
 }
 
-export function useLinkedVoiceAgent(orgHandler: string, projectId: string, agentHandler: string) {
+export function useLinkedVoiceAgents(orgHandler: string, projectId: string, agentHandler: string) {
   const { data, isLoading, isError, refetch } = useComponents(orgHandler, projectId);
-  const voiceAgent = data?.find((c) => isVoiceAgent(c) && c.voiceTargetAgent === agentHandler);
-  return { voiceAgent, isLoading, isError, refetch };
+  const voiceAgents = (data ?? []).filter((c) => isVoiceAgent(c) && c.voiceTargetAgent === agentHandler);
+  return { voiceAgents, isLoading, isError, refetch };
+}
+
+export function voicedAgentHandlers(components: readonly Component[]): Set<string> {
+  return new Set(components.flatMap((c) => (isVoiceAgent(c) && c.voiceTargetAgent ? [c.voiceTargetAgent] : [])));
 }

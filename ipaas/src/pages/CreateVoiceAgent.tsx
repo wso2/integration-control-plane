@@ -30,7 +30,7 @@ import { useAgentVoiceEndpoint } from '../hooks/useAgentVoiceEndpoint';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useComponentByHandler, useComponents } from '../hooks/useComponents';
 import { useActiveProjects, useProjectByHandler } from '../hooks/useProjects';
-import { useCreateVoiceAgent } from '../hooks/useVoiceAgents';
+import { useCreateVoiceAgent, useLinkedVoiceAgents, voicedAgentHandlers } from '../hooks/useVoiceAgents';
 import { newComponentUrl, newProjectUrl, type ComponentScope, type OrgScope, type ProjectScope } from '../nav';
 import { componentOverviewUrl, createVoiceAgentUrl, enableVoiceAgentUrl, voiceAgentsUrl } from '../paths';
 import type { Component } from '../types/component';
@@ -47,7 +47,7 @@ interface WizardStep {
   label: string;
   description: string;
   Form: ComponentType<VoiceAgentStepProps> | null;
-  validate: (s: VoiceAgentSettings) => StepErrors;
+  validate: (s: VoiceAgentSettings, voicedAgents: ReadonlySet<string>) => StepErrors;
 }
 
 const ALL_STEPS: WizardStep[] = [
@@ -67,6 +67,7 @@ type GeneralHandoff = Pick<VoiceAgentSettings, 'displayName' | 'name' | 'descrip
 
 interface HandoffState {
   voiceAgentGeneral?: GeneralHandoff;
+  voiceAgentReturn?: GeneralHandoff;
 }
 
 const toHandoff = (s: VoiceAgentSettings, projectId: string): GeneralHandoff => ({
@@ -144,14 +145,42 @@ export default function CreateVoiceAgent(scope: ProjectScope): JSX.Element {
 }
 
 export function EnableVoiceAgent(scope: ComponentScope): JSX.Element {
-  const { data: project, isLoading: loadingProject, isError: projectFailed, refetch: refetchProject } = useProjectByHandler(scope.project);
-  const { data: agent, isLoading: loadingAgent, isError: agentFailed, refetch: refetchAgent } = useComponentByHandler(project?.id ?? '', scope.component);
-  if (loadingProject || (project && loadingAgent)) return <CreateVoiceAgentSkeleton />;
-  if (projectFailed) return <LoadError message="Could not load the project." onRetry={() => void refetchProject()} />;
+  const { data: project, isLoading, isError, refetch } = useProjectByHandler(scope.project);
+  if (isLoading) return <CreateVoiceAgentSkeleton />;
+  if (isError) return <LoadError message="Could not load the project." onRetry={() => void refetch()} />;
   if (!project) return <PageNotFound title="Project not found" />;
-  if (agentFailed) return <LoadError message="Could not load the AI agent." onRetry={() => void refetchAgent()} />;
+  return <EnableVoiceAgentInProject org={scope.org} project={project} agentHandler={scope.component} />;
+}
+
+function EnableVoiceAgentInProject({ org, project, agentHandler }: { org: string; project: Project; agentHandler: string }): JSX.Element {
+  const agentQuery = useComponentByHandler(project.id, agentHandler);
+  const linked = useLinkedVoiceAgents(org, project.id, agentHandler);
+  const { data: agent } = agentQuery;
+  if (agentQuery.isLoading || linked.isLoading) return <CreateVoiceAgentSkeleton />;
+  if (agentQuery.isError) return <LoadError message="Could not load the AI agent." onRetry={() => void agentQuery.refetch()} />;
   if (!agent) return <PageNotFound title="Integration not found" />;
-  return <CreateVoiceAgentWizard org={scope.org} mode="agent" projects={[project]} project={project} agent={agent} />;
+  if (!isLiveAiAgent(agent)) return <PageNotFound title="Not an AI agent" description="Voice agents can be enabled only for AI agents." actionTo={componentOverviewUrl(org, project.handler, agent.handler)} actionLabel="Back to integration" />;
+  if (linked.isError) return <LoadError message="Could not check whether this AI agent already has a voice agent." onRetry={() => void linked.refetch()} />;
+  return <CreateVoiceAgentWizard org={org} mode="agent" projects={[project]} project={project} agent={agent} existingVoiceAgent={linked.voiceAgents.at(0)} />;
+}
+
+function VoiceAgentAlreadyEnabled({ org, project, agent, voiceAgent }: { org: string; project: Project; agent: Component; voiceAgent: Component }): JSX.Element {
+  const navigate = useAppNavigate();
+  return (
+    <PageContent fullWidth sx={PAGE_SX}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(componentOverviewUrl(org, project.handler, agent.handler))} sx={{ mb: 3 }}>
+        Back to AI agent
+      </Button>
+      <EmptyListing
+        icon={<Mic size={48} />}
+        title="Voice agent already enabled"
+        description={`${agent.displayName || agent.handler} already has the voice agent ${voiceAgent.displayName || voiceAgent.handler}. An AI agent can have one voice agent.`}
+        showAction
+        actionLabel="Open voice agent"
+        onAction={() => navigate(componentOverviewUrl(org, project.handler, voiceAgent.handler))}
+      />
+    </PageContent>
+  );
 }
 
 interface WizardProps {
@@ -160,18 +189,22 @@ interface WizardProps {
   projects: Project[];
   project: Project;
   agent?: Component;
+  existingVoiceAgent?: Component;
 }
 
-function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardProps): JSX.Element {
+function CreateVoiceAgentWizard({ org, mode, projects, project, agent, existingVoiceAgent }: WizardProps): JSX.Element {
   const navigate = useAppNavigate();
   const routerNavigate = useNavigate();
   const guardNavigation = useLeaveGuard();
   const location = useLocation();
   const create = useCreateVoiceAgent();
 
-  const [handoff] = useState(() => (location.state as HandoffState | null)?.voiceAgentGeneral);
-  const resumed = !!handoff && mode !== 'org';
-  const skipTarget = mode === 'agent' && !handoff;
+  const [{ received, restored }] = useState(() => {
+    const state = location.state as HandoffState | null;
+    return { received: mode === 'org' ? undefined : state?.voiceAgentGeneral, restored: state?.voiceAgentReturn };
+  });
+  const handoff = restored ?? received;
+  const skipTarget = mode === 'agent' || !!received;
   const steps = skipTarget ? ALL_STEPS.slice(1) : ALL_STEPS;
 
   const [initialSettings] = useState<VoiceAgentSettings>(() => {
@@ -181,7 +214,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
   });
   const [settings, setSettings] = useState<VoiceAgentSettings>(initialSettings);
   const [projectId, setProjectId] = useState(handoff?.projectId && projects.some((p) => p.id === handoff.projectId) ? handoff.projectId : project.id);
-  const [activeStep, setActiveStep] = useState(resumed ? 1 : 0);
+  const [activeStep, setActiveStep] = useState(0);
   const allowLeave = useUnsavedChanges(settings !== initialSettings && !create.isSuccess);
   const targetProject = projects.find((p) => p.id === projectId) ?? project;
 
@@ -190,11 +223,12 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
   const isTargetAgent = (c: Component): boolean => platformTarget && c.handler === settings.targetAgentHandler;
   const targetAgent = agent && isTargetAgent(agent) ? agent : components?.find((c) => isTargetAgent(c) && isLiveAiAgent(c));
   const endpoint = useAgentVoiceEndpoint(org, targetProject.id, targetAgent);
+  const voicedAgents = voicedAgentHandlers(components ?? []);
   const resolvedSettings = platformTarget ? { ...settings, targetAgentWsUrl: endpoint.status === 'ready' ? endpoint.url : '' } : settings;
-  const agentBlocked = platformTarget && endpoint.status !== 'ready';
+  const agentBlocked = platformTarget && (endpoint.status !== 'ready' || voicedAgents.has(settings.targetAgentHandler));
 
   const step = steps[activeStep];
-  const stepErrors = step.validate(resolvedSettings);
+  const stepErrors = step.validate(resolvedSettings, voicedAgents);
   const stepComplete = Object.keys(stepErrors).length === 0;
   const visibleErrors = step.key === 'tune' ? stepErrors : {};
   const isLastStep = activeStep === steps.length - 1;
@@ -206,7 +240,8 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
     const to = settings.targetMode === 'platform' ? enableVoiceAgentUrl(org, targetProject.handler, settings.targetAgentHandler) : mode === 'org' ? createVoiceAgentUrl(org, targetProject.handler) : null;
     if (!to) return false;
     allowLeave();
-    routerNavigate(`${location.pathname}${location.search}`, { replace: true, state });
+    const sourceState: HandoffState = { ...(location.state as HandoffState | null), voiceAgentReturn: state.voiceAgentGeneral };
+    routerNavigate(`${location.pathname}${location.search}`, { replace: true, state: sourceState });
     navigate(to, { state });
     return true;
   };
@@ -231,7 +266,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
   };
 
   const back = () => {
-    if (resumed && activeStep === 1) {
+    if (received && activeStep === 0) {
       guardNavigation(() => navigate(-1));
       return;
     }
@@ -248,6 +283,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
       </PageContent>
     );
   }
+  if (agent && existingVoiceAgent) return <VoiceAgentAlreadyEnabled org={org} project={targetProject} agent={agent} voiceAgent={existingVoiceAgent} />;
 
   return (
     <PageContent fullWidth sx={PAGE_SX}>
@@ -293,6 +329,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
               onProjectChange={setProjectId}
               lockProject={mode !== 'org'}
               agentEndpoint={endpoint}
+              voicedAgents={voicedAgents}
             />
           )}
           {create.isError && (
@@ -301,7 +338,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
             </Alert>
           )}
           <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
-            <Button variant="outlined" onClick={back} disabled={activeStep === 0 && !resumed}>
+            <Button variant="outlined" onClick={back} disabled={activeStep === 0 && !received}>
               Back
             </Button>
             <Button variant="contained" onClick={next} disabled={!stepComplete || (isLastStep && agentBlocked)}>

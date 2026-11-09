@@ -26,7 +26,7 @@ import { useLocation } from 'react-router';
 import { useEnvEndpoints, useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
-import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
+import { useLinkedVoiceAgents } from '../../../hooks/useVoiceAgents';
 import { voiceAgentTestUrl } from '../../../paths';
 import { isVoiceEndpoint } from '../../../utils/voiceAgent';
 import { useSelectedAgentEndpoint } from './selectedEndpoint';
@@ -79,7 +79,7 @@ export default function EnvCardActions({
   const [selectedId] = useSelectedAgentEndpoint(component.id, env.id);
   const selectedEndpoint = endpoints.find((e) => e.id === selectedId) ?? endpoints[0];
   const voiceSelected = isVoiceEndpoint(selectedEndpoint);
-  const { voiceAgent } = useLinkedVoiceAgent(orgHandler, projectId, componentHandler);
+  const voiceAgent = useLinkedVoiceAgents(orgHandler, projectId, componentHandler).voiceAgents.at(0);
 
   const handleStop = () => {
     stopMutation.mutate(

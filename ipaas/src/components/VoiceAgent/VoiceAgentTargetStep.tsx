@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Card, CardActionArea, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Card, CardActionArea, IconButton, ListItemText, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Activity, Globe, Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import type { AgentVoiceEndpointState } from '../../hooks/useAgentVoiceEndpoint';
@@ -35,9 +35,10 @@ export interface VoiceAgentTargetStepProps extends VoiceAgentStepProps {
   onProjectChange: (projectId: string) => void;
   lockProject: boolean;
   agentEndpoint: AgentVoiceEndpointState;
+  voicedAgents: ReadonlySet<string>;
 }
 
-export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHandler, projects, projectId, onProjectChange, lockProject, agentEndpoint }: VoiceAgentTargetStepProps): JSX.Element {
+export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHandler, projects, projectId, onProjectChange, lockProject, agentEndpoint, voicedAgents }: VoiceAgentTargetStepProps): JSX.Element {
   const [editingName, setEditingName] = useState(!!settings.name);
   const { data: components, isLoading: loadingAgents } = useComponents(orgHandler, projectId);
   const agents = (components ?? []).filter(isLiveAiAgent);
@@ -50,7 +51,7 @@ export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHa
 
   const chooseAgent = (handler: string) => {
     const agent = agents.find((a) => a.handler === handler);
-    if (!agent) return;
+    if (!agent || voicedAgents.has(handler)) return;
     const agentName = agent.displayName || agent.handler;
     onChange({ targetAgentHandler: handler, targetAgentWsUrl: '', displayName: settings.displayName || `${agentName} - Voice agent` });
   };
@@ -128,8 +129,8 @@ export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHa
                   {loadingAgents ? 'Loading agents' : 'Select a deployed agent to add voice to'}
                 </MenuItem>
                 {agents.map((a) => (
-                  <MenuItem key={a.id} value={a.handler}>
-                    {a.displayName || a.handler}
+                  <MenuItem key={a.id} value={a.handler} disabled={voicedAgents.has(a.handler)}>
+                    <ListItemText primary={a.displayName || a.handler} secondary={voicedAgents.has(a.handler) ? 'Already has a voice agent' : undefined} />
                   </MenuItem>
                 ))}
               </TextField>

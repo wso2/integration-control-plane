@@ -73,7 +73,7 @@ import { useChoreoSampleImages, useComponentRepositories } from '../hooks/useRep
 import type { Component, ComponentDeletionError, ComponentSubscription, SubscriptionInfo } from '../types/component';
 import { useDeleteComponent } from '../hooks/useComponents';
 import DeleteIntegrationButton from '../components/DeleteIntegrationButton';
-import { useLinkedVoiceAgent } from '../hooks/useVoiceAgents';
+import { useLinkedVoiceAgents } from '../hooks/useVoiceAgents';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { newComponentUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
@@ -151,8 +151,8 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
   const voiceDelete = useDeleteComponent();
   const confirmed = confirmation === component.displayName;
   const isAiAgent = identifyIntegration(component.displayType, component.componentSubType).type === 'ai-agent';
-  const voiceLookup = useLinkedVoiceAgent(scope.org, isAiAgent ? projectId : '', component.handler);
-  const { voiceAgent } = voiceLookup;
+  const voiceLookup = useLinkedVoiceAgents(scope.org, isAiAgent ? projectId : '', component.handler);
+  const { voiceAgents } = voiceLookup;
   const [aiAgentDeleted, setAiAgentDeleted] = useState(false);
   const busy = mutation.isPending || voiceDelete.isPending;
 
@@ -161,21 +161,24 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
     if (!busy) onClose();
   };
 
-  const deleteVoiceAgent = (target: Component) => {
-    const failed = (reason: string) => setDeleteError(`The AI agent was deleted, but its voice agent '${target.displayName}' was not: ${reason}`);
-    voiceDelete.mutate(
-      { orgHandler: scope.org, componentId: target.id, projectId },
-      {
-        onSuccess: (voiceResult) => (voiceResult.canDelete ? onDeleted() : failed(voiceResult.message || 'try again.')),
-        onError: (e) => failed(e instanceof Error ? e.message : 'try again.'),
-      },
-    );
+  const deleteVoiceAgents = async (targets: Component[]) => {
+    const failures: string[] = [];
+    for (const target of targets) {
+      try {
+        const voiceResult = await voiceDelete.mutateAsync({ orgHandler: scope.org, componentId: target.id, projectId });
+        if (!voiceResult.canDelete) failures.push(`'${target.displayName}': ${voiceResult.message || 'try again.'}`);
+      } catch (e) {
+        failures.push(`'${target.displayName}': ${e instanceof Error ? e.message : 'try again.'}`);
+      }
+    }
+    if (failures.length === 0) onDeleted();
+    else setDeleteError(`The AI agent was deleted, but not all of its voice agents were. ${failures.join(' ')}`);
   };
 
   const handleDelete = () => {
     setDeleteError(null);
-    if (aiAgentDeleted && voiceAgent) {
-      deleteVoiceAgent(voiceAgent);
+    if (aiAgentDeleted && voiceAgents.length > 0) {
+      void deleteVoiceAgents(voiceAgents);
       return;
     }
     mutation.mutate(
@@ -184,7 +187,7 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         onSuccess: (result) => {
           if (result.canDelete) {
             setAiAgentDeleted(true);
-            if (voiceAgent) deleteVoiceAgent(voiceAgent);
+            if (voiceAgents.length > 0) void deleteVoiceAgents(voiceAgents);
             else onDeleted();
             return;
           }
@@ -267,9 +270,10 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
             Couldn&apos;t check whether this AI agent has a voice agent. Retry before deleting it.
           </Alert>
         )}
-        {voiceAgent && (
+        {voiceAgents.length > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            This AI agent is connected to the voice agent <strong>{voiceAgent.displayName || voiceAgent.handler}</strong>. Deleting it will also delete the voice agent.
+            This AI agent is connected to the voice {voiceAgents.length === 1 ? 'agent' : 'agents'} <strong>{voiceAgents.map((v) => v.displayName || v.handler).join(', ')}</strong>. Deleting it will also delete{' '}
+            {voiceAgents.length === 1 ? 'the voice agent' : 'these voice agents'}.
           </Alert>
         )}
         <DialogContentText sx={{ mb: 2 }}>This action will be irreversible and all related details will be lost. Please type in the integration name below to confirm.</DialogContentText>
@@ -285,7 +289,7 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
           Cancel
         </Button>
         <Button variant="contained" color="error" disabled={!confirmed || busy || voiceLookup.isLoading || voiceLookup.isError} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
-          {busy ? 'Deleting...' : aiAgentDeleted ? 'Delete voice agent' : 'Delete'}
+          {busy ? 'Deleting...' : aiAgentDeleted ? (voiceAgents.length === 1 ? 'Delete voice agent' : 'Delete voice agents') : 'Delete'}
         </Button>
       </DialogActions>
     </Dialog>

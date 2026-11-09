@@ -34,7 +34,6 @@ export interface Component {
   voiceTargetAgent?: string;
   version: string;
   createdAt: string;
-  updatedAt?: string;
   lastBuildDate: string;
   labels?: string | string[];
   originCloud?: string;

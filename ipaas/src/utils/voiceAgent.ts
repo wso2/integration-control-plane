@@ -62,7 +62,7 @@ export const DEFAULT_VOICE_AGENT_SETTINGS: VoiceAgentSettings = {
   vadMinSilenceDuration: 0.55,
   vadPrefixPaddingDuration: 0.5,
   vadMaxBufferedSpeech: 60,
-  corsAllowedOrigins: '*',
+  corsAllowedOrigins: window.location.origin,
   tokenTtl: 3600,
 };
 
@@ -112,7 +112,7 @@ export const helperText = (error: string | undefined, hint = ' '): string => err
 
 export type StepErrors = Partial<Record<keyof VoiceAgentSettings, string>>;
 
-export function validateAgentStep(s: VoiceAgentSettings): StepErrors {
+export function validateAgentStep(s: VoiceAgentSettings, voicedAgents: ReadonlySet<string> = new Set()): StepErrors {
   const errors: StepErrors = {};
   if (!s.displayName.trim()) errors.displayName = 'Enter a display name.';
   if (effectiveVoiceAgentHandler(s).length < 3) errors.name = 'Use at least three letters or digits.';
@@ -120,6 +120,8 @@ export function validateAgentStep(s: VoiceAgentSettings): StepErrors {
     if (!isWebSocketUrl(s.targetAgentWsUrl)) errors.targetAgentWsUrl = 'Enter a ws:// or wss:// URL.';
   } else if (!s.targetAgentHandler) {
     errors.targetAgentHandler = 'Choose an agent.';
+  } else if (voicedAgents.has(s.targetAgentHandler)) {
+    errors.targetAgentHandler = 'This agent already has a voice agent. Choose another one.';
   } else if (!isWebSocketUrl(s.targetAgentWsUrl)) {
     errors.targetAgentHandler = 'This agent has no reachable endpoint yet. Deploy it, then try again.';
   }
@@ -165,20 +167,38 @@ const NUMERIC_TUNING_FIELDS = [
   'tokenTtl',
 ] as const satisfies readonly (keyof VoiceAgentSettings)[];
 
+type NumericTuningField = (typeof NUMERIC_TUNING_FIELDS)[number];
+
+const NON_NEGATIVE_TUNING_FIELDS = ['bargeInMinDuration', 'endpointingMinDelay', 'minConsecutiveSpeechDelay', 'vadMinSpeechDuration', 'vadMinSilenceDuration', 'vadPrefixPaddingDuration'] as const satisfies readonly NumericTuningField[];
+
+const POSITIVE_TUNING_FIELDS = ['userAwayTimeout', 'vadMaxBufferedSpeech', 'tokenTtl'] as const satisfies readonly NumericTuningField[];
+
+const isBetween0And1 = (value: number): boolean => value >= 0 && value <= 1;
+
 export function validateTuningStep(s: VoiceAgentSettings): StepErrors {
   const errors: StepErrors = {};
+  if (!s.corsAllowedOrigins.trim()) errors.corsAllowedOrigins = 'Enter at least one origin, or * to allow any.';
   for (const field of NUMERIC_TUNING_FIELDS) {
     if (!Number.isFinite(s[field])) errors[field] = 'Enter a number.';
   }
   if (Object.keys(errors).length > 0) return errors;
-  if (s.endpointingMinDelay < 0) errors.endpointingMinDelay = 'Use a value of 0 or more.';
-  if (s.endpointingMaxDelay < s.endpointingMinDelay) errors.endpointingMaxDelay = 'Use a value no lower than the minimum delay.';
-  if (s.userAwayTimeout <= 0) errors.userAwayTimeout = 'Use a value above 0.';
-  if (s.tokenTtl <= 0) errors.tokenTtl = 'Use a value above 0.';
-  if (s.minConsecutiveSpeechDelay < 0) errors.minConsecutiveSpeechDelay = 'Use a value of 0 or more.';
-  if (s.vadPrefixPaddingDuration < 0) errors.vadPrefixPaddingDuration = 'Use a value of 0 or more.';
-  if (s.vadMaxBufferedSpeech <= 0) errors.vadMaxBufferedSpeech = 'Use a value above 0.';
+  for (const field of NON_NEGATIVE_TUNING_FIELDS) {
+    if (s[field] < 0) errors[field] = 'Enter a value of 0 or more.';
+  }
+  for (const field of POSITIVE_TUNING_FIELDS) {
+    if (s[field] <= 0) errors[field] = 'Enter a value above 0.';
+  }
+  if (!Number.isInteger(s.bargeInMinWords) || s.bargeInMinWords < 0) errors.bargeInMinWords = 'Enter a whole number of 0 or more.';
+  if (!errors.tokenTtl && !Number.isInteger(s.tokenTtl)) errors.tokenTtl = 'Enter a whole number of seconds.';
+  if (!errors.endpointingMinDelay && s.endpointingMaxDelay < s.endpointingMinDelay) errors.endpointingMaxDelay = 'Enter a value no lower than the minimum delay.';
+  if (!isBetween0And1(s.vadActivationThreshold)) errors.vadActivationThreshold = 'Enter a value between 0 and 1.';
+  if (!isBetween0And1(s.vadDeactivationThreshold)) errors.vadDeactivationThreshold = 'Enter a value between 0 and 1.';
+  else if (!errors.vadActivationThreshold && s.vadDeactivationThreshold >= s.vadActivationThreshold) errors.vadDeactivationThreshold = 'Enter a value below the activation threshold.';
   return errors;
+}
+
+export function voiceAgentEnvironment<T>(pipelineEnvironments: readonly T[]): T | undefined {
+  return pipelineEnvironments[0];
 }
 
 const seconds = (ms: number): string => String(ms / 1000);
@@ -215,7 +235,7 @@ export function buildVoiceAgentDeployment(s: VoiceAgentSettings): VoiceAgentDepl
     USER_AWAY_TIMEOUT: String(s.userAwayTimeout),
     MIN_CONSECUTIVE_SPEECH_DELAY: seconds(s.minConsecutiveSpeechDelay),
     CLOSE_ON_PARTICIPANT_DISCONNECT: String(s.closeOnParticipantDisconnect),
-    CORS_ALLOWED_ORIGINS: s.corsAllowedOrigins.trim() || '*',
+    CORS_ALLOWED_ORIGINS: s.corsAllowedOrigins.trim(),
     LIVEKIT_TOKEN_TTL: String(s.tokenTtl),
   };
   const secrets = {

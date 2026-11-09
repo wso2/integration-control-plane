@@ -34,6 +34,7 @@ import {
   validateLiveKitStep,
   validateTtsStep,
   validateTuningStep,
+  voiceAgentEnvironment,
   voiceAgentHandler,
   withSttProvider,
   withTtsProvider,
@@ -110,6 +111,12 @@ describe('step validation', () => {
     expect(validateAgentStep({ ...platform, targetAgentHandler: 'support-agent', targetAgentWsUrl: 'ws://support-agent:8080' })).toEqual({});
   });
 
+  it('rejects an agent that already has a voice agent', () => {
+    const platform = { ...complete, targetMode: 'platform' as const, targetAgentHandler: 'support-agent', targetAgentWsUrl: 'wss://agent.example.com/ws' };
+    expect(validateAgentStep(platform)).toEqual({});
+    expect(validateAgentStep(platform, new Set(['support-agent']))).toEqual({ targetAgentHandler: 'This agent already has a voice agent. Choose another one.' });
+  });
+
   it('checks the typed name, not the display name, when one is given', () => {
     expect(validateAgentStep({ ...complete, name: 'ab' })).toHaveProperty('name');
     expect(effectiveVoiceAgentHandler({ displayName: 'Support line', name: '' })).toBe('support-line');
@@ -132,6 +139,37 @@ describe('step validation', () => {
 
   it('rejects a maximum endpointing delay below the minimum', () => {
     expect(validateTuningStep({ ...complete, endpointingMinDelay: 500, endpointingMaxDelay: 100 })).toHaveProperty('endpointingMaxDelay');
+  });
+
+  it('accepts the default tuning', () => {
+    expect(validateTuningStep(complete)).toEqual({});
+  });
+
+  it('keeps VAD thresholds between 0 and 1, with deactivation below activation', () => {
+    expect(validateTuningStep({ ...complete, vadActivationThreshold: 1.2 })).toEqual({ vadActivationThreshold: 'Enter a value between 0 and 1.' });
+    expect(validateTuningStep({ ...complete, vadDeactivationThreshold: -0.1 })).toEqual({ vadDeactivationThreshold: 'Enter a value between 0 and 1.' });
+    expect(validateTuningStep({ ...complete, vadActivationThreshold: 0.4, vadDeactivationThreshold: 0.4 })).toEqual({ vadDeactivationThreshold: 'Enter a value below the activation threshold.' });
+  });
+
+  it('needs a whole, non-negative number of barge-in words', () => {
+    expect(validateTuningStep({ ...complete, bargeInMinWords: 1.5 })).toEqual({ bargeInMinWords: 'Enter a whole number of 0 or more.' });
+    expect(validateTuningStep({ ...complete, bargeInMinWords: -1 })).toEqual({ bargeInMinWords: 'Enter a whole number of 0 or more.' });
+    expect(validateTuningStep({ ...complete, bargeInMinWords: 0 })).toEqual({});
+  });
+
+  it('rejects negative durations and delays', () => {
+    for (const field of ['bargeInMinDuration', 'vadMinSpeechDuration', 'vadMinSilenceDuration', 'endpointingMinDelay'] as const) {
+      expect(validateTuningStep({ ...complete, [field]: -1 }), field).toEqual({ [field]: 'Enter a value of 0 or more.' });
+    }
+  });
+
+  it('needs a positive, whole token TTL', () => {
+    expect(validateTuningStep({ ...complete, tokenTtl: 0 })).toEqual({ tokenTtl: 'Enter a value above 0.' });
+    expect(validateTuningStep({ ...complete, tokenTtl: 90.5 })).toEqual({ tokenTtl: 'Enter a whole number of seconds.' });
+  });
+
+  it('needs at least one CORS origin', () => {
+    expect(validateTuningStep({ ...complete, corsAllowedOrigins: ' ' })).toHaveProperty('corsAllowedOrigins');
   });
 });
 
@@ -163,6 +201,12 @@ describe('buildVoiceAgentDeployment', () => {
   it('sends the custom voice id in place of the custom marker', () => {
     const { config } = buildVoiceAgentDeployment({ ...complete, ttsVoiceId: 'custom', ttsCustomVoiceId: ' voice-123 ' });
     expect(config.TTS_VOICE_ID).toBe('voice-123');
+  });
+
+  it('allows only the console origin by default', () => {
+    expect(DEFAULT_VOICE_AGENT_SETTINGS.corsAllowedOrigins).toBe(window.location.origin);
+    expect(buildVoiceAgentDeployment(complete).config.CORS_ALLOWED_ORIGINS).toBe(window.location.origin);
+    expect(buildVoiceAgentDeployment({ ...complete, corsAllowedOrigins: ' * ' }).config.CORS_ALLOWED_ORIGINS).toBe('*');
   });
 
   it('sends every value the image requires', () => {
@@ -278,6 +322,13 @@ describe('isVoiceEndpoint', () => {
     expect(isVoiceEndpoint({ type: 'Websocket' })).toBe(true);
     expect(isVoiceEndpoint({ type: 'REST' })).toBe(false);
     expect(isVoiceEndpoint(undefined)).toBe(false);
+  });
+});
+
+describe('voiceAgentEnvironment', () => {
+  it('is the first environment of the pipeline', () => {
+    expect(voiceAgentEnvironment(['development', 'production'])).toBe('development');
+    expect(voiceAgentEnvironment([])).toBeUndefined();
   });
 });
 

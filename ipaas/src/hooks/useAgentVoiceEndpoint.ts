@@ -16,10 +16,11 @@
  * under the License.
  */
 
+import { skipToken, useQuery } from '@tanstack/react-query';
+import { fetchComponentDeployment, fetchEnvEndpoints } from '../api/deployments';
 import type { Component } from '../types/component';
 import type { Environment } from '../types/environment';
-import { agentVoiceWsUrl } from '../utils/voiceAgent';
-import { useComponentDeployment, useEnvEndpoints } from './useDeployments';
+import { agentVoiceWsUrl, voiceAgentEnvironment } from '../utils/voiceAgent';
 import { useEnvironments } from './useEnvironments';
 import { useOrgUuid } from './useOrgUuid';
 import { useSelectedTrack } from './useSelectedTrack';
@@ -32,23 +33,33 @@ export type AgentVoiceEndpointState =
   | { status: 'no-endpoint'; env: Environment }
   | { status: 'ready'; env: Environment; url: string };
 
-export function useAgentVoiceEndpoint(orgHandler: string, projectId: string, agent: Component | undefined): AgentVoiceEndpointState {
-  const orgUuid = useOrgUuid() ?? '';
-  const envQuery = useEnvironments(orgHandler, projectId);
-  const { data: environments = [], isLoading: loadingEnvs } = envQuery;
-  const env = environments.find((e) => !e.critical) ?? environments[0];
-  const { trackId } = useSelectedTrack(agent);
-  const deploymentQuery = useComponentDeployment(orgHandler, orgUuid, agent?.id ?? '', trackId, env?.id ?? '');
-  const { data: deployment, isLoading: loadingDeployment } = deploymentQuery;
-  const releaseId = deployment?.releaseId ?? '';
-  const endpointsQuery = useEnvEndpoints(agent?.id ?? '', trackId, releaseId);
-  const { data: endpoints, isLoading: loadingEndpoints } = endpointsQuery;
+type AgentDeployment = { deployed: false } | { deployed: true; url: string | null };
 
-  const failed = [envQuery, deploymentQuery, endpointsQuery].filter((q) => q.isError);
-  if (failed.length > 0) return { status: 'error', retry: () => failed.forEach((q) => q.refetch()) };
-  if (!agent || loadingEnvs || loadingDeployment || (releaseId && loadingEndpoints)) return { status: 'loading' };
+async function fetchAgentDeployment(orgHandler: string, orgUuid: string, agentId: string, trackId: string, envId: string): Promise<AgentDeployment> {
+  const deployment = await fetchComponentDeployment(orgHandler, orgUuid, agentId, trackId, envId);
+  if (!deployment?.releaseId) return { deployed: false };
+  const endpoints = await fetchEnvEndpoints(agentId, trackId, deployment.releaseId);
+  return { deployed: true, url: agentVoiceWsUrl(endpoints) };
+}
+
+export function useAgentVoiceEndpoint(orgHandler: string, projectId: string, agent: Component | undefined): AgentVoiceEndpointState {
+  const orgUuid = useOrgUuid();
+  const envQuery = useEnvironments(orgHandler, projectId);
+  const env = envQuery.data && voiceAgentEnvironment(envQuery.data);
+  const { trackId } = useSelectedTrack(agent);
+  const deploymentQuery = useQuery({
+    queryKey: ['agentVoiceEndpoint', orgHandler, orgUuid, agent?.id, trackId, env?.id],
+    queryFn: orgUuid && agent && trackId && env ? () => fetchAgentDeployment(orgHandler, orgUuid, agent.id, trackId, env.id) : skipToken,
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  if (envQuery.isError) return { status: 'error', retry: () => void envQuery.refetch() };
+  if (deploymentQuery.isError) return { status: 'error', retry: () => void deploymentQuery.refetch() };
+  if (!orgUuid || !agent || !envQuery.data) return { status: 'loading' };
   if (!env) return { status: 'no-environment' };
-  if (!releaseId) return { status: 'not-deployed', env };
-  const url = agentVoiceWsUrl(endpoints);
+  if (!deploymentQuery.data) return { status: 'loading' };
+  if (!deploymentQuery.data.deployed) return { status: 'not-deployed', env };
+  const { url } = deploymentQuery.data;
   return url ? { status: 'ready', env, url } : { status: 'no-endpoint', env };
 }
