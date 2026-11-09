@@ -168,18 +168,17 @@ export interface PlanScheduleErrors {
  */
 export function validatePlanSchedule(cron: string, timeoutRaw: string, allowConcurrency: boolean, saved: SavedSchedule, limits: ScheduleLimits, free: boolean): PlanScheduleErrors {
   const errors: PlanScheduleErrors = {};
-  const needs = free ? 'needs a paid plan' : 'is not allowed';
   const minInterval = Math.max(limits.minRunIntervalMinutes, MIN_RUN_INTERVAL_MINUTES);
   const gap = shortestRunGapMinutes(cron);
   if (gap !== null && gap < minInterval && cron.trim() !== saved.cron.trim()) {
-    errors.frequency = `Running more often than every ${describeMinutes(minInterval)} ${needs}`;
+    errors.frequency = free ? `The free plan supports intervals of ${describeMinutes(minInterval)} or longer. Upgrade for shorter intervals.` : `Running more often than every ${describeMinutes(minInterval)} is not allowed.`;
   }
   const timeout = timeoutRaw.trim() === '' ? NaN : Number(timeoutRaw);
   if (limits.maxTimeoutSeconds > 0 && timeout > limits.maxTimeoutSeconds && timeout !== saved.timeoutSeconds) {
-    errors.timeout = `A timeout over ${describeSeconds(limits.maxTimeoutSeconds)} ${needs}`;
+    errors.timeout = free ? `The free plan allows a timeout of up to ${describeSeconds(limits.maxTimeoutSeconds)}. Upgrade for longer timeouts.` : `A timeout over ${describeSeconds(limits.maxTimeoutSeconds)} is not allowed.`;
   }
   if (allowConcurrency && !limits.allowOverlap && saved.allowConcurrency !== true) {
-    errors.overlap = free ? 'Overlapping executions need a paid plan' : 'Overlapping executions are not allowed';
+    errors.overlap = free ? 'Overlapping executions are available on paid plans. Upgrade to turn this on.' : 'Overlapping executions are not allowed.';
   }
   return errors;
 }

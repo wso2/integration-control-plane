@@ -60,6 +60,7 @@ export default function DeployEnvironmentCard({
   displayType,
   isWorkflow = false,
   publishesToUserPortal = false,
+  scheduleKind = 'automation',
   env,
   componentName,
   projectHandler,
@@ -424,6 +425,7 @@ export default function DeployEnvironmentCard({
           buildId={deployedBuildId ?? undefined}
           versionId={versionId}
           deploymentPipelineId={deploymentPipelineId}
+          kind={scheduleKind}
         />
       )}
 

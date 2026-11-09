@@ -20,6 +20,7 @@ import type { Commit } from './repository';
 import type { ComponentDeployment, DeploymentTrackImage, DeploymentStatus } from './deployment';
 import type { Environment } from './environment';
 import type { ComponentTypeFlags } from '../utils/componentType';
+import type { ScheduleKind } from './schedule';
 
 export interface BuildAreaProps {
   componentId: string;
@@ -71,6 +72,8 @@ export interface DeployEnvironmentCardProps {
   isWorkflow?: boolean;
   /** An AI agent, automation or workflow: shows whether it is published to the environment's User Portal, with Publish or Unpublish. */
   publishesToUserPortal?: boolean;
+  /** Which limits a schedule set here is held to; an automation's unless set. */
+  scheduleKind?: ScheduleKind;
   env: Environment;
   branch: string;
   componentName: string;

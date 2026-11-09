@@ -20,6 +20,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import ScheduleFields from './ScheduleFields';
+import { cloudConsoleSubscriptionsUrl } from '../../../paths';
 import { useScheduleForm, type ScheduleFormApi } from './useScheduleForm';
 import { SCHEDULE_POLICIES } from '../../../constants/scheduleLimits';
 import type { ExecutionConfigs } from '../../../types/executions';
@@ -42,6 +43,7 @@ const saved = (cron: string, timeoutSeconds?: number, cronjobAllowConcurrency?: 
 const free: PlanAccess = { state: 'free' };
 const paid: PlanAccess = { state: 'paid' };
 const timeoutField = () => container.querySelector<HTMLInputElement>('input[type="number"]');
+const warnings = () => [...container.querySelectorAll('.MuiAlert-colorWarning')].map((a) => a.textContent);
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -84,11 +86,16 @@ describe('useScheduleForm defaults', () => {
 });
 
 describe('useScheduleForm plan limits', () => {
-  it('tells a free plan the automation limits, and blocks running more often', async () => {
+  it('warns a free plan only once an automation runs more often than it allows, and blocks it', async () => {
     await render(null, free);
-    expect(container.textContent).toContain('Schedules that run more often than every 5 minutes, and job timeouts over 300 seconds (5 minutes) can only be configured on a paid plan.');
+    expect(warnings()).toEqual([]);
     await act(() => form.setIntervalCount(1));
-    expect(form.errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan');
+    expect(form.errors.frequency).toBe('The free plan supports intervals of 5 minutes or longer. Upgrade for shorter intervals.');
+    expect(warnings()).toEqual(['The free plan supports intervals of 5 minutes or longer. Upgrade for shorter intervals.']);
+    const upgrade = container.querySelector<HTMLAnchorElement>('.MuiAlert-colorWarning a');
+    expect(upgrade?.textContent).toBe('Upgrade');
+    expect(upgrade?.href).toBe(cloudConsoleSubscriptionsUrl());
+    expect(upgrade?.target).toBe('_blank');
     expect(form.isValid).toBe(false);
   });
 
@@ -99,20 +106,24 @@ describe('useScheduleForm plan limits', () => {
     expect(form.isValid).toBe(true);
   });
 
-  it('holds an ingestion on a free plan to one run a day, 1 hour and no overlap, and says so', async () => {
+  it('holds an ingestion on a free plan to one run a day, 1 hour and no overlap, with a warning for each', async () => {
     await render(saved('0 2 * * *', 3600, false), free, ingestion);
-    expect(container.textContent).toContain('Schedules that run more often than every 1 day, job timeouts over 3600 seconds (1 hour), and overlapping executions can only be configured on a paid plan.');
     expect(form.isValid).toBe(true);
+    expect(warnings()).toEqual([]);
     await act(() => form.setTimeoutSeconds('3601'));
-    expect(form.errors.timeout).toBe('A timeout over 3600 seconds (1 hour) needs a paid plan');
+    expect(form.errors.timeoutLimit).toBe('The free plan allows a timeout of up to 3600 seconds (1 hour). Upgrade for longer timeouts.');
+    expect(form.errors.timeout).toBeUndefined();
+    expect(warnings()).toEqual(['The free plan allows a timeout of up to 3600 seconds (1 hour). Upgrade for longer timeouts.']);
+    expect(timeoutField()?.getAttribute('aria-invalid')).toBe('false');
     await act(() => form.setTimeoutSeconds('1800'));
     await act(() => form.setAllowConcurrency(true));
-    expect(form.errors.overlap).toBe('Overlapping executions need a paid plan');
+    expect(form.errors.overlap).toBe('Overlapping executions are available on paid plans. Upgrade to turn this on.');
+    expect(warnings()).toEqual(['Overlapping executions are available on paid plans. Upgrade to turn this on.']);
     await act(() => form.setAllowConcurrency(false));
     await act(() => form.setTab(0));
     await act(() => form.setIntervalCount(12));
     await act(() => form.setIntervalUnit('Hour'));
-    expect(form.errors.frequency).toBe('Running more often than every 1 day needs a paid plan');
+    expect(form.errors.frequency).toBe('The free plan supports intervals of 1 day or longer. Upgrade for shorter intervals.');
   });
 
   it('lets a paid plan run an ingestion every minute, for any time, overlapping, with no notice', async () => {
@@ -122,7 +133,7 @@ describe('useScheduleForm plan limits', () => {
     await act(() => form.setTimeoutSeconds('86400'));
     await act(() => form.setAllowConcurrency(true));
     expect(form.isValid).toBe(true);
-    expect(container.textContent).not.toContain('paid plan');
+    expect(warnings()).toEqual([]);
   });
 
   it('shows no plan errors while the plan loads, but holds back a schedule beyond the free limits', async () => {
@@ -131,8 +142,8 @@ describe('useScheduleForm plan limits', () => {
     await act(() => form.setIntervalCount(1));
     await act(() => form.setTimeoutSeconds('3600'));
     expect(form.errors.frequency).toBeUndefined();
-    expect(form.errors.timeout).toBeUndefined();
-    expect(container.textContent).not.toContain('paid plan');
+    expect(form.errors.timeoutLimit).toBeUndefined();
+    expect(warnings()).toEqual([]);
     expect(form.isValid).toBe(false);
   });
 
@@ -142,7 +153,7 @@ describe('useScheduleForm plan limits', () => {
     await render(null, paid);
     expect(form.isValid).toBe(true);
     await render(null, free);
-    expect(form.errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan');
+    expect(form.errors.frequency).toBe('The free plan supports intervals of 5 minutes or longer. Upgrade for shorter intervals.');
     expect(form.isValid).toBe(false);
   });
 
@@ -150,13 +161,16 @@ describe('useScheduleForm plan limits', () => {
     await render(saved('*/2 * * * *', 3600, true), free, ingestion);
     expect(form.isValid).toBe(true);
     await act(() => form.setTimeoutSeconds('7200'));
-    expect(form.errors.timeout).toBeDefined();
+    expect(form.errors.timeoutLimit).toBeDefined();
+    expect(form.isValid).toBe(false);
   });
 
-  it('names only the schedule when the timeout is not shown', async () => {
+  it('warns about the schedule when the timeout is not shown', async () => {
     await render(null, free, ingestion, false);
-    expect(container.textContent).toContain('Schedules that run more often than every 1 day can only be configured on a paid plan.');
-    expect(container.textContent).not.toContain('job timeouts');
+    expect(warnings()).toEqual([]);
+    await act(() => form.setIntervalCount(12));
+    await act(() => form.setIntervalUnit('Hour'));
+    expect(warnings()).toEqual(['The free plan supports intervals of 1 day or longer. Upgrade for shorter intervals.']);
   });
 
   it('offers a retry when the plan could not be read', async () => {

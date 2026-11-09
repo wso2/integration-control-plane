@@ -35,6 +35,8 @@ export interface ScheduleValues {
 
 export interface ScheduleFormErrors {
   timeout?: string;
+  /** Set when the timeout is over the org's plan's limit. */
+  timeoutLimit?: string;
   intervalCount?: string;
   /** Set when the schedule runs more often than the org's plan allows. */
   frequency?: string;
@@ -121,7 +123,8 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
   // Only the active tab's fields are validated: the other tab's state is not written.
   const errors = useMemo<ScheduleFormErrors>(
     () => ({
-      timeout: validateTimeout(timeoutSeconds) ?? shownPlanErrors.timeout,
+      timeout: validateTimeout(timeoutSeconds),
+      timeoutLimit: shownPlanErrors.timeout,
       intervalCount: tab === 0 ? validateIntervalCount(intervalCount) : undefined,
       cron: tab === 1 ? validateCronFields(cronFields) : {},
       frequency: shownPlanErrors.frequency,
@@ -130,7 +133,7 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
     [timeoutSeconds, tab, intervalCount, cronFields, shownPlanErrors],
   );
   const waitingForPlan = planLoading && Object.values(planErrors).some(Boolean);
-  const isValid = !waitingForPlan && !errors.timeout && !errors.intervalCount && !errors.frequency && !errors.overlap && Object.keys(errors.cron).length === 0;
+  const isValid = !waitingForPlan && !errors.timeout && !errors.timeoutLimit && !errors.intervalCount && !errors.frequency && !errors.overlap && Object.keys(errors.cron).length === 0;
 
   return {
     tab,
