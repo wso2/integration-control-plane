@@ -23,6 +23,7 @@ import Authorized from '../../Authorized';
 import { Scopes } from '../../../constants/permissions';
 import { useStopSchedule } from '../../../hooks/useExecutions';
 import ScheduleDialog from './ScheduleDialog';
+import type { ScheduleKind } from '../../../types/schedule';
 
 export interface ScheduleButtonProps {
   envId: string;
@@ -40,6 +41,8 @@ export interface ScheduleButtonProps {
   onSaveSuccess?: () => void;
   onSaveError?: (msg: string) => void;
   onStopSuccess?: () => void;
+  /** Which limits the schedule is held to; an automation's unless set. */
+  kind?: ScheduleKind;
 }
 
 export default function ScheduleButton({ hasSchedule, disabled, disabledReason, onSaveSuccess, onSaveError, onStopSuccess, ...dialogProps }: ScheduleButtonProps) {

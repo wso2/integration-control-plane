@@ -167,6 +167,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
                     displayType={component.displayType}
                     isWorkflow={isWorkflow}
                     publishesToUserPortal={publishesToUserPortal}
+                    scheduleKind={integrationType === 'rag-ingestion' ? 'ingestion' : 'automation'}
                     env={env}
                     branch={branch}
                     componentName={component.name}
