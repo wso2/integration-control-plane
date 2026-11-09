@@ -513,16 +513,21 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
         };
 
-        // Deploying is what puts the saved configuration and the integration's links into a
-        // release, so it runs whether or not a build is named: with none the platform releases
-        // the workload as it stands.
+        const done = () => {
+          onClose();
+          onSaved?.();
+        };
+        // A release is what carries the configuration and the links to the running integration,
+        // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
+        // OpenChoreo releases a changed Workload itself then.
         const afterSave = () => {
+          if (AUTO_DEPLOY_AVAILABLE) {
+            done();
+            return;
+          }
           deployTrack
             .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId ?? '', environmentId: actualEnvId, cronTimezone: '' })
-            .then(() => {
-              onClose();
-              onSaved?.();
-            })
+            .then(done)
             .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
         };
 
