@@ -48,15 +48,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
     if (compId) trackEvent('component-test');
   }, [compId]);
 
-  if (isLoading) {
-    return (
-      <PageContent fullWidth>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
-          <CircularProgress />
-        </Box>
-      </PageContent>
-    );
-  }
+  if (isLoading) return <RouteLoading />;
 
   // Not-found is distinct from an unsupported type — surface it rather than "Coming soon".
   if (!comp) {
@@ -93,15 +85,7 @@ export function AgentChatTestRoute(scope: ComponentScope): JSX.Element {
     if (agentId) trackEvent('component-test');
   }, [agentId]);
 
-  if (projectId && isPending) {
-    return (
-      <PageContent fullWidth>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
-          <CircularProgress />
-        </Box>
-      </PageContent>
-    );
-  }
+  if (projectId && isPending) return <RouteLoading />;
 
   // A missing component is AgentChatConsole's own not-found case, not a wrong-type case.
   if (comp && identity?.type !== 'ai-agent') return <Navigate to={`${componentUrl(scope.org, scope.project, scope.component)}/test`} replace />;
@@ -115,7 +99,20 @@ export function AgentChatTestRoute(scope: ComponentScope): JSX.Element {
  */
 export function TestConsoleRoute(scope: ComponentScope): JSX.Element {
   const { projectId } = useProjectId(scope.project);
-  const { data: comp } = useComponentByHandler(projectId, scope.component);
+  const { data: comp, isPending } = useComponentByHandler(projectId, scope.component);
+  // Held until the type is known, so a workflow's link never mounts the console it redirects away from.
+  if (projectId && isPending) return <RouteLoading />;
   if (comp && isWorkflowIntegration(comp)) return <Navigate to={componentUrl(scope.org, scope.project, scope.component)} replace />;
   return <TestConsole {...scope} />;
+}
+
+/** What a test route shows while the component it dispatches on is read. */
+function RouteLoading(): JSX.Element {
+  return (
+    <PageContent fullWidth>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
+        <CircularProgress />
+      </Box>
+    </PageContent>
+  );
 }

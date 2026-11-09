@@ -96,8 +96,8 @@ export function usePublishFlow({ componentId, environment, envName, onStart }: P
     dialog: confirming ? <PublishWorkflowDialog envName={envName} onConfirm={start} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} /> : null,
     error: publish.isError && !confirming ? userPortalErrorText(publish.error, envName) : publish.isPending ? null : backgroundError,
     progress: publishing ? publishingText(envName) : null,
-    // The sync answer's scopes, or those of the background publish the report carries once it is published.
-    rejectedScopes: rejectedScopes.length > 0 ? rejectedScopes : (report?.rejectedScopes ?? []),
+    // The sync answer's scopes, or those of the background publish the report carries, only while it is published.
+    rejectedScopes: rejectedScopes.length > 0 ? rejectedScopes : report?.published ? report.rejectedScopes : [],
     isPending: publish.isPending || publishing,
     reset: () => {
       publish.reset();

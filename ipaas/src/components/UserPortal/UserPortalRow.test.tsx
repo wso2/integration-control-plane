@@ -303,6 +303,15 @@ describe('a publish that finishes in the background, in the row', () => {
     expect(button(container, 'Publish')?.disabled).toBe(false);
   });
 
+  it("lists a background publish's rejected scopes only while the integration is published", async () => {
+    publishability.mockResolvedValue({ ...workflow, published: false, rejectedScopes: ['stale scope'] });
+    expect((await row(DEVELOPER, true)).textContent).not.toContain('stale scope');
+    unmount();
+
+    publishability.mockResolvedValue({ ...workflow, published: true, rejectedScopes: ['bad scope'] });
+    expect((await row(DEVELOPER, true)).textContent).toContain('bad scope');
+  });
+
   it('lists no refusals while a publish is switching the workflow', async () => {
     publishability.mockResolvedValue({ ...refused, publishing: true });
     const container = await row(DEVELOPER, true);
