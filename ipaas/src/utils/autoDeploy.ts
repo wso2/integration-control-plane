@@ -21,17 +21,19 @@ import type { Component } from '../types/component';
 import { identifyIntegration } from './identifyIntegration';
 import { hasIntegrationTraces } from './integrationTraces';
 
+/** The buildpackType ipaas-service reports for an MI integration. */
+const MI_BUILDPACK_TYPE = 'MI';
+
 /**
  * Whether the Deploy page offers "Auto deploy on build" for the integration. ipaas-service keeps
  * auto-deploy off, and refuses turning it on, for the integrations whose deploys it has to make
  * itself, so the switch is not offered for them:
  *
  * - Ballerina integrations, while AUTO_DEPLOY_AVAILABLE is off: a deploy sets up their tracing.
- * - MI integrations as APIs and MI webhooks: a deploy queues the publishing of their endpoints on
- *   the API gateway, which a build OpenChoreo deploys on its own never gets.
+ * - MI integrations: a deploy queues the publishing of an MI API's endpoints on the API gateway,
+ *   which a build OpenChoreo deploys on its own never gets, and every MI type deploys the same way.
  */
 export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displayType' | 'componentSubType'>): boolean {
-  const { type, runtime } = identifyIntegration(c.displayType ?? '', c.componentSubType ?? null);
-  if (runtime === 'mi' && (type === 'integration-as-api' || type === 'webhook')) return false;
+  if (c.buildpackType === MI_BUILDPACK_TYPE || identifyIntegration(c.displayType ?? '', c.componentSubType ?? null).runtime === 'mi') return false;
   return AUTO_DEPLOY_AVAILABLE || !hasIntegrationTraces(c);
 }

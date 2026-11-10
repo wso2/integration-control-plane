@@ -26,15 +26,16 @@ describe('isAutoDeployOffered', () => {
   it('is not offered for the integrations ipaas-service deploys itself', () => {
     expect(offered(BI_BUILDPACK, 'ballerinaService')).toBe(false);
     expect(offered('MI', 'miApiService')).toBe(false);
-    expect(offered('MI', 'miRestApi')).toBe(false);
     expect(offered('MI', 'miWebhook')).toBe(false);
-    expect(offered('MI', 'miApiService', 'webhook')).toBe(false);
+    expect(offered('MI', 'miCronjob')).toBe(false);
+    expect(offered('MI', 'miEventHandler')).toBe(false);
+    expect(offered('MI', 'miApiService', 'miFileIntegration')).toBe(false);
+    // An MI display type decides it when the buildpack is not reported.
+    expect(offered('', 'miCronjob')).toBe(false);
   });
 
-  it('is offered for other MI integrations and for agents', () => {
-    expect(offered('MI', 'miCronjob')).toBe(true);
-    expect(offered('MI', 'miEventHandler')).toBe(true);
-    expect(offered('MI', 'miApiService', 'miFileIntegration')).toBe(true);
+  it('is offered for agents and for integrations of another runtime', () => {
     expect(offered(BI_BUILDPACK, 'ballerinaService', 'aiAgent')).toBe(true);
+    expect(offered('other', 'byocEventHandler')).toBe(true);
   });
 });
