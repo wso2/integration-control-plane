@@ -18,7 +18,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { usePublishToUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
-import { publishingText, refusalText, userPortalErrorText } from '../../utils/userPortal';
+import { publishingText, refusalText, unpublishingText, userPortalErrorText } from '../../utils/userPortal';
 import PublishWorkflowDialog from './PublishWorkflowDialog';
 
 interface PublishFlowOptions {
@@ -40,7 +40,10 @@ export interface PublishFlow {
    * reports. A confirmed publish shows its refusal in the dialog instead.
    */
   error: string | null;
-  /** What a publish running in the background is doing, worded for the reader; null when none is running. */
+  /**
+   * What a publish running in the background is doing, or an unpublish giving a workflow back to the console, worded for
+   * the reader; null when neither is running.
+   */
   progress: string | null;
   /** Scopes the last publish's endpoints require that the User Portal couldn't hold (`RejectedScopes` says so). */
   rejectedScopes: string[];
@@ -95,7 +98,7 @@ export function usePublishFlow({ componentId, environment, envName, onStart }: P
     request,
     dialog: confirming ? <PublishWorkflowDialog envName={envName} onConfirm={start} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} /> : null,
     error: publish.isError && !confirming ? userPortalErrorText(publish.error, envName) : publish.isPending ? null : backgroundError,
-    progress: publishing ? publishingText(envName) : null,
+    progress: publishing ? publishingText(envName) : report?.unpublishing ? unpublishingText(envName) : null,
     // The sync answer's scopes, or those of the background publish the report carries, only while it is published.
     rejectedScopes: rejectedScopes.length > 0 ? rejectedScopes : report?.published ? report.rejectedScopes : [],
     isPending: publish.isPending || publishing,

@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateEndpointSettings } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
 import { useUserPortalPublications, useUserPortals } from '../../../hooks/useUserPortal';
@@ -50,7 +51,9 @@ import { isKeyRefusal } from './workflowTestKey';
  *
  * A workflow published to the User Portal in the environment is managed from the portal: publishing
  * redeploys it so its management API takes only User Portal sign-ins, on the gateway and in the
- * workflow, and no test key opens it. The connection then says so rather than reach for a key.
+ * workflow, and no test key opens it. The connection then says so rather than reach for a key. One
+ * just unpublished takes no key either until it is redeployed back, which ends after the unpublish
+ * answers, so the connection waits for that, then reads the API's security again.
  *
  * Call it once per view and environment and pass the result down, so one probe and one renewal
  * serve the whole view.
@@ -70,7 +73,7 @@ export interface WorkflowTarget {
   isDeploymentLoading: boolean;
 }
 
-export type WorkflowUnavailableReason = TestKeyReason | 'no-endpoint' | 'api-disabled' | 'published-to-user-portal';
+export type WorkflowUnavailableReason = TestKeyReason | 'no-endpoint' | 'api-disabled' | 'published-to-user-portal' | 'unpublishing-from-user-portal';
 
 /** What a notice offers to do about its state: something to run here, or a page to open in a new tab. */
 export type WorkflowNoticeAction = { label: string; run: () => void; pending: boolean } | { label: string; href: string };
@@ -116,6 +119,11 @@ const PUBLISHED: WorkflowNotice = {
   text: 'This workflow is published to the User Portal in this environment, so its runs and human tasks are managed there. Its Workflow Management API accepts only User Portal sign-ins, so the console can’t reach it. Unpublish it to manage it from the console again.',
 };
 
+const UNPUBLISHING: WorkflowNotice = {
+  severity: 'info',
+  text: 'This workflow is unpublished from the User Portal in this environment, and is being redeployed to take the console’s API key again. Its runs and human tasks show here once that’s done, in a minute or two.',
+};
+
 export function useWorkflowConnection({ componentId, environmentId, trackId, deployment, isDeploymentLoading }: WorkflowTarget): WorkflowConnection {
   const queryClient = useQueryClient();
   const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
@@ -134,6 +142,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   // which ipaas-service refuses for it, instead of pointing to the User Portal it is managed in.
   const publications = useUserPortalPublications(componentId, { enabled: isActive });
   const publishedHere = publications.data?.environments.includes(environmentId) ?? false;
+  const unpublishingHere = publications.data?.unpublishing.includes(environmentId) ?? false;
   const publicationsKnown = publications.data !== undefined || (publications.isError && isUserPortalUnavailable(publications.error));
   // Where the User Portal it is published to runs, to open it from the notice.
   const [portal] = useUserPortals(publishedHere ? [environmentId] : []);
@@ -141,9 +150,16 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
 
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
   // Release-scoped discovery already returns the gateway's public URL; the security read may too. A
-  // published workflow takes no test key, so none is minted until it is known not to be one. Its
-  // security is read meanwhile, which changes nothing.
-  const access = useEndpointTestAccess(ref, { enabled: !!ref, mint: publicationsKnown && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
+  // published workflow takes no test key, and nor does one being given back, so none is minted until
+  // it is known to be neither. Its security is read meanwhile, which changes nothing.
+  const access = useEndpointTestAccess(ref, { enabled: !!ref, mint: publicationsKnown && !publishedHere && !unpublishingHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
+
+  // The security read while it was being given back is the User Portal's, so it is read again once that ends.
+  const wasUnpublishing = useRef(unpublishingHere);
+  useEffect(() => {
+    if (wasUnpublishing.current && !unpublishingHere) invalidateEndpointSettings(queryClient, componentId, environmentId);
+    wasUnpublishing.current = unpublishingHere;
+  }, [unpublishingHere, queryClient, componentId, environmentId]);
   const { authHeader, apiKey, mintKey, renewKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 
@@ -160,7 +176,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const probe = useQuery({
     queryKey: workflowKeys.runtime(scopeId),
     queryFn: () => client!.runtime.get(),
-    enabled: !!client && !!scopeId && access.isAuthorized && publicationsKnown && !publishedHere,
+    enabled: !!client && !!scopeId && access.isAuthorized && publicationsKnown && !publishedHere && !unpublishingHere,
     staleTime: 5 * 60_000,
     retry: retryWorkflowRead,
   });
@@ -240,6 +256,9 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   if (publishedHere) {
     const action = portalUrl ? { label: 'Open User Portal', href: portalUrl } : null;
     return { status: 'unavailable', reason: 'published-to-user-portal', notice: PUBLISHED, action };
+  }
+  if (unpublishingHere) {
+    return { status: 'unavailable', reason: 'unpublishing-from-user-portal', notice: UNPUBLISHING, action: null };
   }
   if (!publicationsKnown) {
     return { status: 'error', message: 'Could not check whether this workflow is published to the User Portal.', retry: () => void publications.refetch() };

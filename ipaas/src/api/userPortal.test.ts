@@ -101,6 +101,7 @@ describe('toUserPortalPublishability', () => {
       reasons,
       redeploys: true,
       publishing: false,
+      unpublishing: false,
       rejectedScopes: [],
     });
   });
@@ -122,11 +123,19 @@ describe('toUserPortalPublishability', () => {
     expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: true, publishing: true, publishError })).toMatchObject({ publishing: true, publishError });
     expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true, rejectedScopes: ['bad'] }).rejectedScopes).toEqual(['bad']);
   });
+
+  it('carries a running background unpublish and its failure to give the workflow back', () => {
+    const unpublishError = { code: 'USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED', message: 'unpublish it again' };
+    expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: false, unpublishing: true })).toMatchObject({ unpublishing: true });
+    const report = toUserPortalPublishability({ environment: 'prod', published: false, publishable: true, unpublishError });
+    expect(report).toMatchObject({ unpublishing: false, unpublishError });
+    expect(report.publishError).toBeUndefined();
+  });
 });
 
 describe('toUserPortalPublications', () => {
   it('reads an integration the BFF lists no environments for as published nowhere', () => {
-    expect(toUserPortalPublications({})).toEqual({ environments: [] });
-    expect(toUserPortalPublications({ environments: ['development'] })).toEqual({ environments: ['development'] });
+    expect(toUserPortalPublications({})).toEqual({ environments: [], unpublishing: [] });
+    expect(toUserPortalPublications({ environments: ['development'], unpublishing: ['production'] })).toEqual({ environments: ['development'], unpublishing: ['production'] });
   });
 });

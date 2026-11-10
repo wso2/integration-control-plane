@@ -75,6 +75,9 @@ export const userPortalErrorText = (error: unknown, env: string): string => MESS
 /** The note shown while a workflow's publish finishes in the background. */
 export const publishingText = (env: string): string => `Publishing to the User Portal in ${env}. The workflow is redeployed for the User Portal's sign-in; this takes a minute or two.`;
 
+/** The note shown while an unpublished workflow is given back to the console in the background. */
+export const unpublishingText = (env: string): string => `Unpublished from the User Portal in ${env}. The workflow is redeployed to take the console's API key again; this takes a minute or two.`;
+
 // The rules about what runs in the environment. With nothing deployed there they all fail, and deploying is the fix.
 const NEEDS_A_DEPLOYMENT = new Set(['USER_PORTAL_NO_PUBLIC_ENDPOINT', 'USER_PORTAL_NO_MANAGEMENT_API', 'USER_PORTAL_API_KEY', 'USER_PORTAL_SECURED_BY_PROMOTION', 'USER_PORTAL_AUDIENCE_MISSING', 'USER_PORTAL_TOKEN_NOT_FORWARDED']);
 

@@ -45,6 +45,7 @@ const refused: UserPortalPublishability = {
   publishable: false,
   redeploys: false,
   publishing: false,
+  unpublishing: false,
   rejectedScopes: [],
   reasons: [
     { code: 'USER_PORTAL_PIPELINE', message: 'only integrations of projects on the "default" deployment pipeline can be published to the User Portal' },
@@ -117,8 +118,8 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it('publishes when the rules pass, and reports scopes the portal could not take', async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false, publishing: false, rejectedScopes: [] });
-    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: ['bad scope'] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false, publishing: false, unpublishing: false, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await row(DEVELOPER);
     const b = button(container, 'Publish');
     expect(b?.disabled).toBe(false);
@@ -130,8 +131,8 @@ describe("the deploy card's User Portal row", () => {
 
   // Publishing redeploys the workflow to take only User Portal sign-ins, which turns the console's workflow views off.
   it('warns before a publish that redeploys a workflow, and publishes once confirmed', async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, rejectedScopes: [] });
-    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
     const container = await row(DEVELOPER);
     await act(async () => button(container, 'Publish')?.click());
     await flush();
@@ -148,9 +149,9 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it('clears what the last publish left on screen as soon as another is asked for', async () => {
-    const notPublished = { environment: 'production', published: false, publishable: true, reasons: [], publishing: false, rejectedScopes: [] };
-    publishability.mockResolvedValueOnce({ ...notPublished, redeploys: false, publishing: false, rejectedScopes: [] }).mockResolvedValue({ ...notPublished, redeploys: true, publishing: false, rejectedScopes: [] });
-    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: ['bad scope'] });
+    const notPublished = { environment: 'production', published: false, publishable: true, reasons: [], publishing: false, unpublishing: false, rejectedScopes: [] };
+    publishability.mockResolvedValueOnce({ ...notPublished, redeploys: false, publishing: false, unpublishing: false, rejectedScopes: [] }).mockResolvedValue({ ...notPublished, redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await row(DEVELOPER);
     await act(async () => button(container, 'Publish')?.click());
     await flush();
@@ -163,7 +164,7 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it('publishes nothing when the redeploy warning is cancelled', async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, rejectedScopes: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] });
     const container = await row(DEVELOPER);
     await act(async () => button(container, 'Publish')?.click());
     await flush();
@@ -173,7 +174,7 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it('keeps the redeploy warning open on a failed publish, saying why', async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, rejectedScopes: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] });
     publish.mockRejectedValue(new BffError(503, '{"code":"USER_PORTAL_SIGN_IN_NOT_READY","message":"not ready"}'));
     const container = await row(DEVELOPER);
     await act(async () => button(container, 'Publish')?.click());
@@ -185,7 +186,7 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it("tells a role that can't deploy why it can't publish", async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false, publishing: false, rejectedScopes: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false, publishing: false, unpublishing: false, rejectedScopes: [] });
     const container = await row(VIEWER);
     const b = button(container, 'Publish');
     expect(b?.disabled).toBe(true);
@@ -228,6 +229,7 @@ describe("the deploy card's User Portal row", () => {
       publishable: false,
       redeploys: false,
       publishing: false,
+      unpublishing: false,
       rejectedScopes: [],
       reasons: [
         { code: 'USER_PORTAL_NOT_DEPLOYED', message: 'the integration is not deployed in this environment; deploy it first' },
@@ -242,7 +244,7 @@ describe("the deploy card's User Portal row", () => {
   });
 
   it('words a refused publish from its code', async () => {
-    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false, publishing: false, rejectedScopes: [] });
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [], redeploys: false, publishing: false, unpublishing: false, rejectedScopes: [] });
     publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"the integration is not deployed in this environment; deploy it first"}'));
     const container = await row(DEVELOPER);
     await act(async () => button(container, 'Publish')?.click());
@@ -259,7 +261,7 @@ describe("the deploy card's User Portal row", () => {
 });
 
 describe('a publish that finishes in the background, in the row', () => {
-  const workflow = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, rejectedScopes: [] };
+  const workflow = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
 
   beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
   afterEach(() => vi.useRealTimers());
@@ -267,7 +269,7 @@ describe('a publish that finishes in the background, in the row', () => {
 
   it('shows Publishing… from the 202 on, then Published with the scopes the portal could not hold', async () => {
     publishability.mockResolvedValueOnce(workflow).mockResolvedValue({ ...workflow, publishing: true });
-    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, unpublishing: false, rejectedScopes: [] });
     const container = await row(DEVELOPER, true);
     await act(async () => button(container, 'Publish')?.click());
     await act(async () => dialogButton(container, 'Publish')?.click());
@@ -316,5 +318,28 @@ describe('a publish that finishes in the background, in the row', () => {
     publishability.mockResolvedValue({ ...refused, publishing: true });
     const container = await row(DEVELOPER, true);
     expect(container.textContent).not.toContain('Turn on OAuth security for the agent.');
+  });
+});
+
+describe("the deploy card's row after an unpublish that gives a workflow back in the background", () => {
+  const unpublished: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
+  const unpublish = vi.mocked(api.unpublishFromUserPortal);
+
+  it('says the workflow is being given back, with nothing to publish meanwhile', async () => {
+    publishability.mockResolvedValue({ ...unpublished, publishable: false, unpublishing: true });
+    const container = await row(DEVELOPER, true);
+    expect(container.textContent).toContain("Unpublished from the User Portal in Production. The workflow is redeployed to take the console's API key again");
+    expect(button(container, 'Publish')?.disabled).toBe(true);
+  });
+
+  it('says why giving it back failed, and finishes it without asking again', async () => {
+    publishability.mockResolvedValue({ ...unpublished, unpublishError: { code: 'USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED', message: 'x' } });
+    unpublish.mockResolvedValue({ environment: 'production', published: false, publishing: false, unpublishing: true, rejectedScopes: [] });
+    const container = await row(DEVELOPER, true);
+    expect(container.textContent).toContain('The workflow is unpublished, but switching it back to the console failed. Unpublish again to finish.');
+    await act(async () => button(container, 'Finish unpublishing')?.click());
+    await flush();
+    expect(container.ownerDocument.querySelector('[role="dialog"]')).toBeNull();
+    expect(unpublish).toHaveBeenCalledWith('orders', 'production');
   });
 });

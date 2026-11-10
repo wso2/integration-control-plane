@@ -24,7 +24,7 @@ import { useCan } from '../../hooks/useCan';
 import { useBackgroundPublishOutcome, usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import type { EnvCardNotification } from '../../types/integration';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { DEPLOY_REFUSAL, publishingText, refusalText, rejectedScopesText, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
+import { DEPLOY_REFUSAL, publishingText, refusalText, rejectedScopesText, shownRefusals, unpublishingText, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import AboutUserPortalDialog from './AboutUserPortalDialog';
 import PublishWorkflowDialog from './PublishWorkflowDialog';
@@ -52,7 +52,7 @@ interface UserPortalActionProps {
  * "User Portal off" explains the portal and how to turn it on; "Publish" confirms, then publishes, or
  * lists what to fix when ipaas-service's rules refuse; "Unpublish" confirms, then unpublishes. A publish that
  * redeploys a workflow for the User Portal's sign-in says so in its confirmation, as an unpublish that redeploys it
- * back does.
+ * back does. Both redeploys finish in the background, and the switch says so until they end.
  */
 export default function UserPortalAction({ orgHandler, projectId, componentId, environment, envName, onNotify, isWorkflow = false, showPortalLink = true }: UserPortalActionProps): JSX.Element | null {
   const { data, isLoading, error, refetch } = useUserPortalPublishability(componentId, environment);
@@ -87,6 +87,7 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
   useBackgroundPublishOutcome(componentId, environment, {
     onPublished: notifyPublished,
     onFailed: (failure) => onNotify({ text: `Could not publish to the User Portal in ${envName}.`, severity: 'error', detail: refusalText(failure, envName) }),
+    onUnpublishFailed: (failure) => onNotify({ text: `Could not finish unpublishing from the User Portal in ${envName}.`, severity: 'error', detail: refusalText(failure, envName) }),
   });
   const startPublish = () =>
     publish.mutate(
@@ -99,6 +100,10 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
       },
     );
   const startUnpublish = () => unpublish.mutate({ componentId, environment }, { onSuccess: close });
+  // Unpublishing again finishes giving the workflow back; it is out of the User Portal already, so it isn't confirmed.
+  // No dialog is open to show a refusal in, so the card does.
+  const finishUnpublish = () =>
+    unpublish.mutate({ componentId, environment }, { onError: (err) => onNotify({ text: `Could not finish unpublishing from the User Portal in ${envName}.`, severity: 'error', detail: userPortalErrorText(err, envName) }) });
 
   return (
     <>
@@ -189,28 +194,32 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
     // awaits it), so the switch is never clickable on a stale state after one.
     const { published } = data;
     const publishing = data.publishing || publish.isPending;
+    const unpublishing = data.unpublishing;
     // A failed background publish stays in the report until the next publish; a published one has outlived it.
     const publishFailure = !publishing && !published && data.publishError ? refusalText(data.publishError, envName) : null;
+    // A failed switch back stays until an unpublish finishes it, or a publish starts.
+    const unpublishFailure = !publishing && !unpublishing && !published && data.unpublishError ? refusalText(data.unpublishError, envName) : null;
+    const failure = publishFailure ?? unpublishFailure;
     const toggle = () => openDialog(published ? 'unpublish' : data.publishable ? 'publish' : 'refusals');
-    // The switch's label stays short, so what a publish is doing, or why the last one failed, goes in its tooltip.
-    const tooltip = !canDeploy ? DEPLOY_REFUSAL : publishing ? publishingText(envName) : (publishFailure ?? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}`);
+    // The switch's label stays short, so what a publish or unpublish is doing, or why the last one failed, goes in its tooltip.
+    const tooltip = !canDeploy ? DEPLOY_REFUSAL : publishing ? publishingText(envName) : unpublishing ? unpublishingText(envName) : (failure ?? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}`);
     return (
       <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
         <Tooltip title={tooltip}>
           <FormControlLabel
-            control={<Switch size="small" checked={published} onChange={toggle} disabled={!canDeploy || publishing || unpublish.isPending} />}
+            control={<Switch size="small" checked={published} onChange={toggle} disabled={!canDeploy || publishing || unpublishing || unpublish.isPending} />}
             label={
-              publishing ? (
+              publishing || unpublishing ? (
                 <Box component="span" sx={styles.publishedLabelSx}>
                   <CircularProgress size={12} color="inherit" />
-                  Publishing…
+                  {publishing ? 'Publishing…' : 'Unpublishing…'}
                 </Box>
               ) : published ? (
                 <Box component="span" sx={styles.publishedLabelSx}>
                   <Box component="span" sx={styles.publishedDotSx} />
                   Published to User Portal
                 </Box>
-              ) : publishFailure ? (
+              ) : failure ? (
                 <Box component="span" sx={styles.publishedLabelSx}>
                   <Box component="span" sx={{ display: 'inline-flex', color: 'error.main' }}>
                     <CircleAlert size={14} />
@@ -226,6 +235,11 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
             sx={styles.toggleSx}
           />
         </Tooltip>
+        {unpublishFailure && canDeploy && (
+          <Button variant="text" size="small" color="warning" onClick={finishUnpublish} disabled={unpublish.isPending} startIcon={unpublish.isPending ? <CircularProgress size={12} color="inherit" /> : undefined}>
+            Finish unpublishing
+          </Button>
+        )}
         {/* Only a running portal has an address to open. */}
         {published && showPortalLink && portal?.state === 'active' && portal.url && (
           <Link href={portal.url} target="_blank" rel="noopener noreferrer" variant="body2" underline="hover" sx={styles.footerLinkSx}>
