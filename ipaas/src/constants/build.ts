@@ -33,7 +33,7 @@ export type GitRefType = (typeof GitRefType)[keyof typeof GitRefType];
  * Whether the Deploy page offers "Auto deploy on build" for Ballerina integrations.
  * Off while ipaas-service deploys their builds itself (it refuses turning auto-deploy
  * on for them); turn it back on together with ipaas-service's openChoreoAutoDeploy.
- * Other integrations and agents always offer it.
+ * isAutoDeployOffered decides the switch for every integration.
  */
 export const AUTO_DEPLOY_AVAILABLE = false;
 
