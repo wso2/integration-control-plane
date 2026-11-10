@@ -73,6 +73,7 @@ import { useChoreoSampleImages, useComponentRepositories } from '../hooks/useRep
 import type { Component, ComponentDeletionError, ComponentSubscription, SubscriptionInfo } from '../types/component';
 import { useDeleteComponent } from '../hooks/useComponents';
 import DeleteIntegrationButton from '../components/DeleteIntegrationButton';
+import { useLinkedVoiceAgents } from '../hooks/useVoiceAgents';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { newComponentUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
@@ -147,21 +148,47 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [subscribers, setSubscribers] = useState<{ internal: ComponentSubscription[]; external: ComponentSubscription[] } | null>(null);
   const mutation = useDeleteComponent();
+  const voiceDelete = useDeleteComponent();
   const confirmed = confirmation === component.displayName;
+  const isAiAgent = identifyIntegration(component.displayType, component.componentSubType).type === 'ai-agent';
+  const voiceLookup = useLinkedVoiceAgents(scope.org, isAiAgent ? projectId : '', component.handler);
+  const { voiceAgents } = voiceLookup;
+  const [aiAgentDeleted, setAiAgentDeleted] = useState(false);
+  const busy = mutation.isPending || voiceDelete.isPending;
 
   // Escape and backdrop bypass the disabled Cancel button, so gate them too.
   const handleClose = () => {
-    if (!mutation.isPending) onClose();
+    if (!busy) onClose();
+  };
+
+  const deleteVoiceAgents = async (targets: Component[]) => {
+    const failures: string[] = [];
+    for (const target of targets) {
+      try {
+        const voiceResult = await voiceDelete.mutateAsync({ orgHandler: scope.org, componentId: target.id, projectId });
+        if (!voiceResult.canDelete) failures.push(`'${target.displayName}': ${voiceResult.message || 'try again.'}`);
+      } catch (e) {
+        failures.push(`'${target.displayName}': ${e instanceof Error ? e.message : 'try again.'}`);
+      }
+    }
+    if (failures.length === 0) onDeleted();
+    else setDeleteError(`The AI agent was deleted, but not all of its voice agents were. ${failures.join(' ')}`);
   };
 
   const handleDelete = () => {
     setDeleteError(null);
+    if (aiAgentDeleted && voiceAgents.length > 0) {
+      void deleteVoiceAgents(voiceAgents);
+      return;
+    }
     mutation.mutate(
       { orgHandler: scope.org, componentId: component.id, projectId },
       {
         onSuccess: (result) => {
           if (result.canDelete) {
-            onDeleted();
+            setAiAgentDeleted(true);
+            if (voiceAgents.length > 0) void deleteVoiceAgents(voiceAgents);
+            else onDeleted();
             return;
           }
           // The backend blocks deletion (e.g. active API subscribers) without throwing — canDelete must be checked explicitly.
@@ -231,6 +258,24 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         Are you sure you want to remove the integration &lsquo;<strong>{component.displayName}</strong>&rsquo; ?
       </DialogTitle>
       <DialogContent>
+        {voiceLookup.isError && (
+          <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => voiceLookup.refetch()}>
+                Retry
+              </Button>
+            }>
+            Couldn&apos;t check whether this AI agent has a voice agent. Retry before deleting it.
+          </Alert>
+        )}
+        {voiceAgents.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This AI agent is connected to the voice {voiceAgents.length === 1 ? 'agent' : 'agents'} <strong>{voiceAgents.map((v) => v.displayName || v.handler).join(', ')}</strong>. Deleting it will also delete{' '}
+            {voiceAgents.length === 1 ? 'the voice agent' : 'these voice agents'}.
+          </Alert>
+        )}
         <DialogContentText sx={{ mb: 2 }}>This action will be irreversible and all related details will be lost. Please type in the integration name below to confirm.</DialogContentText>
         {deleteError && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -240,11 +285,11 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         <TextField autoFocus fullWidth placeholder="Enter integration name to confirm" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
       </DialogContent>
       <DialogActions>
-        <Button variant="outlined" color="inherit" onClick={handleClose} disabled={mutation.isPending}>
+        <Button variant="outlined" color="inherit" onClick={handleClose} disabled={busy}>
           Cancel
         </Button>
-        <Button variant="contained" color="error" disabled={!confirmed || mutation.isPending} startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
-          {mutation.isPending ? 'Deleting...' : 'Delete'}
+        <Button variant="contained" color="error" disabled={!confirmed || busy || voiceLookup.isLoading || voiceLookup.isError} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
+          {busy ? 'Deleting...' : aiAgentDeleted ? (voiceAgents.length === 1 ? 'Delete voice agent' : 'Delete voice agents') : 'Delete'}
         </Button>
       </DialogActions>
     </Dialog>

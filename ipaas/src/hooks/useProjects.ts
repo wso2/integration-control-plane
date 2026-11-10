@@ -49,9 +49,9 @@ export function useProject(projectId: string) {
 }
 
 export function useProjectByHandler(handler: string) {
-  const { data: projects = [], isLoading } = useProjects();
+  const { data: projects = [], isLoading, isError, refetch } = useProjects();
   const data = handler && !UUID_RE.test(handler) ? (projects.find((p) => p.handler === handler) ?? undefined) : undefined;
-  return { data, isLoading: !data && isLoading && !!handler && !UUID_RE.test(handler) };
+  return { data, isLoading: !data && isLoading && !!handler && !UUID_RE.test(handler), isError: !data && isError, refetch };
 }
 
 export function useProjectContributors(projectId: string) {
