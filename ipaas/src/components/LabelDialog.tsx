@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Autocomplete, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField } from '@wso2/oxygen-ui';
+import { Autocomplete, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Tooltip } from '@wso2/oxygen-ui';
 import { useEffect, useState } from 'react';
 import type { ComponentDetail } from '../types/component';
 import { useProjectComponentLabels } from '../hooks/useProjects';
@@ -121,17 +121,20 @@ interface LabelDialogProps {
 const titleSx = { fontWeight: 700 } as const;
 
 export default function LabelDialog({ open, onClose, component, projectId, currentLabels }: LabelDialogProps) {
-  const [labels, setLabels] = useState<string[]>(currentLabels);
+  // The platform's labels stay, whatever is removed: the BFF adds them back on save anyway.
+  const locked = component.lockedLabels ?? [];
+  const withLocked = (value: string[]) => [...locked, ...value.filter((l) => !locked.includes(l))];
+  const [labels, setLabels] = useState<string[]>(() => withLocked(currentLabels));
   const updateComponent = useUpdateComponent();
   const { data: projectLabels = [] } = useProjectComponentLabels(projectId);
 
   useEffect(() => {
-    if (open) setLabels(currentLabels);
+    if (open) setLabels(withLocked(currentLabels));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const options = [...new Set([...LABEL_OPTIONS, ...projectLabels])];
-  const hasChanges = [...labels].sort().join(',') !== [...currentLabels].sort().join(',');
+  const hasChanges = [...labels].sort().join(',') !== [...withLocked(currentLabels)].sort().join(',');
   const hasLabels = currentLabels.length > 0;
 
   const handleSave = () => {
@@ -158,14 +161,19 @@ export default function LabelDialog({ open, onClose, component, projectId, curre
             multiple
             options={options}
             value={labels}
-            onChange={(_, value) => setLabels(value as string[])}
+            onChange={(_, value) => setLabels(withLocked(value as string[]))}
             freeSolo
             disableCloseOnSelect
             disableClearable
             renderTags={(value: string[], getTagProps) =>
               value.map((option, index) => {
-                const { key, ...tagProps } = getTagProps({ index });
-                return <Chip key={key} label={option} size="small" variant="outlined" {...tagProps} />;
+                const { key, onDelete, ...tagProps } = getTagProps({ index });
+                if (!locked.includes(option)) return <Chip key={key} label={option} size="small" variant="outlined" onDelete={onDelete} {...tagProps} />;
+                return (
+                  <Tooltip key={key} title="Set by the platform. It can't be removed.">
+                    <Chip label={option} size="small" variant="outlined" {...tagProps} />
+                  </Tooltip>
+                );
               })
             }
             renderInput={(params) => (

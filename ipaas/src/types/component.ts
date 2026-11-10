@@ -35,6 +35,8 @@ export interface Component {
   createdAt: string;
   lastBuildDate: string;
   labels?: string | string[];
+  /** Labels among `labels` the platform sets and keeps (a knowledge base's KB Service is `knowledge-base-as-service`); they can't be removed. */
+  lockedLabels?: string[];
   originCloud?: string;
   apiId?: string;
   serviceAccessMode?: string | null;
