@@ -72,12 +72,8 @@ export interface WorkflowTarget {
 
 export type WorkflowUnavailableReason = TestKeyReason | 'no-endpoint' | 'api-disabled' | 'published-to-user-portal';
 
-/** What a notice offers to do about its state. */
-export interface WorkflowNoticeAction {
-  label: string;
-  run: () => void;
-  pending: boolean;
-}
+/** What a notice offers to do about its state: something to run here, or a page to open in a new tab. */
+export type WorkflowNoticeAction = { label: string; run: () => void; pending: boolean } | { label: string; href: string };
 
 export interface ReadyWorkflowConnection {
   status: 'ready';
@@ -242,7 +238,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   }
   if (publications.isPending) return LOADING;
   if (publishedHere) {
-    const action = portalUrl ? { label: 'Open User Portal', run: () => void window.open(portalUrl, '_blank', 'noopener,noreferrer'), pending: false } : null;
+    const action = portalUrl ? { label: 'Open User Portal', href: portalUrl } : null;
     return { status: 'unavailable', reason: 'published-to-user-portal', notice: PUBLISHED, action };
   }
   if (!publicationsKnown) {

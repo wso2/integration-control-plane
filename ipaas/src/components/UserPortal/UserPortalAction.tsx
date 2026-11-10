@@ -224,8 +224,8 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
             sx={styles.toggleSx}
           />
         </Tooltip>
-        {/* Only a running portal has an address to open. */}
-        {published && portal?.state === 'active' && portal.url && (
+        {/* Only a running portal has an address to open. A published workflow's card body opens it from its notice. */}
+        {published && !isWorkflow && portal?.state === 'active' && portal.url && (
           <Link href={portal.url} target="_blank" rel="noopener noreferrer" variant="body2" underline="hover" sx={styles.footerLinkSx}>
             Open User Portal
             <ExternalLink size={12} />

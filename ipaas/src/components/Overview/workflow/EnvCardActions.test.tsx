@@ -67,11 +67,9 @@ describe('a workflow env card header', () => {
     expect(button(c, 'Stop')).toBeDefined();
   });
 
-  it('leads with the User Portal switch, before View logs', async () => {
+  it('leaves the User Portal switch to the footer', async () => {
     const c = await render(<WorkflowEnvCardActions {...props} />);
-    const portal = c.querySelector('[data-testid="portal-switch"]') as Element;
-    expect(portal.getAttribute('data-workflow')).toBe('true');
-    expect(portal.compareDocumentPosition(button(c, 'View logs') as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(c.querySelector('[data-testid="portal-switch"]')).toBeNull();
   });
 });
 

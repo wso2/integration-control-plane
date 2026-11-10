@@ -187,6 +187,15 @@ describe("the env card's User Portal action", () => {
     expect(link?.getAttribute('target')).toBe('_blank');
   });
 
+  it("leaves a published workflow's link to its card's notice", async () => {
+    publishability.mockResolvedValue({ ...publishable, published: true });
+    portal.mockResolvedValue({ environment: 'production', state: 'active', url: 'https://acme-up.example.com' });
+    const container = await action(DEVELOPER, true);
+    await flush();
+    expect(container.textContent).toContain('Published to User Portal');
+    expect(container.querySelector('a')).toBeNull();
+  });
+
   it('offers no link while the portal has no address to open', async () => {
     publishability.mockResolvedValue({ ...publishable, published: true });
     portal.mockResolvedValue({ environment: 'production', state: 'setting-up' });

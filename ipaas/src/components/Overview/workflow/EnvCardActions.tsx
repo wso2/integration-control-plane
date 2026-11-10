@@ -16,29 +16,14 @@
  * under the License.
  */
 
-import { Box } from '@wso2/oxygen-ui';
 import type { ReactNode } from 'react';
 import type { EnvCardActionsProps } from '../../../types/integration';
-import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
-import UserPortalAction from '../../UserPortal/UserPortalAction';
 import ApiEnvCardActions from '../integration-as-api/EnvCardActions';
 
-// The action renders nothing where ipaas-service serves no User Portal; the wrapper must then take no
-// space, or the header's gap would leave a hole before View logs.
-const portalSx = { display: 'flex', alignItems: 'center', minWidth: 0, '&:empty': { display: 'none' } } as const;
-
 /**
- * A workflow's right-header slot: the User Portal switch where Test sits on other types, then the
- * actions integration-as-API offers (View logs, Stop/Start/Redeploy). Workflows have no Test page.
+ * A workflow's right-header slot: the actions integration-as-API offers (View logs, Stop/Start/Redeploy)
+ * without Test, as a workflow has no Test page. The User Portal switch is in the card's footer.
  */
 export default function EnvCardActions(props: EnvCardActionsProps): ReactNode {
-  const { component, env, orgHandler, projectId, onNotify } = props;
-  return (
-    <>
-      <Box sx={portalSx}>
-        <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={component.id} environment={env.id} envName={env.name} onNotify={onNotify} isWorkflow={isWorkflowIntegration(component)} />
-      </Box>
-      <ApiEnvCardActions {...props} hideTest />
-    </>
-  );
+  return <ApiEnvCardActions {...props} hideTest />;
 }

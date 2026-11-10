@@ -216,13 +216,8 @@ describe('useWorkflowConnection', () => {
   it('offers to open the User Portal a workflow is published to', async () => {
     publications.environments = ['development'];
     publications.portalUrl = 'https://portal.example/acme';
-    const open = vi.spyOn(window, 'open').mockReturnValue(null);
     mount();
-    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', action: { label: 'Open User Portal' } }));
-    const { connection } = current();
-    if (connection.status !== 'unavailable' || !connection.action) throw new Error('expected an action');
-    connection.action.run();
-    expect(open).toHaveBeenCalledWith('https://portal.example/acme', '_blank', 'noopener,noreferrer');
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', action: { label: 'Open User Portal', href: 'https://portal.example/acme' } }));
   });
 
   it('connects as before to a workflow published to the User Portal only in another environment', async () => {
@@ -320,7 +315,7 @@ describe('useWorkflowConnection', () => {
     expect(switchToApiKey).not.toHaveBeenCalled();
 
     const { connection } = current();
-    if (connection.status !== 'unavailable' || !connection.action) throw new Error('expected an action');
+    if (connection.status !== 'unavailable' || !connection.action || !('run' in connection.action)) throw new Error('expected an action to run');
     expect(connection.action.label).toBe('Switch to API key');
     connection.action.run();
     expect(switchToApiKey).toHaveBeenCalledTimes(1);
