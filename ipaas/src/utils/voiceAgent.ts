@@ -62,7 +62,7 @@ export const DEFAULT_VOICE_AGENT_SETTINGS: VoiceAgentSettings = {
   vadMinSilenceDuration: 0.55,
   vadPrefixPaddingDuration: 0.5,
   vadMaxBufferedSpeech: 60,
-  corsAllowedOrigins: window.location.origin,
+  corsAllowedOrigins: '*',
   tokenTtl: 3600,
 };
 

@@ -204,10 +204,10 @@ describe('buildVoiceAgentDeployment', () => {
     expect(config.TTS_VOICE_ID).toBe('voice-123');
   });
 
-  it('allows only the console origin by default', () => {
-    expect(DEFAULT_VOICE_AGENT_SETTINGS.corsAllowedOrigins).toBe(window.location.origin);
-    expect(buildVoiceAgentDeployment(complete).config.CORS_ALLOWED_ORIGINS).toBe(window.location.origin);
-    expect(buildVoiceAgentDeployment({ ...complete, corsAllowedOrigins: ' * ' }).config.CORS_ALLOWED_ORIGINS).toBe('*');
+  it('allows any origin by default, as Devant does, and trims a custom list', () => {
+    expect(DEFAULT_VOICE_AGENT_SETTINGS.corsAllowedOrigins).toBe('*');
+    expect(buildVoiceAgentDeployment(complete).config.CORS_ALLOWED_ORIGINS).toBe('*');
+    expect(buildVoiceAgentDeployment({ ...complete, corsAllowedOrigins: ' https://app.example.com ' }).config.CORS_ALLOWED_ORIGINS).toBe('https://app.example.com');
   });
 
   it('sends every value the image requires', () => {
