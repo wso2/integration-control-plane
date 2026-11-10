@@ -52,7 +52,7 @@ const formatCode = (code: string, language: string): string => {
 
 interface CodeViewerProps {
   code: string;
-  language?: 'xml' | 'json' | 'yaml' | 'javascript' | 'typescript' | 'text';
+  language?: 'xml' | 'json' | 'yaml' | 'javascript' | 'jsx' | 'bash' | 'typescript' | 'text';
   title?: string;
   showCopyButton?: boolean;
   maxHeight?: string | number;

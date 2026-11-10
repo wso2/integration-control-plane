@@ -18,20 +18,28 @@
 
 import { Alert, Button, Divider, Stack, Typography } from '@wso2/oxygen-ui';
 import { Sparkles } from '@wso2/oxygen-ui-icons-react';
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
+import { useLinkedVoiceAgents } from '../../../hooks/useVoiceAgents';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { friendlyApiError } from '../../../utils/apiSecurity';
 import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
+import { isVoiceEndpoint } from '../../../utils/voiceAgent';
+import { useSelectedAgentEndpoint } from './selectedEndpoint';
 
 //AI Agent env-card body
-export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
+export default function EnvCardBody({ component, env, orgHandler, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
-  const [selectedEpIdx, setSelectedEpIdx] = useState(0);
-  const selectedEndpoint = endpoints[selectedEpIdx] ?? endpoints[0];
+  const [selectedId, setSelectedId] = useSelectedAgentEndpoint(component.id, env.id);
+  const selectedEpIdx = Math.max(
+    0,
+    endpoints.findIndex((e) => e.id === selectedId),
+  );
+  const selectedEndpoint = endpoints[selectedEpIdx];
+  const voiceAgent = useLinkedVoiceAgents(orgHandler, projectId, component.handler).voiceAgents.at(0);
 
   // The agent's URL on Agent Manager's AI gateway, where every agent is deployed. It is the only URL the card
   // lists: the endpoint's own routes (its OpenChoreo external route and its in-cluster project URL) carry
@@ -60,7 +68,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   return (
     <>
       <Divider sx={{ my: 2 }} />
-      <EndpointUrlsPanel endpoints={endpoints} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} agentGatewayUrl={agentGatewayUrl} />
+      <EndpointUrlsPanel endpoints={endpoints} selectedIdx={selectedEpIdx} onSelect={(i) => setSelectedId(endpoints[i].id)} agentGatewayUrl={agentGatewayUrl} />
       {/* A failed read is not a missing URL: the row stays "—", and this says why and offers another try. */}
       {isSecurityError && (
         <Alert
@@ -74,7 +82,21 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
           {friendlyApiError(securityError, 'Could not read the agent’s AI gateway URL.')}
         </Alert>
       )}
-      <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
+      {isVoiceEndpoint(selectedEndpoint) ? (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          {voiceAgent ? (
+            <>
+              This WebSocket endpoint serves voice conversations through the voice agent <strong>{voiceAgent.displayName || voiceAgent.handler}</strong>. Click <strong>Test voice</strong> to talk to this AI agent.
+            </>
+          ) : (
+            <>
+              This WebSocket endpoint serves voice conversations. To talk to this AI agent by voice, click <strong>Enable voice agent</strong> at the top of the page, then click <strong>Test voice</strong>.
+            </>
+          )}
+        </Alert>
+      ) : (
+        <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
+      )}
     </>
   );
 }

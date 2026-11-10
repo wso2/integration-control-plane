@@ -169,15 +169,21 @@ export async function waitForConfigureGate(page: Page, timeout = AGENT_GATE_TIME
   }
 }
 
-/** An automation's card renders no status dot, so readiness is its Schedule and Test actions. */
-export async function requireAutomationReady(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
-  const build = await waitForBuildQuiet(page);
-  expect(build, `${AUTOMATION} build ended as ${build}`).toMatch(/^Completed/);
-  await expect(buildCard(page).getByRole('img', { name: 'Completed', exact: true }), `${AUTOMATION}'s build card does not report Completed`).toBeVisible({ timeout: 60_000 });
-
+/**
+ * A sample deployed from its image has no build (Component.tsx hides the build card for a prebuilt
+ * integration), and Quick deploy already started its deployment, so there is nothing to deploy.
+ */
+export async function requireSampleActive(page: Page, name = SAMPLE): Promise<void> {
   await dismissStrayDialog(page);
-  await deployLatestBuild(page);
+  await expect(envCard(page), `no ${ENV} card on ${name}`).toBeVisible({ timeout: 2 * 60_000 });
+  const deployed = await waitForDeploymentSettled(page);
+  expect(deployed, `${name} deployment to ${ENV} ended as ${deployed}`).toBe('Active');
+}
+
+/** An automation's card renders no status dot, so readiness is its Schedule and Test actions. The sample runs from its image, so no build is awaited. */
+export async function requireAutomationReady(page: Page): Promise<void> {
+  await dismissStrayDialog(page);
+  await expect(envCard(page), `no ${ENV} card on ${AUTOMATION}`).toBeVisible({ timeout: 2 * 60_000 });
   // Enabled, not merely visible: both actions are rendered but disabled while a build is running.
   await expect(
     envCard(page)

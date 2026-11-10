@@ -37,6 +37,7 @@ vi.mock('../../../hooks/useConsumers', () => ({
   useEndpointSecurity: () => ({ data: security.data, isError: !!security.error, error: security.error, isFetching: false, refetch: security.refetch }),
 }));
 vi.mock('../../AgentChat', () => ({ default: () => null }));
+vi.mock('../../../hooks/useVoiceAgents', () => ({ useLinkedVoiceAgents: () => ({ voiceAgents: [], isLoading: false, isError: false, refetch: () => {} }) }));
 
 let root: Root;
 let container: HTMLDivElement;

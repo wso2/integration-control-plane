@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Bot, Boxes, CalendarClock, Database, FileText, Globe, MCP, Network, Puzzle, ShieldCheck, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
+import { Bot, Boxes, CalendarClock, Database, FileText, Globe, MCP, Mic, Network, Puzzle, ShieldCheck, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentType } from 'react';
 import type { IntegrationType } from '../types/integration';
 
@@ -33,6 +33,7 @@ export const INTEGRATION_TYPE_ICONS: Record<IntegrationType, IntegrationIconComp
   'file-integration': FileText,
   'event-integration': Zap,
   'ai-agent': Bot,
+  'voice-agent': Mic,
   'mcp-server': MCP,
   'mcp-proxy': Network,
   'tailscale-vpn': ShieldCheck,
