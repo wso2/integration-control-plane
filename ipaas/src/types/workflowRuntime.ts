@@ -32,3 +32,22 @@ export interface WorkflowRuntime {
   /** Derived from the environment names, so listed before the namespaces are registered. */
   namespaces: WorkflowNamespace[];
 }
+
+/** How a workflow's deploy or promote to one environment, which runs after its request, stands. */
+export type WorkflowDeployState = 'none' | 'deploying' | 'deployed' | 'failed';
+
+/**
+ * A workflow's deploy or promote to one environment. The BFF answers it before it is done:
+ * connecting the workflow runtime and releasing outlast the gateway's request timeout.
+ */
+export interface WorkflowDeploy {
+  environment: string;
+  state: WorkflowDeployState;
+  operation?: 'deploy' | 'promote';
+  startedAt?: string;
+  finishedAt?: string;
+  /** The release a finished deploy bound. */
+  releaseName?: string;
+  /** For a failed deploy, what its request would have answered. */
+  message?: string;
+}

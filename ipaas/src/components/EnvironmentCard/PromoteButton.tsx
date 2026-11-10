@@ -22,6 +22,7 @@ import { useState, type ReactNode } from 'react';
 import { useIntegrationLinks } from '../../hooks/useConfiguration';
 import { promoteWithoutValues } from '../../utils/integrationLinks';
 import { useComponentDeployment, usePromote, useProxyReconciliation } from '../../hooks/useDeployments';
+import { useWorkflowDeploy } from '../../hooks/useWorkflowDeploy';
 import { pendingApiChange, PENDING_API_CHANGE_TOOLTIP } from '../../utils/promotion';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useCan } from '../../hooks/useCan';
@@ -60,6 +61,9 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
+  // A workflow promotes after its request: the target's promote holds the button until it ends.
+  const { isDeploying: targetDeploying } = useWorkflowDeploy(componentId, targetEnvId, isWorkflow);
+  const promoting = promote.isPending || targetDeploying;
   const links = useIntegrationLinks(projectId, componentId, true);
   // Read only when promoting, as the resource values are.
   const publications = useUserPortalPublications(componentId, { enabled: false });
@@ -134,8 +138,8 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
     <>
       <Tooltip title={tooltipTitle}>
         <span>
-          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={loading || !canPromote || checking || promote.isPending} onClick={checkThenPromote}>
-            {checking ? 'Checking…' : promote.isPending ? 'Promoting…' : 'Promote'}
+          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={loading || !canPromote || checking || promoting} onClick={checkThenPromote}>
+            {checking ? 'Checking…' : promoting ? 'Promoting…' : 'Promote'}
           </Button>
         </span>
       </Tooltip>

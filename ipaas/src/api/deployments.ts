@@ -43,12 +43,26 @@
  * workstream) rather than adding a query here.
  */
 
-import type { ComponentDeployment, BuildRun, ReleaseMgtDeployment, DeploymentTrackImage, DeployDeploymentTrackInput, PromoteInput, PromoteResult, ProxyReconciliationStatus, StopDeploymentInput, DeployPrebuiltImageInput, ByoiImage } from '../types/deployment';
+import type {
+  ComponentDeployment,
+  BuildRun,
+  ReleaseMgtDeployment,
+  DeploymentTrackImage,
+  DeployDeploymentTrackInput,
+  DeployResult,
+  PromoteInput,
+  PromoteResult,
+  ProxyReconciliationStatus,
+  StopDeploymentInput,
+  DeployPrebuiltImageInput,
+  ByoiImage,
+} from '../types/deployment';
 import type { EndpointExposure, EnvEndpoint } from '../types/component';
 import type { DeployComponentInput } from '../types/build';
 import { bff, items, q, seg, type ListResponse, type MessageResponse } from './_client';
 import { getEndpointLabel } from '../utils/endpoints';
 import { toVisibilityLabel } from './_visibility';
+import { acceptedWorkflowDeploy } from './workflowRuntime';
 
 // Underscored params (_orgHandler, _orgUuid, _projectId) are kept on these
 // signatures for devant contract parity; cloud does not use them. versionId is
@@ -251,12 +265,18 @@ export const fetchDeploymentTrackImages = (componentId: string, versionId: strin
 // The BFF has no BYOI image-history endpoint, so report an empty history.
 export const fetchByoiImageHistory = (_orgUuid: string, _projectId: string, _componentId: string, _versionId: string): Promise<ByoiImage[]> => Promise.resolve([]);
 
-export const deployDeploymentTrack = (input: DeployDeploymentTrackInput): Promise<string> => bff.post<MessageResponse>(`/components/${seg(input.componentId)}/deployments`, input).then((r) => r?.message ?? '');
+// A workflow deploys after the answer, which then carries the run's status (acceptedWorkflowDeploy).
+export const deployDeploymentTrack = (input: DeployDeploymentTrackInput): Promise<DeployResult> =>
+  bff.post<MessageResponse | null>(`/components/${seg(input.componentId)}/deployments`, input).then((r) => ({ message: r?.message ?? '', workflowDeploy: acceptedWorkflowDeploy(r) }));
 
 export const triggerBuild = (input: DeployComponentInput): Promise<{ message: string; success: boolean }> =>
   bff.post<{ message: string; success: boolean }>(`/components/${seg(input.componentId)}/builds`, input).then((r) => r ?? { message: '', success: true });
 
-export const promote = (input: PromoteInput): Promise<PromoteResult> => bff.post<PromoteResult | null>(`/components/${seg(input.componentId)}/deployments/promote`, input).then((r) => r ?? { message: '' });
+export const promote = (input: PromoteInput): Promise<PromoteResult> =>
+  bff.post<PromoteResult | null>(`/components/${seg(input.componentId)}/deployments/promote`, input).then((r) => {
+    const workflowDeploy = acceptedWorkflowDeploy(r);
+    return workflowDeploy ? { message: workflowDeploy.message ?? '', workflowDeploy } : (r ?? { message: '' });
+  });
 
 // One environment's API gateway state. The BFF checks every endpoint on API Platform for it, so it is
 // read on its own rather than with the deployment, whose readers mostly don't need it.

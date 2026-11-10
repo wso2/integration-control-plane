@@ -41,6 +41,15 @@ vi.mock('../../Workflows/overview/WorkflowEnvCardContent', () => ({
   },
 }));
 
+// The workflow's deploy to the environment, which runs after its request.
+const workflowDeploy = vi.hoisted(() => ({ value: { isDeploying: false } as Record<string, unknown>, args: [] as unknown[][] }));
+vi.mock('../../../hooks/useWorkflowDeploy', () => ({
+  useWorkflowDeploy: (...args: unknown[]) => {
+    workflowDeploy.args.push(args);
+    return workflowDeploy.value;
+  },
+}));
+
 const PROPS = {
   component: { id: 'orders' },
   env: { id: 'production', name: 'Production' },
@@ -54,6 +63,8 @@ let container: HTMLDivElement;
 beforeEach(() => {
   state.targets = [];
   webhookBody.rendered = 0;
+  workflowDeploy.value = { isDeploying: false };
+  workflowDeploy.args = [];
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -87,6 +98,21 @@ describe('workflow EnvCardBody', () => {
     await renderBody({ hasDeployment: false, loadingDeployment: false, deploymentStatusV2: null });
     expect(state.targets).toHaveLength(0);
     expect(container.textContent).toBe('This integration has not been deployed to this environment yet.');
+  });
+
+  it('says a deploy to this environment is still running, before the environment has a deployment', async () => {
+    workflowDeploy.value = { isDeploying: true, deploy: { environment: 'production', state: 'deploying', operation: 'deploy' } };
+    await renderBody({ hasDeployment: false, loadingDeployment: false, deploymentStatusV2: null });
+    expect(workflowDeploy.args.at(-1)).toEqual(['orders', 'production']);
+    expect(container.querySelector('[data-testid="workflow-deploy-running"]')?.textContent).toBe('Deploying to this environment. Connecting the workflow runtime can take a minute.');
+  });
+
+  it('says why the last promote to this environment failed', async () => {
+    const failure = { environment: 'production', state: 'failed', operation: 'promote', message: 'the workflow runtime is unavailable; try again later' };
+    workflowDeploy.value = { isDeploying: false, deploy: failure, failure };
+    await renderBody({ hasDeployment: true, loadingDeployment: false, deploymentStatusV2: 'ACTIVE' });
+    expect(container.querySelector('[data-testid="workflow-deploy-failed"]')?.textContent).toBe('The last promotion to this environment failed: the workflow runtime is unavailable; try again later');
+    expect(state.targets).toHaveLength(1);
   });
 
   it('holds the card’s shape while the deployment loads', async () => {

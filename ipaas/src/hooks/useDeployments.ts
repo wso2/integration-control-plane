@@ -24,6 +24,7 @@ import { trackEvent } from '../services/tracking/tracking';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { isExposureTransitioning } from '../utils/endpoints';
 import { invalidateEndpointSettings } from './useConsumers';
+import { trackWorkflowDeploy } from './useWorkflowDeploy';
 import { TYPE_TO_KIND } from '../constants/insights';
 import {
   fetchComponentDeployment,
@@ -213,8 +214,9 @@ export function useDeployDeploymentTrack() {
   return useMutation({
     meta: { operation: 'deploy-integration' },
     mutationFn: (input: DeployDeploymentTrackInput) => deployDeploymentTrack(input),
-    onSuccess: (_data, input) => {
+    onSuccess: (data, input) => {
       trackEvent('component-deploy');
+      if (data.workflowDeploy) trackWorkflowDeploy(qc, input.componentId, data.workflowDeploy);
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId, input.id] });
       qc.invalidateQueries({ queryKey: ['executionConfigs', input.componentId] });
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
@@ -240,8 +242,9 @@ export function usePromote() {
     mutationKey: ['promote'],
     meta: { operation: 'promote-integration' },
     mutationFn: (input: PromoteInput) => promote(input),
-    onSuccess: (_data, input) => {
+    onSuccess: (data, input) => {
       trackEvent('component-promote');
+      if (data.workflowDeploy) trackWorkflowDeploy(qc, input.componentId, data.workflowDeploy);
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
       // The links report what the target's release carries; they follow it until it is the promoted one.
       qc.invalidateQueries({ queryKey: ['integrationLinks'] });
