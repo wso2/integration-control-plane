@@ -18,7 +18,7 @@
 
 import { Divider, Stack, Typography } from '@wso2/oxygen-ui';
 import { Sparkles } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
@@ -32,16 +32,12 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const selectedEndpoint = endpoints[selectedEpIdx] ?? endpoints[0];
 
-  // The enforcing API Platform gateway URL for the selected endpoint. Shown in place of the raw OpenChoreo external route, as the
-  // integration-as-api card does.
+  // The agent's URL on Agent Manager's AI gateway, where every agent is deployed. It is the only URL the card
+  // lists: the endpoint's own routes (its OpenChoreo external route and its in-cluster project URL) carry
+  // neither the agent's API key nor its gateway policy. '' while the gateway has none, which shows as "—".
   const securityRef = selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id, deploymentTrackId: versionId } : null;
   const { data: apiSecurity } = useEndpointSecurity(securityRef, !!selectedEndpoint);
-
-  // The panel must never fall back to the raw OpenChoreo route for an agent — it's a second front
-  // door with no API key or gateway policy, so it's suppressed even before apiSecurity resolves.
-  // AgentChat.tsx keys off the same publicUrl field via its own useEnvEndpoints call to detect a
-  // reachable endpoint at all, so that field is left untouched everywhere except this local copy.
-  const endpointsForPanel = useMemo(() => endpoints.map((e) => ({ ...e, publicUrl: null, defaultPublicUrl: null, invokeUrl: null })), [endpoints]);
+  const agentGatewayUrl = apiSecurity?.publicUrl ?? '';
 
   if (!hasDeployment) {
     return (
@@ -57,16 +53,13 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
     );
   }
 
-  // Show the deployed endpoint URLs whenever the agent is deployed
-  const showEndpoints = endpoints.length > 0;
-
   // The chat is rendered for any deployed agent, whatever the rollout state. It reports its
   // own readiness — endpoint discovery, gateway exposure and the connection chip — so a
   // placeholder here would only duplicate that, less precisely.
   return (
     <>
       <Divider sx={{ my: 2 }} />
-      {showEndpoints && <EndpointUrlsPanel endpoints={endpointsForPanel} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
+      <EndpointUrlsPanel endpoints={endpoints} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} agentGatewayUrl={agentGatewayUrl} />
       <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
     </>
   );

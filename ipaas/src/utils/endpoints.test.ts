@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { aiGatewayUrlRows, editorExposure, envCardUrlRows, exposureLabels, gatewayExposureState, getEndpointLabel, isBrowserReachable, isExposureTransitioning, resolveEndpointInvokeUrl, trimEndpointName, visibilityUrlOptions } from './endpoints';
+import { agentGatewayUrlRows, aiGatewayUrlRows, editorExposure, envCardUrlRows, exposureLabels, gatewayExposureState, getEndpointLabel, isBrowserReachable, isExposureTransitioning, resolveEndpointInvokeUrl, trimEndpointName, visibilityUrlOptions } from './endpoints';
 import type { EnvEndpoint } from '../types/component';
 
 const ep = (partial: Partial<EnvEndpoint>): EnvEndpoint => ({ id: 'e', releaseId: 'r', environmentId: 'env', displayName: 'ep', type: 'GraphQL', visibility: 'Public', ...partial }) as EnvEndpoint;
@@ -257,5 +257,17 @@ describe('aiGatewayUrlRows', () => {
 
   it('lists nothing while the proxy has no URL', () => {
     expect(aiGatewayUrlRows('')).toEqual([]);
+  });
+});
+
+describe('agentGatewayUrlRows', () => {
+  const agentUrl = 'https://gw.example.com/math-tutor';
+
+  it('shows the AI gateway URL as Public', () => {
+    expect(agentGatewayUrlRows(agentUrl)).toEqual([{ key: 'public', label: 'Public', url: agentUrl }]);
+  });
+
+  it('keeps the Public row, empty, while the gateway has no URL', () => {
+    expect(agentGatewayUrlRows('')).toEqual([{ key: 'public', label: 'Public', url: '' }]);
   });
 });
