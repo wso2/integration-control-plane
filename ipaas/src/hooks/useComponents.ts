@@ -59,6 +59,9 @@ export function useOrgComponents(orgHandler: string, projectIds: string[]) {
     })),
     combine: (results) => ({
       byProject: new Map(projectIds.map((id, i) => [id, results[i].data])),
+      isLoading: results.some((r) => r.isLoading),
+      isError: results.some((r) => r.isError),
+      refetch: () => results.forEach((r) => r.refetch()),
     }),
   });
 }

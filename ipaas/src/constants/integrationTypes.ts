@@ -17,7 +17,7 @@
  */
 
 import type { ComponentType } from 'react';
-import { AlertCircle, Clock, FileStack, Folder, Globe, MCP, Network, Sparkles, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
+import { AlertCircle, Clock, FileStack, Folder, Globe, MCP, Mic, Network, Sparkles, Webhook, Workflow, Zap } from '@wso2/oxygen-ui-icons-react';
 import type { IntegrationType } from '../types/integration';
 
 export interface IntegrationTypeInfo {
@@ -44,6 +44,7 @@ export const INTEGRATION_TYPE_INFO: Record<IntegrationType, IntegrationTypeInfo>
   'file-integration': { displayName: 'File Integration', Icon: Folder },
   'event-integration': { displayName: 'Event Integration', Icon: Zap },
   'ai-agent': { displayName: 'AI Agent', Icon: Sparkles },
+  'voice-agent': { displayName: 'Voice Agent', Icon: Mic },
   'mcp-server': { displayName: 'MCP Server', Icon: MCP },
   'mcp-proxy': { displayName: 'MCP Proxy', Icon: MCP },
   'tailscale-vpn': { displayName: 'Tailscale VPN', Icon: Network },

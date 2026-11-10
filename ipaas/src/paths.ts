@@ -118,6 +118,30 @@ export function componentsNewAiBuilderUrl(orgHandler: string, projectHandler: st
   return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/ai-builder`;
 }
 
+export function voiceAgentsUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/voice-agents`;
+}
+
+export function newVoiceAgentUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/voice-agents/new`;
+}
+
+export function createVoiceAgentUrl(orgHandler: string, projectHandler: string): string {
+  return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/voice-agent`;
+}
+
+export function componentTestUrl(orgHandler: string, projectHandler: string, componentHandler: string): string {
+  return `${componentUrl(orgHandler, projectHandler, componentHandler)}/test`;
+}
+
+export function voiceAgentTestUrl(orgHandler: string, projectHandler: string, voiceAgentHandler: string): string {
+  return `${componentTestUrl(orgHandler, projectHandler, voiceAgentHandler)}/voice-agent`;
+}
+
+export function enableVoiceAgentUrl(orgHandler: string, projectHandler: string, agentHandler: string): string {
+  return `/organizations/${orgHandler}/projects/${projectHandler}/components/${agentHandler}/voice-agent/new`;
+}
+
 export function prebuiltIntegrationsUrl(orgHandler: string, projectHandler: string): string {
   return `/organizations/${orgHandler}/projects/${projectHandler}/prebuilt-integrations`;
 }

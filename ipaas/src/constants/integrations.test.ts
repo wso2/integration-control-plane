@@ -48,6 +48,11 @@ describe('project listing — RAG components', () => {
     expect(isSupportedIntegration('byoiService', 'rag-retrieval-service')).toBe(true);
     expect(isSupportedIntegration('byoiService', 'rag-service')).toBe(true);
   });
+
+  it('treats a voice agent as a supported integration with its own label', () => {
+    expect(isSupportedIntegration('voiceAgent', null)).toBe(true);
+    expect(getDisplayLabel('voiceAgent', null)).toBe('Voice Agent');
+  });
 });
 
 describe('project listing — foreign runtimes', () => {

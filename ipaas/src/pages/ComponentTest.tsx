@@ -16,20 +16,21 @@
  * under the License.
  */
 
-import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
+import { Box, CircularProgress, PageContent, Skeleton, Typography } from '@wso2/oxygen-ui';
 import { useEffect, type JSX } from 'react';
 import AgentChatConsole from './AgentChatConsole';
 import AutomationTest from './AutomationTest';
 import ComingSoon from './ComingSoon';
 import McpTest from './McpTest';
 import TestConsole from './TestConsole';
+import VoiceAgentTestConsole from './VoiceAgentTestConsole';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useIntegrationIdentity } from '../hooks/useIntegrationIdentity';
 import { useProjectId } from '../hooks/useProjects';
 import { Navigate } from 'react-router';
 import { trackEvent } from '../services/tracking/tracking';
 import type { ComponentScope } from '../nav';
-import { componentUrl } from '../paths';
+import { componentTestUrl, componentUrl } from '../paths';
 import { isWorkflowIntegration } from '../utils/workflowIntegration';
 
 /**
@@ -66,6 +67,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
   if (identity?.type === 'mcp-server' || identity?.type === 'mcp-proxy') return <McpTest {...scope} />;
   if (identity?.type === 'integration-as-api') return <TestConsole {...scope} />;
   if (identity?.type === 'ai-agent') return <AgentChatConsole {...scope} />;
+  if (identity?.type === 'voice-agent') return <VoiceAgentTestConsole {...scope} />;
   return <ComingSoon title="Coming soon" description="Testing tools are currently under development." />;
 }
 
@@ -115,4 +117,32 @@ function RouteLoading(): JSX.Element {
       </Box>
     </PageContent>
   );
+}
+
+const VOICE_TEST_SKELETON_SX = { mt: 3 } as const;
+
+function VoiceAgentTestSkeleton(): JSX.Element {
+  return (
+    <PageContent fullWidth>
+      <Skeleton variant="text" width={280} height={48} />
+      <Skeleton variant="rounded" height={480} sx={VOICE_TEST_SKELETON_SX} />
+    </PageContent>
+  );
+}
+
+export function VoiceAgentTestRoute(scope: ComponentScope): JSX.Element {
+  const { projectId } = useProjectId(scope.project);
+  const { data: comp, isPending } = useComponentByHandler(projectId, scope.component);
+  const identity = useIntegrationIdentity(comp ?? undefined);
+
+  const voiceAgentId = comp && identity?.type === 'voice-agent' ? comp.id : undefined;
+  useEffect(() => {
+    if (voiceAgentId) trackEvent('component-test');
+  }, [voiceAgentId]);
+
+  if (projectId && isPending) return <VoiceAgentTestSkeleton />;
+
+  if (comp && identity?.type !== 'voice-agent') return <Navigate to={componentTestUrl(scope.org, scope.project, scope.component)} replace />;
+
+  return <VoiceAgentTestConsole {...scope} />;
 }
