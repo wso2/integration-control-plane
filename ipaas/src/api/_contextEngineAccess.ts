@@ -26,7 +26,7 @@
 import { authenticatedFetch, getAccessToken } from '../auth';
 import { CONSOLE_ACCESS_REFRESH_MARGIN_MS } from '../constants/contextEngine';
 import { HttpError } from '../types/http';
-import { isGatewayKeyRefusal, parseContextEngineKey } from '../utils/contextEngine';
+import { isGatewayKeyRefusal } from '../utils/contextEngine';
 import { bff, BffError, seg } from './_client';
 
 interface ConsoleAccess {
@@ -48,8 +48,7 @@ export function asHttpError(err: unknown): unknown {
 
 /** The BFF path of one engine. */
 export function enginePath(engineId: string): string {
-  const { environment, handle } = parseContextEngineKey(engineId);
-  return `/context-engines/${seg(handle)}/environments/${seg(environment)}`;
+  return `/context-engines/${seg(engineId)}`;
 }
 
 const accessByEngine = new Map<string, Promise<ConsoleAccess>>();

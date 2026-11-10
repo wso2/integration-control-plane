@@ -74,7 +74,7 @@ async function sentEvent(call: number): Promise<Record<string, unknown>> {
   return JSON.parse(await (form.get('event') as Blob).text()) as Record<string, unknown>;
 }
 
-const ENGINE = 'development/docs';
+const ENGINE = 'docs';
 const SUPPORT: FileVisibility = { kind: 'roles', roles: ['support'] };
 
 beforeEach(() => {

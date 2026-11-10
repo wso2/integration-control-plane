@@ -95,7 +95,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   if (!engineId) {
     return (
       <PageContent>
-        <NotFound message="This link does not name a context engine and its environment." backTo={contextEnginesUrl(scope.org)} />
+        <NotFound message="This link does not name a context engine." backTo={contextEnginesUrl(scope.org)} />
       </PageContent>
     );
   }

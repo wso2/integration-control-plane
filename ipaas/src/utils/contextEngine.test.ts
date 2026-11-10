@@ -125,6 +125,7 @@ import {
   splitUrls,
   summarizeSource,
   toConfigurationPayload,
+  toBffCreateRequest,
   toCreateInput,
   toSourceRegistration,
   toIntegrationRequest,
@@ -332,7 +333,7 @@ describe('source validation', () => {
     const base = { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name', clientId: 'c', clientSecret: 's' };
     expect(isSourceValid(withValues('salesforce', base))).toBe(true);
     const mapped = withValues('salesforce', { ...base, rmlMapping: '@prefix ex: <http://ex> .' });
-    const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] }, 'development')).sources[0].settings;
+    const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] })).sources[0].settings;
     expect(settings.rmlMapping).toBe('@prefix ex: <http://ex> .');
   });
 
@@ -476,10 +477,14 @@ describe('form completion', () => {
   });
 
   it('converts to a create input with trimmed name/description', () => {
-    const input = toCreateInput({ ...completeForm(), name: '  Ops  ', description: ' d ' }, 'development');
+    const input = toCreateInput({ ...completeForm(), name: '  Ops  ', description: ' d ' });
     expect(input.name).toBe('Ops');
     expect(input.description).toBe('d');
-    expect(() => toCreateInput({ ...completeForm(), llm: null }, 'development')).toThrow();
+    expect(() => toCreateInput({ ...completeForm(), llm: null })).toThrow();
+  });
+
+  it('leaves the environment to the BFF in the create request', () => {
+    expect(toBffCreateRequest(toCreateInput(completeForm()))).not.toHaveProperty('environment');
   });
 });
 
@@ -528,7 +533,7 @@ describe('wire payloads', () => {
   });
 
   it('separates settings from credentials and adds azure fields only for azure', () => {
-    const payload = toConfigurationPayload(toCreateInput(completeForm(), 'development'));
+    const payload = toConfigurationPayload(toCreateInput(completeForm()));
     expect(payload.sources[0].settings).toEqual({ repositoryUrl: 'https://github.com/wso2/docs', branch: 'main', includePaths: '' });
     expect(payload.sources[0].credentials).toEqual({ accessToken: 'ghp_x' });
     expect(payload.llm).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6', apiKey: 'sk-ant' });
@@ -538,7 +543,7 @@ describe('wire payloads', () => {
   it('sends only the settings and credentials the chosen auth flow uses', () => {
     const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale' });
     const form = { ...completeForm(), sources: [sf] };
-    const source = toConfigurationPayload(toCreateInput(form, 'development')).sources[0];
+    const source = toConfigurationPayload(toCreateInput(form)).sources[0];
     // Client credentials is the default flow: the Connected App key is a setting, the hidden refresh token is dropped.
     expect(source.settings).toMatchObject({ authType: 'client_credentials', baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', apiVersion: '59.0' });
     expect(source.credentials).toEqual({ clientSecret: 's' });
@@ -619,7 +624,7 @@ describe('shared api key', () => {
     expect(effectiveLlm(sameProvider)?.apiKey).toBe('sk-test');
     expect(modelsStepBlocker(sameProvider)).toBeNull();
     expect(modelsStepBlocker({ ...sameProvider, shareApiKey: false })).toBe('Complete the ingestion language model');
-    expect(toCreateInput(sameProvider, 'development').llm.apiKey).toBe('sk-test');
+    expect(toCreateInput(sameProvider).llm.apiKey).toBe('sk-test');
   });
 
   it('names the first missing piece of the models step', () => {
@@ -634,9 +639,9 @@ describe('shared api key', () => {
     expect(modelsStepBlocker({ ...form, answersEnabled: false })).toBeNull();
     const chosen = { ...form, answerLlm: { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' } };
     expect(modelsStepBlocker(chosen)).toBeNull();
-    expect(toCreateInput(chosen, 'development').answers).toEqual({ enabled: true, model: chosen.answerLlm });
-    expect(toCreateInput({ ...chosen, answersEnabled: false }, 'development').answers).toEqual({ enabled: false, model: null });
-    expect(toCreateInput(completeForm(), 'development').answers).toEqual({ enabled: true, model: null });
+    expect(toCreateInput(chosen).answers).toEqual({ enabled: true, model: chosen.answerLlm });
+    expect(toCreateInput({ ...chosen, answersEnabled: false }).answers).toEqual({ enabled: false, model: null });
+    expect(toCreateInput(completeForm()).answers).toEqual({ enabled: true, model: null });
   });
 });
 
@@ -741,9 +746,8 @@ describe('drafts', () => {
 
 function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDetail {
   return {
-    id: 'development/support-knowledge',
+    id: 'support-knowledge',
     handle: 'support-knowledge',
-    environment: 'development',
     name: 'Support Knowledge',
     description: '',
     state: 'ready',
@@ -901,7 +905,7 @@ describe('storage', () => {
       password: 'pw',
       sslRequired: true,
     });
-    const payload = toConfigurationPayload(toCreateInput({ ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } } }, 'development'));
+    const payload = toConfigurationPayload(toCreateInput({ ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } } }));
     expect(payload.storage.vector).toEqual({ provider: 'lancedb' });
     expect(payload.storage.graph).toEqual({ provider: 'neo4j', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' });
   });

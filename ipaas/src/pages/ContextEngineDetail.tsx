@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
-import { useLocation, useParams, useSearchParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
@@ -102,8 +102,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   // Once an engine seen deleting answers 404, it was deleted rather than never there.
   const seenDeleting = useRef(false);
   if (deleting) seenDeleting.current = true;
-  const [params] = useSearchParams();
-  const base = contextEnginesUrl(scope.org, engine?.environment ?? (params.get('env') || undefined));
+  const base = contextEnginesUrl(scope.org);
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
@@ -175,7 +174,6 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
               {engine.name}
             </Typography>
             <EngineStateChip state={engine.state} reason={engine.statusReason} />
-            <Chip size="small" variant="outlined" label={engine.environment} />
           </Stack>
           {engine.description && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>

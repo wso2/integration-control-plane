@@ -19,26 +19,10 @@
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
-import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useContextEngineDraft, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
-import { useAllEnvironments } from '../hooks/useEnvironments';
-import {
-  answerChoice,
-  selectEnvironment,
-  checkStagedFile,
-  effectiveVisibility,
-  engineMessage,
-  isFormDirty,
-  modelsStepBlocker,
-  nameStepBlocker,
-  sourcesStepBlocker,
-  storageStepBlocker,
-  toCreateInput,
-  visibilityTags,
-  withSourceVisibilityRules,
-} from '../utils/contextEngine';
+import { answerChoice, checkStagedFile, effectiveVisibility, engineMessage, isFormDirty, modelsStepBlocker, nameStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -100,20 +84,11 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const setUp = useSetUpContextEngine();
   const live = useContextEngine(created?.id ?? '', { pollOnError: true });
   const setupStarted = useRef(false);
-  const [params] = useSearchParams();
-  const environments = useAllEnvironments();
-  const envList = useMemo(() => environments.data ?? [], [environments.data]);
-  const [chosenEnv, setChosenEnv] = useState<string | null>(null);
-  const environment = selectEnvironment(
-    envList.map((e) => e.id),
-    chosenEnv,
-    params.get('env'),
-  );
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   // The roles "everyone who can query" stands for when files are shared; the creator's groups are unknown until the engine runs.
   const { everyone, myGroups } = useUploadAudience(scope.org, form.roles, null);
-  const base = contextEnginesUrl(scope.org, environment || undefined);
+  const base = contextEnginesUrl(scope.org);
   const dirty = isFormDirty(form);
   const engineState = live.data?.state;
   const phase: SetupPhase = result ? 'done' : engineState === 'failed' ? 'failed' : engineState === 'ready' ? 'setting-up' : 'starting';
@@ -178,7 +153,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
   const setupBlockers: (string | null)[] = [
-    nameStepBlocker(form.name, form.description) ?? (environment ? null : 'Choose an environment'),
+    nameStepBlocker(form.name, form.description),
     sourcesStepBlocker(form.sources),
     // null, — 'Grant Access' step hidden
     modelsStepBlocker(form),
@@ -200,13 +175,13 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     setError(null);
     // Each source's visibility becomes audience rules now that the query roles are known.
     const withRules = withSourceVisibilityRules(form.sources, everyone);
-    create.mutate(toCreateInput({ ...form, sources: withRules }, environment), {
+    create.mutate(toCreateInput({ ...form, sources: withRules }), {
       onSuccess: (engine) => {
         draft.clear();
         setCreated({ id: engine.id, name: engine.name, sources: withRules, roles: form.roles });
       },
       onError: (e) => {
-        if (e instanceof HttpError && e.status === 409) setError(`Couldn't create the context engine: ${engineMessage(e, 'the name is taken in this environment')}`);
+        if (e instanceof HttpError && e.status === 409) setError(`Couldn't create the context engine: ${engineMessage(e, 'the name is taken')}`);
         else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines in this organization.");
         else if (e instanceof HttpError && e.status === 402) setError(`Couldn't create the context engine: ${engineMessage(e, 'your plan has no room for another engine')}`);
         else if (e instanceof HttpError) setError(`Couldn't create the context engine: ${engineMessage(e)}`);
@@ -256,17 +231,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
               </Alert>
             )}
 
-            {activeStep === 0 && (
-              <NameStep
-                name={form.name}
-                description={form.description}
-                onNameChange={(value) => dispatch({ type: 'name', value })}
-                onDescriptionChange={(value) => dispatch({ type: 'description', value })}
-                environments={envList}
-                environment={environment}
-                onEnvironmentChange={setChosenEnv}
-              />
-            )}
+            {activeStep === 0 && <NameStep name={form.name} description={form.description} onNameChange={(value) => dispatch({ type: 'name', value })} onDescriptionChange={(value) => dispatch({ type: 'description', value })} />}
             {activeStep === 1 && (
               <SourcesStep
                 orgHandle={scope.org}

@@ -35,7 +35,7 @@ import { BffError } from './_client';
 import { engineRequest, engineUpload, forgetConsoleAccess } from './_contextEngineAccess';
 import { HttpError } from '../types/http';
 
-const ENGINE = 'development/docs';
+const ENGINE = 'docs';
 const URL_BASE = 'https://gw.example.com/docs-console';
 const HOUR = 60 * 60 * 1000;
 
@@ -60,7 +60,7 @@ describe('engineRequest', () => {
 
     await expect(engineRequest(ENGINE, 'GET', '/v1/sources')).resolves.toEqual([{ id: 's1' }]);
 
-    expect(post).toHaveBeenCalledWith('/context-engines/docs/environments/development/console-access', {});
+    expect(post).toHaveBeenCalledWith('/context-engines/docs/console-access', {});
     const [url, init] = authenticatedFetch.mock.calls[0];
     expect(url).toBe(`${URL_BASE}/v1/sources`);
     expect(keyOf(authenticatedFetch.mock.calls[0])['X-API-Key']).toBe('k1');
