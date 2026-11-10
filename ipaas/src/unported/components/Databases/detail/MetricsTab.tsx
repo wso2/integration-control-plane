@@ -19,9 +19,9 @@
 import { Alert, Box, Button, Grid, MenuItem, Paper, Skeleton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { LineChart } from '@wso2/oxygen-ui-charts-react';
 import { useState, type JSX } from 'react';
-import { useServerMetrics } from '../../../hooks/usePlatformServices';
+import { useServerMetrics } from '../../../../hooks/usePlatformServices';
 import { METRIC_CHART_COLORS, METRIC_PERIODS } from '../../../../constants/platformServices';
-import { metricsToChart, metricTitle } from '../../../utils/platformServices';
+import { metricsToChart, metricTitle } from '../../../../utils/platformServices';
 import type { MetricPeriod, ServerVariant } from '../../../../types/platformServices';
 
 export default function MetricsTab({ serverId, variant = 'db-servers' }: { serverId: string; variant?: ServerVariant }): JSX.Element {

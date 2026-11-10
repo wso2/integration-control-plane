@@ -19,7 +19,7 @@
 import { Box, Button, Chip, CircularProgress, IconButton, Paper, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Archive, Cloud, Cpu, Download, HardDrive, MemoryStick, Power, RefreshCw, Server } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { useFetchServerCaCertificate, useSetServerPoweredState } from '../../hooks/usePlatformServices';
+import { useFetchServerCaCertificate, useSetServerPoweredState } from '../../../hooks/usePlatformServices';
 import { providerLabel, regionLabel, STATUS_COLORS, statusLabel, TRANSITIONAL_STATUSES } from '../../../constants/platformServices';
 import CopyField from '../Databases/detail/CopyField';
 import DetailRow from '../Databases/detail/DetailRow';

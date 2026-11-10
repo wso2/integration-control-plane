@@ -48,13 +48,6 @@ export default defineConfig({
     proxy: {
       '/_auth': gatewayProxy,
       '/_api': gatewayProxy,
-      // A locally running Devant Context Engine (`context-engine-api --port 8000`). The engine
-      // has no CORS layer, so the dev server fronts it on the app's own origin.
-      '/context-engine-proxy': {
-        target: process.env.CONTEXT_ENGINE_URL ?? 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/context-engine-proxy/, ''),
-      },
     },
   },
   // Preview mirrors the dev server: the IDP only accepts redirects on :3000, and

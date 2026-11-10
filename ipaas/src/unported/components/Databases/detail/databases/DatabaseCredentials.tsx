@@ -19,9 +19,9 @@
 import { Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListingTable, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { KeyRound, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useDeleteDbCredential } from '../../../../hooks/usePlatformServices';
+import { useDeleteDbCredential } from '../../../../../hooks/usePlatformServices';
 import { useEnvTemplates } from '../../../../../hooks/useDeploymentPipelines';
-import { envLabel } from '../../../../utils/platformServices';
+import { envLabel } from '../../../../../utils/platformServices';
 import CredentialDialog from './CredentialDialog';
 import type { DbCredential } from '../../../../../types/platformServices';
 import type { Notify } from './types';

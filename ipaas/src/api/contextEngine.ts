@@ -35,11 +35,10 @@
  * still renders.
  */
 
-import { getAccessToken } from '#auth';
-import { contextEngineClient, isAccessTokenExpired, refreshAccessToken } from './httpClients';
-import { CONTEXT_ENGINE_ID, CONTEXT_ENGINE_LOCAL_KEY, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS, DEFAULT_CONTEXT_ENGINE_NAME } from '../../constants/contextEngine';
-import { audienceMappingFromRules, deliveryIdentity, engineMessage, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toSourceRegistration } from '../../utils/contextEngine';
-import { HttpError } from '../../types/http';
+import { authenticatedFetch, getAccessToken } from '../auth';
+import { CONTEXT_ENGINE_ID, CONTEXT_ENGINE_LOCAL_KEY, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS, DEFAULT_CONTEXT_ENGINE_NAME } from '../constants/contextEngine';
+import { audienceMappingFromRules, deliveryIdentity, engineMessage, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toSourceRegistration } from '../utils/contextEngine';
+import { HttpError } from '../types/http';
 import type {
   ContextEngine,
   ContextEngineDetail,
@@ -78,7 +77,37 @@ import type {
   ContextGraphRelation,
   ContextQueryMode,
   ContextQueryTrace,
-} from '../../types/contextEngine';
+} from '../types/contextEngine';
+
+// Phase-1 bridge: the console talks to the one engine at CONTEXT_ENGINE_API_URL, sending the
+// static dev token when one is configured and the platform token otherwise.
+const engineBaseUrl = (): string => {
+  const base = window.API_CONFIG?.contextEngineApiUrl;
+  if (!base) throw new Error('Context Engine API URL is not configured');
+  return base;
+};
+
+/** A static engine token from runtime config, for local development; the platform token is used otherwise. */
+const staticEngineToken = (): string | undefined => window.API_CONFIG?.contextEngineApiToken || undefined;
+
+async function engineRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const url = `${engineBaseUrl()}${path}`;
+  const headers: Record<string, string> = body !== undefined ? { 'Content-Type': 'application/json' } : {};
+  const init: RequestInit = { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) };
+  const fixed = staticEngineToken();
+  const res = fixed ? await fetch(url, { ...init, headers: { ...headers, Authorization: `Bearer ${fixed}` } }) : await authenticatedFetch(url, init);
+  const text = await res.text().catch(() => '');
+  if (!res.ok) throw new HttpError(res.status, `HTTP ${res.status}: ${text || res.statusText}`);
+  return text ? (JSON.parse(text) as T) : (undefined as T);
+}
+
+const contextEngineClient = {
+  get: <T>(path: string) => engineRequest<T>('GET', path),
+  post: <T>(path: string, body?: unknown) => engineRequest<T>('POST', path, body),
+  put: <T>(path: string, body?: unknown) => engineRequest<T>('PUT', path, body),
+  patch: <T>(path: string, body?: unknown) => engineRequest<T>('PATCH', path, body),
+  delete: <T>(path: string) => engineRequest<T>('DELETE', path),
+};
 
 const V1 = '/v1';
 const grantsPath = (resourceId: string): string => `${V1}/resources/${encodeURIComponent(resourceId)}/grants`;
@@ -637,18 +666,9 @@ export async function updateContextSource(input: UpdateContextSourceInput): Prom
 
 const sourcePath = (id: string): string => `${V1}/sources/${encodeURIComponent(id)}`;
 
-/** A static engine token from runtime config, for local development; the platform token is used otherwise. */
-const staticEngineToken = (): string | undefined => window.API_CONFIG?.contextEngineApiToken || undefined;
-
-/**
- * The bearer for requests the browser sends itself: the dev token when
- * configured, else the platform token, refreshed first when it has expired,
- * as the JSON client's fetch does.
- */
+/** The bearer for requests the browser sends itself: the dev token when configured, else the platform token. */
 async function engineBearer(): Promise<string | null> {
-  const fixed = staticEngineToken();
-  if (!fixed && isAccessTokenExpired()) await refreshAccessToken();
-  const token = fixed || (await getAccessToken());
+  const token = staticEngineToken() || (await getAccessToken());
   return token ? `Bearer ${token}` : null;
 }
 
@@ -673,7 +693,7 @@ async function deliveryKey(sourceId: string, operation: string, recordId: string
   return `${sourceId}:${operation}:${await sha256Hex(deliveryIdentity(recordId, version))}`;
 }
 
-/** One multipart POST with a given bearer; the caller decides whether to try again. */
+/** One multipart POST with a given bearer. */
 function postMultipart(url: string, form: FormData, headers: Record<string, string>, bearer: string | null, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -708,19 +728,9 @@ function postMultipart(url: string, form: FormData, headers: Record<string, stri
   });
 }
 
-/**
- * An XHR rather than fetch, because only XHR reports upload progress. Like
- * the fetch client, it refreshes an expired platform token before sending and
- * once more after a 401, then tries again. Errors carry the engine's status.
- */
+/** An XHR rather than fetch, because only XHR reports upload progress. Errors carry the engine's status. */
 async function sendMultipart(url: string, form: FormData, headers: Record<string, string>, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
-  try {
-    return await postMultipart(url, form, headers, await engineBearer(), onProgress, signal);
-  } catch (err) {
-    if (!(err instanceof HttpError && err.status === 401) || staticEngineToken()) throw err;
-    await refreshAccessToken();
-    return postMultipart(url, form, headers, await engineBearer(), onProgress, signal);
-  }
+  return postMultipart(url, form, headers, await engineBearer(), onProgress, signal);
 }
 
 /** The job accepted under a delivery key, or null when the engine has none: the check after a lost reply. */

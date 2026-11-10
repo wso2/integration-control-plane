@@ -20,7 +20,7 @@ import { Box, FormControlLabel, ListingTable, Stack, Switch, Typography, TextFie
 import { useEffect, useState, type JSX } from 'react';
 import { MAX_RETRIEVE_CHUNKS } from '../../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import SecretField from '../../../../components/KnowledgeBase/SecretField';
+import SecretField from '../../../../components/common/SecretField';
 import { fieldStackSx, stepHeadingSx } from '../../../../components/KnowledgeBase/styles';
 import type { RetrievalQuery, RetrievedChunk } from '../../../../types/ragIngestion';
 

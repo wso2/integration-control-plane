@@ -19,9 +19,9 @@
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Autocomplete, Avatar, Box, Button, Chip, CircularProgress, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, Database, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
-import { useDbCredentials, useServerDatabases } from '../../../hooks/usePlatformServices';
+import { useDbCredentials, useServerDatabases } from '../../../../hooks/usePlatformServices';
 import { DB_MARKETPLACE_FILTERS, DB_STATUS, type DbMarketplaceFilter } from '../../../../constants/platformServices';
-import { matchesDatabaseFilter } from '../../../utils/platformServices';
+import { matchesDatabaseFilter } from '../../../../utils/platformServices';
 import SearchField from '../../../../components/SearchField';
 import CreateDatabaseDialog from './databases/CreateDatabaseDialog';
 import DatabaseCredentials from './databases/DatabaseCredentials';

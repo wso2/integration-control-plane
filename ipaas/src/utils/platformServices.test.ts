@@ -18,8 +18,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { deriveProviders, deriveRegions, envLabel, isPlanAvailableInRegion, isValidCidr, logOffsetNs, matchesDatabaseFilter, metricsToChart, metricTitle, planRegionSpec, plansForProviderRegion, toCreateError } from './platformServices';
-import type { DatabaseInfo, MetricSeries, ServicePlan } from '../../types/platformServices';
-import type { EnvTemplate } from '../../types/deploymentPipeline';
+import type { DatabaseInfo, MetricSeries, ServicePlan } from '../types/platformServices';
+import type { EnvTemplate } from '../types/deploymentPipeline';
 
 const region = (cloud_provider: ServicePlan['regions'][number]['cloud_provider'], cloud_region: ServicePlan['regions'][number]['cloud_region'], extra: Partial<ServicePlan['regions'][number]> = {}) => ({
   cloud_provider,

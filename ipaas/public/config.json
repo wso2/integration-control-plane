@@ -21,6 +21,5 @@
   "INTEGRATION_BUILDER_MAX_TOKENS": "1024",
   "INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL": "https://api.dev-central.ballerina.io/2.0/graphql",
   "MOESIF_APP_URL": "https://web-dev.moesif.com",
-  "TRACKING_ENV": "off",
-  "ENABLE_CONTEXT_ENGINE_FEATURE": "true"
+  "TRACKING_ENV": "off"
 }

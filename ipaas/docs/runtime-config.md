@@ -55,6 +55,7 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `MOESIF_APP_URL`                                                             | API Insights. See below.                                                                                                 |
 | `TRACKING_ENV`                                                               | Analytics tier: `dev`, `stage`, `prod` or `off`. Picks the GTM container and CookiePro script. Defaults to `dev`.        |
 | `MOESIF_APP_API_KEY`                                                         | Moesif app key for product-usage events, set per deployment. Not API Insights. Unset disables Moesif tracking.           |
+| `CONTEXT_ENGINE_*`, `ENABLE_CONTEXT_ENGINE_FEATURE`                          | Context Engines. See below.                                                                                              |
 | `SCOPES_ENFORCED`                                                            | `true` hides what the user's role doesn't allow. Set with ipaas-service's `SCOPES_ENFORCED`.                             |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
@@ -81,6 +82,14 @@ The org-level API Insights page embeds the Moesif dashboard, the same way the AP
 - The console fetches a Moesif viewer token from ipaas-service (`CHOREO_BASE_API_URL`) at `/analytics/id-token`. ipaas-service forwards the call to platform-api, which serves it only on an internal route.
 
 Moesif only answers an embed from origins it allowlists, so each console origin must be added on Moesif's side. Until then the page times out with Retry.
+
+## Context Engines
+
+Until ipaas-service provisions engines, the org-level Context Engines pages work with one running engine.
+
+- `ENABLE_CONTEXT_ENGINE_FEATURE` set to `true` shows the Context Engines entry. It also needs `CONTEXT_ENGINE_API_URL`.
+- `CONTEXT_ENGINE_API_URL` is the engine's base URL. The browser calls `<base>/v1/...` directly, so the engine must answer CORS for the console origin.
+- `CONTEXT_ENGINE_API_TOKEN` is for local development only: a bearer from the engine's static token file, sent instead of the platform token. Never set it in a shared deployment.
 
 ## Verification
 

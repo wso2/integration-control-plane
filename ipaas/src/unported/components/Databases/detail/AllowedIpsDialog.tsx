@@ -19,8 +19,8 @@
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useUpdateAllowedIps } from '../../../hooks/usePlatformServices';
-import { isValidCidr } from '../../../utils/platformServices';
+import { useUpdateAllowedIps } from '../../../../hooks/usePlatformServices';
+import { isValidCidr } from '../../../../utils/platformServices';
 import SelectableChoiceCard from './SelectableChoiceCard';
 import type { AllowedIpsPayload, DatabaseServerDetail, ServerVariant } from '../../../../types/platformServices';
 

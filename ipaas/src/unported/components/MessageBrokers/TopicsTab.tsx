@@ -19,7 +19,7 @@
 import { Alert, Button, Chip, CircularProgress, Dialog, DialogContent, DialogTitle, IconButton, ListingTable, Stack, Typography } from '@wso2/oxygen-ui';
 import { Plus, Pencil, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useDeleteKafkaTopic, useKafkaTopics } from '../../hooks/usePlatformServices';
+import { useDeleteKafkaTopic, useKafkaTopics } from '../../../hooks/usePlatformServices';
 import TopicDialog from './TopicDialog';
 import type { KafkaTopic } from '../../../types/platformServices';
 

@@ -34,7 +34,7 @@ const api = vi.hoisted(() => ({
   sendContextRecordEvent: vi.fn(),
   updateContextSource: vi.fn(),
 }));
-vi.mock('#api/contextEngine', () => api);
+vi.mock('../api/contextEngine', () => api);
 
 import { checkUpload, refreshUploads, retryUpload, startUploads, useSourceUploads } from './contextUploads';
 

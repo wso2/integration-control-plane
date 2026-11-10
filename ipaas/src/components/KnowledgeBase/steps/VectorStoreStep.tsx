@@ -22,7 +22,7 @@ import { blankVectorStore, ragLogoUrl, VECTOR_STORE_PROVIDERS } from '../../../c
 import { chromaCollectionNameError, pineconeIndexNameError, postgresTableNameError, weaviateCollectionNameError } from '../../../utils/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import SelectableCard from '../../common/SelectableCard';
-import SecretField from '../SecretField';
+import SecretField from '../../common/SecretField';
 import { fieldStackSx, stepHeadingSx, tileGridSx } from '../styles';
 import type { VectorStoreConfig } from '../../../types/ragIngestion';
 

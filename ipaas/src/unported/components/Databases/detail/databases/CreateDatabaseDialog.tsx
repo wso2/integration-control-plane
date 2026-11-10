@@ -18,7 +18,7 @@
 
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
-import { useCreateDatabase } from '../../../../hooks/usePlatformServices';
+import { useCreateDatabase } from '../../../../../hooks/usePlatformServices';
 import type { Notify } from './types';
 
 interface CreateDatabaseDialogProps {

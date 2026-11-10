@@ -18,7 +18,7 @@
 
 import { Card, CardActionArea, Divider, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { planRegionSpec } from '../../../utils/platformServices';
+import { planRegionSpec } from '../../../../utils/platformServices';
 import type { CloudProvider, CloudRegion, ServicePlan } from '../../../../types/platformServices';
 
 interface PlanCardProps {

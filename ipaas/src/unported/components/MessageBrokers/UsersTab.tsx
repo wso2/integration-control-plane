@@ -19,7 +19,7 @@
 import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListingTable, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, RotateCcw, Trash2, Download } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useCreateKafkaUser, useDeleteKafkaUser, useKafkaUsers, useResetKafkaUserCredentials } from '../../hooks/usePlatformServices';
+import { useCreateKafkaUser, useDeleteKafkaUser, useKafkaUsers, useResetKafkaUserCredentials } from '../../../hooks/usePlatformServices';
 
 const downloadText = (filename: string, content: string) => {
   const blob = new Blob([content], { type: 'application/x-pem-file' });

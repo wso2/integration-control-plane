@@ -21,7 +21,7 @@ import { type JSX } from 'react';
 import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import SelectableCard from '../../common/SelectableCard';
-import SecretField from '../SecretField';
+import SecretField from '../../common/SecretField';
 import { fieldStackSx, stepHeadingSx, tileGridSx } from '../styles';
 import type { EmbeddingConfig } from '../../../types/ragIngestion';
 

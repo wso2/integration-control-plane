@@ -18,9 +18,9 @@
 
 import { Box, MenuItem, Stack, TextField } from '@wso2/oxygen-ui';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
-import { useFetchServerLogs } from '../../../hooks/usePlatformServices';
+import { useFetchServerLogs } from '../../../../hooks/usePlatformServices';
 import { LOG_TIME_RANGES } from '../../../../constants/platformServices';
-import { logOffsetNs } from '../../../utils/platformServices';
+import { logOffsetNs } from '../../../../utils/platformServices';
 import LogsPanel from '../../../../components/Logs/LogsPanel';
 import DbLogRow from './DbLogRow';
 import type { LogEntry, ServerVariant } from '../../../../types/platformServices';

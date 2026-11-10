@@ -65,9 +65,9 @@ interface RuntimeConfig {
   /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
   TRACKING_ENV?: string;
   MOESIF_APP_API_KEY?: string;
-  /** Devant Context Engine REST base (the app calls `<base>/v1/...`). Unset disables the feature. */
+  /** Context Engine REST base (the app calls `<base>/v1/...`). Unset disables the feature. */
   CONTEXT_ENGINE_API_URL?: string;
-  /** Local-development only: a static engine token when the engine cannot verify platform tokens yet. */
+  /** Local-development only: a static engine token when the engine cannot verify platform tokens. */
   CONTEXT_ENGINE_API_TOKEN?: string;
   ENABLE_CONTEXT_ENGINE_FEATURE?: string | boolean;
   SCOPES_ENFORCED?: string | boolean;
@@ -157,7 +157,7 @@ export interface ApiConfig {
   trackingEnv: 'dev' | 'stage' | 'prod' | 'off';
   /** Moesif app key for product-usage analytics. Separate from the API Insights embed above. Unset disables Moesif tracking. */
   moesifAppApiKey?: string;
-  /** Devant Context Engine REST base. Empty when the engine is not configured for this deployment. */
+  /** Context Engine REST base. Empty when the engine is not configured for this deployment. */
   contextEngineApiUrl: string;
   /** Dev-only static bearer token for the engine; unset sends the platform token. */
   contextEngineApiToken?: string;
@@ -213,8 +213,7 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
   trackingEnv: 'dev',
-  // Dev server proxies this path to a locally running engine (see vite.config.ts).
-  contextEngineApiUrl: import.meta.env.DEV ? '/context-engine-proxy' : '',
+  contextEngineApiUrl: '',
 };
 
 const localPath = (value: string | undefined): string | undefined => (value && /^\/(?![/\\])/.test(value) ? value : undefined);

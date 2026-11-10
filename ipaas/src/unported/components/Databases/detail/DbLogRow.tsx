@@ -19,7 +19,7 @@
 import { Chip, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronRight, Copy } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { formatServerDateTime } from '../../../utils/platformServices';
+import { formatServerDateTime } from '../../../../utils/platformServices';
 import type { LogEntry } from '../../../../types/platformServices';
 
 /** A single database-server log line for the shared LogsPanel (collapsed summary + expandable detail). */

@@ -19,7 +19,7 @@
 import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListingTable, MenuItem, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useCreateKafkaAcl, useDeleteKafkaAcl, useKafkaAcls, useKafkaTopics, useKafkaUsers } from '../../hooks/usePlatformServices';
+import { useCreateKafkaAcl, useDeleteKafkaAcl, useKafkaAcls, useKafkaTopics, useKafkaUsers } from '../../../hooks/usePlatformServices';
 
 const PERMISSION_LABELS: Record<string, string> = {
   read: 'Consume',
