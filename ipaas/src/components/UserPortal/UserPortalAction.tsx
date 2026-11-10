@@ -43,6 +43,8 @@ interface UserPortalActionProps {
   onNotify: (notification: EnvCardNotification) => void;
   /** Unpublishing a workflow gives its Management API back to the console, where the environment's API security allows. */
   isWorkflow?: boolean;
+  /** Whether a published integration's Open User Portal link is here; false where the card links the portal elsewhere. */
+  showPortalLink?: boolean;
 }
 
 /**
@@ -52,12 +54,12 @@ interface UserPortalActionProps {
  * redeploys a workflow for the User Portal's sign-in says so in its confirmation, as an unpublish that redeploys it
  * back does.
  */
-export default function UserPortalAction({ orgHandler, projectId, componentId, environment, envName, onNotify, isWorkflow = false }: UserPortalActionProps): JSX.Element | null {
+export default function UserPortalAction({ orgHandler, projectId, componentId, environment, envName, onNotify, isWorkflow = false, showPortalLink = true }: UserPortalActionProps): JSX.Element | null {
   const { data, isLoading, error, refetch } = useUserPortalPublishability(componentId, environment);
   const publish = usePublishToUserPortal();
   const unpublish = useUnpublishFromUserPortal();
-  // The portal's address, for the link a published integration offers. Read only once published.
-  const { data: portal } = useUserPortal(environment, !!data?.published);
+  // The portal's address, for the link a published integration offers. Read only once published, and only where the link is.
+  const { data: portal } = useUserPortal(environment, !!data?.published && showPortalLink);
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [open, setOpen] = useState<'about' | 'publish' | 'refusals' | 'unpublish' | null>(null);
 
@@ -190,7 +192,7 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
     // A failed background publish stays in the report until the next publish; a published one has outlived it.
     const publishFailure = !publishing && !published && data.publishError ? refusalText(data.publishError, envName) : null;
     const toggle = () => openDialog(published ? 'unpublish' : data.publishable ? 'publish' : 'refusals');
-    // The switch sits in a header row, so what a publish is doing, or why the last one failed, goes in its tooltip.
+    // The switch's label stays short, so what a publish is doing, or why the last one failed, goes in its tooltip.
     const tooltip = !canDeploy ? DEPLOY_REFUSAL : publishing ? publishingText(envName) : (publishFailure ?? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}`);
     return (
       <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
@@ -225,7 +227,7 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
           />
         </Tooltip>
         {/* Only a running portal has an address to open. */}
-        {published && portal?.state === 'active' && portal.url && (
+        {published && showPortalLink && portal?.state === 'active' && portal.url && (
           <Link href={portal.url} target="_blank" rel="noopener noreferrer" variant="body2" underline="hover" sx={styles.footerLinkSx}>
             Open User Portal
             <ExternalLink size={12} />

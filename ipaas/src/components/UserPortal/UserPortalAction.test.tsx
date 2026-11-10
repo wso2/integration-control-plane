@@ -67,10 +67,10 @@ beforeEach(() => {
   entry.value = { isEntry: true, loading: false, entryEnvironmentName: 'Development' };
 });
 
-async function action(scopes: string[], isWorkflow = false) {
+async function action(scopes: string[], isWorkflow = false, showPortalLink = true) {
   const r = await renderWithScopes(
     <MemoryRouter>
-      <UserPortalAction orgHandler="acme" projectId="shop" componentId="orders" environment="production" envName="Production" onNotify={onNotify} isWorkflow={isWorkflow} />
+      <UserPortalAction orgHandler="acme" projectId="shop" componentId="orders" environment="production" envName="Production" onNotify={onNotify} isWorkflow={isWorkflow} showPortalLink={showPortalLink} />
     </MemoryRouter>,
     scopes,
   );
@@ -185,6 +185,16 @@ describe("the env card's User Portal action", () => {
     expect(link?.textContent).toBe('Open User Portal');
     expect(link?.getAttribute('href')).toBe('https://acme-up.example.com');
     expect(link?.getAttribute('target')).toBe('_blank');
+  });
+
+  it('offers no link, and reads no portal for one, where the card links the portal elsewhere', async () => {
+    publishability.mockResolvedValue({ ...publishable, published: true });
+    portal.mockResolvedValue({ environment: 'production', state: 'active', url: 'https://acme-up.example.com' });
+    const container = await action(DEVELOPER, true, false);
+    await flush();
+    expect(container.textContent).toContain('Published to User Portal');
+    expect(container.querySelector('a')).toBeNull();
+    expect(portal).not.toHaveBeenCalled();
   });
 
   it('offers no link while the portal has no address to open', async () => {

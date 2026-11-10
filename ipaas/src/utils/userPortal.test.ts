@@ -38,6 +38,7 @@ describe('refusalText for a background publish', () => {
   it('words an interrupted publish and a generic failure as asking to publish again', () => {
     expect(refusalText({ code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'x' }, 'Production')).toBe("Publishing didn't finish. Publish again.");
     expect(refusalText({ code: 'USER_PORTAL_PUBLISH_FAILED', message: 'x' }, 'Production')).toBe('Publishing to the User Portal failed. Publish again.');
+    expect(refusalText({ code: 'USER_PORTAL_PUBLISH_UNDOING', message: 'x' }, 'Production')).toBe('An earlier publish is still being undone in Production. Publish again in a minute.');
   });
 });
 

@@ -27,8 +27,8 @@ import DeployAction from './DeployAction';
  * Workflow integration module. Resolves from the `ballerinaWorkflow` display type.
  *
  * A deployed workflow runs like a service (its engine serves the Workflow Management
- * API over HTTP), so it reuses integration-as-API's status slot and its actions minus Test,
- * with the User Portal switch leading the header actions.
+ * API over HTTP), so it reuses integration-as-API's status slot and its actions minus Test.
+ * The User Portal switch is the footer action the loader adds to the types the portal shows.
  */
 const workflowModule: IntegrationModule = {
   ...INTEGRATION_TYPE_INFO.workflow,

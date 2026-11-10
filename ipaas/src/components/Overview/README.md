@@ -28,8 +28,7 @@ Overview/
 │   │                            file/event, ai-agent (drives the button + Run/Schedule)
 │   ├── UserPortalSharedAction.tsx  EnvCardSharedAction: the User Portal's Publish /
 │   │                            Unpublish / "User Portal off" action. useIntegrationModule
-│   │                            adds it to the types in constants/userPortal.ts USER_PORTAL_TYPES,
-│   │                            except workflow, which renders UserPortalAction in its own header actions
+│   │                            adds it to the types in constants/userPortal.ts USER_PORTAL_TYPES
 │   ├── FileEventHeader.tsx      shared CustomHeader for file- + event-integration
 │   │                            (status dot + Configure + Stop/Start; logs are in the body)
 │   ├── HeaderShell.tsx          integration-level header rendered above the cards
@@ -66,8 +65,8 @@ Overview/
 │   │                            tools list via the MCP SDK + Configure Policies action
 │   ├── HeaderStatus.tsx  EnvCardActions.tsx  EnvCardBody.tsx  OverviewHeaderActions.tsx
 │   └── McpToolTile.tsx / McpToolDrawer.tsx  (reuse _shared/bodies/OperationTile + OperationHeader)
-├── workflow/                    integration-as-api's status + actions minus Test (`hideTest`), with
-│                                the User Portal switch first in the header; the webhook body (endpoints +
+├── workflow/                    integration-as-api's status + actions minus Test (`hideTest`); the
+│                                User Portal switch in the footer; the webhook body (endpoints +
 │                                insights) with the workflow content between them once the
 │                                deployment is active (Workflows/overview/: definitions + figures)
 └── registry.ts                  IntegrationType → () => import('./<type>')  (one chunk per type)
@@ -91,7 +90,7 @@ loader's `EnvCardSharedAction` in the footer. A type with no env-card concept (e
 | `HeaderStatus`        | types with a status/Configure | service / ai-agent status dot + Configure                    |
 | `EnvCardActions`      | types with header actions     | Run/Schedule, Stop/Test/Logs                                 |
 | `CustomHeader`        | header outliers               | file- + event-integration (shared `FileEventHeader`)         |
-| `EnvCardSharedAction` | the loader, never a type      | User Portal action (USER_PORTAL_TYPES minus workflow), in the card's footer |
+| `EnvCardSharedAction` | the loader, never a type      | User Portal action (USER_PORTAL_TYPES), in the card's footer |
 | `CustomOverview`      | full-surface outliers         | Tailscale                                                    |
 | `HeaderActions`       | integration-level actions     | integration-as-api's Configure security link                 |
 

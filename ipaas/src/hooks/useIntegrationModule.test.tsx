@@ -42,8 +42,8 @@ describe('the User Portal env card action', { timeout: 20000 }, () => {
     expect((await load('automation'))?.EnvCardSharedAction).toBeDefined();
   });
 
-  it('is not a footer action for a workflow, whose header carries it', async () => {
-    expect((await load('workflow'))?.EnvCardSharedAction).toBeUndefined();
+  it('is a footer action for a workflow', async () => {
+    expect((await load('workflow'))?.EnvCardSharedAction).toBeDefined();
   });
 
   it('is not added to integration-as-API, which the portal does not show', async () => {
