@@ -26,6 +26,8 @@ import { useUpdateEndpoint } from '../../hooks/useComponents';
 import type { EndpointExposure, EnvEndpoint } from '../../types/component';
 import { friendlyApiError } from '../../utils/apiSecurity';
 import { editorExposure, exposureLabels } from '../../utils/endpoints';
+import { isWorkflowManagementEndpoint, MANAGEMENT_API_VISIBILITY_WARNING } from '../../utils/workflowIntegration';
+import { useManagementApiConfirm } from '../Overview/integration-as-api/useManagementApiConfirm';
 
 // Project access is always on, so it shows checked and locked. The gateway serves an endpoint on one
 // host at a time, so Public and Organization exclude each other, and clearing the checked one leaves
@@ -96,6 +98,7 @@ interface ManageEndpointProps {
   onBack: () => void;
 }
 
+/** Edits an endpoint's network visibility. A workflow's Management API says what its visibility reaches, and asks first. */
 export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, environmentId, onBack }: ManageEndpointProps) {
   const [{ exposure: seededExposure, legacyBothHosts }] = useState(() => editorExposure(ep));
   const [exposure, setExposure] = useState<EndpointExposure>(seededExposure);
@@ -104,6 +107,8 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
   const allowLeave = useUnsavedChanges(exposure !== seededExposure);
   const guardNavigation = useLeaveGuard();
   const canExpose = useCan()(Scopes.ENDPOINT_EXPOSE);
+  const isManagementApi = isWorkflowManagementEndpoint(ep);
+  const confirm = useManagementApiConfirm(isManagementApi, { title: 'Change the Workflow Management API’s visibility?', warning: MANAGEMENT_API_VISIBILITY_WARNING, confirmLabel: 'Update' });
 
   const handleSave = () => {
     setSaveError(null);
@@ -186,6 +191,11 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
           );
         })}
       </Stack>
+      {isManagementApi && canExpose && (
+        <Alert severity="warning" sx={{ mb: 1.5 }}>
+          {MANAGEMENT_API_VISIBILITY_WARNING}
+        </Alert>
+      )}
       {legacyBothHosts && (
         <Alert severity="info" sx={{ mb: 1.5 }}>
           This endpoint was exposed on both the public and the organization host. An endpoint is now served on one host, so saving keeps it only on the host selected here.
@@ -203,11 +213,12 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
           Cancel
         </Button>
         {canExpose && (
-          <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+          <Button variant="contained" onClick={() => confirm.request(handleSave)} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
             {updateEp.isPending ? 'Updating…' : 'Update'}
           </Button>
         )}
       </Stack>
+      {confirm.dialog}
     </Box>
   );
 }

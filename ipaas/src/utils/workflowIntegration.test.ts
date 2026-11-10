@@ -17,26 +17,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isUserVisibleEndpoint, isWorkflowIntegration, isWorkflowManagementEndpoint } from './workflowIntegration';
+import { isWorkflowIntegration, isWorkflowManagementEndpoint } from './workflowIntegration';
 
 const management = { displayName: 'Workflow Management API' };
 const business = { displayName: 'Processorder' };
-
-describe('isUserVisibleEndpoint', () => {
-  it('leaves a workflow integration’s management API out', () => {
-    expect(isUserVisibleEndpoint(management, true)).toBe(false);
-    expect(isUserVisibleEndpoint({ displayName: '  workflow management api ' }, true)).toBe(false);
-  });
-
-  it('keeps a workflow integration’s own endpoints', () => {
-    expect(isUserVisibleEndpoint(business, true)).toBe(true);
-  });
-
-  it('keeps every endpoint of an integration that is not a workflow', () => {
-    expect(isUserVisibleEndpoint(management, false)).toBe(true);
-    expect(isUserVisibleEndpoint(business, false)).toBe(true);
-  });
-});
 
 describe('isWorkflowIntegration', () => {
   it('tells a workflow integration from the others', () => {

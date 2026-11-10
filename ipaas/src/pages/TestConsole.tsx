@@ -42,8 +42,6 @@ import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
 import EnvironmentSelect from '../components/common/EnvironmentSelect';
-import { useUserVisibleEndpoints } from '../hooks/useUserVisibleEndpoints';
-import { isWorkflowIntegration } from '../utils/workflowIntegration';
 /** Header the APIM gateway reads the test key from. Cloud uses the api-key-auth header instead. */
 
 // Hides SwaggerUI top chrome — keeps only the operations list with try-it-out
@@ -82,8 +80,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   const releaseId = deployment?.releaseId ?? '';
 
   // Endpoints for the selected env + track
-  const { data: allEndpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
-  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflowIntegration(component));
+  const { data: endpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
 
   // Selected endpoint — derived rather than synced via an effect, since useApimSwagger below
   // keys off selectedEndpoint and an effect+render round trip would delay it becoming enabled.

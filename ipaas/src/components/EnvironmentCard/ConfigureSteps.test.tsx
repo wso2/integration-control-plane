@@ -18,22 +18,30 @@
 
 import { act } from 'react';
 import { MemoryRouter } from 'react-router';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ManageEndpoint } from './ConfigureSteps';
 import { UnsavedChangesProvider } from '../../contexts/UnsavedChangesContext';
 import { button, renderWithScopes } from '../../test/renderWithScopes';
 import { DEVELOPER, VIEWER } from '../../test/roles';
 import type { EnvEndpoint } from '../../types/component';
 
-const ep = { id: 'http', displayName: 'HTTP', networkVisibilities: ['Public'] } as EnvEndpoint;
-let unmount = () => {};
-afterEach(() => unmount());
+// The update the editor sends, without a BFF behind it.
+const updateEndpoint = vi.hoisted(() => vi.fn());
+vi.mock('../../hooks/useComponents', () => ({ useUpdateEndpoint: () => ({ mutate: updateEndpoint, isPending: false }) }));
 
-async function render(scopes: string[]) {
+const ep = { id: 'http', displayName: 'HTTP', networkVisibilities: ['Public'] } as EnvEndpoint;
+const management = { id: 'workflow-ma-cf1', displayName: 'Workflow Management API', networkVisibilities: ['Public'] } as EnvEndpoint;
+let unmount = () => {};
+afterEach(() => {
+  unmount();
+  updateEndpoint.mockReset();
+});
+
+async function render(scopes: string[], endpoint: EnvEndpoint = ep) {
   const r = await renderWithScopes(
     <MemoryRouter>
       <UnsavedChangesProvider>
-        <ManageEndpoint ep={ep} componentId="orders" projectId="default" versionId="v1" releaseId="orders-1" environmentId="production" onBack={() => {}} />
+        <ManageEndpoint ep={endpoint} componentId="orders" projectId="default" versionId="v1" releaseId="orders-1" environmentId="production" onBack={() => {}} />
       </UnsavedChangesProvider>
     </MemoryRouter>,
     scopes,
@@ -77,5 +85,38 @@ describe('ManageEndpoint network visibility', () => {
     const container = await render(DEVELOPER);
     await act(async () => checkbox(container, 'Organization').click());
     expect(checkedLabels(container)).toEqual(['Project', 'Organization']);
+  });
+});
+
+describe("ManageEndpoint on a workflow's Management API", () => {
+  const dialog = (container: HTMLElement) => container.ownerDocument.querySelector('[role="dialog"]');
+  const dialogButton = (container: HTMLElement, name: string) => [...(dialog(container)?.querySelectorAll('button') ?? [])].find((b) => b.textContent === name);
+
+  it('says what its visibility reaches, and asks before updating it', async () => {
+    const container = await render(DEVELOPER, management);
+    expect(container.textContent).toContain('the User Portal calls it only on the public host');
+    await act(async () => button(container, 'Update')?.click());
+    expect(dialog(container)?.textContent).toContain('Change the Workflow Management API’s visibility?');
+    expect(updateEndpoint).not.toHaveBeenCalled();
+
+    await act(async () => dialogButton(container, 'Cancel')?.click());
+    expect(dialog(container)).toBeNull();
+    expect(updateEndpoint).not.toHaveBeenCalled();
+
+    await act(async () => button(container, 'Update')?.click());
+    await act(async () => dialogButton(container, 'Update')?.click());
+    expect(updateEndpoint).toHaveBeenCalledWith(expect.objectContaining({ endpointId: 'workflow-ma-cf1' }), expect.anything());
+  });
+
+  it('updates any other endpoint without asking', async () => {
+    const container = await render(DEVELOPER);
+    expect(container.textContent).not.toContain('Workflow Management API');
+    await act(async () => button(container, 'Update')?.click());
+    expect(dialog(container)).toBeNull();
+    expect(updateEndpoint).toHaveBeenCalledWith(expect.objectContaining({ endpointId: 'http' }), expect.anything());
+  });
+
+  it('says nothing to a role that cannot change it', async () => {
+    expect((await render(VIEWER, management)).textContent).not.toContain('the User Portal calls it only on the public host');
   });
 });

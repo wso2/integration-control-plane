@@ -40,7 +40,6 @@ import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
-import { useUserVisibleEndpoints } from '../../hooks/useUserVisibleEndpoints';
 
 // Keys the platform sets (a workflow integration's runtime connection), shown read-only.
 const managedConfigKeys = (configurations: SchemaConfigItem[] | undefined): ReadonlySet<string> => new Set((configurations ?? []).filter((c) => c.isManaged).map((c) => c.key));
@@ -691,8 +690,6 @@ export interface ConfigureDrawerProps {
   isAutomation?: boolean;
   /** Hide the Endpoints step — file/event integrations have no endpoints. */
   hideEndpoints?: boolean;
-  /** A workflow integration, whose management endpoint the Endpoints step leaves out (see isUserVisibleEndpoint). */
-  isWorkflow?: boolean;
   /** An MCP server, whose endpoints the AI gateway may front instead of the API Platform. */
   isMcpServer?: boolean;
   envTemplateId?: string;
@@ -770,7 +767,6 @@ function GenericServiceConfigureDrawer({
   buildId,
   continueWithoutChanges = false,
   hideEndpoints = false,
-  isWorkflow = false,
   isMcpServer = false,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
@@ -802,8 +798,7 @@ function GenericServiceConfigureDrawer({
   const { data, isLoading, isError } = useSchemaConfig(projectId, componentId, schemaEnvId, versionId, commitHash);
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, schemaEnvId, versionId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
-  const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
-  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
+  const { data: endpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
   const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId, envId, versionId }, open && isMcpServer && !hideEndpoints);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();

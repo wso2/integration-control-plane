@@ -29,7 +29,9 @@ import { isPermissionError } from '../../../utils/apiErrors';
 import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
 import CorsSection from '../../Policies/CorsSection';
 import RateLimitingSection from '../../Policies/RateLimitingSection';
+import { isWorkflowManagementEndpoint, MANAGEMENT_API_SETTINGS_WARNING } from '../../../utils/workflowIntegration';
 import { useEndpointDrawer } from './useEndpointDrawer';
+import { useManagementApiConfirm } from './useManagementApiConfirm';
 import * as styles from './apiConsumption.styles';
 import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 
@@ -51,7 +53,11 @@ interface ApiSettingsDrawerProps {
   deploymentTrackId?: string;
 }
 
-/** Cloud-only "API settings" drawer: CORS and rate limiting. Authentication lives in ApiSecurityDrawer. */
+/**
+ * Cloud-only "API settings" drawer: CORS and rate limiting. Authentication lives in ApiSecurityDrawer. A workflow's
+ * Management API keeps the CORS ipaas-service sets for the User Portal, says what a rate limit there reaches, and asks
+ * before a change to it is applied.
+ */
 export default function ApiSettingsDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSettingsDrawerProps): JSX.Element {
   const canUpdate = useCan()(Scopes.ENDPOINT_UPDATE);
   const [cors, setCors] = useState<CorsConfig | null>(null);
@@ -104,6 +110,9 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
     }
   };
 
+  const isManagementApi = !!selectedEndpoint && isWorkflowManagementEndpoint(selectedEndpoint);
+  const confirm = useManagementApiConfirm(isManagementApi, { title: 'Change the Workflow Management API’s settings?', warning: MANAGEMENT_API_SETTINGS_WARNING, confirmLabel: 'Apply' });
+
   const seeded = useMemo(() => (policies ? policyToConfig(policies) : null), [policies]);
   useUnsavedChanges(open && !!seeded && !!cors && !!rateLimit && JSON.stringify({ cors, rateLimit }) !== JSON.stringify(seeded));
   const guardNavigation = useLeaveGuard();
@@ -131,6 +140,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
             {error && <Alert severity="error">{error}</Alert>}
             {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
             {readOnlyNotice && !notice && !error && <Alert severity="info">{readOnlyNotice}</Alert>}
+            {isManagementApi && !readOnly && !notice && <Alert severity="warning">{MANAGEMENT_API_SETTINGS_WARNING}</Alert>}
 
             <Stack direction="row" alignItems="center" gap={2}>
               <Typography variant="body2" fontWeight={500}>
@@ -158,7 +168,8 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
                     <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
                       CORS
                     </Typography>
-                    <CorsSection value={cors} onChange={setCors} disabled={saving || readOnly} />
+                    {/* ipaas-service keeps a workflow Management API's CORS as exposure sets it, and refuses a change. */}
+                    <CorsSection value={cors} onChange={setCors} disabled={saving || readOnly || isManagementApi} />
                   </Box>
 
                   <Divider />
@@ -194,11 +205,12 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
           Cancel
         </Button>
         {canUpdate && (
-          <Button variant="contained" onClick={() => void handleApply()} disabled={!canApply} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
+          <Button variant="contained" onClick={() => confirm.request(() => void handleApply())} disabled={!canApply} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
             {saving ? 'Applying…' : 'Apply'}
           </Button>
         )}
       </DrawerPanel.Footer>
+      {confirm.dialog}
     </DrawerPanel>
   );
 }

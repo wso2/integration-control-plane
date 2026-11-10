@@ -19,8 +19,6 @@
 import { Box, CircularProgress, Divider } from '@wso2/oxygen-ui';
 import { useState, type ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
-import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
-import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
@@ -39,8 +37,7 @@ import { ENV_CARD_INSIGHTS_ENABLED } from '../../../constants/insights';
  * insights (the workflow body's definitions and figures).
  */
 export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2, children }: EnvCardBodyProps & { children?: ReactNode }): ReactNode {
-  const { data: allEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
-  const envEndpoints = useUserVisibleEndpoints(allEndpoints, isWorkflowIntegration(component));
+  const { data: envEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];
 

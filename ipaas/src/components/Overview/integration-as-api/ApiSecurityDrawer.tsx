@@ -27,8 +27,10 @@ import type { Environment } from '../../../types/environment';
 import { apiErrorMessage, httpStatusOf, isPermissionError } from '../../../utils/apiErrors';
 import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
 import { hasJwtFormErrors, jwtFormErrors, jwtFormOf, toJwtSecurity, type JwtForm } from '../../../utils/jwtSecurity';
+import { isWorkflowManagementEndpoint, MANAGEMENT_API_SECURITY_WARNING } from '../../../utils/workflowIntegration';
 import OAuthSettingsSection from './OAuthSettingsSection';
 import { useEndpointDrawer } from './useEndpointDrawer';
+import { useManagementApiConfirm } from './useManagementApiConfirm';
 import * as styles from './apiConsumption.styles';
 import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 
@@ -65,7 +67,8 @@ function securityConfigOf(mode: SecurityMode, apiKeyHeader: string, jwtForm: Jwt
  * Cloud-only "Configure security" drawer for one exposed endpoint API, in one environment: the
  * pipeline's entry environment, since later ones take the API only by promotion. Mirrors the APIM
  * SecurityDrawer's layout (endpoint selector + security-scheme table), with the OAuth options below
- * the table while OAuth is the scheme.
+ * the table while OAuth is the scheme. A workflow's Management API says what its security keeps working, and asks
+ * before a change to it is applied.
  */
 export default function ApiSecurityDrawer({ open, onClose, componentName, envName, envLabel, environments, onEnvironmentChange, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
   const canUpdate = useCan()(Scopes.ENDPOINT_UPDATE);
@@ -132,6 +135,8 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
 
   useUnsavedChanges(open && !!saved && JSON.stringify(draft) !== JSON.stringify(saved));
   const guardNavigation = useLeaveGuard();
+  const isManagementApi = !!selectedEndpoint && isWorkflowManagementEndpoint(selectedEndpoint);
+  const confirm = useManagementApiConfirm(isManagementApi, { title: 'Change the Workflow Management API’s security?', warning: MANAGEMENT_API_SECURITY_WARNING, confirmLabel: 'Apply' });
 
   const handleCancel = () =>
     guardNavigation(() => {
@@ -156,6 +161,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
             {error && <Alert severity="error">{error}</Alert>}
             {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
             {readOnlyNotice && !notice && !error && <Alert severity="info">{readOnlyNotice}</Alert>}
+            {isManagementApi && !readOnly && !notice && <Alert severity="warning">{MANAGEMENT_API_SECURITY_WARNING}</Alert>}
             {envLabel && !readOnly && !notice && (
               <Typography variant="body2" color="text.secondary">
                 Changes apply in <strong>{envLabel}</strong>. Promote to apply them to later environments.
@@ -257,11 +263,12 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
           Cancel
         </Button>
         {canUpdate && (
-          <Button variant="contained" onClick={() => void handleApply()} disabled={saving || readOnly || invalid || !selectedEndpoint || loadingSecurity || Boolean(securityError)} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
+          <Button variant="contained" onClick={() => confirm.request(() => void handleApply())} disabled={saving || readOnly || invalid || !selectedEndpoint || loadingSecurity || Boolean(securityError)} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
             {saving ? 'Applying…' : 'Apply'}
           </Button>
         )}
       </DrawerPanel.Footer>
+      {confirm.dialog}
     </DrawerPanel>
   );
 }

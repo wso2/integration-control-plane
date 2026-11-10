@@ -73,8 +73,9 @@ async function listedEndpoints(displayType: string): Promise<string[]> {
 }
 
 describe('webhook EnvCardBody endpoints', () => {
-  it('leaves a workflow integration’s management API out of its endpoints', async () => {
-    expect(await listedEndpoints('ballerinaWorkflow')).toEqual(['Processorder']);
+  // A team may share a workflow's Management API through the Developer Portal, or call it from its own applications.
+  it('lists a workflow integration’s management API with its own endpoints', async () => {
+    expect(await listedEndpoints('ballerinaWorkflow')).toEqual(['Processorder', 'Workflow Management API']);
   });
 
   it('lists every endpoint of an integration that is not a workflow', async () => {

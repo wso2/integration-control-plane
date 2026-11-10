@@ -44,7 +44,6 @@ import WorkflowRuntimeRow from './WorkflowRuntimeRow';
 import UserPortalRow from '../../UserPortal/UserPortalRow';
 import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
-import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 
@@ -157,8 +156,7 @@ export default function DeployEnvironmentCard({
 
   const { data: trackImages = [] } = useDeploymentTrackImages(componentId, versionId);
   const { data: deploymentStatus = [] } = useDeploymentStatus(componentId, versionId);
-  const { data: allEndpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '');
-  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
+  const { data: endpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '');
 
   const deployedRunId = deployment?.build?.runId ?? null;
   const deployedBuildId = deployment?.build?.buildId ?? null;
@@ -398,7 +396,6 @@ export default function DeployEnvironmentCard({
       </Card>
 
       <ConfigureDrawer
-        isWorkflow={isWorkflow}
         isMcpServer={isMcpServer}
         open={configureOpen}
         onClose={() => setConfigureOpen(false)}
