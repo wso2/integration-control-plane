@@ -294,6 +294,12 @@ export default function BuildArea({
               sx={{ mb: 2, ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
             />
           )}
+          {/* The BFF refuses auto-deploy for an integration its type can't trace safely yet; say why the switch went back. */}
+          {autoDeployAvailable && updateAutoDeploy.isError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {updateAutoDeploy.error.message}
+            </Alert>
+          )}
 
           {/* ── Endpoint Configurations (only for deployed service integrations;
                hidden for file/event/AI-agent, which have no endpoints) ── */}
