@@ -55,10 +55,11 @@ function formatTime(ts: number): string {
 export default function AgentChat({ projectId, componentId, versionId, releaseId, environmentName, envCritical, waitForConfig = false, variant = 'card', onConnectionChange }: AgentChatProps): ReactNode {
   const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, releaseId);
 
-  // Candidate chat endpoint: the first reachable one. (The `/chat` operation is
-  // confirmed below only as a hint; the endpoint is still used when its operations
-  // aren't discoverable.)
-  const candidate = useMemo(() => endpoints.find((e) => e.publicUrl) ?? null, [endpoints]);
+  // Candidate chat endpoint: the first one listed with a public URL, else the first one. Every agent is
+  // deployed to the AI gateway, and the chat URL comes from the endpoint's security below, so an endpoint
+  // the release listing reports without a public URL is still the agent's way in. (The `/chat` operation
+  // is confirmed below only as a hint; the endpoint is still used when its operations aren't discoverable.)
+  const candidate = useMemo(() => endpoints.find((e) => e.publicUrl) ?? endpoints[0] ?? null, [endpoints]);
 
   // The enforcing gateway URL, active auth mode and a short-lived test key, from the
   // same BFF routes the swagger console and the API security drawer use.
@@ -74,7 +75,7 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
   // An agent publishes no OpenAPI spec, so a missing `/chat` is unknown rather than absent.
   const operationsKnown = !!chatSpec;
 
-  // Chat invokes the apip gateway and nothing else. The endpoint's own external
+  // Chat invokes the AI gateway and nothing else. The endpoint's own external
   // route is open (the policy engine is not in its path), so falling back to it
   // would hand the test key to a host that never validates it and would make an
   // unenforced call look like a secured one.
