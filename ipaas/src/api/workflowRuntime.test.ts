@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { toWorkflowRuntime } from './workflowRuntime';
+import { acceptedWorkflowDeploy, toWorkflowDeploy, toWorkflowRuntime } from './workflowRuntime';
 
 describe('toWorkflowRuntime', () => {
   it('maps the server name and namespaces', () => {
@@ -30,5 +30,41 @@ describe('toWorkflowRuntime', () => {
 
   it('reads an unknown status as an error and a null list as empty', () => {
     expect(toWorkflowRuntime({ status: 'SOMETHING_NEW', namespaces: null })).toEqual({ status: 'ERROR', serverName: undefined, namespaces: [] });
+  });
+});
+
+describe('acceptedWorkflowDeploy', () => {
+  it('reads the deploying status a 202 answer to a workflow deploy carries', () => {
+    expect(acceptedWorkflowDeploy({ environment: 'development', state: 'deploying', operation: 'deploy', startedAt: '2026-11-10T11:33:09Z', message: 'running' })).toEqual({
+      environment: 'development',
+      state: 'deploying',
+      operation: 'deploy',
+      startedAt: '2026-11-10T11:33:09Z',
+      finishedAt: undefined,
+      releaseName: undefined,
+      message: 'running',
+    });
+  });
+
+  it.each([
+    ['a deploy finished within its request', { message: 'orders-20261110-3' }],
+    ['a promote finished within its request', { message: 'orders-20261110-3', proxyReconciliation: { status: 'SUCCEEDED' } }],
+    ['an empty answer', null],
+  ])('finds none in %s', (_name, body) => {
+    expect(acceptedWorkflowDeploy(body)).toBeUndefined();
+  });
+});
+
+describe('toWorkflowDeploy', () => {
+  it('reads a state or operation it does not know as none and unset', () => {
+    expect(toWorkflowDeploy({ environment: 'development', state: 'rolling', operation: 'redeploy' })).toMatchObject({ state: 'none', operation: undefined });
+  });
+
+  it('keeps a failed deploy’s message', () => {
+    expect(toWorkflowDeploy({ environment: 'production', state: 'failed', operation: 'promote', message: 'the workflow runtime is unavailable; try again later' })).toMatchObject({
+      state: 'failed',
+      operation: 'promote',
+      message: 'the workflow runtime is unavailable; try again later',
+    });
   });
 });

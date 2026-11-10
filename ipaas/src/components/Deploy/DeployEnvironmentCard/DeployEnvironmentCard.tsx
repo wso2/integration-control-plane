@@ -41,6 +41,7 @@ import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 import DeploymentHistoryDrawer from './DeploymentHistoryDrawer';
 import EndpointsDrawer from './EndpointsDrawer';
 import WorkflowRuntimeRow from './WorkflowRuntimeRow';
+import WorkflowDeployNotice from '../../Workflows/deploy/WorkflowDeployNotice';
 import UserPortalRow from '../../UserPortal/UserPortalRow';
 import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
@@ -367,6 +368,7 @@ export default function DeployEnvironmentCard({
             onEndpointsClick={showEndpoints ? () => setEndpointsOpen(true) : undefined}
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
+          {isWorkflow && <WorkflowDeployNotice componentId={componentId} environment={env.id} />}
           <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
           {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={env.id} envName={env.name} isWorkflow={isWorkflow} />}
         </CardContent>

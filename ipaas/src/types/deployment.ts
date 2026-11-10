@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import type { WorkflowDeploy } from './workflowRuntime';
 import type { SchemaConfigItem } from './configuration';
 import type { IntegrationKind } from './insights';
 import type { EndpointExposure } from './component';
@@ -73,6 +74,15 @@ export interface ProxyReconciliationSummary {
 export interface PromoteResult {
   message: string;
   proxyReconciliation?: ProxyReconciliationSummary;
+  /** Set when the promote runs after the answer, as a workflow's does. */
+  workflowDeploy?: WorkflowDeploy;
+}
+
+/** A deploy's answer. */
+export interface DeployResult {
+  message: string;
+  /** Set when the deploy runs after the answer, as a workflow's does. */
+  workflowDeploy?: WorkflowDeploy;
 }
 
 export interface ComponentDeployment {
