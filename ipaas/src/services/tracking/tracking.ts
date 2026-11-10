@@ -28,8 +28,10 @@ declare global {
   }
 }
 
-// One GTM container and CookiePro domain script per deployment tier, chosen by the TRACKING_ENV
-// runtime key. Dev and stage share the staging codes; prod has its own. Microsoft Clarity is not a
+// WSO2 Cloud shares one GTM container and one CookiePro domain script across all consoles, owned by
+// the cloud team and set through the GTM_CONTAINER_ID and COOKIEPRO_DOMAIN_SCRIPT_ID runtime keys.
+// When those are unset, the per-tier defaults below apply, chosen by TRACKING_ENV. Dev and stage
+// share the staging codes; prod has its own. Microsoft Clarity is not a
 // separate snippet: it is a tag inside the GTM container, so loading GTM brings it along.
 type TrackingEnv = 'dev' | 'stage' | 'prod';
 
@@ -290,8 +292,8 @@ function injectGtmOnceConsented(containerId: string): () => void {
 
 /**
  * Loads CookiePro, then GTM (which carries Clarity) and Moesif once analytics consent is granted.
- * The tier comes from the TRACKING_ENV runtime key ('off' loads nothing) and the Moesif app key
- * from MOESIF_APP_API_KEY.
+ * The IDs come from GTM_CONTAINER_ID and COOKIEPRO_DOMAIN_SCRIPT_ID, else the TRACKING_ENV tier
+ * defaults ('off' loads nothing), and the Moesif app key from MOESIF_APP_API_KEY.
  */
 export function initTracking(): void {
   const env = window.API_CONFIG?.trackingEnv ?? 'dev';
@@ -301,7 +303,7 @@ export function initTracking(): void {
     return;
   }
 
-  const injectGtmIfConsented = injectGtmOnceConsented(GTM_CONTAINER_ID[env]);
+  const injectGtmIfConsented = injectGtmOnceConsented(window.API_CONFIG?.gtmContainerId ?? GTM_CONTAINER_ID[env]);
   const sync = (): void => {
     syncMoesifConsent(window.API_CONFIG?.moesifAppApiKey);
     injectGtmIfConsented();
@@ -309,7 +311,7 @@ export function initTracking(): void {
   // Some OneTrust versions call OptanonWrapper again after a preference change. Register the
   // consent listener only on the first call, so listeners don't stack; later calls just re-sync.
   let listening = false;
-  injectCookiePro(COOKIEPRO_DOMAIN_SCRIPT_ID[env], () => {
+  injectCookiePro(window.API_CONFIG?.cookieProDomainScriptId ?? COOKIEPRO_DOMAIN_SCRIPT_ID[env], () => {
     if (listening) return sync();
     listening = true;
     onConsentChange(sync);

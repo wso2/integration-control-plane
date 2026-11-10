@@ -176,6 +176,19 @@ describe('initTracking', () => {
     expect(cookieProScript?.getAttribute('data-domain-script')).toBe('486163bc-a8c5-40d8-b185-c707cc718a23');
   });
 
+  it('loads the WSO2 Cloud-wide GTM container and CookiePro script from runtime config over the tier defaults', () => {
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'prod', gtmContainerId: 'GTM-CLOUD01', cookieProDomainScriptId: '11111111-2222-3333-4444-555555555555' };
+
+    initTracking();
+    setActiveGroups('C0001,C0002');
+    window.OptanonWrapper?.();
+
+    const gtmScript = document.head.querySelector('script[src*="googletagmanager.com/gtm.js"]');
+    expect(gtmScript?.getAttribute('src')).toContain('GTM-CLOUD01');
+    const cookieProScript = document.head.querySelector('script[src*="cookiepro"]');
+    expect(cookieProScript?.getAttribute('data-domain-script')).toBe('11111111-2222-3333-4444-555555555555');
+  });
+
   it('injects GTM only once across repeated consent-change events', () => {
     let onConsentChanged: (() => void) | undefined;
     (globalThis as Record<string, unknown>).OneTrust = {
