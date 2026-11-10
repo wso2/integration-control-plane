@@ -22,6 +22,7 @@ import { useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
 import EmptyListing from '../components/EmptyListing';
 import SearchField from '../components/SearchField';
+import { INTEGRATION_TYPE_INFO } from '../constants/integrationTypes';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useActiveProjects } from '../hooks/useProjects';
 import { useOrgVoiceAgents } from '../hooks/useVoiceAgents';
@@ -150,7 +151,7 @@ function VoiceAgentList({ org, projects }: { org: string; projects: Project[] })
                     )}
                   </ListingTable.Cell>
                   <ListingTable.Cell>{component.description || '—'}</ListingTable.Cell>
-                  <ListingTable.Cell>Voice agent</ListingTable.Cell>
+                  <ListingTable.Cell>{INTEGRATION_TYPE_INFO['voice-agent'].displayName}</ListingTable.Cell>
                   <ListingTable.Cell align="right">{updated ? <RelativeTime time={formatDistanceToNow(updated)} dateTime={updated} tooltip={formatDateTime(updated)} /> : '—'}</ListingTable.Cell>
                 </ListingTable.Row>
               );
