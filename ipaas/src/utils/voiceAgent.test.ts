@@ -39,6 +39,7 @@ import {
   withSttProvider,
   withTtsProvider,
   helperText,
+  visibleStepErrors,
 } from './voiceAgent';
 
 const complete: VoiceAgentSettings = withTtsProvider(
@@ -337,5 +338,22 @@ describe('helperText', () => {
     expect(helperText('Required', 'A hint')).toBe('Required');
     expect(helperText(undefined, 'A hint')).toBe('A hint');
     expect(helperText(undefined)).toBe(' ');
+  });
+});
+
+describe('visibleStepErrors', () => {
+  const errors = { liveKitUrl: 'Enter a ws:// or wss:// URL.', liveKitApiKey: 'Enter the API key.', name: 'Use at least three letters or digits.' };
+
+  it('shows only the errors of fields the user has changed', () => {
+    expect(visibleStepErrors(errors, new Set(['liveKitUrl']), false)).toEqual({ liveKitUrl: 'Enter a ws:// or wss:// URL.' });
+    expect(visibleStepErrors(errors, new Set(), false)).toEqual({});
+  });
+
+  it('shows the name error once the display name it derives from is changed', () => {
+    expect(visibleStepErrors(errors, new Set(['displayName']), false)).toEqual({ name: 'Use at least three letters or digits.' });
+  });
+
+  it('shows every error once the user tries to continue', () => {
+    expect(visibleStepErrors(errors, new Set(), true)).toEqual(errors);
   });
 });

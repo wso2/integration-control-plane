@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, Chip, Paper, Stack, Typography, type SxProps, type Theme } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, Paper, Stack, Typography, type SxProps, type Theme } from '@wso2/oxygen-ui';
 import { Mic, PhoneOff } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { VoiceTesterStatus } from '../../hooks/useVoiceTesterSession';
@@ -48,6 +48,21 @@ export function VoiceSessionButton({ status, canStart, onStart, onStop }: VoiceS
     <Button variant="contained" startIcon={<Mic size={16} />} onClick={onStart} disabled={!canStart}>
       Start session
     </Button>
+  );
+}
+
+export function VoiceAudioBlockedAlert({ onResume, sx }: { onResume: () => void; sx?: SxProps<Theme> }): JSX.Element {
+  return (
+    <Alert
+      severity="warning"
+      sx={sx}
+      action={
+        <Button color="inherit" size="small" onClick={onResume}>
+          Play audio
+        </Button>
+      }>
+      Your browser blocked the voice agent&apos;s audio. Select Play audio to hear it.
+    </Alert>
   );
 }
 

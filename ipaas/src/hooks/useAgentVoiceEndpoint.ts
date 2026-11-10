@@ -58,6 +58,7 @@ export function useAgentVoiceEndpoint(orgHandler: string, projectId: string, age
   if (deploymentQuery.isError) return { status: 'error', retry: () => void deploymentQuery.refetch() };
   if (!orgUuid || !agent || !envQuery.data) return { status: 'loading' };
   if (!env) return { status: 'no-environment' };
+  if (!trackId) return { status: 'not-deployed', env };
   if (!deploymentQuery.data) return { status: 'loading' };
   if (!deploymentQuery.data.deployed) return { status: 'not-deployed', env };
   const { url } = deploymentQuery.data;

@@ -20,7 +20,7 @@ import { Alert, Avatar, Box, Stack, Typography } from '@wso2/oxygen-ui';
 import { Mic } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useVoiceTesterSession } from '../../hooks/useVoiceTesterSession';
-import { VoiceSessionButton, VoiceSessionStatusChip, VoiceTranscript } from './VoiceSession';
+import { VoiceAudioBlockedAlert, VoiceSessionButton, VoiceSessionStatusChip, VoiceTranscript } from './VoiceSession';
 import { hiddenSx } from './VoiceSession.styles';
 import * as styles from './VoiceAgentTester.styles';
 
@@ -30,7 +30,7 @@ interface VoiceAgentTesterProps {
 }
 
 export default function VoiceAgentTester({ tokenServiceUrl, unavailableReason }: VoiceAgentTesterProps): JSX.Element {
-  const { status, error, transcript, start, stop, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl);
+  const { status, error, transcript, audioBlocked, start, stop, resumeAudio, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl);
   const canStart = !!tokenServiceUrl && !unavailableReason;
   const hint = unavailableReason ?? (status === 'connected' ? 'The session is live. Start speaking to see the conversation below.' : status === 'connecting' ? 'Connecting to the voice agent…' : 'Start a session to talk to the voice agent.');
 
@@ -58,6 +58,7 @@ export default function VoiceAgentTester({ tokenServiceUrl, unavailableReason }:
           {error}
         </Alert>
       )}
+      {audioBlocked && <VoiceAudioBlockedAlert onResume={resumeAudio} sx={styles.errorSx} />}
       <VoiceTranscript messages={transcript} sx={styles.transcriptSx} />
       <Box ref={audioContainerRef} sx={hiddenSx} />
     </Box>

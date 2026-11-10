@@ -112,6 +112,15 @@ export const helperText = (error: string | undefined, hint = ' '): string => err
 
 export type StepErrors = Partial<Record<keyof VoiceAgentSettings, string>>;
 
+export function visibleStepErrors(errors: StepErrors, touched: ReadonlySet<keyof VoiceAgentSettings>, showAll: boolean): StepErrors {
+  if (showAll) return errors;
+  const visible: StepErrors = {};
+  for (const [field, message] of Object.entries(errors) as [keyof VoiceAgentSettings, string][]) {
+    if (touched.has(field) || (field === 'name' && touched.has('displayName'))) visible[field] = message;
+  }
+  return visible;
+}
+
 export function validateAgentStep(s: VoiceAgentSettings, voicedAgents: ReadonlySet<string> = new Set()): StepErrors {
   const errors: StepErrors = {};
   if (!s.displayName.trim()) errors.displayName = 'Enter a display name.';

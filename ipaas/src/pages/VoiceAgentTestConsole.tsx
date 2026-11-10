@@ -30,6 +30,7 @@ import NotFound from '../components/NotFound';
 import VoiceAgentTestPanel from '../components/VoiceAgent/VoiceAgentTestPanel';
 import { PILL_SELECT_SX } from '../constants/styles';
 import { resourceUrl, type ComponentScope } from '../nav';
+import { orgProjectsUrl } from '../paths';
 import type { Component } from '../types/component';
 import type { Environment } from '../types/environment';
 import { tokenServiceUrlOf, voiceAgentEnvironment } from '../utils/voiceAgent';
@@ -40,11 +41,22 @@ const ENV_SELECT_SX = { ...PILL_SELECT_SX, minWidth: 160 } as const;
 
 export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid();
-  const { projectId } = useProjectId(scope.project);
+  const projectQuery = useProjectId(scope.project);
+  const { projectId } = projectQuery;
   const componentQuery = useComponentByHandler(projectId, scope.component);
   const { data: component, isLoading: loadingComponent } = componentQuery;
 
-  if (loadingComponent || !orgUuid) return <VoiceAgentTestSkeleton />;
+  if (projectQuery.isLoading || loadingComponent || !orgUuid) return <VoiceAgentTestSkeleton />;
+  if (projectQuery.isError) {
+    return (
+      <PageContent fullWidth sx={CONTENT_SX}>
+        <Alert severity="error" action={<Button onClick={() => void projectQuery.refetch()}>Retry</Button>}>
+          Could not load the project.
+        </Alert>
+      </PageContent>
+    );
+  }
+  if (!projectId) return <NotFound message="Project not found" backTo={orgProjectsUrl(scope.org)} backLabel="Back to projects" />;
   if (componentQuery.isError) {
     return (
       <PageContent fullWidth sx={CONTENT_SX}>

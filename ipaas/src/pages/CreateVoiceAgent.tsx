@@ -38,7 +38,7 @@ import type { Project } from '../types/project';
 import type { VoiceAgentSettings } from '../types/voiceAgent';
 import PageNotFound from './PageNotFound';
 import { isLiveAiAgent } from '../utils/identifyIntegration';
-import { DEFAULT_VOICE_AGENT_SETTINGS, validateAgentStep, validateLiveKitStep, validateSttStep, validateTtsStep, validateTuningStep, type StepErrors } from '../utils/voiceAgent';
+import { DEFAULT_VOICE_AGENT_SETTINGS, validateAgentStep, validateLiveKitStep, validateSttStep, validateTtsStep, validateTuningStep, visibleStepErrors, type StepErrors } from '../utils/voiceAgent';
 
 type StepKey = 'agent' | 'livekit' | 'stt' | 'tts' | 'tune';
 
@@ -215,6 +215,8 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent, existingV
   const [settings, setSettings] = useState<VoiceAgentSettings>(initialSettings);
   const [projectId, setProjectId] = useState(handoff?.projectId && projects.some((p) => p.id === handoff.projectId) ? handoff.projectId : project.id);
   const [activeStep, setActiveStep] = useState(0);
+  const [touched, setTouched] = useState<ReadonlySet<keyof VoiceAgentSettings>>(() => new Set());
+  const [attemptedSteps, setAttemptedSteps] = useState<ReadonlySet<string>>(() => new Set());
   const allowLeave = useUnsavedChanges(settings !== initialSettings && !create.isSuccess);
   const targetProject = projects.find((p) => p.id === projectId) ?? project;
 
@@ -230,10 +232,13 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent, existingV
   const step = steps[activeStep];
   const stepErrors = step.validate(resolvedSettings, voicedAgents);
   const stepComplete = Object.keys(stepErrors).length === 0;
-  const visibleErrors = step.key === 'tune' ? stepErrors : {};
+  const visibleErrors = visibleStepErrors(stepErrors, touched, step.key === 'tune' || attemptedSteps.has(step.key));
   const isLastStep = activeStep === steps.length - 1;
 
-  const onChange = (patch: Partial<VoiceAgentSettings>) => setSettings((prev) => ({ ...prev, ...patch }));
+  const onChange = (patch: Partial<VoiceAgentSettings>) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
+    setTouched((prev) => new Set([...prev, ...(Object.keys(patch) as (keyof VoiceAgentSettings)[])]));
+  };
 
   const handOff = (): boolean => {
     const state: HandoffState = { voiceAgentGeneral: toHandoff(settings, targetProject.id) };
@@ -247,7 +252,10 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent, existingV
   };
 
   const next = () => {
-    if (!stepComplete) return;
+    if (!stepComplete) {
+      setAttemptedSteps((prev) => new Set(prev).add(step.key));
+      return;
+    }
     if (step.key === 'agent' && handOff()) return;
     if (!isLastStep) {
       setActiveStep(activeStep + 1);
@@ -341,7 +349,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent, existingV
             <Button variant="outlined" onClick={back} disabled={activeStep === 0 && !received}>
               Back
             </Button>
-            <Button variant="contained" onClick={next} disabled={!stepComplete || (isLastStep && agentBlocked)}>
+            <Button variant="contained" onClick={next} disabled={isLastStep && agentBlocked}>
               {isLastStep ? 'Deploy voice agent' : 'Next'}
             </Button>
           </Stack>

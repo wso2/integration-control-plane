@@ -29,6 +29,7 @@ export function useVoiceTesterSession(tokenServiceUrl: string | null) {
   const [status, setStatus] = useState<VoiceTesterStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<VoiceTranscriptMessage[]>([]);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const roomRef = useRef<Room | null>(null);
   const nextId = useRef(0);
   const audioContainerRef = useRef<HTMLDivElement | null>(null);
@@ -41,6 +42,7 @@ export function useVoiceTesterSession(tokenServiceUrl: string | null) {
       room.disconnect().catch((e) => console.error('Voice tester disconnect failed', e));
     }
     audioContainerRef.current?.replaceChildren();
+    setAudioBlocked(false);
   }, []);
 
   useEffect(() => teardown, [teardown]);
@@ -53,6 +55,7 @@ export function useVoiceTesterSession(tokenServiceUrl: string | null) {
     setStatus('connecting');
     const room = new Room();
     roomRef.current = room;
+    let connected = false;
     try {
       const { token, url } = await fetchVoiceAgentRoomToken(tokenServiceUrl, `voice-tester-${Date.now()}`, 'console-tester');
       if (roomRef.current !== room) return;
@@ -67,13 +70,18 @@ export function useVoiceTesterSession(tokenServiceUrl: string | null) {
         const raw = new TextDecoder().decode(payload);
         setTranscript((prev) => applyTranscriptEvent(prev, raw, id));
       });
+      room.on(RoomEvent.AudioPlaybackStatusChanged, () => setAudioBlocked(!room.canPlaybackAudio));
       room.on(RoomEvent.Disconnected, () => {
-        if (roomRef.current !== room) return;
+        if (!connected || roomRef.current !== room) return;
         teardown();
         setStatus('idle');
       });
       await room.connect(url, token);
       if (roomRef.current !== room) return;
+      connected = true;
+      await room.startAudio().catch(() => undefined);
+      if (roomRef.current !== room) return;
+      setAudioBlocked(!room.canPlaybackAudio);
       await room.localParticipant.setMicrophoneEnabled(true);
       if (roomRef.current !== room) return;
       setStatus('connected');
@@ -85,10 +93,19 @@ export function useVoiceTesterSession(tokenServiceUrl: string | null) {
     }
   }, [teardown, tokenServiceUrl]);
 
+  const resumeAudio = useCallback(() => {
+    const room = roomRef.current;
+    if (!room) return;
+    room
+      .startAudio()
+      .then(() => setAudioBlocked(!room.canPlaybackAudio))
+      .catch((e) => console.error('Voice tester audio playback failed', e));
+  }, []);
+
   const stop = useCallback(() => {
     teardown();
     setStatus('idle');
   }, [teardown]);
 
-  return { status, error, transcript, start, stop, audioContainerRef };
+  return { status, error, transcript, audioBlocked, start, stop, resumeAudio, audioContainerRef };
 }
