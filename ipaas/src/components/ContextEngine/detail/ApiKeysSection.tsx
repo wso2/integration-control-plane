@@ -32,8 +32,8 @@ import type { ContextApiKey } from '../../../types/contextEngine';
 /** Keys for the engine's public API and MCP endpoint: create one (shown once), see them masked, revoke them. */
 export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.Element {
   const can = useCan();
-  const canRead = can(Scopes.ENDPOINT_READ);
-  const canManage = can(Scopes.ENDPOINT_API_KEY_MANAGE);
+  const canRead = can(Scopes.INTEGRATION_READ);
+  const canManage = can(Scopes.CONFIG_MANAGE);
   const keys = useContextApiKeys(engineId, canRead);
   const create = useCreateContextApiKey(engineId);
   const revoke = useRevokeContextApiKey(engineId);

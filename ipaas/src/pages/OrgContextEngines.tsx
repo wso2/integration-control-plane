@@ -162,7 +162,6 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const can = useCan();
   const canRead = can(Scopes.INTEGRATION_READ);
   const canManage = can(Scopes.CONFIG_MANAGE);
-  const canTest = can(Scopes.ENDPOINT_TEST);
   const { data: engines, isLoading, isError, error, refetch } = useContextEngines(canRead);
   const remove = useDeleteContextEngine();
   const [search, setSearch] = useState('');
@@ -244,7 +243,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                 </ListingTable.Cell>
               </ListingTable.Row>
             ) : (
-              filtered.map((e) => <EngineRow key={e.id} engine={e} onOpen={() => goDetail(e.id)} onPlayground={canTest ? () => goPlayground(e.id) : undefined} onDelete={canManage ? () => setToDelete(e) : undefined} />)
+              filtered.map((e) => <EngineRow key={e.id} engine={e} onOpen={() => goDetail(e.id)} onPlayground={canManage ? () => goPlayground(e.id) : undefined} onDelete={canManage ? () => setToDelete(e) : undefined} />)
             )}
           </ListingTable.Body>
         </ListingTable>

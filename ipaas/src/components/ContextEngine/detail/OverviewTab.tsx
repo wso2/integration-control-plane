@@ -111,7 +111,6 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   };
   const can = useCan();
   const canManage = !readOnly && can(Scopes.CONFIG_MANAGE);
-  const canUpload = !readOnly && can(Scopes.ENDPOINT_TEST);
   const { asked } = useAskedFlag(engine.id);
   const progress = useContextEngineProgress(readOnly ? '' : engine.id);
   // Adding a source reuses the wizard's drawer; the session key remounts it fresh each time.
@@ -202,7 +201,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             engineId={engine.id}
             running={!readOnly}
             sources={engine.sources}
-            onManageFiles={canUpload ? openFiles : undefined}
+            onManageFiles={canManage ? openFiles : undefined}
             onAddSource={
               !canManage
                 ? undefined
@@ -334,7 +333,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
       </Grid>
 
       {modelsSession > 0 && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={engine.models} open={modelsOpen} onClose={() => setModelsOpen(false)} />}
-      {filesSource && canUpload && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
+      {filesSource && canManage && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
       <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} queryRoles={engine.queryRoles} engineId={engine.id} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
       {editSource && (
         <EditSourceDrawer

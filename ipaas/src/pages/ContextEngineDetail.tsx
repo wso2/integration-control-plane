@@ -106,8 +106,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   const remove = useDeleteContextEngine();
-  const can = useCan();
-  const canTest = can(Scopes.ENDPOINT_TEST);
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleting = engine?.state === 'deleting';
@@ -229,10 +228,10 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
       </Tabs>
 
       {shownTab === 'overview' && (
-        <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting || !can(Scopes.CONFIG_MANAGE) ? undefined : () => setConfirmDelete(true)} />
+        <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting || !canManage ? undefined : () => setConfirmDelete(true)} />
       )}
-      {shownTab === 'playground' && (canTest ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
-      {shownTab === 'graph' && (canTest ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
+      {shownTab === 'playground' && (canManage ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
+      {shownTab === 'graph' && (canManage ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'api' && <ApiTab engine={engine} />}
       {shownTab === 'mcp' && <McpTab key={engine.id} engine={engine} />}
       {/* {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />} */}

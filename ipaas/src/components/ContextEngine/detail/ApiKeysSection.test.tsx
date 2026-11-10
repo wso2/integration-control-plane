@@ -32,16 +32,16 @@ let unmount = () => {};
 afterEach(() => unmount());
 
 describe('ApiKeysSection', () => {
-  it('hides creating and revoking keys without the API key scope', async () => {
-    const r = await renderWithScopes(<ApiKeysSection engineId="docs" />, [Scopes.ENDPOINT_READ]);
+  it('hides creating and revoking keys without the manage scope', async () => {
+    const r = await renderWithScopes(<ApiKeysSection engineId="docs" />, [Scopes.INTEGRATION_READ]);
     unmount = r.unmount;
     expect(r.container.textContent).toContain('Bot');
     expect(button(r.container, 'Create key')).toBeUndefined();
     expect(button(r.container, 'Revoke Bot')).toBeUndefined();
   });
 
-  it('shows them with the API key scope', async () => {
-    const r = await renderWithScopes(<ApiKeysSection engineId="docs" />, [Scopes.ENDPOINT_READ, Scopes.ENDPOINT_API_KEY_MANAGE]);
+  it('shows them with the manage scope', async () => {
+    const r = await renderWithScopes(<ApiKeysSection engineId="docs" />, [Scopes.INTEGRATION_READ, Scopes.CONFIG_MANAGE]);
     unmount = r.unmount;
     expect(button(r.container, 'Create key')).toBeDefined();
     expect(button(r.container, 'Revoke Bot')).toBeDefined();

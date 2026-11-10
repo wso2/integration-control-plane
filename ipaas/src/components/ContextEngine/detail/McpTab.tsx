@@ -47,7 +47,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   const [testing, setTesting] = useState(false);
   // The playground calls the public endpoint like any client would, with a short-lived key minted for it.
   const testKey = useCreateContextApiKey(engine.id);
-  const canMintKey = useCan()(Scopes.ENDPOINT_API_KEY_MANAGE);
+  const canMintKey = useCan()(Scopes.CONFIG_MANAGE);
   const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + TEST_KEY_LIFETIME_MS).toISOString() });
   const selected = configs.find((c) => c.id === client) ?? configs[0];
 
