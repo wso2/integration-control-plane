@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { Divider, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Button, Divider, Stack, Typography } from '@wso2/oxygen-ui';
 import { Sparkles } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ReactNode } from 'react';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
+import { friendlyApiError } from '../../../utils/apiSecurity';
 import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 
@@ -36,7 +37,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   // lists: the endpoint's own routes (its OpenChoreo external route and its in-cluster project URL) carry
   // neither the agent's API key nor its gateway policy. '' while the gateway has none, which shows as "—".
   const securityRef = selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id, deploymentTrackId: versionId } : null;
-  const { data: apiSecurity } = useEndpointSecurity(securityRef, !!selectedEndpoint);
+  const { data: apiSecurity, isError: isSecurityError, error: securityError, isFetching: isSecurityFetching, refetch: refetchSecurity } = useEndpointSecurity(securityRef, !!selectedEndpoint);
   const agentGatewayUrl = apiSecurity?.publicUrl ?? '';
 
   if (!hasDeployment) {
@@ -60,6 +61,19 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
     <>
       <Divider sx={{ my: 2 }} />
       <EndpointUrlsPanel endpoints={endpoints} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} agentGatewayUrl={agentGatewayUrl} />
+      {/* A failed read is not a missing URL: the row stays "—", and this says why and offers another try. */}
+      {isSecurityError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" disabled={isSecurityFetching} onClick={() => void refetchSecurity()}>
+              {isSecurityFetching ? 'Retrying…' : 'Retry'}
+            </Button>
+          }>
+          {friendlyApiError(securityError, 'Could not read the agent’s AI gateway URL.')}
+        </Alert>
+      )}
       <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
     </>
   );

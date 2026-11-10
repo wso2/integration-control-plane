@@ -32,8 +32,10 @@ const gatewayUrl = 'https://npvdrmdwhj-gw-p1.gateway.dp.dev.cloud.wso2.com/math-
 const listed = vi.hoisted(() => ({ endpoints: [] as unknown[] }));
 const agentEndpoint = { id: 'math-tutor-endpoint', displayName: 'math-tutor-endpoint', networkVisibilities: ['Project'], exposure: 'none', projectUrl, publicUrl: rawRoute, invokeUrl: rawRoute };
 vi.mock('../../../hooks/useDeployments', () => ({ useEnvEndpoints: () => ({ data: listed.endpoints }) }));
-const security = vi.hoisted(() => ({ data: undefined as { publicUrl?: string } | undefined }));
-vi.mock('../../../hooks/useConsumers', () => ({ useEndpointSecurity: () => ({ data: security.data }) }));
+const security = vi.hoisted(() => ({ data: undefined as { publicUrl?: string } | undefined, error: null as Error | null, refetch: (() => {}) as () => void }));
+vi.mock('../../../hooks/useConsumers', () => ({
+  useEndpointSecurity: () => ({ data: security.data, isError: !!security.error, error: security.error, isFetching: false, refetch: security.refetch }),
+}));
 vi.mock('../../AgentChat', () => ({ default: () => null }));
 
 let root: Root;
@@ -41,6 +43,8 @@ let container: HTMLDivElement;
 
 beforeEach(() => {
   listed.endpoints = [agentEndpoint];
+  security.error = null;
+  security.refetch = () => {};
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -82,6 +86,26 @@ describe('ai-agent EnvCardBody URLs', () => {
       expect(text).not.toContain(projectUrl);
       expect(text).not.toContain(rawRoute);
     }
+  });
+
+  it('offers a retry when the gateway URL could not be read, keeping "—" and no project URL', async () => {
+    const refetch = vi.fn();
+    security.data = undefined;
+    security.error = new Error('agent-manager unavailable');
+    security.refetch = refetch;
+    const text = await render();
+    expect(container.querySelector('[aria-label="No public URL"]')?.textContent).toBe('—');
+    expect(text).not.toContain(projectUrl);
+    const retry = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Retry');
+    expect(retry).toBeDefined();
+    await act(async () => retry!.click());
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no error when the gateway simply has no URL yet', async () => {
+    security.data = { publicUrl: '' };
+    await render();
+    expect([...container.querySelectorAll('button')].some((b) => b.textContent === 'Retry')).toBe(false);
   });
 
   it('keeps the endpoint section, with "—", before the release lists an endpoint', async () => {

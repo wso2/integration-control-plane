@@ -68,12 +68,12 @@ export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, ex
   const handleDownload = async () => {
     try {
       const content = inlineSpec;
-      if (!content) return;
+      if (!ep || !content) return;
       const { extension, mimeType } = specFileType(content);
       const blob = new Blob([content], { type: mimeType });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `${trimEndpointName(ep?.displayName ?? '') || 'api'}-spec.${extension}`;
+      link.download = `${trimEndpointName(ep.displayName) || 'api'}-spec.${extension}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
