@@ -142,8 +142,10 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
   // Release-scoped discovery already returns the gateway's public URL; the security read may too. A
   // published workflow takes no test key, so none is minted until it is known not to be one. Its
-  // security is read meanwhile, which changes nothing.
-  const access = useEndpointTestAccess(ref, { enabled: !!ref, mint: publicationsKnown && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
+  // security is read meanwhile, which changes nothing. Nothing on the card shows until the gateway
+  // answers, so the key is kept across page loads: a load that finds one calls the gateway at the
+  // discovered URL without waiting for the security read or a mint.
+  const access = useEndpointTestAccess(ref, { enabled: !!ref, mint: publicationsKnown && !publishedHere, gatewayUrlFallback: endpoint?.publicUrl ?? '', persist: true });
   const { authHeader, apiKey, mintKey, renewKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 

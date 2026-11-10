@@ -30,6 +30,7 @@ import { connect, disconnect, type CloudSession, type CloudUser } from './sessio
 import { THUNDER_INSTANCE_ID, bffSignInUrl, gatewaySignedIn, isBffAuth, signInParams, thunderConfig } from './thunderConfig';
 import { stripBase } from '../utils/basePath';
 import { local, session as browserSession } from '../utils/storage';
+import { clearStoredTestKeys } from '../utils/storedTestKeys';
 
 const ORG_HANDLE_KEY = 'org_handle';
 const MISSING_ORG = 'Missing organization context after sign-in. Please try logging in again.';
@@ -283,6 +284,8 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
   const logout = useCallback(async () => {
     disconnect();
     local.remove(ORG_HANDLE_KEY);
+    // A test key is a credential: it leaves with the session, though the tab stays open.
+    clearStoredTestKeys();
     browserSession.set(SKIP_SILENT_KEY, '1');
     // Clears the local session, then leaves for Thunder's end-session endpoint.
     await signOut();

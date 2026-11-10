@@ -16,15 +16,18 @@
  * under the License.
  */
 
-import { act, useState } from 'react';
+import { act, useState, type JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEndpointTestKey, getEndpointSecurity, setEndpointApiKeyAuth } from '../api/consumers';
 import { keyRenewalTime, useEndpointTestAccess, type EndpointTestAccess } from './useEndpointTestAccess';
 import { flush, renderWithScopes } from '../test/renderWithScopes';
 import { DEVELOPER } from '../test/roles';
+import { storeTestKey } from '../utils/storedTestKeys';
 import type { EndpointRef } from '../types/consumers';
 
 vi.mock('../api/consumers', () => ({ getEndpointSecurity: vi.fn(), createEndpointTestKey: vi.fn(), setEndpointApiKeyAuth: vi.fn() }));
+const org = vi.hoisted(() => ({ uuid: 'org-a' as string | null }));
+vi.mock('./useOrgUuid', () => ({ useOrgUuid: () => org.uuid }));
 
 const a: EndpointRef = { componentName: 'orders', environmentName: 'development', endpointName: 'http', deploymentTrackId: 'main' };
 let select: (ref: EndpointRef) => void = () => {};
@@ -301,6 +304,79 @@ describe('the key held for an endpoint', () => {
     expect(mints).toBe(2);
     await flush();
     expect(shown(r.container, 'first')).toBe('key-2');
+  });
+});
+
+describe('a key kept across page loads', () => {
+  function Kept({ persist = true }: { persist?: boolean }) {
+    const access = useEndpointTestAccess(a, { persist });
+    currentAccess = access;
+    return <output>{access.apiKey}</output>;
+  }
+  // Each render has a query cache of its own, as a page load does. The mint waits on the security read.
+  const load = async (view: JSX.Element) => {
+    unmount();
+    const r = await renderWithScopes(view, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    await flush();
+    return r;
+  };
+  let mints = 0;
+  beforeEach(() => {
+    unmount = () => {};
+    sessionStorage.clear();
+    org.uuid = 'org-a';
+    mints = 0;
+    vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'api-key', publicUrl: 'https://gw.example/orders' } as never);
+    vi.mocked(createEndpointTestKey).mockImplementation(async () => {
+      mints += 1;
+      return { keyId: `k${mints}`, apiKey: `key-${mints}`, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() };
+    });
+  });
+  afterEach(() => sessionStorage.clear());
+
+  it('is used by the next page load instead of minting another', async () => {
+    expect((await load(<Kept />)).container.textContent).toBe('key-1');
+    expect((await load(<Kept />)).container.textContent).toBe('key-1');
+    expect(mints).toBe(1);
+  });
+
+  it('is used before the security read answers', async () => {
+    await load(<Kept />);
+    vi.mocked(getEndpointSecurity).mockReturnValue(new Promise(() => {}));
+    await load(<Kept />);
+    expect(currentAccess?.mode).toBeNull();
+    expect(currentAccess?.apiKey).toBe('key-1');
+    expect(currentAccess?.isAuthorized).toBe(true);
+  });
+
+  it('is not used once it is due for renewal', async () => {
+    const mintedAt = Date.now() - 60 * 60_000;
+    storeTestKey('org-a|orders|development|http|main', { key: 'spent', mintedAt, renewAt: Date.now() - 1 });
+    expect((await load(<Kept />)).container.textContent).toBe('key-1');
+    expect(mints).toBe(1);
+  });
+
+  it('belongs to the organization it was minted in', async () => {
+    await load(<Kept />);
+    org.uuid = 'org-b';
+    expect((await load(<Kept />)).container.textContent).toBe('key-2');
+    expect(mints).toBe(2);
+  });
+
+  it('is replaced by the key minted to renew it', async () => {
+    await load(<Kept />);
+    await act(async () => void (await currentAccess?.renewKey('key-1')));
+    expect((await load(<Kept />)).container.textContent).toBe('key-2');
+    expect(mints).toBe(2);
+  });
+
+  it('is not kept by a view that does not ask for it', async () => {
+    await load(<Kept persist={false} />);
+    await load(<Kept persist={false} />);
+    expect(mints).toBe(2);
+    expect(sessionStorage.length).toBe(0);
   });
 });
 

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
 import { isCompleteRef, useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
@@ -26,6 +26,8 @@ import { isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
 import { aiGatewayAccessOf, mcpUrlOf, type AiGatewayAccess } from '../utils/mcpGateway';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
+import { useOrgUuid } from './useOrgUuid';
+import { readStoredTestKey, storeTestKey } from '../utils/storedTestKeys';
 
 export interface EndpointTestAccess {
   /**
@@ -124,7 +126,8 @@ const RENEW_RETRY_MS = 30_000;
 /**
  * A held key outlives the views that use it by this long, so coming back to one reuses it. It is a
  * plaintext credential kept in the shared query cache, so a cache persister added later must leave
- * out `heldKeyQueryKey` queries.
+ * out `heldKeyQueryKey` queries. A view that opts in (`persist`) also keeps it in the tab's
+ * sessionStorage, which sign-out clears.
  */
 const HELD_KEY_GC_MS = DEFAULT_KEY_VALIDITY_MS;
 /** The longest delay a browser timer honours; a longer one fires at once. */
@@ -197,9 +200,15 @@ interface TestAccessOptions {
   gatewayUrlFallback?: string;
   /** An AI agent's test key comes from Agent Manager, which also checks `amp:agent:api-key-manage`. */
   agent?: boolean;
+  /**
+   * Keep the key in this tab's sessionStorage, scoped to the organization, so a page load reuses it
+   * until it is due for renewal instead of minting one more. For a view that waits on the key before
+   * showing anything: a kept key lets it call the gateway before the security read answers.
+   */
+  persist?: boolean;
 }
 
-export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
+export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false, persist = false }: TestAccessOptions = {}): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError, isLoading: isSecurityLoading } = useEndpointSecurity(ref, enabled);
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
@@ -223,9 +232,34 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const switchable = canSwitch && !aiGateway && managedIn === null;
   const mode = security?.mode ?? null;
 
+  // Component names repeat across organizations, so a kept key is scoped to the one it was minted in.
+  const orgUuid = useOrgUuid();
+  const keptIn = useCallback((target: EndpointRef): string | null => (persist && orgUuid ? `${orgUuid}|${keyOf(target)}` : null), [persist, orgUuid]);
+  const mintAndKeep = useCallback(
+    async (target: EndpointRef): Promise<HeldKey> => {
+      const minted = await mintHeldKey(createKeyFor, target);
+      const scope = keptIn(target);
+      if (scope) storeTestKey(scope, minted);
+      return minted;
+    },
+    [createKeyFor, keptIn],
+  );
+
+  // A kept key is put in the cache before the held key's query can mint, and before the security read
+  // answers: it is fresh until due for renewal, so the query uses it rather than minting. A key the
+  // endpoint no longer takes is refused, which renews it as an expired key is.
+  const keepScope = enabled && isCompleteRef(endpoint) && mintable ? keptIn(endpoint) : null;
+  useLayoutEffect(() => {
+    if (!keepScope) return;
+    const queryKey = heldKeyQueryKey(refKey);
+    if (queryClient.getQueryData(queryKey)) return;
+    const kept = readStoredTestKey(keepScope);
+    if (kept) queryClient.setQueryData<HeldKey>(queryKey, kept, { updatedAt: kept.mintedAt });
+  }, [keepScope, refKey, queryClient]);
+
   const held = useQuery({
     queryKey: heldKeyQueryKey(refKey),
-    queryFn: () => mintHeldKey(createKeyFor, endpoint!),
+    queryFn: () => mintAndKeep(endpoint!),
     // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
     enabled: enabled && isCompleteRef(endpoint) && mintable && mode === 'api-key',
     // Fresh until it is due for renewal, so a view that mounts later uses the held key.
@@ -267,14 +301,14 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
       }
       try {
         // Mints even though a key is held; a mint already in flight for the endpoint is joined, not repeated.
-        const minted = await queryClient.fetchQuery({ queryKey, queryFn: () => mintHeldKey(createKeyFor, target), staleTime: 0, gcTime: HELD_KEY_GC_MS, retry: false });
+        const minted = await queryClient.fetchQuery({ queryKey, queryFn: () => mintAndKeep(target), staleTime: 0, gcTime: HELD_KEY_GC_MS, retry: false });
         return minted.key;
       } catch {
         // The failure is on the held key's query, where every view of the endpoint reads it.
         return null;
       }
     },
-    [mintable, queryClient, createKeyFor],
+    [mintable, queryClient, mintAndKeep],
   );
   // Mints a view asked for, which it shows as minting even while it holds a key.
   const [requestedMints, setRequestedMints] = useState(0);

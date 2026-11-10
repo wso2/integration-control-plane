@@ -200,7 +200,7 @@ describe('useWorkflowConnection', () => {
     // The endpoint the test key is for, and its discovered public URL as the gateway URL fallback.
     expect(testAccessCalls.at(-1)).toEqual([
       { componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' },
-      { enabled: true, mint: true, gatewayUrlFallback: GATEWAY_URL },
+      { enabled: true, mint: true, gatewayUrlFallback: GATEWAY_URL, persist: true },
     ]);
   });
 
