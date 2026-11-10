@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, type Theme } from '@wso2/oxygen-ui';
 import { ArrowUpRight } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { WorkflowNotice } from '../connection/workflowCredential';
@@ -39,7 +39,7 @@ const actionSx = {
   boxShadow: 'none',
   '& .MuiButton-endIcon': { transition: 'transform 150ms ease-out' },
   '&:hover': { boxShadow: 'none' },
-  '&:hover .MuiButton-endIcon': { transform: 'translate(2px, -2px)' },
+  '&:hover .MuiButton-endIcon': { transform: (theme: Theme) => `translate(${theme.spacing(0.25)}, ${theme.spacing(-0.25)})` },
   '@media (prefers-reduced-motion: reduce)': { '& .MuiButton-endIcon': { transition: 'none' } },
 } as const;
 
@@ -50,20 +50,20 @@ const actionSx = {
  * styled as the Test Console's notice for an endpoint it cannot test.
  */
 export default function TestKeyNotice({ notice, action }: TestKeyNoticeProps): JSX.Element {
+  // A page opens in a new tab; anything else runs here, held while it does.
+  const kind = !action
+    ? null
+    : 'href' in action
+      ? { href: action.href, target: '_blank', rel: 'noopener noreferrer', endIcon: <ArrowUpRight size={16} /> }
+      : { onClick: action.run, disabled: action.pending, startIcon: action.pending ? <CircularProgress size={14} color="inherit" /> : undefined };
   return (
     <Alert severity={notice.severity}>
       {notice.text}
-      {action && (
+      {action && kind && (
         <Box sx={actionRowSx}>
-          {'href' in action ? (
-            <Button variant="contained" color={notice.severity} size="small" href={action.href} target="_blank" rel="noopener noreferrer" endIcon={<ArrowUpRight size={16} />} sx={actionSx}>
-              {action.label}
-            </Button>
-          ) : (
-            <Button variant="contained" color={notice.severity} size="small" disabled={action.pending} onClick={action.run} startIcon={action.pending ? <CircularProgress size={14} color="inherit" /> : undefined} sx={actionSx}>
-              {action.label}
-            </Button>
-          )}
+          <Button variant="contained" color={notice.severity} size="small" sx={actionSx} {...kind}>
+            {action.label}
+          </Button>
         </Box>
       )}
     </Alert>
