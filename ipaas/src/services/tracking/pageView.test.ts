@@ -31,6 +31,8 @@ vi.mock('../../config/routes', () => ({
           children: [
             { path: 'organizations/:orgHandler/projects', element: null },
             { path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/overview', element: null },
+            // How routes.tsx catches hidden pages under each scope level.
+            { path: 'organizations/:orgHandler/*', element: null },
           ],
         },
       ],
@@ -57,7 +59,11 @@ describe('routePattern', () => {
     expect(routePattern('/')).toBe('/');
   });
 
-  it('never echoes a path that only the catch-all matches', () => {
+  it('reports a path that only the top-level catch-all matches as not found', () => {
+    expect(routePattern('/somewhere-else')).toBe(NOT_FOUND_ROUTE);
+  });
+
+  it('reports a path that only a nested catch-all matches as not found', () => {
     expect(routePattern('/organizations/acme/secret-thing')).toBe(NOT_FOUND_ROUTE);
   });
 });

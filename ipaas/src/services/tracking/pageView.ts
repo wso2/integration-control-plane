@@ -27,7 +27,7 @@ export const PRODUCT = 'integration';
 
 /** Reported for a path no route declares, so the raw path is never sent. */
 export const UNMATCHED_ROUTE = '/(unmatched)';
-/** Reported for the catch-all route, whose splat would otherwise stand for the raw path. */
+/** Reported for a catch-all route, top-level (`*`) or nested (`.../*`), so unknown pages read as not found. */
 export const NOT_FOUND_ROUTE = '/(not-found)';
 
 /**
@@ -42,7 +42,7 @@ export function routePattern(pathname: string): string {
   let pattern = '';
   for (const { route } of matched) {
     if (!route.path) continue;
-    if (route.path === '*') return NOT_FOUND_ROUTE;
+    if (route.path === '*' || route.path.endsWith('/*')) return NOT_FOUND_ROUTE;
     pattern = route.path.startsWith('/') ? route.path : `${pattern.replace(/\/$/, '')}/${route.path}`;
   }
   return pattern || '/';
