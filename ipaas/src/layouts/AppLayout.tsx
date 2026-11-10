@@ -748,7 +748,7 @@ export default function AppLayout(): JSX.Element {
                       </Sidebar.Item>
                     </Sidebar.Item>
 
-                    {isContextEngineEnabled() && (
+                    {isContextEngineEnabled() && canReadIntegrations && (
                       <Sidebar.Item id="org-context-engines">
                         <Sidebar.ItemIcon>
                           <Waypoints size={20} />

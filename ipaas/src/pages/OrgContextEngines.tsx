@@ -20,8 +20,10 @@ import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, PageCon
 import { Play, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX, type MouseEvent } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useCan } from '../hooks/useCan';
 import { isContextEngineEnabled, useContextEngines, useContextEngineSummary, useDeleteContextEngine, useSeenOnScreen } from '../hooks/useContextEngine';
 import { contextEngineUrl, newContextEngineUrl } from '../paths';
+import { Scopes } from '../constants/permissions';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
@@ -42,7 +44,7 @@ const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRa
 const MAX_MARKS = 4;
 
 /** A row's actions; they pause while the engine is not running. */
-function RowActions({ engine, onPlayground, onDelete }: { engine: ContextEngine; onPlayground: () => void; onDelete: () => void }): JSX.Element {
+function RowActions({ engine, onPlayground, onDelete }: { engine: ContextEngine; onPlayground?: () => void; onDelete?: () => void }): JSX.Element {
   const deleting = engine.state === 'deleting';
   const running = engine.state === 'ready';
   const stop = (fn: () => void) => (ev: MouseEvent) => {
@@ -51,20 +53,24 @@ function RowActions({ engine, onPlayground, onDelete }: { engine: ContextEngine;
   };
   return (
     <>
-      <Tooltip title={running ? 'Open playground' : 'Available once the engine is running'}>
-        <span>
-          <IconButton size="small" aria-label={`Open playground for ${engine.name}`} disabled={!running} onClick={stop(onPlayground)}>
-            <Play size={16} />
-          </IconButton>
-        </span>
-      </Tooltip>
-      <Tooltip title={deleting ? 'Being deleted' : 'Delete'}>
-        <span>
-          <IconButton size="small" color="error" aria-label={`Delete ${engine.name}`} disabled={deleting} onClick={stop(onDelete)}>
-            <Trash2 size={16} />
-          </IconButton>
-        </span>
-      </Tooltip>
+      {onPlayground && (
+        <Tooltip title={running ? 'Open playground' : 'Available once the engine is running'}>
+          <span>
+            <IconButton size="small" aria-label={`Open playground for ${engine.name}`} disabled={!running} onClick={stop(onPlayground)}>
+              <Play size={16} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      )}
+      {onDelete && (
+        <Tooltip title={deleting ? 'Being deleted' : 'Delete'}>
+          <span>
+            <IconButton size="small" color="error" aria-label={`Delete ${engine.name}`} disabled={deleting} onClick={stop(onDelete)}>
+              <Trash2 size={16} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      )}
     </>
   );
 }
@@ -110,7 +116,7 @@ function SummaryCells({ summary, pending }: { summary: ContextEngineSummary | nu
 }
 
 /** One engine; its summary is read from the engine once the row is on screen and the engine runs. */
-function EngineRow({ engine, onOpen, onPlayground, onDelete }: { engine: ContextEngine; onOpen: () => void; onPlayground: () => void; onDelete: () => void }): JSX.Element {
+function EngineRow({ engine, onOpen, onPlayground, onDelete }: { engine: ContextEngine; onOpen: () => void; onPlayground?: () => void; onDelete?: () => void }): JSX.Element {
   const [rowRef, seen] = useSeenOnScreen<HTMLTableRowElement>();
   const running = engine.state === 'ready';
   const summary = useContextEngineSummary(engine.id, seen && running);
@@ -153,7 +159,11 @@ function EngineRow({ engine, onOpen, onPlayground, onDelete }: { engine: Context
 
 export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
-  const { data: engines, isLoading, isError, error, refetch } = useContextEngines();
+  const can = useCan();
+  const canRead = can(Scopes.INTEGRATION_READ);
+  const canManage = can(Scopes.CONFIG_MANAGE);
+  const canTest = can(Scopes.ENDPOINT_TEST);
+  const { data: engines, isLoading, isError, error, refetch } = useContextEngines(canRead);
   const remove = useDeleteContextEngine();
   const [search, setSearch] = useState('');
   const [toDelete, setToDelete] = useState<ContextEngine | null>(null);
@@ -191,6 +201,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   };
 
   const body = (): JSX.Element => {
+    if (!canRead) return <Alert severity="info">Your role can&apos;t view context engines.</Alert>;
     if (isLoading) {
       return (
         <Box sx={centeredSx}>
@@ -211,7 +222,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
         </Alert>
       );
     }
-    if (!engines?.length) return <NoContextEnginesBanner onCreate={goCreate} />;
+    if (!engines?.length) return <NoContextEnginesBanner onCreate={canManage ? goCreate : undefined} />;
     return (
       <ListingTable.Container elevation={0} sx={tableContainerSx}>
         <ListingTable size="small">
@@ -233,7 +244,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                 </ListingTable.Cell>
               </ListingTable.Row>
             ) : (
-              filtered.map((e) => <EngineRow key={e.id} engine={e} onOpen={() => goDetail(e.id)} onPlayground={() => goPlayground(e.id)} onDelete={() => setToDelete(e)} />)
+              filtered.map((e) => <EngineRow key={e.id} engine={e} onOpen={() => goDetail(e.id)} onPlayground={canTest ? () => goPlayground(e.id) : undefined} onDelete={canManage ? () => setToDelete(e) : undefined} />)
             )}
           </ListingTable.Body>
         </ListingTable>
@@ -251,9 +262,11 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
           {!!engines?.length && (
             <>
               <SearchField value={search} onChange={setSearch} placeholder="Search engines..." sx={{ minWidth: 220 }} />
-              <Button variant="contained" startIcon={<Plus size={20} />} onClick={goCreate} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                Create
-              </Button>
+              {canManage && (
+                <Button variant="contained" startIcon={<Plus size={20} />} onClick={goCreate} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  Create
+                </Button>
+              )}
             </>
           )}
         </Stack>

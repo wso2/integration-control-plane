@@ -20,6 +20,8 @@ import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, Skeleto
 import { KeyRound, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useContextApiKeys, useCreateContextApiKey, useRevokeContextApiKey } from '../../../hooks/useContextEngine';
+import { useCan } from '../../../hooks/useCan';
+import { Scopes } from '../../../constants/permissions';
 import { engineMessage } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
@@ -29,7 +31,10 @@ import type { ContextApiKey } from '../../../types/contextEngine';
 
 /** Keys for the engine's public API and MCP endpoint: create one (shown once), see them masked, revoke them. */
 export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.Element {
-  const keys = useContextApiKeys(engineId);
+  const can = useCan();
+  const canRead = can(Scopes.ENDPOINT_READ);
+  const canManage = can(Scopes.ENDPOINT_API_KEY_MANAGE);
+  const keys = useContextApiKeys(engineId, canRead);
   const create = useCreateContextApiKey(engineId);
   const revoke = useRevokeContextApiKey(engineId);
   const [name, setName] = useState('');
@@ -49,7 +54,8 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
     );
   };
 
-  const list = (): JSX.Element => {
+  const list = (): JSX.Element | null => {
+    if (!canRead) return null;
     if (keys.isLoading) return <Skeleton variant="rounded" height={88} />;
     if (keys.isError) {
       return (
@@ -80,7 +86,7 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
               <ListingTable.Cell>Name</ListingTable.Cell>
               <ListingTable.Cell>Key</ListingTable.Cell>
               <ListingTable.Cell>Status</ListingTable.Cell>
-              <ListingTable.Cell align="right">Actions</ListingTable.Cell>
+              {canManage && <ListingTable.Cell align="right">Actions</ListingTable.Cell>}
             </ListingTable.Row>
           </ListingTable.Head>
           <ListingTable.Body>
@@ -89,13 +95,15 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
                 <ListingTable.Cell>{k.displayName || k.name}</ListingTable.Cell>
                 <ListingTable.Cell sx={maskedKeySx}>{k.maskedKey}</ListingTable.Cell>
                 <ListingTable.Cell>{k.expiresAt ? `${k.status} · expires ${new Date(k.expiresAt).toLocaleString()}` : k.status}</ListingTable.Cell>
-                <ListingTable.Cell align="right">
-                  <Tooltip title="Revoke">
-                    <IconButton size="small" color="error" aria-label={`Revoke ${k.displayName || k.name}`} onClick={() => setToRevoke(k)}>
-                      <Trash2 size={16} />
-                    </IconButton>
-                  </Tooltip>
-                </ListingTable.Cell>
+                {canManage && (
+                  <ListingTable.Cell align="right">
+                    <Tooltip title="Revoke">
+                      <IconButton size="small" color="error" aria-label={`Revoke ${k.displayName || k.name}`} onClick={() => setToRevoke(k)}>
+                        <Trash2 size={16} />
+                      </IconButton>
+                    </Tooltip>
+                  </ListingTable.Cell>
+                )}
               </ListingTable.Row>
             ))}
           </ListingTable.Body>
@@ -109,12 +117,14 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
       <Typography variant="subtitle2" sx={headingSx}>
         API keys
       </Typography>
-      <Stack direction="row" gap={1.5} alignItems="center" sx={createRowSx}>
-        <TextField size="small" label="Key name" placeholder="e.g. support-bot" value={name} onChange={(e) => setName(e.target.value)} sx={nameFieldSx} />
-        <Button variant="outlined" startIcon={create.isPending ? <CircularProgress size={14} color="inherit" /> : <Plus size={16} />} disabled={create.isPending} onClick={submit}>
-          Create key
-        </Button>
-      </Stack>
+      {canManage && (
+        <Stack direction="row" gap={1.5} alignItems="center" sx={createRowSx}>
+          <TextField size="small" label="Key name" placeholder="e.g. support-bot" value={name} onChange={(e) => setName(e.target.value)} sx={nameFieldSx} />
+          <Button variant="outlined" startIcon={create.isPending ? <CircularProgress size={14} color="inherit" /> : <Plus size={16} />} disabled={create.isPending} onClick={submit}>
+            Create key
+          </Button>
+        </Stack>
+      )}
       {create.isError && (
         <Alert severity="error" variant="outlined" sx={noticeSx}>
           {`Couldn't create the key: ${engineMessage(create.error, 'please try again')}`}

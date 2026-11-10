@@ -20,6 +20,8 @@ import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogCont
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useCan } from '../hooks/useCan';
+import { Scopes } from '../constants/permissions';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useContextEngineDraft, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import { answerChoice, checkStagedFile, effectiveVisibility, engineMessage, isFormDirty, modelsStepBlocker, nameStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
@@ -69,6 +71,7 @@ interface SetupResult {
 
 export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const draft = useContextEngineDraft(scope.org);
   const { save: saveDraft, clear: clearDraft } = draft;
   // Restore a draft from this session, if there is one; secrets were never stored and must be re-entered.
@@ -199,7 +202,11 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         <PageTitle.Header>Create Context Engine</PageTitle.Header>
       </PageTitle>
 
-      {created ? (
+      {!canManage ? (
+        <Alert severity="info" variant="outlined" sx={{ mt: 3 }}>
+          Your role can&apos;t create context engines.
+        </Alert>
+      ) : created ? (
         <Box sx={{ mt: 3 }}>
           <SetupProgress
             engineId={created.id}

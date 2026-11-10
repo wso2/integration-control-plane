@@ -50,7 +50,7 @@ function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: 
 }
 
 /** Empty-state hero for the Context Engines page, in the style of the other org admin banners. */
-export default function NoContextEnginesBanner({ onCreate }: { onCreate: () => void }): JSX.Element {
+export default function NoContextEnginesBanner({ onCreate }: { onCreate?: () => void }): JSX.Element {
   return (
     <Stack gap={4} sx={{ pb: 6, maxWidth: 960 }}>
       <Stack gap={1.5} sx={{ maxWidth: 560 }}>
@@ -60,11 +60,13 @@ export default function NoContextEnginesBanner({ onCreate }: { onCreate: () => v
         <Typography variant="body2" color="text.secondary">
           Build a knowledge graph from your sources. Ask it questions, or call it from agents over API or MCP.
         </Typography>
-        <Box>
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={onCreate} sx={{ mt: 1 }}>
-            Create Context Engine
-          </Button>
-        </Box>
+        {onCreate && (
+          <Box>
+            <Button variant="contained" startIcon={<Plus size={20} />} onClick={onCreate} sx={{ mt: 1 }}>
+              Create Context Engine
+            </Button>
+          </Box>
+        )}
       </Stack>
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>

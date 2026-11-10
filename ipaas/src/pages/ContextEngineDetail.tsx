@@ -21,6 +21,8 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useCan } from '../hooks/useCan';
+import { Scopes } from '../constants/permissions';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
 import { engineMessage } from '../utils/contextEngine';
@@ -85,6 +87,14 @@ function EngineNotRunning({ state, reason }: { state: ContextEngineState; reason
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
 const tabsSx = { borderBottom: '1px solid', borderColor: 'divider', mb: 3 } as const;
 
+function NoConsoleAccess(): JSX.Element {
+  return (
+    <Alert severity="info" variant="outlined">
+      Your role can&apos;t query this engine or browse its graph.
+    </Alert>
+  );
+}
+
 export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
   const { tab = 'overview' } = useParams();
@@ -96,6 +106,8 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   const remove = useDeleteContextEngine();
+  const can = useCan();
+  const canTest = can(Scopes.ENDPOINT_TEST);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleting = engine?.state === 'deleting';
@@ -216,9 +228,11 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting ? undefined : () => setConfirmDelete(true)} />}
-      {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
-      {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
+      {shownTab === 'overview' && (
+        <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting || !can(Scopes.CONFIG_MANAGE) ? undefined : () => setConfirmDelete(true)} />
+      )}
+      {shownTab === 'playground' && (canTest ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
+      {shownTab === 'graph' && (canTest ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'api' && <ApiTab engine={engine} />}
       {shownTab === 'mcp' && <McpTab key={engine.id} engine={engine} />}
       {/* {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />} */}

@@ -72,11 +72,11 @@ export function useRouteEngineId(): string {
 const TRANSIENT_STATES: ReadonlySet<ContextEngineState> = new Set(['provisioning', 'starting', 'deleting', 'unknown']);
 
 /** The engines; checked again while any is starting, syncing or being deleted, so the listing's progress keeps moving. */
-export function useContextEngines() {
+export function useContextEngines(enabled = true) {
   return useQuery({
     queryKey: [ROOT_KEY, 'list'],
     queryFn: listContextEngines,
-    enabled: isContextEngineEnabled(),
+    enabled: isContextEngineEnabled() && enabled,
     retry: false,
     refetchInterval: (query) => (query.state.data?.some((e) => TRANSIENT_STATES.has(e.state)) ? DELETION_POLL_MS : listPollInterval(query.state.data)),
   });
