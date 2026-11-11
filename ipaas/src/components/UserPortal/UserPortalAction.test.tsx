@@ -277,6 +277,19 @@ describe('a publish that finishes in the background', () => {
     expect(onNotify).toHaveBeenCalledTimes(1);
   });
 
+  // An agent's publish brings the User Portal's scopes in step after the response too, and redeploys nothing.
+  it('says what an agent’s background publish is doing, without a redeploy', async () => {
+    publishability.mockResolvedValueOnce(publishable).mockResolvedValue({ ...publishable, publishing: true });
+    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    const tooltip = container.querySelector('label')?.getAttribute('aria-label') ?? '';
+    expect(tooltip).toContain('Its scopes are added to the User Portal');
+    expect(tooltip).not.toContain('redeployed');
+  });
+
   it('reports a failed background publish once, worded as a refused one is', async () => {
     publishability.mockResolvedValueOnce(workflow).mockResolvedValue(running);
     publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, unpublishing: false, rejectedScopes: [] });

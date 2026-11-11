@@ -64,7 +64,7 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   const can = useCan();
   const enable = useEnableUserPortal();
   const [enableOpen, setEnableOpen] = useState(false);
-  const publish = usePublishFlow({ componentId, environment: environment.id, envName: environment.name });
+  const publish = usePublishFlow({ componentId, environment: environment.id, envName: environment.name, isWorkflow: true });
 
   const portal = portalQuery.data;
   const report = publishability.data;
@@ -174,7 +174,7 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
         publishable={report.publishable}
         redeploys={report.redeploys}
         busy={publishability.isFetching}
-        holdReason={report.unpublishing ? unpublishingText(environment.name) : undefined}
+        holdReason={report.unpublishing ? unpublishingText(environment.name, true) : undefined}
         label="Publish to User Portal"
         variant="contained"
         size="medium"

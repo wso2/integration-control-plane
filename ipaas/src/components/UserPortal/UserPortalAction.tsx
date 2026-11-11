@@ -215,7 +215,7 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
     const failure = publishFailure ?? unpublishFailure;
     const toggle = () => openDialog(published ? 'unpublish' : data.publishable ? 'publish' : 'refusals');
     // The switch's label stays short, so what a publish or unpublish is doing, or why the last one failed, goes in its tooltip.
-    const tooltip = !canDeploy ? DEPLOY_REFUSAL : publishing ? publishingText(envName) : unpublishing ? unpublishingText(envName) : (failure ?? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}`);
+    const tooltip = !canDeploy ? DEPLOY_REFUSAL : publishing ? publishingText(envName, isWorkflow) : unpublishing ? unpublishingText(envName, isWorkflow) : (failure ?? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}`);
     return (
       <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
         <Tooltip title={tooltip}>

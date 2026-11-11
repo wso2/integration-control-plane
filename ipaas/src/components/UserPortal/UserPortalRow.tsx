@@ -58,7 +58,7 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
   const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
-  const publish = usePublishFlow({ componentId, environment, envName, onStart: () => unpublish.reset() });
+  const publish = usePublishFlow({ componentId, environment, envName, isWorkflow, onStart: () => unpublish.reset() });
   // A finish refused earlier no longer stands once a run has started, or the workflow is published again.
   const { reset: resetUnpublish } = unpublish;
   const settledElsewhere = !!data?.unpublishing || !!data?.published;
@@ -113,7 +113,7 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
       </span>
     </Tooltip>
   ) : (
-    <PublishButton flow={publish} publishable={data.publishable} redeploys={data.redeploys} busy={unpublish.isPending || isFetching} holdReason={data.unpublishing ? unpublishingText(envName) : undefined} label="Publish" />
+    <PublishButton flow={publish} publishable={data.publishable} redeploys={data.redeploys} busy={unpublish.isPending || isFetching} holdReason={data.unpublishing ? unpublishingText(envName, isWorkflow) : undefined} label="Publish" />
   );
 
   return (

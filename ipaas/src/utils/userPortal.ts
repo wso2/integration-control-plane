@@ -72,11 +72,18 @@ export const refusalText = ({ code, message }: UserPortalRefusal, env: string): 
 /** A failed User Portal call: its code worded, or else the API's sentence. */
 export const userPortalErrorText = (error: unknown, env: string): string => MESSAGES[httpCodeOf(error)]?.(env) ?? apiErrorMessage(error, 'Something went wrong.');
 
-/** The note shown while a workflow's publish finishes in the background. */
-export const publishingText = (env: string): string => `Publishing to the User Portal in ${env}. The workflow is redeployed for the User Portal's sign-in; this takes a minute or two.`;
+/**
+ * The note shown while a publish finishes in the background: a workflow's redeploys it for the User Portal's sign-in,
+ * and every publish adds its scopes to the User Portal.
+ */
+export const publishingText = (env: string, isWorkflow: boolean): string =>
+  isWorkflow ? `Publishing to the User Portal in ${env}. The workflow is redeployed for the User Portal's sign-in; this takes a minute or two.` : `Publishing to the User Portal in ${env}. Its scopes are added to the User Portal; this can take a minute.`;
 
-/** The note shown while an unpublished workflow is given back to the console in the background. */
-export const unpublishingText = (env: string): string => `Unpublished from the User Portal in ${env}. The workflow is redeployed to take the console's API key again; this takes a minute or two.`;
+/** The note shown while an unpublish finishes in the background: a workflow is given back to the console, and its scopes taken off. */
+export const unpublishingText = (env: string, isWorkflow: boolean): string =>
+  isWorkflow
+    ? `Unpublished from the User Portal in ${env}. The workflow is redeployed to take the console's API key again; this takes a minute or two.`
+    : `Unpublished from the User Portal in ${env}. Its scopes are being taken off the User Portal; this can take a minute.`;
 
 // The rules about what runs in the environment. With nothing deployed there they all fail, and deploying is the fix.
 const NEEDS_A_DEPLOYMENT = new Set(['USER_PORTAL_NO_PUBLIC_ENDPOINT', 'USER_PORTAL_NO_MANAGEMENT_API', 'USER_PORTAL_API_KEY', 'USER_PORTAL_SECURED_BY_PROMOTION', 'USER_PORTAL_AUDIENCE_MISSING', 'USER_PORTAL_TOKEN_NOT_FORWARDED']);
