@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, Card, CardContent, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowRight, Mic, GitHub, Plus, GitBranch } from '@wso2/oxygen-ui-icons-react';
+import { ArrowRight, GitHub, Plus, GitBranch } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useDeploySample } from '../hooks/useDeploySample';
@@ -40,7 +40,7 @@ import { GitProvider } from '../types/credentials';
 import { GITHUB_AUTH } from '../constants/github';
 import { PROVIDER_ICON_SX, GITHUB_ICON_SX, SECTION_LABEL_SX } from '../constants/styles';
 import { resourceUrl, narrow, type ProjectScope } from '../nav';
-import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl, createVoiceAgentUrl } from '../paths';
+import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl } from '../paths';
 import type { Sample } from '../types/samples';
 import { sampleKey } from '../constants/samples';
 import { buildCloudEditorUrl } from '../utils/cloudEditor';
@@ -54,7 +54,6 @@ import { useSamples } from '../hooks/useSamples';
 import { trackEvent } from '../services/tracking/tracking';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
 
-const VOICE_AGENT_CARD_SX = { display: 'flex', alignItems: 'center', gap: 2, p: 2, '&:last-child': { pb: 2 } } as const;
 
 /** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
 const GET_STARTED_TABS = [{ label: 'Prebuilt integrations' }, { label: 'Samples' }];
@@ -382,25 +381,6 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     </>
                   )}
                 </Box>
-              </CardContent>
-            </Card>
-          </Box>
-
-          <Box sx={{ flex: '0 0 auto' }}>
-            <Card sx={{ boxShadow: 'none', ...(creationBlocked ? { pointerEvents: 'none', opacity: 0.5 } : {}) }}>
-              <CardContent sx={VOICE_AGENT_CARD_SX}>
-                <Mic size={18} />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    Voice agent
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Let callers talk to one of your agents.
-                  </Typography>
-                </Box>
-                <Button variant="text" endIcon={<ArrowRight size={14} />} onClick={() => navigate(createVoiceAgentUrl(scope.org, scope.project))} disabled={creationBlocked}>
-                  Create voice agent
-                </Button>
               </CardContent>
             </Card>
           </Box>
