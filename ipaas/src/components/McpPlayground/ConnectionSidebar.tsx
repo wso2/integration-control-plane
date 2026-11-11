@@ -37,8 +37,6 @@ interface ConnectionSidebarProps {
    * another MCP client.
    */
   keyless?: boolean;
-  /** The header another client sends the token in. */
-  keyHeader?: string;
   /** The endpoint's visibility, shown read-only. */
   visibility?: string;
 }
@@ -53,7 +51,7 @@ const STATUS_META: Record<McpConnectionStatus, { label: string; color: string }>
 const readOnlyInputSx = { bgcolor: 'action.hover', fontFamily: 'monospace', fontSize: 12.5 } as const;
 
 /** The playground's left panel: the endpoint selector, the derived URL + test key, and connect controls. */
-export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, keyHeader = 'X-API-Key', visibility }: ConnectionSidebarProps): JSX.Element {
+export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, visibility }: ConnectionSidebarProps): JSX.Element {
   const [showToken, setShowToken] = useState(false);
   const connected = status === 'connected';
   const connecting = status === 'connecting';
@@ -101,13 +99,6 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         }}
       />
 
-      {keyless && (
-        <Typography variant="caption" color="text.secondary">
-          {onGetTestKey
-            ? `This page connects through the integration platform with a key of its own, so its calls pass the AI gateway's key check and policies. To call this URL from another MCP client, get a test key and send it in the ${keyHeader} header.`
-            : "This page connects through the integration platform with a key of its own, so its calls pass the AI gateway's key check and policies. Agents call this URL with keys Agent Manager gives them."}
-        </Typography>
-      )}
       {(!keyless || onGetTestKey) && (
         <TextField
           labelPlacement="top"

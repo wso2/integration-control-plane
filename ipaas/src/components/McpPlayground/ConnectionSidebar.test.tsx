@@ -51,11 +51,10 @@ describe('ConnectionSidebar', () => {
     expect(connectButton()?.disabled).toBe(true);
   });
 
-  it('connects without a token when keyless, and says the calls pass the AI gateway', async () => {
+  it('connects without a token when keyless', async () => {
     const onConnect = vi.fn();
     await render({ keyless: true, visibility: 'Public', onConnect });
     expect(container.querySelector('[aria-label="Show token"]')).toBeNull();
-    expect(container.textContent).toContain("pass the AI gateway's key check");
     expect((container.querySelector('input[value="Public"]') as HTMLInputElement | null)?.readOnly).toBe(true);
     expect((container.querySelector(`input[value="${proxyUrl}"]`) as HTMLInputElement | null)?.readOnly).toBe(true);
     const button = connectButton();
@@ -66,10 +65,9 @@ describe('ConnectionSidebar', () => {
 
   it('offers a key for another client when keyless, without needing it to connect', async () => {
     const onGetTestKey = vi.fn();
-    await render({ keyless: true, onGetTestKey, keyHeader: 'X-API-Key' });
+    await render({ keyless: true, onGetTestKey });
     expect(container.querySelector('[aria-label="Show token"]')).not.toBeNull();
     expect(container.querySelector('input[placeholder="Get a test key to call this URL yourself"]')).not.toBeNull();
-    expect(container.textContent).toContain('send it in the X-API-Key header');
     expect((container.querySelector('[aria-label="Copy token"]') as HTMLButtonElement | null)?.disabled).toBe(true);
     expect(connectButton()?.disabled).toBe(false);
     const getKey = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Get test key'));

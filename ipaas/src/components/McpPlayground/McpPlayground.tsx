@@ -117,7 +117,6 @@ export default function McpPlayground({ url, token, headerName = 'test-key', isT
           url={url}
           token={token ?? ''}
           keyless={!!relay}
-          keyHeader={headerName}
           visibility={visibility}
           status={conn.status}
           isTokenFetching={isTokenFetching}
