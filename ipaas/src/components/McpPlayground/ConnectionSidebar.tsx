@@ -118,9 +118,12 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
                   {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
                 </IconButton>
                 <Tooltip title="Copy token">
-                  <IconButton size="small" aria-label="Copy token" onClick={() => copy(token)} edge="end" disabled={!token}>
-                    <Copy size={14} />
-                  </IconButton>
+                  {/* A disabled button fires no events, so the tooltip listens on its wrapper. */}
+                  <Box component="span">
+                    <IconButton size="small" aria-label="Copy token" onClick={() => copy(token)} edge="end" disabled={!token}>
+                      <Copy size={14} />
+                    </IconButton>
+                  </Box>
                 </Tooltip>
               </InputAdornment>
             ),

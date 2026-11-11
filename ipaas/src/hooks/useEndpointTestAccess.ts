@@ -21,8 +21,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
 import { isCompleteRef, useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
 import type { ApiKeyResult, EndpointRef, SecurityMode } from '../types/consumers';
-import { friendlyApiError } from '../utils/apiSecurity';
-import { isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
+import { codedApiError, friendlyApiError } from '../utils/apiSecurity';
+import { httpStatusOf, isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
 import { aiGatewayAccessOf, mcpUrlOf, type AiGatewayAccess } from '../utils/mcpGateway';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
@@ -39,8 +39,8 @@ export interface EndpointTestAccess {
   gatewayUrl: string;
   /**
    * Set when Agent Manager's AI gateway fronts the endpoint, as it does an MCP server. No test key is minted for it
-   * here: the gateway answers no browser's CORS preflight, so the page calls it through ipaas-service's relay, which
-   * holds a key of its own. A key for another MCP client is issued only on request. `null` for the API Platform.
+   * unasked: the gateway answers no browser's CORS preflight, so the page calls it through ipaas-service's relay,
+   * which holds a key of its own. `mintKey` mints one for another MCP client. `null` for the API Platform.
    */
   aiGateway: AiGatewayAccess | null;
   /** The URL an MCP client connects to on the gateway, or '' while there is none. */
@@ -178,7 +178,8 @@ async function mintHeldKey(mint: (target: EndpointRef) => Promise<ApiKeyResult>,
  * the swagger test console.
  *
  * A key is minted automatically only when `api-key` is the active mode — that is
- * the auto-expose default. For another mode, ipaas-service refuses a test key
+ * the auto-expose default — and never for an AI gateway endpoint, which gets one
+ * only from `mintKey`. For another mode, ipaas-service refuses a test key
  * (`needsApiKeyAuth`) until the caller switches the endpoint with `switchToApiKey()`,
  * which changes how every caller of the API authenticates.
  *
@@ -218,9 +219,10 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const [switchFailure, setSwitchFailure] = useState<{ refKey: string; message: string } | null>(null);
 
   const aiGateway = aiGatewayAccessOf(security, securityError);
-  // Nothing is minted here for an AI gateway endpoint: the Test page's relay holds a key of its own, and a key
-  // for another MCP client is issued only when asked for.
-  const mintable = canCreateKey && !aiGateway && mint;
+  const mintable = canCreateKey && mint;
+  // A key is minted unasked for the API Platform only. On the AI gateway the Test page's relay holds a key of its
+  // own, so one there is for another MCP client: minted only when asked for, and not renewed.
+  const autoMint = mintable && !aiGateway;
   const managedIn = security?.editable === false ? security.entryEnvironment || 'the first environment' : null;
   const switchable = canSwitch && !aiGateway && managedIn === null;
   const mode = security?.mode ?? null;
@@ -229,7 +231,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     queryKey: heldKeyQueryKey(refKey),
     queryFn: () => mintHeldKey(createKeyFor, endpoint!),
     // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
-    enabled: enabled && isCompleteRef(endpoint) && mintable && mode === 'api-key',
+    enabled: enabled && isCompleteRef(endpoint) && autoMint && mode === 'api-key',
     // Fresh until it is due for renewal, so a view that mounts later uses the held key.
     staleTime: (query) => Math.max((query.state.data?.renewAt ?? 0) - Date.now(), 0),
     gcTime: HELD_KEY_GC_MS,
@@ -250,17 +252,21 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     refetchOnReconnect: (query) => query.state.status !== 'error',
   });
 
-  const apiKey = held.data?.key ?? null;
+  // A key nothing renews is shown only until it is due for renewal, so the view never offers one about to lapse.
+  const apiKey = held.data && (autoMint || Date.now() < held.data.renewAt) ? held.data.key : null;
   const needsKey = !aiGateway && (mode === 'api-key' || mode === 'jwt');
   // A mint in flight is the answer to the last failure, so the failure is not shown meanwhile.
   const mintError = held.isFetching ? null : held.error;
   const apiKeyRequired = !!mintError && isApiKeyAuthRequired(mintError);
-  const mintFailure = mintError && !apiKeyRequired && !isPermissionError(mintError) ? friendlyApiError(mintError, MINT_FAILED) : null;
+  // The API Platform's reading of a 404 or 409, an endpoint not exposed as an API yet, doesn't apply on the AI gateway.
+  const gatewayMisread = !!aiGateway && !!mintError && !codedApiError(mintError) && [404, 409].includes(httpStatusOf(mintError));
+  const mintFailure = mintError && !apiKeyRequired && !isPermissionError(mintError) ? (gatewayMisread ? MINT_FAILED : friendlyApiError(mintError, MINT_FAILED)) : null;
   const keyError = !canCreateKey && needsKey ? MINT_REFUSED : switchFailure?.refKey === refKey ? switchFailure.message : mintFailure;
 
   const mintFor = useCallback(
     async (target: EndpointRef, refused?: string | null): Promise<string | null> => {
-      if (!mintable) return null;
+      // An AI gateway binding that checks no key takes none.
+      if (!mintable || (aiGateway && mode !== 'api-key')) return null;
       const queryKey = heldKeyQueryKey(keyOf(target));
       if (refused !== undefined) {
         // Another view renewed the refused key already: use theirs rather than mint again.
@@ -276,7 +282,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
         return null;
       }
     },
-    [mintable, queryClient, createKeyFor],
+    [mintable, aiGateway, mode, queryClient, createKeyFor],
   );
   // Mints a view asked for, which it shows as minting even while it holds a key.
   const [requestedMints, setRequestedMints] = useState(0);
@@ -296,11 +302,11 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const retriedFor = useRef<string | null>(null);
   const retryUnauthorized = useCallback(() => {
     // An open endpoint's 401 is not a stale key, and minting would switch it to api-key auth.
-    if (!mintable || mode !== 'api-key') return;
+    if (!autoMint || mode !== 'api-key') return;
     if (retriedFor.current === refKey) return;
     retriedFor.current = refKey;
     void renewKey(apiKey);
-  }, [mintable, mode, refKey, renewKey, apiKey]);
+  }, [autoMint, mode, refKey, renewKey, apiKey]);
 
   const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
@@ -338,7 +344,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     isMinting: (held.isFetching && !apiKey) || requestedMints > 0,
     canCreateKey,
     keyError,
-    needsApiKeyAuth: mintable && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
+    needsApiKeyAuth: autoMint && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
     canSwitch: switchable,
     managedIn,
     isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,

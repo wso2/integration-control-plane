@@ -34,8 +34,7 @@ import type { EndpointRef } from '../types/consumers';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
 import { mcpTestEndpoints } from '../utils/mcpGateway';
-import { createEndpointTestKey, mcpRelayUrl } from '../api/consumers';
-import { friendlyApiError } from '../utils/apiSecurity';
+import { mcpRelayUrl } from '../api/consumers';
 import { bffFetch } from '../api/_client';
 import { PILL_SELECT_SX } from '../constants/styles';
 
@@ -89,34 +88,12 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   const onAiGateway = !!access.aiGateway;
   const relay = useMemo(() => (onAiGateway && accessRef ? { url: mcpRelayUrl(accessRef), fetch: bffFetch } : undefined), [onAiGateway, accessRef]);
 
-  // A key for calling the AI gateway URL from another MCP client. It is held against the endpoint it was
-  // issued for, so one that lands after the selection moved on is never shown for another endpoint.
-  const [copiedKey, setCopiedKey] = useState<{ target: string; key: string } | null>(null);
-  const [copiedKeyFailure, setCopiedKeyFailure] = useState<{ target: string; message: string } | null>(null);
-  const [issuingFor, setIssuingFor] = useState<string | null>(null);
-  const relayTarget = relay?.url ?? '';
-  const getCopiedKey = async () => {
-    if (!accessRef || !relayTarget) return;
-    const target = relayTarget;
-    setIssuingFor(target);
-    setCopiedKeyFailure(null);
-    try {
-      const result = await createEndpointTestKey(accessRef);
-      setCopiedKey({ target, key: result.apiKey });
-    } catch (error) {
-      setCopiedKeyFailure({ target, message: friendlyApiError(error, 'Could not issue a test key.') });
-    } finally {
-      setIssuingFor((current) => (current === target ? null : current));
-    }
-  };
-  // Only for a binding that checks keys: an open one takes none.
-  const canCopyKey = access.canCreateKey && access.mode === 'api-key';
-
   const endpointSwitcher = { options: testableEndpoints.map((e) => ({ label: e.displayName, value: e.id })), value: activeEndpointId, onChange: setSelectedEndpointId };
 
   const regenerate = () => void access.mintKey();
-  // Not offered for an open endpoint: the test-key route switches enforcement to api-key, so
-  // minting would secure an endpoint whose api-key scheme the user turned off.
+  // Not offered for an open endpoint: on the API Platform the test-key route switches enforcement to api-key, so
+  // minting would secure an endpoint whose api-key scheme the user turned off, and an open AI gateway binding takes
+  // no key. On the AI gateway the key is for another MCP client: the relay holds one of its own.
   const canMint = access.canCreateKey && access.mode === 'api-key';
 
   // Non-MCP components keep this route's previous Coming Soon behaviour.
@@ -154,18 +131,18 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
           // Keyed by where it connects: a session is to one environment's endpoint, and the environment can
           // change while it is open, so a new target starts a new playground rather than reusing the old session.
           <>
-            {copiedKeyFailure?.target === relay.url && (
+            {access.keyError && (
               <Alert severity="warning" sx={{ mb: 1.5 }}>
-                {copiedKeyFailure.message}
+                {access.keyError}
               </Alert>
             )}
             <McpPlayground
               key={relay.url}
               url={mcpUrl}
-              token={copiedKey?.target === relay.url ? copiedKey.key : null}
+              token={access.apiKey}
               headerName={access.authHeader}
-              isTokenFetching={issuingFor === relay.url}
-              onTokenRegenerate={canCopyKey ? () => void getCopiedKey() : undefined}
+              isTokenFetching={access.isMinting}
+              onTokenRegenerate={canMint ? regenerate : undefined}
               relay={relay}
               visibility="Public"
               endpointSwitcher={endpointSwitcher}

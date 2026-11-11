@@ -68,7 +68,7 @@ describe('ConnectionSidebar', () => {
     await render({ keyless: true, onGetTestKey });
     expect(container.querySelector('[aria-label="Show token"]')).not.toBeNull();
     expect(container.querySelector('input[placeholder="Get a test key to call this URL yourself"]')).not.toBeNull();
-    expect((container.querySelector('[aria-label="Copy token"]') as HTMLButtonElement | null)?.disabled).toBe(true);
+    expect((container.querySelector('button[aria-label="Copy token"]') as HTMLButtonElement | null)?.disabled).toBe(true);
     expect(connectButton()?.disabled).toBe(false);
     const getKey = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Get test key'));
     await act(async () => getKey?.click());

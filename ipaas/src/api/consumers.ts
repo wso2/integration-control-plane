@@ -70,7 +70,10 @@ export const createEndpointApiKey = (ref: EndpointRef, input: CreateApiKeyInput)
 
 export const revokeEndpointApiKey = (ref: EndpointRef, keyName: string): Promise<void> => bff.delete<void>(endpointUrl(ref, `/api-keys/${seg(keyName)}`));
 
-/** One-click 1h credential. Also forces `api-key-auth` on (no-op when already on). */
+/**
+ * One-click 1h credential. On the API Platform it also forces `api-key-auth` on (no-op when already on). For an MCP
+ * server on the AI gateway it is an Agent Manager key, and only while the binding checks keys.
+ */
 export const createEndpointTestKey = (ref: EndpointRef): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(endpointUrl(ref, '/test-key'));
 
 // ---------------------------------------------------------------------------
@@ -96,7 +99,7 @@ export const getEndpointSecurity = (ref: EndpointRef): Promise<SecurityConfig> =
 
 /**
  * Where the Test page's MCP client connects for an MCP server on the AI gateway: ipaas-service relays each
- * request to the server, since the AI gateway gives the console no key and answers no browser's CORS preflight.
+ * request to the server with a key of its own, since the AI gateway answers no browser's CORS preflight.
  * Send with `bffFetch`, which carries the console's session.
  */
 export const mcpRelayUrl = (ref: EndpointRef): string => bffAbsoluteUrl(endpointUrl(ref, '/mcp'));
