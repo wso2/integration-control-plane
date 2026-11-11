@@ -38,8 +38,9 @@ export interface EndpointTestAccess {
    */
   gatewayUrl: string;
   /**
-   * Set when Agent Manager's AI gateway fronts the endpoint, as it does an MCP server. No test key is minted for it:
-   * the AI gateway issues keys only to Agent Manager agents. `null` for the API Platform.
+   * Set when Agent Manager's AI gateway fronts the endpoint, as it does an MCP server. No test key is minted for it
+   * here: the gateway answers no browser's CORS preflight, so the page calls it through ipaas-service's relay, which
+   * holds a key of its own. A key for another MCP client is issued only on request. `null` for the API Platform.
    */
   aiGateway: AiGatewayAccess | null;
   /** The URL an MCP client connects to on the gateway, or '' while there is none. */
