@@ -139,10 +139,22 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
       );
     }
     case 'setting-up':
+    case 'starting':
       return (
         <Button variant="contained" disabled startIcon={<CircularProgress size={16} color="inherit" />}>
-          Setting up User Portal…
+          {portal.state === 'starting' ? 'Starting User Portal…' : 'Setting up User Portal…'}
         </Button>
+      );
+    // Enabling it again doesn't make it ready, and some of these recover on their own, so only the reason is offered.
+    case 'unhealthy':
+      return (
+        <Tooltip title={portal.readinessMessage ?? ''}>
+          <span>
+            <Button variant="contained" disabled>
+              User Portal not ready
+            </Button>
+          </span>
+        </Tooltip>
       );
     case 'removing':
       return (

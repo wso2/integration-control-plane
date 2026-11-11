@@ -17,17 +17,27 @@
  */
 
 import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { AppWindow, ExternalLink, RotateCcw } from '@wso2/oxygen-ui-icons-react';
+import { AppWindow, ExternalLink, RotateCcw, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { Environment } from '../../types/environment';
 import type { UserPortal, UserPortalState } from '../../types/userPortal';
 import * as styles from './UserPortal.styles';
 
-const STATUS: Record<Exclude<UserPortalState, 'not-enabled'>, { label: string; color: 'success' | 'info' | 'error' | 'default' }> = {
+const STATUS: Record<Exclude<UserPortalState, 'not-enabled'>, { label: string; color: 'success' | 'info' | 'warning' | 'error' | 'default' }> = {
   active: { label: 'Active', color: 'success' },
   'setting-up': { label: 'Setting up', color: 'info' },
+  starting: { label: 'Starting', color: 'info' },
+  unhealthy: { label: 'Not ready', color: 'warning' },
   failed: { label: 'Failed', color: 'error' },
   removing: { label: 'Removing', color: 'default' },
+};
+
+// What the card's button says while the portal can't be opened. An active portal with no address can't be either.
+const WAITING: Partial<Record<UserPortalState, string>> = {
+  'setting-up': 'Setting up portal…',
+  starting: 'Starting portal…',
+  unhealthy: 'Portal not ready',
+  removing: 'Removing portal…',
 };
 
 interface UserPortalCardProps {
@@ -38,13 +48,16 @@ interface UserPortalCardProps {
   /** Whether an enable (a retry) is running for this portal. */
   retrying: boolean;
   onRetry: () => void;
+  /** Why the user can't deprovision portals; empty when they can. */
+  deprovisionRefusal: string;
+  onDeprovision: () => void;
 }
 
 /** One environment's User Portal: its status, a link to open it, and the actions on it. */
-export default function UserPortalCard({ environment, portal, manageRefusal, retrying, onRetry }: UserPortalCardProps): JSX.Element {
+export default function UserPortalCard({ environment, portal, manageRefusal, retrying, onRetry, deprovisionRefusal, onDeprovision }: UserPortalCardProps): JSX.Element {
   const { state } = portal;
   const status = STATUS[state];
-  const busy = state === 'setting-up' || state === 'removing';
+  const busy = state === 'setting-up' || state === 'starting' || state === 'removing';
 
   return (
     <Card variant="outlined" sx={styles.cardSx}>
@@ -92,16 +105,31 @@ export default function UserPortalCard({ environment, portal, manageRefusal, ret
           ) : state === 'failed' ? (
             // Enabling a portal whose setup failed retries it; ipaas-service refuses a failure a retry can't repeat, and says so.
             <Tooltip title={manageRefusal}>
-              <Box component="span" sx={{ display: 'inline-flex', flex: 1 }}>
+              <Box component="span" sx={styles.cardActionAnchorSx}>
                 <Button fullWidth size="small" sx={styles.actionButtonSx} variant="contained" onClick={onRetry} disabled={!!manageRefusal || retrying} startIcon={retrying ? <CircularProgress size={16} color="inherit" /> : <RotateCcw size={16} />}>
                   {retrying ? 'Retrying…' : 'Retry setup'}
                 </Button>
               </Box>
             </Tooltip>
           ) : (
-            <Button fullWidth size="small" sx={styles.actionButtonSx} variant="contained" disabled startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}>
-              {state === 'setting-up' ? 'Setting up portal…' : state === 'removing' ? 'Removing portal…' : 'Portal unavailable'}
-            </Button>
+            // A portal that isn't ready says why on hover: OpenChoreo's reason, which is too raw to be the headline.
+            <Tooltip title={state === 'unhealthy' ? (portal.readinessMessage ?? '') : ''}>
+              <Box component="span" sx={styles.cardActionAnchorSx}>
+                <Button fullWidth size="small" sx={styles.actionButtonSx} variant="contained" disabled startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                  {WAITING[state] ?? 'Portal unavailable'}
+                </Button>
+              </Box>
+            </Tooltip>
+          )}
+          {/* A portal can be deprovisioned only while it isn't setting up, starting or being removed. */}
+          {!busy && (
+            <Tooltip title={deprovisionRefusal}>
+              <Box component="span" sx={styles.cardSideActionAnchorSx}>
+                <Button size="small" sx={styles.dangerActionButtonSx} variant="outlined" color="error" onClick={onDeprovision} disabled={!!deprovisionRefusal} startIcon={<Trash2 size={16} />}>
+                  Deprovision
+                </Button>
+              </Box>
+            </Tooltip>
           )}
         </Stack>
       </CardContent>

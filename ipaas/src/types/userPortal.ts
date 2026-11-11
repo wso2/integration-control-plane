@@ -22,11 +22,13 @@
  * Where an environment's User Portal is, as the console shows it.
  * - `not-enabled`: no portal runs there. A portal kept suspended for a later environment's sake also reads so: it serves no one.
  * - `setting-up`: being provisioned; it opens once ready.
+ * - `starting`: provisioned, and its pods are starting, on a first run or a new version's rollout.
  * - `active`: running at `url`.
+ * - `unhealthy`: provisioned, but not ready; `readinessMessage` says why. Some of these recover on their own.
  * - `failed`: its provisioning stopped at a step; `error` says which and why.
  * - `removing`: being torn down after a disable.
  */
-export type UserPortalState = 'not-enabled' | 'setting-up' | 'active' | 'failed' | 'removing';
+export type UserPortalState = 'not-enabled' | 'setting-up' | 'starting' | 'active' | 'unhealthy' | 'failed' | 'removing';
 
 export interface UserPortal {
   /** The environment's slug. */
@@ -36,6 +38,8 @@ export interface UserPortal {
   url?: string;
   /** Why provisioning failed, for a `failed` portal. */
   error?: string;
+  /** Why an `unhealthy` portal isn't ready, in OpenChoreo's words, so it is shown only as a detail. */
+  readinessMessage?: string;
 }
 
 /** A publishing rule an integration breaks: the code a publish answers with, and what to change. */

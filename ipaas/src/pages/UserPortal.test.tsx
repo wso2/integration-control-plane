@@ -22,7 +22,7 @@ import UserPortal from './UserPortal';
 import { BffError } from '../api/_client';
 import * as api from '../api/userPortal';
 import { button, flush, reasonFor, renderWithScopes } from '../test/renderWithScopes';
-import { PLATFORM_ENGINEER } from '../test/roles';
+import { DEVELOPER, PLATFORM_ENGINEER } from '../test/roles';
 import type { Environment } from '../types/environment';
 import type { UserPortal as Portal } from '../types/userPortal';
 
@@ -130,5 +130,96 @@ describe('the User Portal page', () => {
     for (let i = 0; i < 5 && !r.container.textContent?.includes('Coming soon'); i++) await flush();
     expect(r.container.textContent).toContain('Coming soon');
     expect(button(r.container, 'Enable User Portal')).toBeUndefined();
+  });
+
+  it('offers Deprovision on a settled portal, not one setting up, starting or being removed', async () => {
+    const portals: Record<string, Portal> = {
+      dev: { environment: 'dev', state: 'active', url: 'https://dev-up.example' },
+      qa: { environment: 'qa', state: 'failed', error: 'portal: readiness timed out' },
+      uat: { environment: 'uat', state: 'unhealthy' },
+      stage: { environment: 'stage', state: 'setting-up' },
+      perf: { environment: 'perf', state: 'starting' },
+      prod: { environment: 'prod', state: 'removing' },
+    };
+    vi.mocked(api.fetchUserPortalEnvironments).mockResolvedValue(Object.keys(portals).map(env));
+    vi.mocked(api.fetchUserPortal).mockImplementation(async (environment) => portals[environment]);
+    const r = await renderWithScopes(<UserPortal level="organizations" org="acme" />, PLATFORM_ENGINEER);
+    unmount = r.unmount;
+    const busy = ['Setting up portal…', 'Starting portal…', 'Removing portal…'];
+    for (let i = 0; i < 5 && !busy.every((name) => button(r.container, name)); i++) await flush();
+
+    const deprovisions = [...r.container.querySelectorAll('button')].filter((b) => b.textContent?.trim() === 'Deprovision');
+    expect(deprovisions).toHaveLength(3);
+    expect(deprovisions.every((b) => !b.disabled)).toBe(true);
+  });
+});
+
+describe("a User Portal card while the portal isn't ready", () => {
+  // Only the polling interval is faked: the tests' own settling waits on real timers.
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
+  afterEach(() => vi.useRealTimers());
+  const poll = () => act(async () => vi.advanceTimersByTimeAsync(3_000));
+  const openLink = (container: HTMLElement) => [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Open portal');
+
+  async function page(first: Portal, scopes = PLATFORM_ENGINEER) {
+    vi.mocked(api.fetchUserPortalEnvironments).mockResolvedValue([env('dev')]);
+    vi.mocked(api.fetchUserPortal).mockResolvedValueOnce(first).mockResolvedValue({ environment: 'dev', state: 'active', url: 'https://dev-up.example' });
+    const r = await renderWithScopes(<UserPortal level="organizations" org="acme" />, scopes);
+    unmount = r.unmount;
+    // The portals are read once the environments are.
+    for (let i = 0; i < 5 && !r.container.textContent?.includes('Status'); i++) await flush();
+    return r.container;
+  }
+
+  it('says it is starting, with no link, and opens it once a re-read finds it ready', async () => {
+    const container = await page({ environment: 'dev', state: 'starting' });
+    expect(container.textContent).toContain('Starting');
+    expect(button(container, 'Starting portal…')?.disabled).toBe(true);
+    expect(openLink(container)).toBeUndefined();
+
+    await poll();
+    await flush();
+    expect(openLink(container)?.getAttribute('href')).toBe('https://dev-up.example');
+  });
+
+  it("says it isn't ready, with OpenChoreo's reason only on hover, offers no retry, and reads it again", async () => {
+    const container = await page({ environment: 'dev', state: 'unhealthy', readinessMessage: 'pods are crash-looping' });
+    expect(container.textContent).toContain('Not ready');
+    const notReady = button(container, 'Portal not ready');
+    expect(notReady?.disabled).toBe(true);
+    expect(reasonFor(notReady)).toBe('pods are crash-looping');
+    expect(container.textContent).not.toContain('pods are crash-looping');
+    expect(button(container, 'Retry setup')).toBeUndefined();
+    expect(openLink(container)).toBeUndefined();
+
+    await poll();
+    await flush();
+    expect(openLink(container)?.getAttribute('href')).toBe('https://dev-up.example');
+  });
+
+  // The card's button and the dialog's confirm share their label.
+  const dialogButton = (name: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((b) => b.textContent?.trim() === name);
+
+  it('deprovisions a portal, once confirmed, and shows it being removed', async () => {
+    vi.mocked(api.disableUserPortal).mockResolvedValue({ environment: 'dev', state: 'removing' });
+    const container = await page({ environment: 'dev', state: 'unhealthy' });
+    vi.mocked(api.fetchUserPortal).mockResolvedValue({ environment: 'dev', state: 'removing' });
+
+    await act(async () => button(container, 'Deprovision')?.click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('This unpublishes every integration published to the User Portal in dev');
+    expect(api.disableUserPortal).not.toHaveBeenCalled();
+    await act(async () => dialogButton('Deprovision')?.click());
+    await flush();
+    expect(vi.mocked(api.disableUserPortal).mock.calls[0]?.[0]).toBe('dev');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(button(container, 'Removing portal…')?.disabled).toBe(true);
+    expect(document.body.textContent).toContain('Deprovisioning the User Portal.');
+  });
+
+  it("tells a role that can't deprovision the User Portal why", async () => {
+    const container = await page({ environment: 'dev', state: 'unhealthy' }, DEVELOPER);
+    const deprovision = button(container, 'Deprovision');
+    expect(deprovision?.disabled).toBe(true);
+    expect(reasonFor(deprovision)).toBe("Your role can't deprovision the User Portal.");
   });
 });

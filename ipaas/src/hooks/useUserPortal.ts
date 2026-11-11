@@ -19,19 +19,21 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublications, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
-import type { UserPortal, UserPortalPublications, UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
+import type { UserPortal, UserPortalPublications, UserPortalPublishability, UserPortalRefusal, UserPortalState } from '../types/userPortal';
 import { isUserPortalUnavailable } from '../utils/apiErrors';
 import { invalidateEndpointSettings } from './useConsumers';
 
 const ROOT_KEY = 'userPortal';
 
 /**
- * How often a portal that is still setting up or being removed is read again. Short enough that
- * Open portal shows soon after it is ready; the poll stops once every portal has settled.
+ * How often a portal that is still setting up, starting, not ready or being removed is read again.
+ * Short enough that Open portal shows soon after it is ready; the poll stops once every portal has settled.
  */
 const SETTLING_POLL_MS = 3_000;
 
-const settling = (portal: UserPortal | undefined): boolean => portal?.state === 'setting-up' || portal?.state === 'removing';
+const SETTLING: ReadonlySet<UserPortalState> = new Set(['setting-up', 'starting', 'unhealthy', 'removing']);
+
+const settling = (portal: UserPortal | undefined): boolean => !!portal && SETTLING.has(portal.state);
 
 /** The environments a User Portal can run in, in promotion order. */
 export function useUserPortalEnvironments() {

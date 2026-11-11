@@ -278,3 +278,39 @@ describe('a publish that finishes in the background, from the prompt', () => {
     expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
   });
 });
+
+describe("a User Portal that isn't ready yet", () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
+  afterEach(() => vi.useRealTimers());
+  const poll = () => act(async () => vi.advanceTimersByTimeAsync(3_000));
+  const openLink = (container: HTMLElement) => [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Open User Portal');
+
+  it('waits while it starts, with no Publish or link, and offers to open it once a re-read finds it ready', async () => {
+    portal.mockResolvedValueOnce({ environment: 'production', state: 'starting' }).mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
+    const container = await prompt(DEVELOPER);
+    expect(button(container, 'Starting User Portal…')?.disabled).toBe(true);
+    expect(button(container, 'Publish to User Portal')).toBeUndefined();
+    expect(openLink(container)).toBeUndefined();
+
+    await poll();
+    await flush();
+    expect(openLink(container)?.getAttribute('href')).toBe('https://portal.example/acme');
+  });
+
+  it("says it isn't ready, with OpenChoreo's reason only as a detail, offers no Enable, and reads it again", async () => {
+    portal.mockResolvedValueOnce({ environment: 'production', state: 'unhealthy', readinessMessage: 'pods are crash-looping' }).mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue(PUBLISHABLE);
+    const container = await prompt(PLATFORM_ENGINEER);
+    const notReady = button(container, 'User Portal not ready');
+    expect(notReady?.disabled).toBe(true);
+    expect(reasonFor(notReady)).toBe('pods are crash-looping');
+    expect(container.textContent).not.toContain('pods are crash-looping');
+    expect(button(container, 'Enable User Portal')).toBeUndefined();
+    expect(button(container, 'Publish to User Portal')).toBeUndefined();
+
+    await poll();
+    await flush();
+    expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+  });
+});

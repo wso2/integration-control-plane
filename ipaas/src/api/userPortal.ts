@@ -32,6 +32,8 @@ import { orderEnvironmentsByPipeline, pipelineEnvOrder } from '../utils/environm
 
 // models.UserPortalStatus. `state` is the orchestrator provision's: PENDING, APPLIED (in
 // progress), DONE, FAILED, MIGRATING, DELETING. It is missing when the environment has no portal.
+// `readiness` is UP-DP's latest render: READY, STARTING, UNHEALTHY or SUSPENDED. It is missing until
+// the portal first runs, while it is DELETING, for a retried portal, and from an older ipaas-service.
 interface BffUserPortalStatus {
   environment: string;
   enabled: boolean;
@@ -39,6 +41,8 @@ interface BffUserPortalStatus {
   state?: string;
   portalUrl?: string;
   error?: string;
+  readiness?: string;
+  readinessMessage?: string;
 }
 
 // The provision states of a portal still being set up. Any other, a state added later or none,
@@ -47,23 +51,40 @@ const SETTING_UP = new Set(['PENDING', 'APPLIED', 'MIGRATING']);
 
 // A suspended portal only carries the portal's API to a later environment, so it reads as not
 // enabled: enabling it there makes it active.
-function portalState(s: BffUserPortalStatus): { state: UserPortalState; error?: string } {
+function portalState(s: BffUserPortalStatus): { state: UserPortalState; error?: string; readinessMessage?: string } {
   const state = s.state?.toUpperCase();
   if (state === 'DELETING') return { state: 'removing' };
   if (state === 'FAILED') return { state: 'failed', ...(s.error ? { error: s.error } : {}) };
   if (!s.enabled) return { state: 'not-enabled' };
-  if (state === 'DONE') return { state: 'active' };
+  if (state === 'DONE') return readyState(s);
   if (state && SETTING_UP.has(state)) return { state: 'setting-up' };
   return { state: 'failed', error: state ? `The User Portal is in a state the console doesn't know: ${state}.` : 'ipaas-service reported no state for the User Portal.' };
 }
 
+// A finished provision doesn't mean UP-DP answers yet: its pods may still be starting, so it opens
+// only once READY. With no readiness, or one the console doesn't know, it reads as active, as it
+// did before ipaas-service reported readiness.
+function readyState(s: BffUserPortalStatus): { state: UserPortalState; readinessMessage?: string } {
+  switch (s.readiness?.toUpperCase()) {
+    // An enabled portal reads SUSPENDED only for a moment after the enable; the next read corrects it.
+    case 'STARTING':
+    case 'SUSPENDED':
+      return { state: 'starting' };
+    case 'UNHEALTHY':
+      return { state: 'unhealthy', ...(s.readinessMessage ? { readinessMessage: s.readinessMessage } : {}) };
+    default:
+      return { state: 'active' };
+  }
+}
+
 export const toUserPortal = (s: BffUserPortalStatus): UserPortal => {
-  const { state, error } = portalState(s);
+  const { state, error, readinessMessage } = portalState(s);
   return {
     environment: s.environment,
     state,
     ...(s.portalUrl && state === 'active' ? { url: s.portalUrl } : {}),
     ...(error ? { error } : {}),
+    ...(readinessMessage ? { readinessMessage } : {}),
   };
 };
 
