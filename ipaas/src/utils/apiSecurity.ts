@@ -117,6 +117,10 @@ export function codedApiError(error: unknown): string {
       return 'This MCP server is public through the AI gateway, so its visibility can’t be changed.';
     case 'MCP_POLICIES_IN_AGENT_MANAGER':
       return 'This MCP server’s gateway policies are managed on the AI gateway in Agent Manager.';
+    case 'MCP_API_KEY_NOT_CHECKED':
+      return 'This MCP server’s AI gateway URL takes no API key, so it needs no test key.';
+    case 'MCP_KEYS_UNAVAILABLE':
+      return 'Test keys aren’t available for this MCP server yet.';
     default:
       return '';
   }

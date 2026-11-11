@@ -115,7 +115,8 @@ export interface SecurityConfig {
   stateUnknown?: boolean;
   /**
    * Set when Agent Manager's AI gateway fronts the endpoint instead of the API Platform, as it does an MCP server.
-   * `publicUrl` is then the full MCP URL, MCP path included, and the gateway issues keys only to Agent Manager agents.
+   * `publicUrl` is then the full MCP URL, MCP path included. Its keys come from Agent Manager: agents get theirs there,
+   * and a person gets a short-lived test key through ipaas-service.
    */
   aiGateway?: AiGatewayBinding;
 }

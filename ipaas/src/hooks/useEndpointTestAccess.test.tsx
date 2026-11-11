@@ -304,6 +304,130 @@ describe('the key held for an endpoint', () => {
   });
 });
 
+describe('a key for an MCP server on the AI gateway', () => {
+  // The Test page relays through ipaas-service, which holds a key of its own: a key here is for another MCP client.
+  const views: Record<string, EndpointTestAccess> = {};
+  function View({ id, target = a }: { id: string; target?: EndpointRef }) {
+    const access = useEndpointTestAccess(target);
+    views[id] = access;
+    return <output data-view={id}>{access.apiKey}</output>;
+  }
+  let showLater: (show: boolean) => void = () => {};
+  function Views() {
+    const [later, setLater] = useState(false);
+    showLater = setLater;
+    return (
+      <>
+        <View id="first" />
+        {later && <View id="later" />}
+      </>
+    );
+  }
+  const shown = (container: HTMLElement, id: string) => container.querySelector(`[data-view="${id}"]`)?.textContent ?? null;
+  const onGateway = (mode: string) => ({ mode, publicUrl: 'https://ai-gw.example/demo/orders/mcp', aiGateway: { deploymentStatus: 'Deployed' } }) as never;
+  const coded = (status: number, code?: string) => Object.assign(new Error(`HTTP ${status}`), { status, code });
+
+  let mints = 0;
+  beforeEach(() => {
+    mints = 0;
+    vi.mocked(getEndpointSecurity).mockResolvedValue(onGateway('api-key'));
+    vi.mocked(createEndpointTestKey).mockImplementation(async (ref) => {
+      mints += 1;
+      return { keyId: `k${mints}`, apiKey: `key-${mints}-${ref.environmentName}`, expiresAt: new Date(Date.now() + 60 * 60_000).toISOString() };
+    });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('is minted only when asked for, and held for the endpoint across views', async () => {
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    expect(createEndpointTestKey).not.toHaveBeenCalled();
+    expect(views.first.needsApiKeyAuth).toBe(false);
+
+    await act(async () => void (await views.first.mintKey()));
+    await flush();
+    expect(shown(r.container, 'first')).toBe('key-1-development');
+
+    // A view that mounts later, as the page after navigating back, shows the same key without minting.
+    await act(async () => showLater(true));
+    await flush();
+    expect(shown(r.container, 'later')).toBe('key-1-development');
+    expect(mints).toBe(1);
+  });
+
+  it('joins a mint in flight instead of issuing a second key', async () => {
+    const r = await renderWithScopes(<View id="first" />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    await act(async () => void (await Promise.all([views.first.mintKey(), views.first.mintKey()])));
+    expect(mints).toBe(1);
+  });
+
+  it('keeps a key that lands after the selection moved on for the endpoint it was minted for', async () => {
+    let finish: () => void = () => {};
+    vi.mocked(createEndpointTestKey).mockImplementationOnce((ref) => new Promise((resolve) => (finish = () => resolve({ keyId: 'k', apiKey: `late-${ref.environmentName}`, expiresAt: new Date(Date.now() + 60 * 60_000).toISOString() }))));
+    const r = await renderWithScopes(<Selection />, DEVELOPER);
+    unmount = r.unmount;
+    vi.mocked(getEndpointSecurity).mockResolvedValue(onGateway('api-key'));
+    await flush();
+    let minting: Promise<string | null> = Promise.resolve(null);
+    await act(async () => void (minting = currentAccess!.mintKey()));
+    await act(async () => select({ ...a, environmentName: 'production' }));
+    await act(async () => {
+      finish();
+      await minting;
+    });
+    expect(r.container.textContent).toBe('');
+    await act(async () => select(a));
+    expect(r.container.textContent).toBe('late-development');
+  });
+
+  it('is not minted for a binding that checks no key', async () => {
+    vi.mocked(getEndpointSecurity).mockResolvedValue(onGateway('none'));
+    const r = await renderWithScopes(<View id="first" />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    await act(async () => void (await views.first.mintKey()));
+    expect(createEndpointTestKey).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an answer without a key', async () => ({ keyId: 'k', apiKey: '' }), 'Could not mint a test key.'],
+    ['a 409 that reads as an unexposed API elsewhere', async () => Promise.reject(coded(409)), 'Could not mint a test key.'],
+    ['a binding that stopped checking keys', async () => Promise.reject(coded(409, 'MCP_API_KEY_NOT_CHECKED')), 'This MCP server’s AI gateway URL takes no API key, so it needs no test key.'],
+  ])('reports %s as a failed mint', async (_, answer, message) => {
+    vi.mocked(createEndpointTestKey).mockImplementation(answer as never);
+    const r = await renderWithScopes(<View id="first" />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    await act(async () => void (await views.first.mintKey()));
+    await vi.waitFor(async () => {
+      await flush();
+      expect(views.first.keyError).toBe(message);
+    });
+    expect(shown(r.container, 'first')).toBe('');
+  });
+
+  it('is neither renewed nor shown once it is due for renewal', async () => {
+    vi.useFakeTimers();
+    const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(0)));
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await settle();
+    await act(async () => void (await views.first.mintKey()));
+    await settle();
+    expect(shown(r.container, 'first')).toBe('key-1-development');
+
+    await act(async () => void (await vi.advanceTimersByTimeAsync(59 * 60_000 + 1_000)));
+    await act(async () => showLater(true));
+    await settle();
+    expect(mints).toBe(1);
+    expect(shown(r.container, 'first')).toBe('');
+    expect(shown(r.container, 'later')).toBe('');
+  });
+});
+
 describe('keyRenewalTime', () => {
   const mintedAt = Date.parse('2026-11-07T10:00:00Z');
 
