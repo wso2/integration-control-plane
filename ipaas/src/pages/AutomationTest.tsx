@@ -42,11 +42,13 @@ import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
 import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validateRequiredFields } from '../utils/runtimeArguments';
-import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
+import { httpStatusOf, isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { isTerminalStatus } from '../utils/executionStatus';
 import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, TaskExecution } from '../types/executions';
 import type { ComponentScope } from '../nav';
+
+const argsNoticeSx = { mb: 3 } as const;
 
 /**
  * Automation "Test" page — mirrors Devant's "Test your automation" console layout:
@@ -244,9 +246,11 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     );
   };
 
-  // A 404 means "no schema" and a not-implemented stub means the product has no
-  // runtime-arguments API at all. Neither is a failure — both mean trigger-only.
-  const argsUnavailable = argsError && (isNotFoundError(argsErr) || isUnsupportedError(argsErr));
+  // A 404 means the integration is gone, a not-implemented stub a build with no
+  // runtime-arguments API, and a 424 a build that recorded no arguments the console
+  // can use (a rebuild records them). None is a failure — all mean trigger-only.
+  const argsNotRecorded = argsError && httpStatusOf(argsErr) === 424;
+  const argsUnavailable = argsError && (isNotFoundError(argsErr) || isUnsupportedError(argsErr) || argsNotRecorded);
   const hardArgsError = argsError && !argsUnavailable;
   const hasFormData = hasAnyFormData(formData);
   const hasArgs = runtimeArguments.length > 0;
@@ -278,6 +282,11 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   const renderExecutionsView = (resolvedTrackId: string): JSX.Element => (
     <Box>
       {pageTitle}
+      {argsNotRecorded && (
+        <Alert severity="info" sx={argsNoticeSx}>
+          This build didn&apos;t record any runtime arguments the form can use. Declare them under runtimeArguments in the integration&apos;s component.yaml, then rebuild it to test with a form.
+        </Alert>
+      )}
       <Card sx={{ mb: 4 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ m: 3 }}>
           <Stack direction="row" alignItems="center" gap={2}>
