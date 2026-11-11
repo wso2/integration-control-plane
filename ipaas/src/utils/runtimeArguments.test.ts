@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildExecutionArgumentsFromForm, hasAnyFormData, parseRuntimeArgumentsToFormFields, validateRequiredFields } from './runtimeArguments';
+import { AFTER_REPEATED_ERROR, FREE_FORM_ARGUMENTS, POSITIONAL_GAP_ERROR, isCommitSha, buildExecutionArgumentsFromForm, hasAnyFormData, parseRuntimeArgumentsToFormFields, validatePositionalOrder, validateRequiredFields } from './runtimeArguments';
 import type { RuntimeArgument } from '../types/executions';
 
 describe('parseRuntimeArgumentsToFormFields', () => {
@@ -40,6 +40,14 @@ describe('parseRuntimeArgumentsToFormFields', () => {
       { name: 'forced', type: 'string', prefix: '--f', required: true },
     ]);
     expect(fields.map((f) => f.required)).toEqual([true, false, true]);
+  });
+
+  it('a trailing positional arg the schema marks required: false is optional', () => {
+    const fields = parseRuntimeArgumentsToFormFields([
+      { name: 'count', type: 'int', required: true },
+      { name: 'name', type: 'string', required: false }, // has a default
+    ]);
+    expect(fields.map((f) => f.required)).toEqual([true, false]);
   });
 
   it('turns enum values into options and uses displayName as label', () => {
@@ -69,14 +77,99 @@ describe('validateRequiredFields', () => {
   });
 });
 
+describe('parseRuntimeArgumentsToFormFields positional requirement', () => {
+  it('marks an optional positional argument before a required one as required', () => {
+    // main(string? region, int count, string suffix = "")
+    const fields = parseRuntimeArgumentsToFormFields([
+      { name: 'region', type: 'string', required: false },
+      { name: 'count', type: 'int', required: true },
+      { name: 'suffix', type: 'string', required: false },
+      { name: 'verbose', type: 'boolean', prefix: '--verbose' },
+    ]);
+    expect(fields.map((f) => f.required)).toEqual([true, true, false, false]);
+  });
+
+  it('leaves a repeated argument optional before a required one', () => {
+    const fields = parseRuntimeArgumentsToFormFields([
+      { name: 'tags', type: 'string', repeat: true, required: false },
+      { name: 'name', type: 'string', required: true },
+    ]);
+    expect(fields.map((f) => f.required)).toEqual([false, true]);
+  });
+});
+
+describe('validatePositionalOrder', () => {
+  // main(string name = "World", int times = 1)
+  const args: RuntimeArgument[] = [
+    { name: 'name', type: 'string', required: false },
+    { name: 'times', type: 'int', required: false },
+  ];
+
+  it('flags an empty positional value before a filled one', () => {
+    expect(validatePositionalOrder(args, { name: '', times: '5' })).toEqual({ name: POSITIONAL_GAP_ERROR });
+  });
+
+  it('allows trailing empty values', () => {
+    expect(validatePositionalOrder(args, {})).toEqual({});
+    expect(validatePositionalOrder(args, { name: 'Ada' })).toEqual({});
+  });
+
+  it('counts values that follow the declared arguments', () => {
+    expect(validatePositionalOrder(args, { name: 'Ada' }, true)).toEqual({ times: POSITIONAL_GAP_ERROR });
+  });
+
+  it('requires a nilable argument before a filled one, since nil cannot be passed by position', () => {
+    // main(string? region, int count)
+    const nilableFirst: RuntimeArgument[] = [
+      { name: 'region', type: 'string', required: false },
+      { name: 'count', type: 'int', required: true },
+    ];
+    expect(validatePositionalOrder(nilableFirst, { count: '3' })).toEqual({ region: POSITIONAL_GAP_ERROR });
+  });
+
+  describe('a repeated argument before others', () => {
+    // main(string[] tags, string name, string? suffix)
+    const listFirst: RuntimeArgument[] = [
+      { name: 'tags', type: 'string', repeat: true, required: false },
+      { name: 'name', type: 'string', required: true },
+      { name: 'suffix', type: 'string', required: false },
+    ];
+
+    it('may stay empty, since the program leaves the values to the parameters after it', () => {
+      expect(validatePositionalOrder(listFirst, { tags: [''], name: 'x', suffix: 'y' })).toEqual({});
+    });
+
+    it('needs every parameter after it filled once it has values', () => {
+      expect(validatePositionalOrder(listFirst, { tags: ['a', 'b'], name: 'x' })).toEqual({ suffix: AFTER_REPEATED_ERROR });
+      expect(validatePositionalOrder(listFirst, { tags: ['a', 'b'], name: 'x', suffix: 'y' })).toEqual({});
+    });
+  });
+
+  it('ignores prefixed options and lets a repeated argument stay empty', () => {
+    const mixed: RuntimeArgument[] = [
+      { name: 'files', type: 'string', repeat: true },
+      { name: 'verbose', type: 'boolean', prefix: '--verbose' },
+      { name: 'target', type: 'string' },
+    ];
+    expect(validatePositionalOrder(mixed, { files: [''], target: 'x' })).toEqual({});
+  });
+
+  it('keeps the serialized values in their positions once it passes', () => {
+    const formData = { name: 'Ada', times: '5' };
+    expect(validatePositionalOrder(args, formData)).toEqual({});
+    expect(buildExecutionArgumentsFromForm(args, formData).map((a) => a.argument_value)).toEqual(['Ada', '5']);
+  });
+});
+
 describe('buildExecutionArgumentsFromForm', () => {
   it('emits positional values directly', () => {
     const args: RuntimeArgument[] = [{ name: 'name', type: 'string' }];
     expect(buildExecutionArgumentsFromForm(args, { name: 'World' })).toEqual([{ argument_name: 'name', argument_value: 'World' }]);
   });
 
-  it('skips empty non-repeat values', () => {
+  it('skips empty and blank non-repeat values', () => {
     expect(buildExecutionArgumentsFromForm([{ name: 'name', type: 'string' }], { name: '' })).toEqual([]);
+    expect(buildExecutionArgumentsFromForm([{ name: 'name', type: 'string' }], { name: '   ' })).toEqual([]);
   });
 
   it('boolean emits its prefix only when checked', () => {
@@ -108,5 +201,28 @@ describe('hasAnyFormData', () => {
     expect(hasAnyFormData({ a: '', b: [''] })).toBe(false);
     expect(hasAnyFormData({ a: 'x' })).toBe(true);
     expect(hasAnyFormData({ a: true })).toBe(true);
+  });
+});
+
+describe('isCommitSha', () => {
+  it('accepts a full or abbreviated SHA in either case', () => {
+    expect(isCommitSha('d571bee3')).toBe(true);
+    expect(isCommitSha('D571BEE3FEE7647F6B65C3BA041497EB85B26455')).toBe(true);
+  });
+
+  it('rejects an image tag or a too-short SHA', () => {
+    expect(isCommitSha('latest')).toBe(false);
+    expect(isCommitSha('1.4.2')).toBe(false);
+    expect(isCommitSha('d571be')).toBe(false);
+  });
+});
+
+describe('FREE_FORM_ARGUMENTS', () => {
+  it('passes the values entered in order and leaves out blank rows', () => {
+    expect(buildExecutionArgumentsFromForm(FREE_FORM_ARGUMENTS, { arguments: ['--car', 'P', '', '-DpersonId=3'] }).map((a) => a.argument_value)).toEqual(['--car', 'P', '-DpersonId=3']);
+  });
+
+  it('lets a run go without any', () => {
+    expect(validateRequiredFields(parseRuntimeArgumentsToFormFields(FREE_FORM_ARGUMENTS), {})).toEqual({});
   });
 });

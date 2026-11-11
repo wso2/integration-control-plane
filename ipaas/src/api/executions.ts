@@ -144,11 +144,7 @@ export const fetchTaskExecutions = async (releaseId: string, componentId = '', e
   return all;
 };
 
-export const fetchExecutionArguments = (runId: string, componentId: string, _releaseId: string): Promise<ExecutionArgument[]> =>
-  bff
-    .get<ExecutionArgument[]>(`/components/${seg(componentId)}/executions/${seg(runId)}/arguments`)
-    .then((r) => r ?? [])
-    .catch(() => []);
+export const fetchExecutionArguments = (runId: string, componentId: string, _releaseId: string): Promise<ExecutionArgument[]> => bff.get<ExecutionArgument[]>(`/components/${seg(componentId)}/executions/${seg(runId)}/arguments`).then((r) => r ?? []);
 
 // Padding around a run's bounds. The history row's startTime is the earliest
 // Kubernetes event for the Job, which the kubelet's image-pull and startup
@@ -286,9 +282,9 @@ export const fetchExecutionLogs = async (componentId: string, _deploymentTrackId
 };
 
 // GET /components/{name}/runtime-arguments — the arguments the deployed build recorded
-// from the `runtimeArguments` of the integration's component.yaml. 424: the build
-// recorded none, or recorded a section that breaks the descriptor's rules; a rebuild
-// changes either.
+// from the `runtimeArguments` of the integration's component.yaml. 424: no build of the
+// commit was found, the build recorded none, or it recorded a section that breaks a rule;
+// its message says which, and a build of the commit changes each.
 export const fetchRuntimeArguments = (componentId: string, deploymentTrackId: string, commitHash: string): Promise<RuntimeArgument[]> =>
   bff.get<RuntimeArgument[]>(`/components/${seg(componentId)}/runtime-arguments${q({ commit: commitHash, deploymentTrackId })}`);
 
@@ -310,10 +306,10 @@ export const triggerTask = (_input: TriggerTaskInput): Promise<{ status: string;
 
 // POST /components/{name}/releases/{releaseId}/executions — BFF resolves the env.
 // The BFF takes positional string args; map the name/value pairs to their values.
-// OpenChoreo does not return a run id from this endpoint, so runId is null.
+// The BFF answers with the started job, whose name is the run id the executions list reports.
 export const triggerComponentRun = (input: TriggerComponentInput): Promise<TriggerRunResult> =>
   bff
-    .post(`/components/${seg(input.componentId)}/releases/${seg(input.releaseId)}/executions`, {
+    .post<{ jobId?: string } | undefined>(`/components/${seg(input.componentId)}/releases/${seg(input.releaseId)}/executions`, {
       args: (input.args ?? []).map((a) => a.argument_value),
     })
-    .then(() => ({ runId: null }));
+    .then((e) => ({ runId: e?.jobId || null }));

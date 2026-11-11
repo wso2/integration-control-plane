@@ -89,9 +89,8 @@ export interface TriggerRunResult {
 }
 
 // runtime arguments (Automation "Test" form)
-// Mirrors Devant's runtime-args schema + dynamic-form model. The backend derives
-// `RuntimeArgument[]` from the automation's entrypoint signature (Ballerina `main`
-// params) or, for image-based components, from user-declared CLI args.
+// Mirrors Choreo v2's runtime-args schema + dynamic-form model. The deployed build records
+// `RuntimeArgument[]` from the `runtimeArguments` the integration's component.yaml declares.
 
 /** One declared runtime argument, as returned by the `runtimeArguments` query. */
 export interface RuntimeArgument {
