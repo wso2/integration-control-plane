@@ -37,11 +37,12 @@ export interface TokenClaims {
 /**
  * Where the Thunder SDK keeps a signed-in session: the session record in sessionStorage (the
  * console's configured storage), the active flag in localStorage. This is the SDK's own,
- * internal format — read off a real sign-in with the SDK at these versions, and not a public
- * API. token.test.ts fails when package.json pins other versions, so an upgrade re-checks these
- * keys instead of finding out from a run that never signs in.
+ * internal format, not a public API: read off a real sign-in at browser 1.10.0 / react 1.12.0,
+ * and re-checked for these versions by diffing the SDK source (key resolution, session fields,
+ * isSignedIn), with no sign-in yet. token.test.ts fails when package.json pins other versions,
+ * so an upgrade re-checks these keys instead of finding out from a run that never signs in.
  */
-export const SDK_STORAGE_VERSIONS: Record<string, string> = { '@thunderid/browser': '1.10.0', '@thunderid/react': '1.12.0' };
+export const SDK_STORAGE_VERSIONS: Record<string, string> = { '@thunderid/browser': '1.17.0', '@thunderid/react': '1.20.0' };
 export const SDK_SESSION_ACTIVE_KEY = 'thunderid-session-active';
 
 /** Instance 0 is the only SDK instance the console creates. */
