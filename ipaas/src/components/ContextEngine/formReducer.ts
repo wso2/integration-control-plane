@@ -46,7 +46,9 @@ export type ContextEngineFormAction =
   | { type: 'answerChoice'; value: AnswerChoice }
   | { type: 'storage'; kind: StorageKind; value: StorageSelection }
   | { type: 'name'; value: string }
-  | { type: 'description'; value: string };
+  | { type: 'description'; value: string }
+  /** Start over: drop everything entered, e.g. when a restored draft is discarded. */
+  | { type: 'reset' };
 
 export function contextEngineFormReducer(state: ContextEngineForm, action: ContextEngineFormAction): ContextEngineForm {
   switch (action.type) {
@@ -74,5 +76,7 @@ export function contextEngineFormReducer(state: ContextEngineForm, action: Conte
       return { ...state, name: action.value };
     case 'description':
       return { ...state, description: action.value };
+    case 'reset':
+      return initialContextEngineForm;
   }
 }

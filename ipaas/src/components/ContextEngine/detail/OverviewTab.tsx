@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography, Paper } from '@wso2/oxygen-ui';
 import { EyeOff, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { CONTEXT_ENGINE_MODEL_UPDATES, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
+import { CONTEXT_ENGINE_MODEL_UPDATES, useAddContextSource, useAskedFlag, useConnectViewedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { checkStagedFile, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
@@ -28,11 +28,12 @@ import { HttpError } from '../../../types/http';
 import GetStartedChecklist from './GetStartedChecklist';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourcesProgressCard from './SourcesProgressCard';
+import SectionCard from '../SectionCard';
 import FilesDrawer from '../files/FilesDrawer';
 import EditSourceDrawer from './EditSourceDrawer';
 import EditModelsDrawer from './EditModelsDrawer';
 import SourceDrawer from '../SourceDrawer';
-import { deleteCardSx, mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
+import { deleteCardSx, exposureButtonSx, mutedSx, summaryRowSx } from '../styles';
 import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
@@ -51,15 +52,9 @@ interface OverviewTabProps {
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }): JSX.Element {
   return (
-    <Box sx={summaryCardSx}>
-      <Box sx={summaryCardHeaderSx}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {title}
-        </Typography>
-        {action}
-      </Box>
+    <SectionCard title={title} action={action} fill>
       {children}
-    </Box>
+    </SectionCard>
   );
 }
 
@@ -86,7 +81,8 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
         </Typography>
         {model && (
           <Typography variant="caption" sx={mutedSx}>
-            {model}
+            {/* The provider is the line above, so "openai/gpt-5-mini" shows as "gpt-5-mini". */}
+            {model.replace(/^[^/]+\//, '')}
           </Typography>
         )}
       </Box>
@@ -107,13 +103,14 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
     setFilesSource(source);
     setFilesOpen(true);
   };
-  const { asked } = useAskedFlag(engine.id);
+  const { asked } = useAskedFlag(engine.id, engine.createdAt);
+  const { connectViewed } = useConnectViewedFlag(engine.id, engine.createdAt);
   const progress = useContextEngineProgress(readOnly ? '' : engine.id);
   // Adding a source reuses the wizard's drawer; the session key remounts it fresh each time.
   const [addSession, setAddSession] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [editSource, setEditSource] = useState<ContextSource | null>(null);
-  const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
+  const [sourceNotice, setSourceNotice] = useState<{ severity: 'success' | 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
   const permissions = useContextPermissions(readOnly ? '' : engine.id);
   // Models are set when the engine is created; the BFF cannot change them yet.
@@ -146,6 +143,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
           startUploads(engine.id, created.id, files, visibility, visibilityTags(visibility, everyone));
           openFiles(created);
         }
+        setSourceNotice({ severity: 'success', message: `Source '${created.name}' added successfully.` });
       },
       onError: (e) => {
         const forbidden = e instanceof HttpError && e.status === 403;
@@ -164,7 +162,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const uploadSources = engine.sources.filter((s) => s.type === 'upload');
   const uploadFirst = uploadSources.length > 0 && uploadSources.length === engine.sources.length && (!progressSummary || (progressSummary.processed === 0 && progressSummary.active === 0));
   // 'Grant access' step hidden along with the Access tab: roles can't be granted from the UI, so it would never complete.
-  const steps = getStartedSteps(engine, asked, progressSummary, uploadFirst).filter((s) => s.id !== 'grant');
+  const steps = getStartedSteps(engine, asked, progressSummary, uploadFirst, connectViewed).filter((s) => s.id !== 'grant');
   const allDone = steps.every((s) => s.state === 'done');
 
   const onChecklistAction = (id: GetStartedStepId) => {
@@ -180,12 +178,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
       {!allDone && !readOnly && <GetStartedChecklist steps={steps} onAction={onChecklistAction} />}
 
       {sourceNotice && (
-        <Alert
-          severity={sourceNotice.severity}
-          variant="outlined"
-          onClose={() => setSourceNotice(null)}
-          action={sourceNotice.forbidden && sourceNotice.retry ? <OwnerAccessButton engineId={engine.id} onGranted={sourceNotice.retry} /> : undefined}
-          sx={{ mb: 2 }}>
+        <Alert severity={sourceNotice.severity} onClose={() => setSourceNotice(null)} action={sourceNotice.forbidden && sourceNotice.retry ? <OwnerAccessButton engineId={engine.id} onGranted={sourceNotice.retry} /> : undefined} sx={{ mb: 2 }}>
           {sourceNotice.message}
         </Alert>
       )}
@@ -242,11 +235,19 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
                 <Link component="button" type="button" variant="body2" onClick={openModels}>
                   {engine.models.embedding || engine.models.llm ? 'Edit' : 'Choose models'}
                 </Link>
+              ) : canSeeModels(permissions.data) ? (
+                // Nothing here can be changed, so the lock covers the card, as it does on Storage.
+                <LockedChip title="Models are set by the engine's environment." />
               ) : undefined
             }>
             {canSeeModels(permissions.data) ? (
               <>
-                <ModelRow label="Embedding" provider={engine.models.embedding ? modelProviderName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
+                <ModelRow
+                  label="Embedding"
+                  provider={engine.models.embedding ? modelProviderName('embedding', engine.models.embedding.provider) : 'Engine default'}
+                  model={engine.models.embedding?.model}
+                  locked={canEditModels && !!engine.models.embeddingLocked}
+                />
                 <ModelRow label="Ingestion language model" provider={engine.models.llm ? modelProviderName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
                 <ModelRow
                   label="Answer language model"
@@ -289,29 +290,35 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
         <Grid size={{ xs: 12, md: 4 }}>
           <Card title="Exposure">
             <Box sx={summaryRowSx}>
-              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('api')}>
+              <Button size="small" variant="text" onClick={() => onGoTab('api')} sx={exposureButtonSx}>
                 REST API
-              </Link>
+              </Button>
               <Chip size="small" variant="outlined" color={engine.exposure.api ? 'success' : 'default'} label={engine.exposure.api ? 'Published' : 'Not published'} />
             </Box>
             <Box sx={summaryRowSx}>
-              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('mcp')}>
+              <Button size="small" variant="text" onClick={() => onGoTab('mcp')} sx={exposureButtonSx}>
                 MCP server
-              </Link>
+              </Button>
               <Chip size="small" variant="outlined" color={engine.exposure.mcp ? 'success' : 'default'} label={engine.exposure.mcp ? 'Published' : 'Not published'} />
             </Box>
             <Box sx={summaryRowSx}>
-              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('playground')}>
+              <Button size="small" variant="text" onClick={() => onGoTab('playground')} sx={exposureButtonSx}>
                 Test playground
-              </Link>
+              </Button>
               <Chip size="small" variant="outlined" label="Always on" />
             </Box>
+            {(engine.exposure.api || engine.exposure.mcp) && (
+              // Both are on from the start, so say who can reach the content rather than leave it implied by a chip.
+              <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1.5 }}>
+                {engine.exposure.api && engine.exposure.mcp ? 'REST API and MCP server are on.' : engine.exposure.api ? 'REST API is on.' : 'MCP server is on.'} Anyone with access can query this engine.
+              </Typography>
+            )}
           </Card>
         </Grid>
 
         {onRequestDelete && (
           <Grid size={{ xs: 12 }}>
-            <Box sx={deleteCardSx}>
+            <Paper variant="outlined" sx={deleteCardSx}>
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                   Delete engine
@@ -323,7 +330,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
               <Button variant="outlined" color="error" onClick={onRequestDelete} sx={{ flexShrink: 0 }}>
                 Delete engine
               </Button>
-            </Box>
+            </Paper>
           </Grid>
         )}
       </Grid>
@@ -341,6 +348,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
           queryRoles={engine.queryRoles}
           open
           onClose={() => setEditSource(null)}
+          onSaved={(name) => setSourceNotice({ severity: 'success', message: `Source '${name}' updated successfully.` })}
         />
       )}
     </>

@@ -81,12 +81,14 @@ export const canvasNoteSx = {
 /** The right-hand panel; `lit` frames it in the accent, as when a node is selected. */
 export const panelSx = (lit: boolean) =>
   ({
-    border: '1px solid',
+    // A lit panel takes a 2px border rather than a 1px border plus an outer ring: the ring sat outside
+    // the box, so a scrolling parent clipped it and the rounded corners came out jagged.
+    border: lit ? '2px solid' : '1px solid',
     borderColor: lit ? 'primary.main' : 'divider',
-    boxShadow: lit ? (t: { palette: { primary: { main: string } } }) => `0 0 0 1px ${t.palette.primary.main}` : 'none',
     borderRadius: 1.5,
     bgcolor: 'background.paper',
-    p: 2,
+    // One pixel less padding when the border is one pixel wider, so the content does not move.
+    p: lit ? '15px' : 2,
     display: 'flex',
     flexDirection: 'column',
     gap: 1.5,

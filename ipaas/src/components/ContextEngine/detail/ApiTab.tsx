@@ -17,7 +17,8 @@
  */
 
 import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import { useEffect, type JSX } from 'react';
+import { useConnectViewedFlag } from '../../../hooks/useContextEngine';
 import { useSearchParams } from 'react-router';
 import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl } from '../../../utils/contextEngine';
 import ApiKeysSection from './ApiKeysSection';
@@ -32,6 +33,9 @@ interface ApiTabProps {
 
 /** Expose as API — the engine's public endpoints, how to authenticate, and a ready-to-run request. */
 export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
+  // Opening this tab is what completes the Overview's Connect an agent step.
+  const { markConnectViewed } = useConnectViewedFlag(engine.id, engine.createdAt);
+  useEffect(() => markConnectViewed(), [markConnectViewed]);
   const [params] = useSearchParams();
   // "Use in API" on the Playground lands here with the question, and the answer route when it was asked for an answer.
   const question = params.get('q')?.trim() || undefined;
@@ -68,7 +72,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
       ))}
 
       <Stack gap={2} sx={{ mb: 3 }}>
-        <Alert severity="info" variant="outlined">
+        <Alert severity="info">
           Requests carry one of this engine's API keys in the <code>X-API-Key</code> header. The engine's gateway checks the key; a request without a valid one never reaches the engine.
         </Alert>
         <Typography variant="body2" sx={mutedSx}>
