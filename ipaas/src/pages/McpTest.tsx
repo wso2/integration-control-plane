@@ -34,7 +34,8 @@ import type { EndpointRef } from '../types/consumers';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
 import { mcpTestEndpoints } from '../utils/mcpGateway';
-import { mcpRelayUrl } from '../api/consumers';
+import { createEndpointTestKey, mcpRelayUrl } from '../api/consumers';
+import { friendlyApiError } from '../utils/apiSecurity';
 import { bffFetch } from '../api/_client';
 import { PILL_SELECT_SX } from '../constants/styles';
 
@@ -42,8 +43,9 @@ import { PILL_SELECT_SX } from '../constants/styles';
  * MCP Server "Test" page: resolves the deployed MCP endpoint's gateway URL + a test
  * credential for the selected environment, then hands them to the in-house
  * {@link McpPlayground} (the interactive connect / list-tools / invoke / ping surface).
- * An MCP server on Agent Manager's AI gateway takes no test key: the page shows its proxy
- * URL and connects through ipaas-service's relay instead.
+ * An MCP server on Agent Manager's AI gateway answers no browser's CORS preflight: the page
+ * connects through ipaas-service's relay, which holds a key of its own, and offers a test key only
+ * for calling the proxy URL from another MCP client.
  */
 export default function McpTest(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
@@ -83,9 +85,32 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.
   const mcpUrl = access.mcpUrl;
-  // The AI gateway gives the console no key, so the page talks to an MCP server there through ipaas-service's relay.
+  // The AI gateway answers no browser's CORS preflight, so the page talks to an MCP server there through ipaas-service's relay.
   const onAiGateway = !!access.aiGateway;
   const relay = useMemo(() => (onAiGateway && accessRef ? { url: mcpRelayUrl(accessRef), fetch: bffFetch } : undefined), [onAiGateway, accessRef]);
+
+  // A key for calling the AI gateway URL from another MCP client. It is held against the endpoint it was
+  // issued for, so one that lands after the selection moved on is never shown for another endpoint.
+  const [copiedKey, setCopiedKey] = useState<{ target: string; key: string } | null>(null);
+  const [copiedKeyFailure, setCopiedKeyFailure] = useState<{ target: string; message: string } | null>(null);
+  const [issuingFor, setIssuingFor] = useState<string | null>(null);
+  const relayTarget = relay?.url ?? '';
+  const getCopiedKey = async () => {
+    if (!accessRef || !relayTarget) return;
+    const target = relayTarget;
+    setIssuingFor(target);
+    setCopiedKeyFailure(null);
+    try {
+      const result = await createEndpointTestKey(accessRef);
+      setCopiedKey({ target, key: result.apiKey });
+    } catch (error) {
+      setCopiedKeyFailure({ target, message: friendlyApiError(error, 'Could not issue a test key.') });
+    } finally {
+      setIssuingFor((current) => (current === target ? null : current));
+    }
+  };
+  // Only for a binding that checks keys: an open one takes none.
+  const canCopyKey = access.canCreateKey && access.mode === 'api-key';
 
   const endpointSwitcher = { options: testableEndpoints.map((e) => ({ label: e.displayName, value: e.id })), value: activeEndpointId, onChange: setSelectedEndpointId };
 
@@ -128,7 +153,24 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
         ) : relay ? (
           // Keyed by where it connects: a session is to one environment's endpoint, and the environment can
           // change while it is open, so a new target starts a new playground rather than reusing the old session.
-          <McpPlayground key={relay.url} url={mcpUrl} token={null} relay={relay} visibility="Public" endpointSwitcher={endpointSwitcher} />
+          <>
+            {copiedKeyFailure?.target === relay.url && (
+              <Alert severity="warning" sx={{ mb: 1.5 }}>
+                {copiedKeyFailure.message}
+              </Alert>
+            )}
+            <McpPlayground
+              key={relay.url}
+              url={mcpUrl}
+              token={copiedKey?.target === relay.url ? copiedKey.key : null}
+              headerName={access.authHeader}
+              isTokenFetching={issuingFor === relay.url}
+              onTokenRegenerate={canCopyKey ? () => void getCopiedKey() : undefined}
+              relay={relay}
+              visibility="Public"
+              endpointSwitcher={endpointSwitcher}
+            />
+          </>
         ) : !mcpUrl ? (
           // Deployed, but with no enforcing URL to call — a different state from "not deployed".
           <Alert severity="info">{access.isUnavailable ? 'This MCP server isn’t exposed as an API on the gateway yet, so it cannot be tested from here.' : 'No testable endpoint URL is available for this MCP server yet.'}</Alert>

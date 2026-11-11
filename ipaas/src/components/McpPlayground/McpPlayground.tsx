@@ -44,13 +44,14 @@ interface McpPlaygroundProps {
   headerName?: string;
   /** Shows a loading state on the token field while it is being minted. */
   isTokenFetching?: boolean;
-  /** Mint a fresh token ("Get test key"). */
+  /** Mint a fresh token ("Get test key"). With `relay`, the token is only for another client to use. */
   onTokenRegenerate?: () => void;
   /** Endpoint chooser rendered in the sidebar. */
   endpointSwitcher?: McpSwitcher;
   /**
-   * Connect through ipaas-service's MCP relay instead of to `url`, which is then only shown: for a server whose
-   * gateway gives the console no key. The relay takes the console's session, so no token is asked for.
+   * Connect through ipaas-service's MCP relay instead of to `url` directly: for a server on the AI gateway,
+   * which answers no browser's CORS preflight. The relay takes the console's session and calls `url` with a key
+   * of its own, so the connection needs no token.
    */
   relay?: { url: string; fetch: (input: string | URL, init?: RequestInit) => Promise<Response> };
   /** The endpoint's visibility, shown read-only in the sidebar. */
@@ -109,13 +110,14 @@ export default function McpPlayground({ url, token, headerName = 'test-key', isT
 
   return (
     <Stack gap={1.5} sx={{ height: '100%', minHeight: 0 }}>
-      <ConnectionAlert error={conn.error} errorKind={conn.errorKind} isTokenFetching={isTokenFetching} onGetTestKey={onTokenRegenerate} keyless={!!relay} />
+      <ConnectionAlert error={conn.error} errorKind={conn.errorKind} isTokenFetching={isTokenFetching} onGetTestKey={relay ? undefined : onTokenRegenerate} keyless={!!relay} />
 
       <Stack direction="row" gap={2} sx={{ flex: 1, minHeight: 0 }}>
         <ConnectionSidebar
           url={url}
           token={token ?? ''}
           keyless={!!relay}
+          keyHeader={headerName}
           visibility={visibility}
           status={conn.status}
           isTokenFetching={isTokenFetching}

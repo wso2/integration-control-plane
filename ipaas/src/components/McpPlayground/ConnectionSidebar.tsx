@@ -31,8 +31,14 @@ interface ConnectionSidebarProps {
   onDisconnect: () => void;
   onReconnect: () => void;
   onGetTestKey?: () => void;
-  /** The connection takes no key: the token field gives way to a note on why. */
+  /**
+   * The page connects through ipaas-service's relay, which holds a key of its own, so connecting needs no
+   * token. A token field is still shown when `onGetTestKey` is given: it is for calling the URL from
+   * another MCP client.
+   */
   keyless?: boolean;
+  /** The header another client sends the token in. */
+  keyHeader?: string;
   /** The endpoint's visibility, shown read-only. */
   visibility?: string;
 }
@@ -47,7 +53,7 @@ const STATUS_META: Record<McpConnectionStatus, { label: string; color: string }>
 const readOnlyInputSx = { bgcolor: 'action.hover', fontFamily: 'monospace', fontSize: 12.5 } as const;
 
 /** The playground's left panel: the endpoint selector, the derived URL + test key, and connect controls. */
-export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, visibility }: ConnectionSidebarProps): JSX.Element {
+export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, keyHeader = 'X-API-Key', visibility }: ConnectionSidebarProps): JSX.Element {
   const [showToken, setShowToken] = useState(false);
   const connected = status === 'connected';
   const connecting = status === 'connecting';
@@ -78,8 +84,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         size="small"
         fullWidth
         value={url}
-        // Through the relay the page needs no URL to connect; the one shown is where agents call, which
-        // the AI gateway gives only once it has published the server.
+        // The AI gateway gives the URL only once it has published the server; the relay calls it too.
         placeholder={keyless ? 'Not published on the AI gateway yet' : undefined}
         InputProps={{
           readOnly: true,
@@ -96,11 +101,14 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         }}
       />
 
-      {keyless ? (
+      {keyless && (
         <Typography variant="caption" color="text.secondary">
-          Calls from this page go straight to the MCP server, not through the AI gateway, so they need no key and the gateway's policies don't apply to them. Agents call this URL with keys Agent Manager gives them.
+          {onGetTestKey
+            ? `This page connects through the integration platform with a key of its own, so its calls pass the AI gateway's key check and policies. To call this URL from another MCP client, get a test key and send it in the ${keyHeader} header.`
+            : "This page connects through the integration platform with a key of its own, so its calls pass the AI gateway's key check and policies. Agents call this URL with keys Agent Manager gives them."}
         </Typography>
-      ) : (
+      )}
+      {(!keyless || onGetTestKey) && (
         <TextField
           labelPlacement="top"
           label="Token"
@@ -108,6 +116,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
           fullWidth
           type={showToken ? 'text' : 'password'}
           value={token}
+          placeholder={keyless ? 'Get a test key to call this URL yourself' : undefined}
           InputProps={{
             readOnly: true,
             sx: readOnlyInputSx,
@@ -118,7 +127,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
                   {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
                 </IconButton>
                 <Tooltip title="Copy token">
-                  <IconButton size="small" aria-label="Copy token" onClick={() => copy(token)} edge="end">
+                  <IconButton size="small" aria-label="Copy token" onClick={() => copy(token)} edge="end" disabled={!token}>
                     <Copy size={14} />
                   </IconButton>
                 </Tooltip>
@@ -144,7 +153,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
           </Button>
         </Stack>
       ) : (
-        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || (keyless ? false : !url || !token)}>
+        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || !url || (!keyless && !token)}>
           {connecting ? 'Connecting…' : 'Connect'}
         </Button>
       )}

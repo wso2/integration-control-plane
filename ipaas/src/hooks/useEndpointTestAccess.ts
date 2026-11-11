@@ -217,7 +217,8 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const [switchFailure, setSwitchFailure] = useState<{ refKey: string; message: string } | null>(null);
 
   const aiGateway = aiGatewayAccessOf(security, securityError);
-  // The test-key routes refuse an AI gateway endpoint, so none of the minting below applies to it.
+  // Nothing is minted here for an AI gateway endpoint: the Test page's relay holds a key of its own, and a key
+  // for another MCP client is issued only when asked for.
   const mintable = canCreateKey && !aiGateway && mint;
   const managedIn = security?.editable === false ? security.entryEnvironment || 'the first environment' : null;
   const switchable = canSwitch && !aiGateway && managedIn === null;

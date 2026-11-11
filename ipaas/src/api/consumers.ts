@@ -102,8 +102,8 @@ export const getEndpointSecurity = (ref: EndpointRef): Promise<SecurityConfig> =
 export const mcpRelayUrl = (ref: EndpointRef): string => bffAbsoluteUrl(endpointUrl(ref, '/mcp'));
 
 /**
- * The tools an MCP server on the AI gateway exposes (`GET .../mcp-tools`). The BFF lists them over the
- * server's own route: the AI gateway gives keys only to Agent Manager agents, so the console can't ask it.
+ * The tools an MCP server on the AI gateway exposes (`GET .../mcp-tools`), as Agent Manager listed them through
+ * the gateway after the server's last deploy or refresh.
  */
 export const getMcpServerTools = (ref: EndpointRef): Promise<McpTool[]> => bff.get<{ tools?: McpTool[] }>(endpointUrl(ref, '/mcp-tools')).then((r) => r?.tools ?? []);
 
