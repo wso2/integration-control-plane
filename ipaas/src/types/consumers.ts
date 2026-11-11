@@ -57,6 +57,9 @@ export interface ApiExposure {
   publicUrl?: string;
 }
 
+/** Whether a key still authenticates. A revoked key stays listed. */
+export type ApiKeyStatus = 'active' | 'revoked';
+
 /** A masked API key of an exposed endpoint API. */
 export interface ApiKeySummary {
   /** Key name — the identifier used to revoke it. */
@@ -65,6 +68,7 @@ export interface ApiKeySummary {
   /** Masked form, e.g. `***abcde`. The plaintext is never retrievable. */
   maskedApiKey: string;
   status: string;
+  createdAt?: string;
   expiresAt?: string;
 }
 
@@ -199,58 +203,4 @@ export interface EndpointRateLimitPolicy {
   timeUnit?: 'MINUTE' | 'HOUR' | 'DAY';
   /** Per-operation limits, keyed by `"<METHOD> <path>"`. Absent operations stay unlimited. */
   operations?: Record<string, { requestCount: number; timeUnit: 'MINUTE' | 'HOUR' | 'DAY' }>;
-}
-
-/** Normalised from the credential's raw status. A revoked consumer keeps its row. */
-export type ConsumerStatus = 'active' | 'revoked';
-
-/** A consumer application. Org-scoped and shared across the org. */
-export interface ConsumerApplication {
-  id: string;
-  displayName?: string;
-  projectId?: string;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-/** Payload for creating a consumer application. */
-export interface CreateApplicationInput {
-  displayName: string;
-  /** Project handle the application belongs to. */
-  projectName: string;
-  description?: string;
-}
-
-/** A consumer application's credential for an exposed API. */
-export interface ConsumerCredential {
-  id: string;
-  applicationId: string;
-  /** Handle of the exposed API this credential grants access to. */
-  restApiId: string;
-  /** Plaintext, sent as `X-API-Key`. Populated only by the call that mints it. */
-  token?: string;
-  status?: string;
-  createdAt?: string;
-}
-
-/** One row per consumer, whatever its credential history. */
-export interface Consumer {
-  /** Application id when one backs this row, else the api-key group the row was built from. */
-  id: string;
-  displayName: string;
-  /** Absent for key-only rows — api-keys minted before applications were used. */
-  application?: ConsumerApplication;
-  credential: ConsumerCredential;
-  status: ConsumerStatus;
-  /** The consumer's live api-keys — revoked ones are excluded, having nothing left to revoke. */
-  credentialIds: string[];
-}
-
-/** Payload for creating a consumer application and minting its credential in one step. */
-export interface CreateConsumerInput extends EndpointRef {
-  /** Project handle the new application belongs to. */
-  projectName: string;
-  /** Display name of the consumer application. */
-  appName: string;
 }

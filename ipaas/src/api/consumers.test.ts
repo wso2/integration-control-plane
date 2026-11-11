@@ -29,11 +29,9 @@ vi.mock('./_client', async (importOriginal) => {
 });
 
 import {
-  createConsumer,
   createEndpointApiKey,
   createEndpointTestKey,
   exposeEndpoint,
-  fetchConsumers,
   getEndpointPolicies,
   setEndpointPolicies,
   getEndpointSecurity,
@@ -98,33 +96,21 @@ describe('endpoint API calls', () => {
   });
 });
 
-describe('consumers', () => {
+describe('api keys', () => {
   beforeEach(() => {
     for (const fn of [get, post, put, del]) fn.mockReset();
   });
 
-  it("tag a new application with the endpoint's track", async () => {
-    post.mockResolvedValueOnce({ id: 'app-1', displayName: 'Shop' }).mockResolvedValueOnce({ keyId: 'k1', apiKey: 'secret' });
-    await createConsumer({ ...TRACKED, projectName: 'proj', appName: 'Shop' });
-    expect(post).toHaveBeenNthCalledWith(1, '/applications', { displayName: 'Shop', projectName: 'proj', description: 'endpoint:hello/development/api@next-bbbbbb' });
-    expect(post).toHaveBeenNthCalledWith(2, `${BASE}/api-keys?deploymentTrackId=next-bbbbbb`, { displayName: 'app-1' });
+  it("issue a key under the name it's given, on the endpoint's track", async () => {
+    post.mockResolvedValueOnce({ keyId: 'k1', apiKey: 'secret' });
+    await createEndpointApiKey(TRACKED, { displayName: 'billing-service' });
+    expect(post).toHaveBeenCalledWith(`${BASE}/api-keys?deploymentTrackId=next-bbbbbb`, { displayName: 'billing-service' });
   });
 
-  it("list a track's applications, and older ones whose keys its API holds", async () => {
-    get.mockImplementation((url: string) =>
-      url.startsWith('/applications')
-        ? Promise.resolve([
-            { id: 'tracked', displayName: 'Tracked', description: 'endpoint:hello/development/api@next-bbbbbb' },
-            { id: 'other-track', displayName: 'Other', description: 'endpoint:hello/development/api@main-aaaaaa' },
-            { id: 'legacy-here', displayName: 'Legacy here', description: 'endpoint:hello/development/api' },
-            { id: 'legacy-elsewhere', displayName: 'Legacy elsewhere', description: 'endpoint:hello/development/api' },
-          ])
-        : Promise.resolve([
-            { name: 'k-tracked', displayName: 'tracked', status: 'active' },
-            { name: 'k-legacy', displayName: 'legacy-here', status: 'active' },
-          ]),
-    );
-    const consumers = await fetchConsumers(TRACKED, 'proj');
-    expect(consumers.map((c) => c.id)).toEqual(['tracked', 'legacy-here']);
+  it('list the bare array or the items envelope alike', async () => {
+    const key = { name: 'k1', displayName: 'billing-service', maskedApiKey: '***abcde', status: 'active' };
+    get.mockResolvedValueOnce([key]).mockResolvedValueOnce({ items: [key] });
+    expect(await listEndpointApiKeys(TRACKED)).toEqual([key]);
+    expect(await listEndpointApiKeys(TRACKED)).toEqual([key]);
   });
 });

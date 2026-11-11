@@ -30,7 +30,7 @@ The suite runs in two places:
 | 01      | Creates the run's own fixture project                                               |
 | 02      | Empty project overview                                                              |
 | 03      | Browsing samples                                                                    |
-| 04–04d  | Deploying a sample; endpoints and consumers; the test console; scheduled automation |
+| 04–04d  | Deploying a sample; endpoints and API keys; the test console; scheduled automation |
 | 05      | Importing an AI agent from a public repository                                      |
 | 06      | Populated project overview                                                          |
 | 07      | Page availability (logs, metrics, settings) at every level                          |

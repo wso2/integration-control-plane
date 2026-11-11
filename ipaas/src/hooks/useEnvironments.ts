@@ -18,7 +18,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOrgUuidFromToken } from '../auth';
-import { fetchAllEnvironments, fetchCloudDataPlanes, fetchEnvironments, fetchEnvironmentTemplates, fetchLoggers, updateLogLevel } from '../api/environments';
+import { fetchAllEnvironments, fetchCloudDataPlanes, fetchEnvironmentIdentityProvider, fetchEnvironments, fetchEnvironmentTemplates, fetchLoggers, updateLogLevel } from '../api/environments';
 
 export function useEnvironments(orgUuid: string, projectId: string) {
   const effectiveOrgUuid = getOrgUuidFromToken() ?? orgUuid;
@@ -43,6 +43,18 @@ export function useCloudDataPlanes(orgUuid: string) {
     queryFn: () => fetchCloudDataPlanes(orgUuid),
     enabled: !!orgUuid,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** The org's identity platform in an environment, where OAuth clients of its integrations' APIs are created. */
+export function useEnvironmentIdentityProvider(environmentName: string, enabled = true) {
+  return useQuery({
+    queryKey: ['environment-identity-provider', environmentName],
+    queryFn: () => fetchEnvironmentIdentityProvider(environmentName),
+    enabled: enabled && !!environmentName,
+    // Changes only when the org's identity platform is provisioned or moved.
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 }
 

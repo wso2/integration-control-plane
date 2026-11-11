@@ -67,3 +67,18 @@ export interface UpdateLogLevelInput {
   componentName: string;
   logLevel: 'INFO' | 'DEBUG' | 'WARN' | 'ERROR';
 }
+
+/**
+ * The org's identity platform in one environment. The environment's API gateway trusts tokens from it
+ * only, so an OAuth client calling an integration's API is created in it, from the Identity Platform
+ * console, and gets its tokens from `tokenEndpoint`.
+ */
+export interface EnvironmentIdentityProvider {
+  /** False when the org has no identity platform ready in the environment; the endpoints are then absent. */
+  available: boolean;
+  issuer?: string;
+  tokenEndpoint?: string;
+  jwksUrl?: string;
+  /** Where OAuth clients are created. Absent when the deployment doesn't configure it. */
+  consoleUrl?: string;
+}

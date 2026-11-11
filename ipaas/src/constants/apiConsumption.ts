@@ -35,21 +35,17 @@ export const MAX_JWT_AUDIENCES = 20;
 export const MAX_SCOPES_PER_LIST = 20;
 export const MAX_TOKEN_OPTION_LENGTH = 128;
 
-/** Stand-in shown wherever a consumer's credential is hidden. */
+/** Stand-in shown wherever an API key is hidden. */
 export const TOKEN_MASK = '•'.repeat(28);
 
 export const API_KEY_SCHEME_DESCRIPTION = 'Secure your API with API key protocol.';
 export const OAUTH_SCHEME_DESCRIPTION = 'Secure your API with OAuth 2 protocol.';
 
-export const REGENERATE_KEY_WARNING = 'The current key is revoked immediately and replaced. Any client still presenting the previous key will be rejected until it is updated.';
-export const REVOKE_KEY_WARNING = 'The key is revoked immediately and requests presenting it will be rejected. The consumer application is retained and can be issued a new key.';
-export const DELETE_CONSUMER_WARNING = 'The key is revoked and the consumer application is permanently removed. This action cannot be undone.';
+export const REVOKE_KEY_WARNING = 'The key is revoked immediately, and requests that present it are rejected. This can’t be undone; issue a new key to restore access.';
 
-export const TOKEN_ONE_TIME_WARNING = 'This key is displayed once and is not stored in retrievable form. Copy it to a secure location before closing this panel.';
+export const TOKEN_ONE_TIME_WARNING = 'This key is shown once and can’t be retrieved later. Copy it to a secure location before you close this panel.';
 
-export const TOKEN_NOT_RETRIEVABLE_NOTICE = 'This key was displayed once at creation and cannot be retrieved. Regenerate to issue a replacement.';
-
-export const CONSUMER_NAME_TAKEN = 'A consumer with this name already exists for this endpoint.';
+export const API_KEY_NAME_TAKEN = 'An API key with this name already exists for this endpoint.';
 
 export const SECURITY_MODE_LABEL: Record<SecurityMode, string> = {
   none: 'No auth',

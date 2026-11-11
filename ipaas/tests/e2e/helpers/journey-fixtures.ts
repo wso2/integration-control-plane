@@ -39,8 +39,7 @@ export const AGENT_REPO_URL = 'https://github.com/gabilvtg/bal-task-assistant';
 export const AGENT_NAME_PATTERN = /bal[- ]?task[- ]?assistant/i;
 export const AGENT_PROMPT = 'Hello from dokimibot';
 
-export const CONSUMER = 'ipaas-test-consumer';
-export const NO_CONSUMERS = 'No consumer applications yet. Create your first consumer application to start calling this API.';
+export const API_KEY = 'ipaas-test-key';
 export const NO_SCHEDULE = 'This automation doesn’t have an active schedule. Add one to run it automatically.';
 
 /** Order matters: this is the order AppLayout renders them in. Hrefs from paths.ts. */
