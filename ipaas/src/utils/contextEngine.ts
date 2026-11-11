@@ -1350,7 +1350,8 @@ export function modelsAfterUpdate(models: ContextEngineModels, update: Omit<Upda
 
 /** An engine read while it restarts, with what its last read got from the engine itself. */
 export function withLastKnownFacets(engine: ContextEngineDetail, last: ContextEngineDetail | undefined): ContextEngineDetail {
-  if (!last || engine.state !== 'ready' || !isRestartPending(engine.startedAt, engine.restartedAt)) return engine;
+  const restarting = engine.state === 'ready' ? isRestartPending(engine.startedAt, engine.restartedAt) : (engine.state === 'starting' || engine.state === 'provisioning') && !!engine.restartedAt;
+  if (!last || !restarting) return engine;
   return {
     ...engine,
     description: engine.description || last.description,
