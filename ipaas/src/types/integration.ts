@@ -144,7 +144,11 @@ export interface EnvCardBodyProps extends EnvCardSlotProps {
   onTriggerResolved: () => void;
 }
 
-/** An action the loader adds in the card's footer, below the body: the User Portal's, for the types the portal shows. */
+/**
+ * An action the loader adds in the card's footer, below the body: the User Portal's, for the types the portal shows. It
+ * is rendered from the card's first frame, while the deployment still loads (`loadingDeployment`), so it can hold its
+ * place with a placeholder of its own size.
+ */
 export type EnvCardSharedActionProps = EnvCardSlotProps;
 
 /**

@@ -64,6 +64,13 @@ export interface UserPortalPublishability {
   publishing: boolean;
   /** Why the last background publish failed, as a publish's refusal; it ends when another publish starts or the integration is unpublished. */
   publishError?: UserPortalRefusal;
+  /**
+   * An unpublished workflow is still being redeployed to take the console's API key again, in the background. It is out
+   * of the User Portal already (`published` is false), and can't be published again until this ends.
+   */
+  unpublishing: boolean;
+  /** Why the workflow couldn't be given back to the console after the last unpublish; unpublishing again finishes it. */
+  unpublishError?: UserPortalRefusal;
   /** Scopes the last background publish's endpoints require that the User Portal can't hold, while published. */
   rejectedScopes: string[];
 }
@@ -72,14 +79,20 @@ export interface UserPortalPublishability {
 export interface UserPortalPublications {
   /** The environments' slugs. */
   environments: string[];
+  /** The environments a workflow was unpublished from and is still being redeployed in to take the console's API key again. */
+  unpublishing: string[];
+  /** The environments a workflow was unpublished from but couldn't be redeployed in to take the console's API key again. */
+  notGivenBack: string[];
 }
 
-/** The outcome of a publish. */
+/** The outcome of a publish or an unpublish. */
 export interface UserPortalPublication {
   environment: string;
   published: boolean;
   /** The publish was accepted and finishes in the background; the publishability says when it ends. */
   publishing: boolean;
+  /** The workflow is unpublished, and is given back to the console in the background; the publishability says when that ends. */
+  unpublishing: boolean;
   /** Scopes the integration's endpoints require that the User Portal can't hold, so its users' tokens never carry them. */
   rejectedScopes: string[];
 }

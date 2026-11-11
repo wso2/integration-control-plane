@@ -61,4 +61,12 @@ describe("the footer's Open User Portal link", () => {
     expect(action?.getAttribute('data-link')).toBe(String(link));
     expect(action?.getAttribute('data-workflow')).toBe(String(component === WORKFLOW));
   });
+
+  // Every card holds the switch's place from its first frame, whatever the integration type.
+  it.each([WORKFLOW, AUTOMATION])('holds the switch’s place while the deployment loads', async (component) => {
+    const props = { component, env: { id: 'production', name: 'Production' }, orgHandler: 'acme', projectId: 'shop', onNotify: () => {}, deploymentStatusV2: null, loadingDeployment: true } as unknown as EnvCardSharedActionProps;
+    await act(async () => root.render(<UserPortalSharedAction {...props} />));
+    expect(container.querySelector('[data-testid="portal-action"]')).toBeNull();
+    expect(container.querySelector('[role="status"][aria-label="Loading the User Portal"]')).not.toBeNull();
+  });
 });

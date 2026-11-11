@@ -25,7 +25,7 @@ import { useEnableUserPortal, useUserPortalEnvironments, useUserPortalPublishabi
 import type { Environment } from '../../types/environment';
 import type { UserPortalPublishability } from '../../types/userPortal';
 import { apiErrorMessage, isUserPortalUnavailable } from '../../utils/apiErrors';
-import { shownRefusals, USER_PORTAL_NOT_ENABLED } from '../../utils/userPortal';
+import { shownRefusals, unpublishingText, USER_PORTAL_NOT_ENABLED } from '../../utils/userPortal';
 import EnableUserPortalDialog from './EnableUserPortalDialog';
 import PublishButton from './PublishButton';
 import PublishRefusals from './PublishRefusals';
@@ -64,7 +64,7 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   const can = useCan();
   const enable = useEnableUserPortal();
   const [enableOpen, setEnableOpen] = useState(false);
-  const publish = usePublishFlow({ componentId, environment: environment.id, envName: environment.name });
+  const publish = usePublishFlow({ componentId, environment: environment.id, envName: environment.name, isWorkflow: true });
 
   const portal = portalQuery.data;
   const report = publishability.data;
@@ -169,7 +169,16 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   const reasons = shownRefusals(report.reasons).filter((r) => !staleReport || r.code !== USER_PORTAL_NOT_ENABLED);
   return (
     <Stack alignItems="center" gap={1}>
-      <PublishButton flow={publish} publishable={report.publishable} redeploys={report.redeploys} busy={publishability.isFetching} label="Publish to User Portal" variant="contained" size="medium" />
+      <PublishButton
+        flow={publish}
+        publishable={report.publishable}
+        redeploys={report.redeploys}
+        busy={publishability.isFetching}
+        holdReason={report.unpublishing ? unpublishingText(environment.name, true) : undefined}
+        label="Publish to User Portal"
+        variant="contained"
+        size="medium"
+      />
       {publish.progress && (
         <Typography variant="caption" color="text.secondary" textAlign="center">
           {publish.progress}

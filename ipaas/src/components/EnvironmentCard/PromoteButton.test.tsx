@@ -48,7 +48,7 @@ vi.mock('../../hooks/useUserPortal', () => ({
     },
   }),
 }));
-const publishedIn = (...environments: string[]) => Promise.resolve({ isSuccess: true, data: { environments }, error: null });
+const publishedIn = (...environments: string[]) => Promise.resolve({ isSuccess: true, data: { environments, unpublishing: [] as string[], notGivenBack: [] as string[] }, error: null });
 vi.mock('../../hooks/useCan', () => ({ useCan: () => () => true }));
 vi.mock('@wso2/oxygen-ui', () => {
   const Plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
@@ -147,6 +147,17 @@ describe('PromoteButton', () => {
     expect(mutate).not.toHaveBeenCalled();
     await act(async () => dialog.querySelectorAll('button')[1].click());
     expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  // Both redeploy the workflow in the target, and whichever lands last would decide the key it takes.
+  it('holds a promotion into an environment the workflow is still being given back to the console in', async () => {
+    portal.result = Promise.resolve({ isSuccess: true, data: { environments: [], unpublishing: ['production'], notGivenBack: [] }, error: null });
+    await render(true);
+    await act(async () => button().click());
+    const dialog = container.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).toContain('still being redeployed there to take the console');
+    expect(dialog.querySelectorAll('button')[1].disabled).toBe(true);
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it('promotes a workflow published in the target too, or nowhere, without asking', async () => {

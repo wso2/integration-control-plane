@@ -41,7 +41,7 @@ const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const publish = vi.mocked(api.publishToUserPortal);
 
 const ACTIVE: UserPortal = { environment: 'production', state: 'active', url: 'https://portal.example/acme' };
-const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, rejectedScopes: [] };
+const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
 const NOT_ENABLED: UserPortalPublishability = {
   ...PUBLISHABLE,
   publishable: false,
@@ -100,7 +100,7 @@ describe('the way to a workflow in the User Portal', () => {
   it('shows the scopes the portal could not hold once a publish from here goes through', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValueOnce({ ...PUBLISHABLE, redeploys: false }).mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
-    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: ['bad scope'] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await prompt(DEVELOPER);
     await act(async () => button(container, 'Publish to User Portal')?.click());
     await flush();
@@ -147,7 +147,7 @@ describe('the way to a workflow in the User Portal', () => {
   it('offers to publish where the User Portal runs, warning first of the redeploy', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue(PUBLISHABLE);
-    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
 
     await act(async () => button(container, 'Publish to User Portal')?.click());
@@ -247,7 +247,7 @@ describe('a publish that finishes in the background, from the prompt', () => {
   it('shows Publishing… after the 202 and offers to open the portal once published', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValueOnce(PUBLISHABLE).mockResolvedValue({ ...PUBLISHABLE, publishing: true });
-    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, unpublishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
     await act(async () => button(container, 'Publish to User Portal')?.click());
     await flush();
@@ -258,7 +258,7 @@ describe('a publish that finishes in the background, from the prompt', () => {
     expect(button(container, 'Publishing…')?.disabled).toBe(true);
     expect(container.textContent).toContain('this takes a minute or two');
 
-    publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, publishing: false, rejectedScopes: ['bad scope'] });
+    publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     await poll();
     await flush();
     expect(container.textContent).toContain('Open User Portal');

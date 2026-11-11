@@ -100,12 +100,16 @@ interface BffUserPortalPublishability {
   redeploys?: boolean;
   publishing?: boolean;
   publishError?: { code: string; message: string };
+  unpublishing?: boolean;
+  unpublishError?: { code: string; message: string };
   rejectedScopes?: string[];
 }
 
 // models.UserPortalPublications.
 interface BffUserPortalPublications {
   environments?: string[];
+  unpublishing?: string[];
+  notGivenBack?: string[];
 }
 
 // models.UserPortalPublication.
@@ -113,6 +117,7 @@ interface BffUserPortalPublication {
   environment: string;
   published: boolean;
   publishing?: boolean;
+  unpublishing?: boolean;
   rejectedScopes?: string[];
 }
 
@@ -127,10 +132,13 @@ export const toUserPortalPublishability = (p: BffUserPortalPublishability): User
   redeploys: p.redeploys ?? false,
   publishing: p.publishing ?? false,
   ...(p.publishError ? { publishError: p.publishError } : {}),
+  // A BFF from before unpublishing finished in the background answers once the workflow is given back.
+  unpublishing: p.unpublishing ?? false,
+  ...(p.unpublishError ? { unpublishError: p.unpublishError } : {}),
   rejectedScopes: p.rejectedScopes ?? [],
 });
 
-export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [] });
+export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [], unpublishing: p.unpublishing ?? [], notGivenBack: p.notGivenBack ?? [] });
 
 /** The environments the integration is published to the User Portal in. */
 export const fetchUserPortalPublications = (componentId: string): Promise<UserPortalPublications> => bff.get<BffUserPortalPublications>(`/components/${seg(componentId)}/user-portal`).then(toUserPortalPublications);
@@ -138,7 +146,7 @@ export const fetchUserPortalPublications = (componentId: string): Promise<UserPo
 /** Runs a publish's rules without publishing: whether it is published there, and every rule it breaks. */
 export const fetchUserPortalPublishability = (componentId: string, environment: string): Promise<UserPortalPublishability> => bff.get<BffUserPortalPublishability>(publicationPath(componentId, environment)).then(toUserPortalPublishability);
 
-const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, publishing: p.publishing ?? false, rejectedScopes: p.rejectedScopes ?? [] });
+const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, publishing: p.publishing ?? false, unpublishing: p.unpublishing ?? false, rejectedScopes: p.rejectedScopes ?? [] });
 
 export const publishToUserPortal = (componentId: string, environment: string): Promise<UserPortalPublication> => bff.put<BffUserPortalPublication>(publicationPath(componentId, environment)).then(toPublication);
 

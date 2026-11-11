@@ -22,6 +22,7 @@ import type { EnvCardSharedActionProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import UserPortalAction from '../../UserPortal/UserPortalAction';
+import UserPortalActionSkeleton from '../../UserPortal/UserPortalActionSkeleton';
 
 // The action renders nothing where ipaas-service serves no User Portal; the footer then takes no
 // space, so the card doesn't end in an empty gap.
@@ -31,8 +32,17 @@ const footerSx = { mt: 2, '&:empty': { display: 'none' } } as const;
  * The env card's User Portal action, in the card's footer: Publish, Unpublish, or
  * "User Portal off" while the environment has none. For the types the portal shows.
  */
-export default function UserPortalSharedAction({ component, env, orgHandler, projectId, onNotify, deploymentStatusV2 }: EnvCardSharedActionProps): JSX.Element {
+export default function UserPortalSharedAction({ component, env, orgHandler, projectId, onNotify, deploymentStatusV2, loadingDeployment }: EnvCardSharedActionProps): JSX.Element {
   const isWorkflow = isWorkflowIntegration(component);
+  // Where a workflow's link goes waits on its deployment; the switch's placeholder holds its place meanwhile, so every
+  // card shows the same one from the start.
+  if (loadingDeployment) {
+    return (
+      <Box sx={footerSx}>
+        <UserPortalActionSkeleton />
+      </Box>
+    );
+  }
   // A workflow's card body shows its workflows only while the deployment is active, and a published one's notice opens
   // the portal there. In any other state the body has no notice, so the footer keeps the link.
   const linkInBody = isWorkflow && isDeploymentHealthy(deploymentStatusV2);

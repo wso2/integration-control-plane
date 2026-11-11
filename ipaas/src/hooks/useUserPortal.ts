@@ -17,10 +17,11 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublications, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
-import type { UserPortal, UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
+import type { UserPortal, UserPortalPublications, UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
 import { isUserPortalUnavailable } from '../utils/apiErrors';
+import { invalidateEndpointSettings } from './useConsumers';
 
 const ROOT_KEY = 'userPortal';
 
@@ -92,55 +93,97 @@ export const useEnableUserPortal = () => useWritePortal(enableUserPortal);
 export const useDisableUserPortal = () => useWritePortal(disableUserPortal);
 
 /**
+ * A publish or an unpublish that ran in the background switched the workflow's Management API between the console's API
+ * key and the User Portal's sign-in, so every view of its endpoint security in environment reads it again once that
+ * ends. It is done where the reads that see the end land, rather than in one view, so the views that never saw the run
+ * aren't left with the security from before it.
+ */
+function rereadSecurityOnceSettled(qc: QueryClient, componentId: string, environment: string, wasRunning: boolean, isRunning: boolean): void {
+  if (wasRunning && !isRunning) invalidateEndpointSettings(qc, componentId, environment);
+}
+
+/**
  * Whether the integration is, and can be, published to the environment's User Portal. It is read again every few seconds
- * while a background publish is running, and while `rereadWhile` holds for the report read last, as a settling portal is.
+ * while a background publish or unpublish is running, and while `rereadWhile` holds for the report read last, as a
+ * settling portal is.
  */
 export function useUserPortalPublishability(componentId: string, environment: string, { rereadWhile }: { rereadWhile?: (report: UserPortalPublishability) => boolean } = {}) {
+  const qc = useQueryClient();
+  const queryKey = [ROOT_KEY, 'publishability', componentId, environment];
   return useQuery({
-    queryKey: [ROOT_KEY, 'publishability', componentId, environment],
-    queryFn: () => fetchUserPortalPublishability(componentId, environment),
+    queryKey,
+    queryFn: async () => {
+      const before = qc.getQueryData<UserPortalPublishability>(queryKey);
+      const report = await fetchUserPortalPublishability(componentId, environment);
+      rereadSecurityOnceSettled(qc, componentId, environment, !!before && (before.publishing || before.unpublishing), report.publishing || report.unpublishing);
+      return report;
+    },
     enabled: !!componentId && !!environment,
     retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
     staleTime: 30_000,
-    refetchInterval: (query) => (query.state.data && (query.state.data.publishing || rereadWhile?.(query.state.data)) ? SETTLING_POLL_MS : false),
+    refetchInterval: (query) => (query.state.data && (query.state.data.publishing || query.state.data.unpublishing || rereadWhile?.(query.state.data)) ? SETTLING_POLL_MS : false),
   });
 }
 
 /**
  * The environments the integration is published to the User Portal in. A workflow published in one is managed
- * from the User Portal there, so the console's workflow views step aside.
+ * from the User Portal there, so the console's workflow views step aside, and they wait while one unpublished is
+ * given back to the console: they are read again every few seconds until that ends.
  */
 export function useUserPortalPublications(componentId: string, { enabled = true }: { enabled?: boolean } = {}) {
+  const qc = useQueryClient();
+  const queryKey = [ROOT_KEY, 'publications', componentId];
   return useQuery({
-    queryKey: [ROOT_KEY, 'publications', componentId],
-    queryFn: () => fetchUserPortalPublications(componentId),
+    queryKey,
+    queryFn: async () => {
+      const before = qc.getQueryData<UserPortalPublications>(queryKey);
+      const publications = await fetchUserPortalPublications(componentId);
+      for (const environment of before?.unpublishing ?? []) rereadSecurityOnceSettled(qc, componentId, environment, true, publications.unpublishing.includes(environment));
+      return publications;
+    },
     enabled: enabled && !!componentId,
     retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
     staleTime: 30_000,
+    refetchInterval: (query) => ((query.state.data?.unpublishing.length ?? 0) > 0 ? SETTLING_POLL_MS : false),
   });
 }
 
+interface BackgroundOutcomeHandlers {
+  onPublished: (rejectedScopes: string[]) => void;
+  onFailed: (error: UserPortalRefusal) => void;
+  /** An unpublish's work after its response finished: the scopes are in step, and the workflow is given back. */
+  onUnpublished: () => void;
+  /** The scopes, or giving the workflow back to the console, failed after an unpublish. */
+  onUnpublishFailed: (error: UserPortalRefusal) => void;
+}
+
 /**
- * Runs `onPublished` or `onFailed` once when a background publish this page saw running ends. A publish that was
- * already over when the page loaded reports nothing, and neither does a re-read of the same outcome.
+ * Runs `onPublished` or `onFailed` once when a background publish this page saw running ends, and `onUnpublished` or
+ * `onUnpublishFailed` when a background unpublish does. One that was already over when the page loaded reports nothing,
+ * and neither does a re-read of the same outcome.
  */
-export function useBackgroundPublishOutcome(componentId: string, environment: string, { onPublished, onFailed }: { onPublished: (rejectedScopes: string[]) => void; onFailed: (error: UserPortalRefusal) => void }) {
+export function useBackgroundPublishOutcome(componentId: string, environment: string, handlers: BackgroundOutcomeHandlers) {
   const { data: report } = useUserPortalPublishability(componentId, environment);
-  const sawRunning = useRef(false);
-  const handlers = useRef({ onPublished, onFailed });
+  const sawRunning = useRef<'publishing' | 'unpublishing' | null>(null);
+  const latest = useRef(handlers);
   useEffect(() => {
-    handlers.current = { onPublished, onFailed };
+    latest.current = handlers;
   });
   useEffect(() => {
     if (!report) return;
-    if (report.publishing) {
-      sawRunning.current = true;
+    if (report.publishing || report.unpublishing) {
+      sawRunning.current = report.publishing ? 'publishing' : 'unpublishing';
       return;
     }
-    if (!sawRunning.current) return;
-    sawRunning.current = false;
-    if (report.published) handlers.current.onPublished(report.rejectedScopes);
-    else if (report.publishError) handlers.current.onFailed(report.publishError);
+    const ended = sawRunning.current;
+    sawRunning.current = null;
+    if (ended === 'publishing') {
+      if (report.published) latest.current.onPublished(report.rejectedScopes);
+      else if (report.publishError) latest.current.onFailed(report.publishError);
+    } else if (ended === 'unpublishing') {
+      if (report.unpublishError) latest.current.onUnpublishFailed(report.unpublishError);
+      else if (!report.published) latest.current.onUnpublished();
+    }
   }, [report]);
 }
 
@@ -165,4 +208,14 @@ export function usePublishToUserPortal() {
   });
 }
 
-export const useUnpublishFromUserPortal = () => useWritePublication(unpublishFromUserPortal);
+/**
+ * An unpublish that gives a workflow back to the console answers once it is out of the User Portal, with `unpublishing`
+ * set, and the redeploy carries on in the background. The report says so at once, as for a publish.
+ */
+export function useUnpublishFromUserPortal() {
+  const qc = useQueryClient();
+  return useWritePublication(unpublishFromUserPortal, (out, { componentId, environment }) => {
+    if (!out.unpublishing) return;
+    qc.setQueryData<UserPortalPublishability>([ROOT_KEY, 'publishability', componentId, environment], (report) => report && { ...report, published: false, unpublishing: true, unpublishError: undefined });
+  });
+}
