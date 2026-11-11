@@ -31,6 +31,7 @@ export interface Component {
   componentSubType: string | null;
   /** The knowledge base a `kb-ingestion` integration feeds. */
   knowledgeBase?: string;
+  voiceTargetAgent?: string;
   version: string;
   createdAt: string;
   lastBuildDate: string;

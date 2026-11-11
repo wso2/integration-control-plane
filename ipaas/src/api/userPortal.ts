@@ -19,11 +19,12 @@
 /**
  * The org's User Portal, per environment, and publishing integrations to it. Calls ipaas-service:
  *   GET|PUT|DELETE /user-portal/environments/{environment}
+ *   GET /components/{component}/user-portal
  *   GET|PUT|DELETE /components/{component}/user-portal/environments/{environment}
  */
 
 import type { Environment } from '../types/environment';
-import type { UserPortal, UserPortalPublication, UserPortalPublishability, UserPortalState } from '../types/userPortal';
+import type { UserPortal, UserPortalPublication, UserPortalPublications, UserPortalPublishability, UserPortalState } from '../types/userPortal';
 import { bff, seg } from './_client';
 import { fetchAllEnvironments } from './environments';
 import { DEFAULT_PIPELINE_NAME, fetchDeploymentPipeline } from './deploymentPipelines';
@@ -96,12 +97,22 @@ interface BffUserPortalPublishability {
   published: boolean;
   publishable: boolean;
   reasons?: { code: string; message: string }[];
+  redeploys?: boolean;
+  publishing?: boolean;
+  publishError?: { code: string; message: string };
+  rejectedScopes?: string[];
+}
+
+// models.UserPortalPublications.
+interface BffUserPortalPublications {
+  environments?: string[];
 }
 
 // models.UserPortalPublication.
 interface BffUserPortalPublication {
   environment: string;
   published: boolean;
+  publishing?: boolean;
   rejectedScopes?: string[];
 }
 
@@ -112,12 +123,22 @@ export const toUserPortalPublishability = (p: BffUserPortalPublishability): User
   published: p.published,
   publishable: p.publishable,
   reasons: p.reasons ?? [],
+  // A BFF from before publishing switched workflows to the User Portal's sign-in never redeploys.
+  redeploys: p.redeploys ?? false,
+  publishing: p.publishing ?? false,
+  ...(p.publishError ? { publishError: p.publishError } : {}),
+  rejectedScopes: p.rejectedScopes ?? [],
 });
+
+export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [] });
+
+/** The environments the integration is published to the User Portal in. */
+export const fetchUserPortalPublications = (componentId: string): Promise<UserPortalPublications> => bff.get<BffUserPortalPublications>(`/components/${seg(componentId)}/user-portal`).then(toUserPortalPublications);
 
 /** Runs a publish's rules without publishing: whether it is published there, and every rule it breaks. */
 export const fetchUserPortalPublishability = (componentId: string, environment: string): Promise<UserPortalPublishability> => bff.get<BffUserPortalPublishability>(publicationPath(componentId, environment)).then(toUserPortalPublishability);
 
-const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, rejectedScopes: p.rejectedScopes ?? [] });
+const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, publishing: p.publishing ?? false, rejectedScopes: p.rejectedScopes ?? [] });
 
 export const publishToUserPortal = (componentId: string, environment: string): Promise<UserPortalPublication> => bff.put<BffUserPortalPublication>(publicationPath(componentId, environment)).then(toPublication);
 

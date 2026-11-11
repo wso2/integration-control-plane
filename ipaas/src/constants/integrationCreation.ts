@@ -28,4 +28,11 @@ export const CREATION_STEPS: CreationStep[] = [
   { progress: 85, text: 'Finalizing setup…' },
 ];
 
+export const VOICE_AGENT_CREATION_STEPS: CreationStep[] = [
+  { progress: 10, text: 'Creating voice agent…' },
+  { progress: 35, text: 'Storing your provider keys…' },
+  { progress: 65, text: 'Deploying voice agent…' },
+  { progress: 85, text: 'Finalizing setup…' },
+];
+
 export const CREATION_STEP_INTERVAL = 1200; // milliseconds between each step

@@ -20,7 +20,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { fetchDeploymentPipeline } from './deploymentPipelines';
 import { fetchAllEnvironments } from './environments';
-import { fetchUserPortalEnvironments, toUserPortal, toUserPortalPublishability } from './userPortal';
+import { fetchUserPortalEnvironments, toUserPortal, toUserPortalPublications, toUserPortalPublishability } from './userPortal';
 import type { DeploymentPipeline, PromotionTreeNode } from '../types/deploymentPipeline';
 import type { Environment } from '../types/environment';
 
@@ -94,10 +94,39 @@ describe('toUserPortalPublishability', () => {
       { code: 'USER_PORTAL_PIPELINE', message: 'pipeline' },
       { code: 'USER_PORTAL_NOT_ENABLED', message: 'not enabled' },
     ];
-    expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: false, reasons })).toEqual({ environment: 'prod', published: false, publishable: false, reasons });
+    expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: false, reasons, redeploys: true })).toEqual({
+      environment: 'prod',
+      published: false,
+      publishable: false,
+      reasons,
+      redeploys: true,
+      publishing: false,
+      rejectedScopes: [],
+    });
   });
 
   it('gives a publishable integration an empty reasons list', () => {
     expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true }).reasons).toEqual([]);
+    expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true }).redeploys).toBe(false);
+  });
+
+  it('reads a BFF that reports no background publish as none running, with no scopes or error', () => {
+    const report = toUserPortalPublishability({ environment: 'prod', published: true, publishable: true });
+    expect(report.publishing).toBe(false);
+    expect(report.rejectedScopes).toEqual([]);
+    expect(report.publishError).toBeUndefined();
+  });
+
+  it('carries a running background publish, its last failure and the scopes of its last success', () => {
+    const publishError = { code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'interrupted' };
+    expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: true, publishing: true, publishError })).toMatchObject({ publishing: true, publishError });
+    expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true, rejectedScopes: ['bad'] }).rejectedScopes).toEqual(['bad']);
+  });
+});
+
+describe('toUserPortalPublications', () => {
+  it('reads an integration the BFF lists no environments for as published nowhere', () => {
+    expect(toUserPortalPublications({})).toEqual({ environments: [] });
+    expect(toUserPortalPublications({ environments: ['development'] })).toEqual({ environments: ['development'] });
   });
 });

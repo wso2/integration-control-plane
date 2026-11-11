@@ -30,6 +30,18 @@ describe('refusalText', () => {
   });
 });
 
+describe('refusalText for a background publish', () => {
+  it('words the codes a background publish ends with as the synchronous one does', () => {
+    expect(refusalText({ code: 'USER_PORTAL_REDEPLOY_FAILED', message: 'x' }, 'Production')).toBe(userPortalErrorText(new BffError(502, '{"code":"USER_PORTAL_REDEPLOY_FAILED","message":"x"}'), 'Production'));
+  });
+
+  it('words an interrupted publish and a generic failure as asking to publish again', () => {
+    expect(refusalText({ code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'x' }, 'Production')).toBe("Publishing didn't finish. Publish again.");
+    expect(refusalText({ code: 'USER_PORTAL_PUBLISH_FAILED', message: 'x' }, 'Production')).toBe('Publishing to the User Portal failed. Publish again.');
+    expect(refusalText({ code: 'USER_PORTAL_PUBLISH_UNDOING', message: 'x' }, 'Production')).toBe('An earlier publish is still being undone in Production. Publish again in a minute.');
+  });
+});
+
 describe('userPortalErrorText', () => {
   it('words a coded error', () => {
     expect(userPortalErrorText(new BffError(502, '{"code":"USER_PORTAL_SCOPES_NOT_SYNCED","message":"scopes"}'), 'Production')).toBe("The User Portal's scopes could not be updated. Try again.");
@@ -46,6 +58,11 @@ describe('shownRefusals', () => {
   it('drops the rules a deployment would settle when nothing is deployed', () => {
     const reasons = [refusal('USER_PORTAL_NOT_ENABLED'), refusal('USER_PORTAL_NOT_DEPLOYED'), refusal('USER_PORTAL_NO_PUBLIC_ENDPOINT'), refusal('USER_PORTAL_API_KEY')];
     expect(shownRefusals(reasons).map((r) => r.code)).toEqual(['USER_PORTAL_NOT_ENABLED', 'USER_PORTAL_NOT_DEPLOYED']);
+  });
+
+  it('drops the gateway security a promotion would bring when nothing is deployed', () => {
+    const reasons = [refusal('USER_PORTAL_NOT_DEPLOYED'), refusal('USER_PORTAL_SECURED_BY_PROMOTION')];
+    expect(shownRefusals(reasons).map((r) => r.code)).toEqual(['USER_PORTAL_NOT_DEPLOYED']);
   });
 
   it('keeps every rule of a deployed integration', () => {

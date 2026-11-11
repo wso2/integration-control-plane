@@ -57,6 +57,17 @@ describe('TestKeyNotice', () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  it('opens a page it links to in a new tab, from a button under the text', async () => {
+    await act(async () => root.render(<TestKeyNotice notice={NOT_EXPOSED} action={{ label: 'Open User Portal', href: 'https://portal.example/acme' }} />));
+    const link = container.querySelector('a');
+    expect(link?.textContent).toBe('Open User Portal');
+    expect(link?.getAttribute('href')).toBe('https://portal.example/acme');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(link?.className).toMatch(/MuiButton-contained/);
+    expect(container.querySelector('.MuiAlert-action')).toBeNull();
+  });
+
   it('holds the action while it runs', async () => {
     await act(async () => root.render(<TestKeyNotice notice={NOT_EXPOSED} action={{ label: 'Get test key', run: vi.fn(), pending: true }} />));
     expect(container.querySelector('button')?.disabled).toBe(true);

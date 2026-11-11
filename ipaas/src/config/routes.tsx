@@ -39,6 +39,10 @@ const ProtectedRoute = lazyPage(() => import('../layouts/ProtectedRoute'));
 const OrgHomeRedirect = lazyPage(() => import('../components/OrgHomeRedirect'));
 
 const OIDCCallback = lazyPage(() => import('../pages/OIDCCallback'));
+const VoiceAgents = lazyPage(() => import('../pages/VoiceAgents'));
+const CreateVoiceAgent = lazyPage(() => import('../pages/CreateVoiceAgent'));
+const CreateVoiceAgentOrg = lazyPage(() => import('../pages/CreateVoiceAgent').then((m) => ({ default: m.CreateVoiceAgentOrg })));
+const EnableVoiceAgent = lazyPage(() => import('../pages/CreateVoiceAgent').then((m) => ({ default: m.EnableVoiceAgent })));
 const GitHubOAuthCallback = lazyPage(() => import('../pages/GitHubOAuthCallback'));
 const AzureDevOpsOAuthCallback = lazyPage(() => import('../pages/AzureDevOpsOAuthCallback'));
 const CookiePolicy = lazyPage(() => import('../pages/CookiePolicy'));
@@ -49,7 +53,7 @@ const Projects = lazyPage(() => import('../pages/Projects'));
 const Project = lazyPage(() => import('../pages/Project'));
 const Component = lazyPage(() => import('../pages/Component'));
 const CreateProject = lazyPage(() => import('../pages/CreateProject'));
-const EditProject = lazyPage(() => import('../pages/EditProject'));
+const ProjectManageRedirect = lazyPage(() => import('../pages/ProjectManageRedirect'));
 const LinkRepository = lazyPage(() => import('../pages/LinkRepository'));
 const ImportProject = lazyPage(() => import('../pages/ImportProject'));
 const CreateIntegrationOptions = lazyPage(() => import('../pages/CreateIntegrationOptions'));
@@ -86,8 +90,9 @@ const ProjectTest = lazyPage(() => import('../pages/ProjectTest'));
 const OrgDeploy = lazyPage(() => import('../pages/OrgDeploy'));
 const ProjectDeploy = lazyPage(() => import('../pages/ProjectDeploy'));
 const Deploy = lazyPage(() => import('../pages/Deploy'));
-const TestConsole = lazyPage(() => import('../pages/TestConsole'));
+const TestConsoleRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.TestConsoleRoute })));
 const AgentChatTestRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.AgentChatTestRoute })));
+const VoiceAgentTestRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.VoiceAgentTestRoute })));
 const RuntimeLogsOrg = lazyPage(() => import('../pages/RuntimeLogsOrg'));
 const RuntimeLogsProject = lazyPage(() => import('../pages/RuntimeLogsProject'));
 const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegration'));
@@ -143,6 +148,8 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/deploy', element: createElement(withScope(OrgDeploy, ['organizations'])) },
               { path: 'organizations/:orgHandler/test', element: createElement(withScope(OrgTest, ['organizations'])) },
               { path: 'organizations/:orgHandler/insights', element: createElement(withScope(ApiInsights, ['organizations'])) },
+              { path: 'organizations/:orgHandler/voice-agents', element: createElement(withScope(VoiceAgents, ['organizations'])) },
+              { path: 'organizations/:orgHandler/voice-agents/new', element: createElement(withScope(CreateVoiceAgentOrg, ['organizations'])) },
               { path: 'organizations/:orgHandler/metrics', element: <ComingSoon description="One view of throughput, latency and errors for every integration you run." /> },
               { path: 'organizations/:orgHandler/admin/data-planes', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDataPlanes, ['organizations']))) },
               { path: 'organizations/:orgHandler/ai-services/knowledge-bases', element: createElement(withScope(KnowledgeBases, ['organizations'])) },
@@ -165,7 +172,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/metrics', element: <ComingSoon title="Coming soon" description="Metrics are currently under development." /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/runtimelogs', element: createElement(withScope(RuntimeLogsProject, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/metrics', element: <ComingSoon description="Throughput, latency and errors for every integration in the project." /> },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(EditProject, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(ProjectManageRedirect, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/link-repository', element: createElement(withScope(LinkRepository, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/redirect', element: <ProjectsRedirect /> },
               { path: 'organizations/:orgHandler/overview', element: createElement(withScope(OrgHome, ['organizations'])) },
@@ -178,6 +185,8 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/ai-builder', element: createElement(withScope(AiIntegrationBuilderView, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/import', element: createElement(withScope(ImportIntegration, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/samples', element: createElement(withScope(BrowseSamples, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/voice-agent', element: createElement(withScope(CreateVoiceAgent, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/voice-agent/new', element: createElement(withScope(EnableVoiceAgent, ['components'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/generate-mcp', element: createElement(withScope(McpProxyFromApi, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/prebuilt-integrations', element: createElement(withScope(BrowsePrebuiltIntegrations, ['projects'])) },
               {
@@ -201,11 +210,15 @@ const routes: AppRoute[] = [
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/console',
-                element: createElement(withScope(TestConsole, ['components'])),
+                element: createElement(withScope(TestConsoleRoute, ['components'])),
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/agent-chat',
                 element: createElement(withScope(AgentChatTestRoute, ['components'])),
+              },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/voice-agent',
+                element: createElement(withScope(VoiceAgentTestRoute, ['components'])),
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/api-chat',

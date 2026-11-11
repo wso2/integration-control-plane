@@ -79,6 +79,8 @@ export const reasonIconSx = { flexShrink: 0, mt: '2px', color: 'warning.main', d
 
 export const dialogErrorSx = { mt: 2 } as const;
 
+export const dialogBodySx = { mt: 2 } as const;
+
 // The row for an environment with no User Portal, and its About dialog.
 
 export const infoButtonSx = { p: 0.25, color: 'text.secondary' } as const;

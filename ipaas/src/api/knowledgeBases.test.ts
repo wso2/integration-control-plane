@@ -38,11 +38,17 @@ describe('toKnowledgeBase', () => {
       config: {},
       secretKeys: [],
       status: '',
+      error: '',
       serviceUrl: '',
       dataSources: [],
       createdAt: '',
       updatedAt: '',
     });
+  });
+
+  it("keeps a data source's first run that did not start", () => {
+    const kb = toKnowledgeBase({ name: 'docs-kb', projectName: 'ai-services', environment: 'development', dataSources: [{ name: 'docs-s3', firstRunError: 'not started' }] });
+    expect(kb.dataSources[0].firstRunError).toBe('not started');
   });
 
   it('keeps how publishing the service on the gateway is going', () => {
@@ -59,14 +65,16 @@ describe('toKnowledgeBase', () => {
       dataSources: [{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], status: 'ACTIVE' }],
     });
     expect(kb.secretKeys).toEqual(['PINECONE_APIKEY']);
-    expect(kb.dataSources).toEqual([{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', releaseName: '', createdAt: '' }]);
+    expect(kb.dataSources).toEqual([
+      { name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', error: '', firstRunError: '', releaseName: '', createdAt: '' },
+    ]);
   });
 });
 
 describe('toKnowledgeBaseDataSource', () => {
-  it('keeps whether a just-created source started its first run', () => {
-    expect(toKnowledgeBaseDataSource({ name: 'docs-drive', ingestionStarted: false, ingestionError: 'Run it with Ingest.' })).toMatchObject({ ingestionStarted: false, ingestionError: 'Run it with Ingest.' });
-    expect(toKnowledgeBaseDataSource({ name: 'docs-drive' })).not.toHaveProperty('ingestionStarted');
+  it('keeps why a create failed', () => {
+    expect(toKnowledgeBaseDataSource({ name: 'docs-drive', status: 'FAILED', error: 'link refused' })).toMatchObject({ status: 'FAILED', error: 'link refused' });
+    expect(toKnowledgeBaseDataSource({ name: 'docs-drive' })).toMatchObject({ status: '', error: '' });
   });
 });
 

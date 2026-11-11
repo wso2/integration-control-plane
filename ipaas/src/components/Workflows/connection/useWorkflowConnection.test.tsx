@@ -20,6 +20,7 @@ import { useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BffError } from '../../../api/_client';
 import type { EndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
 import type { EnvEndpoint } from '../../../types/component';
 import { workflowKeys } from '../api/queryKeys';
@@ -49,12 +50,21 @@ const access = vi.hoisted(() => {
 });
 const testAccessCalls = vi.hoisted(() => [] as unknown[][]);
 const endpoints = vi.hoisted(() => ({ list: [] as EnvEndpoint[], releaseIds: [] as string[] }));
+// The environments the integration is published to the User Portal in, or what reading them failed with.
+const publications = vi.hoisted(() => ({ environments: [] as string[], error: null as unknown, refetch: vi.fn(), portalUrl: undefined as string | undefined }));
 
 vi.mock('../../../hooks/useDeployments', () => ({
   useEnvEndpoints: (_componentId: string, _trackId: string | undefined, releaseId: string) => {
     endpoints.releaseIds.push(releaseId);
     return releaseId ? { data: endpoints.list, isPending: false, isError: false, refetch: vi.fn() } : { data: undefined, isPending: true, isError: false, refetch: vi.fn() };
   },
+}));
+vi.mock('../../../hooks/useUserPortal', () => ({
+  useUserPortalPublications: () =>
+    publications.error
+      ? { data: undefined, isPending: false, isError: true, error: publications.error, refetch: publications.refetch }
+      : { data: { environments: publications.environments }, isPending: false, isError: false, error: null, refetch: publications.refetch },
+  useUserPortals: (environments: string[]) => environments.map((environment) => ({ data: { environment, state: 'active', url: publications.portalUrl } })),
 }));
 vi.mock('../../../hooks/useEndpointTestAccess', () => ({
   useEndpointTestAccess: (...args: unknown[]) => {
@@ -100,10 +110,12 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     keyError: null,
     needsApiKeyAuth: false,
     canSwitch: true,
+    managedIn: null,
     isSwitching: false,
     switchToApiKey: vi.fn(async () => null),
     isUnavailable: false,
     securityError: null,
+    isResolving: false,
     mintKey: vi.fn(async () => null),
     renewKey: vi.fn(async () => null),
     retryUnauthorized: vi.fn(),
@@ -159,6 +171,10 @@ beforeEach(() => {
   endpoints.list = [business, management];
   endpoints.releaseIds = [];
   testAccessCalls.length = 0;
+  publications.environments = [];
+  publications.error = null;
+  publications.refetch.mockReset();
+  publications.portalUrl = undefined;
   rendered = undefined;
   access.reset(keyAccess());
   fetchMock.mockReset();
@@ -184,8 +200,48 @@ describe('useWorkflowConnection', () => {
     // The endpoint the test key is for, and its discovered public URL as the gateway URL fallback.
     expect(testAccessCalls.at(-1)).toEqual([
       { componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' },
-      { enabled: true, gatewayUrlFallback: GATEWAY_URL },
+      { enabled: true, mint: true, gatewayUrlFallback: GATEWAY_URL },
     ]);
+  });
+
+  // Publishing redeploys the workflow to take only User Portal sign-ins, so no test key opens it.
+  it('steps aside for a workflow published to the User Portal in the environment, asking for no test key', async () => {
+    publications.environments = ['development'];
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', notice: { severity: 'info' }, action: null }));
+    expect(testAccessCalls.every(([, options]) => (options as { mint: boolean }).mint === false)).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('offers to open the User Portal a workflow is published to', async () => {
+    publications.environments = ['development'];
+    publications.portalUrl = 'https://portal.example/acme';
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', action: { label: 'Open User Portal', href: 'https://portal.example/acme' } }));
+  });
+
+  it('connects as before to a workflow published to the User Portal only in another environment', async () => {
+    publications.environments = ['production'];
+    mount();
+    await vi.waitFor(() => expect(status()).toBe('ready'));
+  });
+
+  // Unread, a published workflow's views would offer to switch its API back to API key, which ipaas-service refuses there.
+  it('stops on a failed read of where the workflow is published, asking for no test key, and reads it again on retry', async () => {
+    publications.error = new BffError(500, '{"message":"boom"}');
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'error', message: 'Could not check whether this workflow is published to the User Portal.' }));
+    expect(testAccessCalls.every(([, options]) => (options as { mint: boolean }).mint === false)).toBe(true);
+    const { connection } = current();
+    if (connection.status !== 'error') throw new Error('expected an error');
+    connection.retry();
+    expect(publications.refetch).toHaveBeenCalled();
+  });
+
+  it('connects as before when the BFF serves no User Portal', async () => {
+    publications.error = new BffError(404, '');
+    mount();
+    await vi.waitFor(() => expect(status()).toBe('ready'));
   });
 
   it('lists only the task queue the integration reports, since every integration in an environment shares its namespace', async () => {
@@ -259,7 +315,7 @@ describe('useWorkflowConnection', () => {
     expect(switchToApiKey).not.toHaveBeenCalled();
 
     const { connection } = current();
-    if (connection.status !== 'unavailable' || !connection.action) throw new Error('expected an action');
+    if (connection.status !== 'unavailable' || !connection.action || !('run' in connection.action)) throw new Error('expected an action to run');
     expect(connection.action.label).toBe('Switch to API key');
     connection.action.run();
     expect(switchToApiKey).toHaveBeenCalledTimes(1);
@@ -270,6 +326,12 @@ describe('useWorkflowConnection', () => {
     access.reset(keyAccess({ apiKey: null, isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, canSwitch: false }));
     mount();
     await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'needs-api-key', action: null }));
+  });
+
+  it('says where an environment that takes its security by promotion gets it, and offers no switch there', async () => {
+    access.reset(keyAccess({ apiKey: null, isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, canSwitch: false, managedIn: 'development' }));
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'secured-by-promotion', action: null }));
   });
 
   it('says a role that may not create test keys cannot reach the API, and offers nothing to retry', async () => {

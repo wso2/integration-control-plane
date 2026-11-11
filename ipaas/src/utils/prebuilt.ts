@@ -17,6 +17,7 @@
  */
 
 import { toHandler } from './string';
+import { matchCatalogEntry } from './catalogMatch';
 import type { PrebuiltIntegration, PrebuiltIntegrationsData } from '../types/prebuilt';
 import type { Repository } from '../types/repository';
 
@@ -26,10 +27,7 @@ import type { Repository } from '../types/repository';
  * setup instructions. Mirrors Devant's matching. Returns undefined if no match.
  */
 export function matchPrebuiltIntegration(repository: Repository | null | undefined, prebuilts: PrebuiltIntegration[] | undefined): PrebuiltIntegration | undefined {
-  if (!prebuilts?.length || !repository?.organizationApp || !repository?.nameApp || !repository?.appSubPath) return undefined;
-  const repoUrl = `https://github.com/${repository.organizationApp}/${repository.nameApp}/`;
-  const componentPath = `/${repository.appSubPath.replace(/^\/+/, '')}`;
-  return prebuilts.find((pi) => pi.repositoryUrl === repoUrl && pi.componentPath === componentPath && (repository.branch ? (pi.branch ?? 'main') === repository.branch : true));
+  return matchCatalogEntry(repository, prebuilts, (pi) => pi.componentPath);
 }
 
 /**
@@ -53,7 +51,7 @@ const VALID_HANDLER = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
  * Prefers the last path segment of componentPath when it is a valid handler;
  * falls back to a sanitised version of displayName.
  */
-export function derivePrebuiltSlug(integration: PrebuiltIntegration): string {
+export function derivePrebuiltSlug(integration: Pick<PrebuiltIntegration, 'componentPath' | 'displayName'>): string {
   const fromPath = integration.componentPath.split('/').pop() ?? '';
   if (fromPath.length >= 3 && VALID_HANDLER.test(fromPath)) {
     return fromPath.slice(0, 25);

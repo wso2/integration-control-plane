@@ -52,7 +52,7 @@ import { RAG_NO_SOURCE_SUBTYPES } from '../constants/ragIngestion';
  * type uses the new dispatch and the legacy `<Environment>` is deleted.
  * See [[icp-integration-migration]] and [[icp-phase4-commitment]] in memory.
  */
-const MIGRATED_INTEGRATION_TYPES = new Set<IntegrationType>(['automation', 'integration-as-api', 'webhook', 'file-integration', 'event-integration', 'ai-agent', 'mcp-server', 'mcp-proxy', 'tailscale-vpn', 'rag-ingestion', 'workflow']);
+const MIGRATED_INTEGRATION_TYPES = new Set<IntegrationType>(['automation', 'integration-as-api', 'webhook', 'file-integration', 'event-integration', 'ai-agent', 'voice-agent', 'mcp-server', 'mcp-proxy', 'tailscale-vpn', 'rag-ingestion', 'workflow']);
 
 /**
  * Types whose module provides a `CustomOverview` that owns the WHOLE surface
@@ -137,7 +137,8 @@ export default function Component(scope: ComponentScope): JSX.Element {
   // deployed from a prebuilt image with no source repo — hide Source/Commit,
   // the editor, and the Build card (same treatment as a proxy).
   const isRagNoSource = RAG_NO_SOURCE_SUBTYPES.has(component.componentSubType ?? '');
-  const hasSource = !isProxyComponent && !isRagNoSource;
+  const isVoiceAgent = identity?.type === 'voice-agent';
+  const hasSource = !isProxyComponent && !isRagNoSource && !isVoiceAgent;
   const showBuildCard = !component.isPrebuilt && hasSource;
 
   return (
@@ -215,7 +216,16 @@ export default function Component(scope: ComponentScope): JSX.Element {
                 />
                 {index < environments.length - 1 && (
                   <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                    <PromoteButton orgHandler={scope.org} projectId={projectId} componentId={component.id} versionId={versionId} deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''} sourceEnvId={env.id} targetEnvId={environments[index + 1].id} />
+                    <PromoteButton
+                      orgHandler={scope.org}
+                      projectId={projectId}
+                      componentId={component.id}
+                      versionId={versionId}
+                      deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''}
+                      sourceEnvId={env.id}
+                      targetEnvId={environments[index + 1].id}
+                      isWorkflow={identity?.type === 'workflow'}
+                    />
                   </Box>
                 )}
               </Fragment>

@@ -25,6 +25,7 @@ import DeploymentTrackBar from '../../DeploymentTrackBar';
 import EmptyListing from '../../EmptyListing';
 import NotDeployedAlert from '../../NotDeployedAlert';
 import NotFound from '../../NotFound';
+import UserPortalPrompt from '../../UserPortal/UserPortalPrompt';
 import EnvironmentSelect from '../../common/EnvironmentSelect';
 import { useComponentByHandler } from '../../../hooks/useComponents';
 import { useComponentDeployment } from '../../../hooks/useDeployments';
@@ -47,13 +48,17 @@ import TestKeyNotice from './TestKeyNotice';
 import { WorkflowContentSkeleton, WorkflowPageSkeleton } from './WorkflowPageSkeleton';
 import * as styles from './WorkflowPageShell.styles';
 
-/** What a workflow page's content gets once the management API answers. */
-export interface WorkflowPageSlotProps {
+/** What a workflow page's placeholder gets: the integration and the environment shown. */
+export interface WorkflowPagePlaceholderProps {
   scope: ComponentScope;
   component: Component;
   /** The environment shown; its id is what `?env=` links carry. */
   environment: Environment;
   environments: Environment[];
+}
+
+/** What a workflow page's content gets once the management API answers. */
+export interface WorkflowPageSlotProps extends WorkflowPagePlaceholderProps {
   /** The client and the ready connection, for this environment and deployment track. */
   api: ReadyWorkflowApi;
 }
@@ -65,6 +70,11 @@ interface WorkflowPageShellProps {
   purpose: Extract<NotDeployedPurpose, 'runWorkflows' | 'workOnTasks'>;
   /** The page's own content, rendered only once the connection is ready. */
   children: (slot: WorkflowPageSlotProps) => ReactNode;
+  /**
+   * What stands in for the page's content while the console can't serve it yet, for the environment shown. With one,
+   * the page makes no connection to the management API.
+   */
+  placeholder?: (slot: WorkflowPagePlaceholderProps) => ReactNode;
 }
 
 /** The auto-refresh switch and the refresh button for every read of the connection. */
@@ -86,8 +96,12 @@ function RefreshControls({ scopeId }: { scopeId: string }): JSX.Element {
   );
 }
 
-/** What the page shows until the management API answers, or its content once it does. */
-function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose: WorkflowPageShellProps['purpose']; children: (api: ReadyWorkflowApi) => ReactNode }): ReactNode {
+/**
+ * What the page shows until the management API answers, or its content once it does. Where the API's security comes by
+ * promotion and takes no test key, the User Portal is the way left to manage the workflow here, so `portalPrompt` shows
+ * the next step towards it.
+ */
+function ConnectionBody({ api, purpose, portalPrompt, children }: { api: WorkflowApi; purpose: WorkflowPageShellProps['purpose']; portalPrompt: ReactNode; children: (api: ReadyWorkflowApi) => ReactNode }): ReactNode {
   if (api.client) return children(api);
   const { connection } = api;
   switch (connection.status) {
@@ -97,6 +111,14 @@ function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose:
       // Not a failure: say so, and what deploying is for, as the Test Console does.
       return <NotDeployedAlert status={connection.deploymentStatus} purpose={purpose} />;
     case 'unavailable':
+      if (connection.reason === 'secured-by-promotion') {
+        return (
+          <Stack gap={2}>
+            <TestKeyNotice notice={connection.notice} action={connection.action} />
+            <Stack alignItems="center">{portalPrompt}</Stack>
+          </Stack>
+        );
+      }
       return <TestKeyNotice notice={connection.notice} action={connection.action} />;
     case 'refused':
       return (
@@ -123,7 +145,7 @@ function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose:
  * The environment shown is held in `?env=`, which links from the overview set; without one, the
  * first environment.
  */
-export default function WorkflowPageShell({ scope, title, purpose, children }: WorkflowPageShellProps): JSX.Element {
+export default function WorkflowPageShell({ scope, title, purpose, children, placeholder }: WorkflowPageShellProps): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
   const { projectId, isLoading: loadingProject, isError: projectError, refetch: refetchProject } = useProjectId(scope.project);
   const { data: component, isLoading: loadingComponent, error: componentError, refetch: refetchComponent } = useComponentByHandler(projectId, scope.component);
@@ -144,8 +166,10 @@ export default function WorkflowPageShell({ scope, title, purpose, children }: W
     );
 
   const componentId = component?.id ?? '';
-  const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', componentId, trackId, environment?.id ?? '');
-  const api = useWorkflowApi({ componentId, environmentId: environment?.id ?? '', trackId, deployment, isDeploymentLoading: loadingDeployment });
+  // A placeholder needs no connection, so no deployment is read for one: with none to connect to, none is made.
+  const reads = !!component && !placeholder;
+  const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(reads ? scope.org : '', reads ? orgUuid : '', componentId, trackId, environment?.id ?? '');
+  const api = useWorkflowApi({ componentId, environmentId: environment?.id ?? '', trackId, deployment: placeholder ? null : deployment, isDeploymentLoading: !placeholder && loadingDeployment });
 
   if (loadingProject || loadingComponent || loadingEnvironments) return <WorkflowPageSkeleton title={title} />;
   // A failed read is not a missing integration; only a 404 says it does not exist.
@@ -175,9 +199,11 @@ export default function WorkflowPageShell({ scope, title, purpose, children }: W
     );
   } else if (!environment) {
     body = <EmptyListing icon={<Layers size={48} />} title="No environments" description="This project has no environments yet, so there is nowhere this integration runs." />;
+  } else if (placeholder) {
+    body = placeholder({ scope, component, environment, environments });
   } else {
     body = (
-      <ConnectionBody api={api} purpose={purpose}>
+      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt componentId={component.id} environment={environment} />}>
         {(ready) => children({ scope, component, environment, environments, api: ready })}
       </ConnectionBody>
     );

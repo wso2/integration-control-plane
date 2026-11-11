@@ -37,6 +37,7 @@ export default function ApiKeyAuthOffer({ access, sx }: { access: EndpointTestAc
       }>
       This endpoint uses {access.mode ? SECURITY_MODE_LABEL[access.mode] : 'another'} authentication, so it can&apos;t issue a test key.
       {access.canSwitch && ' Switching it to API key changes how every caller of this API authenticates.'}
+      {access.managedIn && ` Its security is managed in ${access.managedIn}. Switch it to API key there, then promote to apply it here.`}
     </Alert>
   );
 }

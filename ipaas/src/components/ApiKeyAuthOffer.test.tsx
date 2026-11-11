@@ -67,6 +67,14 @@ const refusalShown = () =>
   });
 
 describe('ApiKeyAuthOffer', () => {
+  it('points to where the security is managed when it comes by promotion, and offers no switch', async () => {
+    vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'jwt', publicUrl: 'https://gw.example/orders', editable: false, entryEnvironment: 'development' } as never);
+    const c = await refusedTestKey(DEVELOPER);
+    await refusalShown();
+    expect(button(c, 'Switch to API key')).toBeUndefined();
+    expect(document.body.textContent).toContain('Its security is managed in development. Switch it to API key there, then promote to apply it here.');
+  });
+
   it('explains a 409 and switches the endpoint to API key, then mints', async () => {
     const c = await refusedTestKey(DEVELOPER);
     await refusalShown();

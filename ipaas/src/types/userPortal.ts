@@ -51,12 +51,35 @@ export interface UserPortalPublishability {
   publishable: boolean;
   /** Every rule it breaks there, in the order a publish checks them. Empty when publishable. */
   reasons: UserPortalRefusal[];
+  /**
+   * Publishing redeploys the workflow so its Workflow Management API takes only User Portal sign-ins, on the
+   * gateway and in the workflow itself. The console's workflow views stop working there: the User Portal is
+   * where its runs and tasks are managed.
+   */
+  redeploys: boolean;
+  /**
+   * A publish that redeploys a workflow finishes in the background: it is running, and `published` stays false until it
+   * completes.
+   */
+  publishing: boolean;
+  /** Why the last background publish failed, as a publish's refusal; it ends when another publish starts or the integration is unpublished. */
+  publishError?: UserPortalRefusal;
+  /** Scopes the last background publish's endpoints require that the User Portal can't hold, while published. */
+  rejectedScopes: string[];
+}
+
+/** The environments an integration is published to the User Portal in. */
+export interface UserPortalPublications {
+  /** The environments' slugs. */
+  environments: string[];
 }
 
 /** The outcome of a publish. */
 export interface UserPortalPublication {
   environment: string;
   published: boolean;
+  /** The publish was accepted and finishes in the background; the publishability says when it ends. */
+  publishing: boolean;
   /** Scopes the integration's endpoints require that the User Portal can't hold, so its users' tokens never carry them. */
   rejectedScopes: string[];
 }

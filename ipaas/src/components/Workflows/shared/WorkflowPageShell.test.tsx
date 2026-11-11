@@ -26,6 +26,8 @@ import type { WorkflowApi } from '../api/useWorkflowApi';
 import type { WorkflowClient } from '../api/client';
 import WorkflowPageShell from './WorkflowPageShell';
 
+type WorkflowPageShellProps = Parameters<typeof WorkflowPageShell>[0];
+
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const state = vi.hoisted(() => ({
@@ -34,6 +36,8 @@ const state = vi.hoisted(() => ({
   targets: [] as unknown[],
   componentError: null as Error | null,
   refetchComponent: vi.fn(),
+  // The org each deployment read was made for; '' is a read left disabled.
+  deploymentReads: [] as string[],
 }));
 
 vi.mock('../../../hooks/useOrgUuid', () => ({ useOrgUuid: () => 'org-uuid' }));
@@ -56,7 +60,13 @@ vi.mock('../../../hooks/useEnvironments', () => ({
   }),
 }));
 vi.mock('../../../hooks/useSelectedTrack', () => ({ useSelectedTrack: () => ({ trackId: 'track-1' }), withTrackParam: (url: string) => url }));
-vi.mock('../../../hooks/useDeployments', () => ({ useComponentDeployment: () => ({ data: { releaseId: 'release-1', deploymentStatusV2: 'ACTIVE' }, isLoading: false }) }));
+vi.mock('../../../hooks/useDeployments', () => ({
+  useComponentDeployment: (org: string) => {
+    state.deploymentReads.push(org);
+    return { data: { releaseId: 'release-1', deploymentStatusV2: 'ACTIVE' }, isLoading: false };
+  },
+}));
+vi.mock('../../UserPortal/UserPortalPrompt', () => ({ default: ({ environment }: { environment: { id: string } }) => <span>{`User Portal prompt for ${environment.id}`}</span> }));
 vi.mock('../api/useWorkflowApi', () => ({
   useWorkflowApi: (target: unknown) => {
     state.targets.push(target);
@@ -72,12 +82,12 @@ const SCOPE: ComponentScope = { level: 'components', org: 'acme', project: 'defa
 let root: Root;
 let container: HTMLDivElement;
 
-async function renderShell(url = '/') {
+async function renderShell(url = '/', placeholder?: WorkflowPageShellProps['placeholder']) {
   await act(async () =>
     root.render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={[url]}>
-          <WorkflowPageShell scope={SCOPE} title="Workflows" purpose="runWorkflows">
+          <WorkflowPageShell scope={SCOPE} title="Workflows" purpose="runWorkflows" placeholder={placeholder}>
             {({ api, environment }) => <p>{`slot for ${environment.id} on ${api.connection.runtime.taskQueue}`}</p>}
           </WorkflowPageShell>
         </MemoryRouter>
@@ -92,6 +102,7 @@ beforeEach(() => {
   state.targets = [];
   state.componentError = null;
   state.refetchComponent.mockClear();
+  state.deploymentReads = [];
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -129,6 +140,25 @@ describe('WorkflowPageShell', () => {
 
     state.api = pending({ status: 'loading' });
     expect(await renderShell()).toContain('Connecting to the workflow engine');
+  });
+
+  it('shows the way to the User Portal under the notice of an environment that takes its security by promotion', async () => {
+    state.api = pending({ status: 'unavailable', reason: 'secured-by-promotion', notice: { severity: 'info', text: 'Security comes by promotion.' }, action: null });
+    const text = await renderShell('/?env=production');
+    expect(text).toContain('Security comes by promotion.');
+    expect(text).toContain('User Portal prompt for production');
+
+    state.api = pending({ status: 'unavailable', reason: 'not-exposed', notice: { severity: 'info', text: 'Not exposed yet.' }, action: null });
+    expect(await renderShell()).not.toContain('User Portal prompt');
+  });
+
+  it('shows a placeholder for the environment shown, reading no deployment and making no connection', async () => {
+    state.api = pending({ status: 'loading' });
+    const text = await renderShell('/?env=production', ({ environment, environments }) => <p>{`placeholder for ${environment.id} of ${environments.length}`}</p>);
+    expect(text).toContain('placeholder for production of 2');
+    expect(text).not.toContain('Connecting to the workflow engine');
+    expect(state.deploymentReads.every((org) => org === '')).toBe(true);
+    expect(state.targets.at(-1)).toMatchObject({ environmentId: 'production', deployment: null, isDeploymentLoading: false });
   });
 
   it('says the credentials were refused, and retries on request', async () => {

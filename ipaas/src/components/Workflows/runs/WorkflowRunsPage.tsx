@@ -36,6 +36,8 @@ import type { WorkflowPageSlotProps } from '../shared/WorkflowPageShell';
 import { WORKFLOW_STATUS_CHIP_COLOR, WORKFLOW_STATUS_LABEL, WORKFLOW_STATUS_OPTIONS, WORKFLOW_STATUS_ROW_STATUS } from '../shared/workflowStatus';
 import { WORKFLOW_TIME_RANGE_OPTIONS, workflowTimeRangeFrom, type WorkflowTimeRange } from '../shared/workflowTimeRangeFilter';
 import StartWorkflowDialog from './StartWorkflowDialog';
+import UserPortalPrompt from '../../UserPortal/UserPortalPrompt';
+import { useUserPortalServed } from '../../../hooks/useUserPortal';
 import WorkflowRunDetailDrawer from './WorkflowRunDetailDrawer';
 import * as styles from './WorkflowRunsPage.styles';
 
@@ -77,7 +79,8 @@ function MessageRow({ children }: { children: ReactNode }): JSX.Element {
  * back for both. The status and the definition are held in the URL (`?status=`, `?type=`), so an
  * overview figure links to them and the page follows a later link.
  */
-export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotProps): JSX.Element {
+export default function WorkflowRunsPage({ component, environment, api }: WorkflowPageSlotProps): JSX.Element {
+  const portalServed = useUserPortalServed(environment.id);
   const { client } = api;
   const { scopeId } = api.connection;
   const { goToWorkflowRuns } = useWorkflowRoutes();
@@ -414,7 +417,7 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
 
       <StartWorkflowDialog open={startOpen} api={client} scopeId={scopeId} definitions={definitions} onClose={() => setStartOpen(false)} onViewRun={({ workflowType, runId }) => goToWorkflowRuns({ workflowType, envId: environment.id, runId })} />
 
-      <WorkflowRunDetailDrawer run={shownRun} api={api} onClose={() => setSelectedRun(null)} />
+      <WorkflowRunDetailDrawer run={shownRun} api={api} onClose={() => setSelectedRun(null)} comingSoonAction={portalServed ? <UserPortalPrompt componentId={component.id} environment={environment} /> : undefined} />
     </Box>
   );
 }

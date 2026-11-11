@@ -109,6 +109,13 @@ async function request<T>(method: string, path: string, body?: unknown, headers?
   return text ? (JSON.parse(text) as T) : (undefined as unknown as T);
 }
 
+/**
+ * A BFF route as an absolute URL, and a fetch that sends to it under the console's session: for a client that
+ * makes its own requests to the BFF, such as the MCP SDK's transport on the Test page.
+ */
+export const bffAbsoluteUrl = (path: string): string => new URL(`${bffBaseUrl()}${path}`, window.location.origin).toString();
+export const bffFetch = (input: string | URL, init?: RequestInit): Promise<Response> => authenticatedFetch(String(input), init);
+
 export const bff = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown, headers?: Record<string, string>, signal?: AbortSignal) => request<T>('POST', path, body, headers, signal),

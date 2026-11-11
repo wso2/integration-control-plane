@@ -153,6 +153,24 @@ export function envCardUrlRows(ep: EnvEndpoint, externalUrlOverride?: string): E
   });
 }
 
+/**
+ * The card's rows for an MCP server on Agent Manager's AI gateway: the proxy URL as its Public URL, and nothing
+ * else. The AI gateway serves public callers only, so the endpoint's own routes, whatever their exposure, are
+ * no way in. Before the proxy has a URL there is none to list.
+ */
+export function aiGatewayUrlRows(aiGatewayUrl: string): EndpointVisibilityUrl[] {
+  return aiGatewayUrl ? [{ key: 'public', label: 'Public', url: aiGatewayUrl }] : [];
+}
+
+/**
+ * The card's rows for an AI agent: its URL on Agent Manager's AI gateway, always as the Public row. Every agent is
+ * deployed to the AI gateway, so Public is the one way in; '' (the gateway has no URL for it yet, or it could not
+ * be read) leaves the row as "—". The endpoint's own routes are never listed: they bypass the agent's API key.
+ */
+export function agentGatewayUrlRows(agentGatewayUrl: string): EndpointVisibilityUrl[] {
+  return [{ key: 'public', label: 'Public', url: agentGatewayUrl }];
+}
+
 /** Only Public is callable from a browser; the others are in-cluster hosts. */
 export const isBrowserReachable = (key: VisibilityKey): boolean => key === 'public';
 

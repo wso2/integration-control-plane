@@ -17,7 +17,7 @@
  */
 
 /** Matches the static title in index.html, which public routes keep. */
-export const APP_NAME = 'WSO2 Integration Platform';
+export const APP_NAME = 'WSO2 Integration';
 
 /** Nav ids whose page name is not simply the id in sentence case. */
 const TITLE_OVERRIDES: Record<string, string> = {

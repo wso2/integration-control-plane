@@ -19,6 +19,8 @@
 import { Box } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import type { EnvCardSharedActionProps } from '../../../types/integration';
+import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import UserPortalAction from '../../UserPortal/UserPortalAction';
 
 // The action renders nothing where ipaas-service serves no User Portal; the footer then takes no
@@ -29,10 +31,14 @@ const footerSx = { mt: 2, '&:empty': { display: 'none' } } as const;
  * The env card's User Portal action, in the card's footer: Publish, Unpublish, or
  * "User Portal off" while the environment has none. For the types the portal shows.
  */
-export default function UserPortalSharedAction({ component, env, orgHandler, onNotify }: EnvCardSharedActionProps): JSX.Element {
+export default function UserPortalSharedAction({ component, env, orgHandler, projectId, onNotify, deploymentStatusV2 }: EnvCardSharedActionProps): JSX.Element {
+  const isWorkflow = isWorkflowIntegration(component);
+  // A workflow's card body shows its workflows only while the deployment is active, and a published one's notice opens
+  // the portal there. In any other state the body has no notice, so the footer keeps the link.
+  const linkInBody = isWorkflow && isDeploymentHealthy(deploymentStatusV2);
   return (
     <Box sx={footerSx}>
-      <UserPortalAction orgHandler={orgHandler} componentId={component.id} environment={env.id} envName={env.name} onNotify={onNotify} />
+      <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={component.id} environment={env.id} envName={env.name} onNotify={onNotify} isWorkflow={isWorkflow} showPortalLink={!linkInBody} />
     </Box>
   );
 }

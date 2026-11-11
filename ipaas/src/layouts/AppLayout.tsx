@@ -38,6 +38,7 @@ import {
   Sidebar,
   Tooltip,
   TrialBadge,
+  type Theme,
   type TrialBadgeUsage,
   Typography,
   UserMenu,
@@ -54,6 +55,7 @@ import NotFound from '../components/NotFound';
 import {
   Activity,
   BookOpen,
+  Mic,
   Boxes,
   ChartColumn,
   ChevronDown,
@@ -113,6 +115,24 @@ import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
 import { expandedMenusFrom } from '../utils/sidebar';
+
+// The theme's paper is 78% opaque and relies on a backdrop blur, which the trial usage panel (inside the header's own
+// blur) doesn't get, so the page showed through.
+const trialPanelSx = (theme: Theme) => ({
+  // The paper token at full opacity: white in light mode, midnight ink in dark.
+  backgroundColor: `rgb(from ${(theme.vars ?? theme).palette.background.paper} r g b / 1)`,
+  backdropFilter: 'none',
+});
+
+// Matches Agent Manager's level switcher arrow.
+const nextScopeArrowSx = {
+  p: 1,
+  color: 'text.primary',
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 0.5,
+  '&:hover': { borderColor: 'text.primary' },
+} as const;
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
@@ -279,7 +299,8 @@ export default function AppLayout(): JSX.Element {
   return (
     <AppShell>
       <AppShell.Navbar>
-        <Header>
+        {/* Static by default, so the trial usage panel (rendered inside it) would sit under the page. */}
+        <Header sx={{ position: 'relative', zIndex: 'appBar' }}>
           {/* Platforms lead the bar, as in the WSO2 Cloud console; the sidebar collapses from its own foot. */}
           <PlatformSwitcher />
           <Header.Brand>
@@ -295,7 +316,7 @@ export default function AppLayout(): JSX.Element {
               ref={orgCardRef}
               role="button"
               tabIndex={0}
-              sx={{ position: 'relative', display: 'inline-flex', alignSelf: 'center', cursor: 'pointer' }}
+              sx={{ position: 'relative', display: 'inline-flex', alignSelf: 'center', cursor: 'pointer', ml: 1 }}
               onClick={() => navigateTo(orgHomeUrl(scope.org))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -324,11 +345,12 @@ export default function AppLayout(): JSX.Element {
                 <IconButton
                   aria-label="Select project"
                   size="small"
+                  sx={nextScopeArrowSx}
                   onClick={() => {
                     setProjectMenuDir('right');
                     setProjectMenuAnchor(orgCardRef.current);
                   }}>
-                  <ChevronRight size={18} />
+                  <ChevronRight size={20} />
                 </IconButton>
               </Tooltip>
             )}
@@ -471,11 +493,12 @@ export default function AppLayout(): JSX.Element {
                     <IconButton
                       aria-label="Select integration"
                       size="small"
+                      sx={nextScopeArrowSx}
                       onClick={() => {
                         setComponentMenuDir('right');
                         setComponentMenuAnchor(projectCardRef.current);
                       }}>
-                      <ChevronRight size={18} />
+                      <ChevronRight size={20} />
                     </IconButton>
                   </Tooltip>
                 )}
@@ -621,8 +644,11 @@ export default function AppLayout(): JSX.Element {
           <Header.Spacer />
           <Header.Actions>
             {billingTrial && (
-              // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
-              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} upgradeHref={cloudConsoleSubscriptionsUrl()} usage={trialUsage} title={trialEndLabel} />
+              // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title. Its usage panel
+              // renders inside this Box (no portal), so its card is made opaque here.
+              <Box sx={(theme) => ({ display: 'contents', '& .MuiPopper-root .MuiCard-root': trialPanelSx(theme) })}>
+                <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} upgradeHref={cloudConsoleSubscriptionsUrl()} usage={trialUsage} title={trialEndLabel} />
+              </Box>
             )}
             {/* A plain link: the WSO2 Cloud console serves this path, not this console's router. */}
             <Tooltip title="Organization settings">
@@ -736,6 +762,14 @@ export default function AppLayout(): JSX.Element {
                           <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       )}
+                      {canReadIntegrations && (
+                        <Sidebar.Item id="org-voice-agents">
+                          <Sidebar.ItemIcon>
+                            <Mic size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Voice agents</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      )}
                     </Sidebar.Item>
                   </Sidebar.Category>,
 
@@ -765,6 +799,7 @@ export default function AppLayout(): JSX.Element {
                     const integrationType = identifyIntegration(currentComponent?.displayType ?? '', currentComponent?.componentSubType ?? null).type;
                     const runtimeLogsType = ['file-integration', 'event-integration'].includes(integrationType);
                     const aiAgentType = integrationType === 'ai-agent';
+                    const voiceAgentType = integrationType === 'voice-agent';
                     // A workflow integration's runs and the human tasks they wait on.
                     const workflowType = integrationType === 'workflow';
                     // MCP (server + proxy): a single Test tab → the MCP playground
@@ -806,7 +841,14 @@ export default function AppLayout(): JSX.Element {
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
                           </Sidebar.Item>
-                        ) : mcpType || !isGenericService || runtimeLogsType ? (
+                        ) : voiceAgentType ? (
+                          <Sidebar.Item id="voice-agent">
+                            <Sidebar.ItemIcon>
+                              <FlaskConical size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        ) : workflowType ? null : mcpType || !isGenericService || runtimeLogsType ? (
                           <Sidebar.Item id="test">
                             <Sidebar.ItemIcon>
                               <FlaskConical size={20} />

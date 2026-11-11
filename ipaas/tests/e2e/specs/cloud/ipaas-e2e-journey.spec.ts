@@ -36,6 +36,9 @@ import {
   EXECUTIONS_TARGET,
   EXECUTIONS_WATCH_MS,
   FOOTER_LINKS,
+  MI_AUTOMATION,
+  MI_AUTOMATION_REPO_URL,
+  MI_AUTOMATION_SUB_PATH,
   MI_DEPLOY_TIMEOUT_MS,
   MI_TECHNOLOGY,
   NO_CONSUMERS,
@@ -45,6 +48,7 @@ import {
   REDEPLOY_SETTLE_MS,
   REMOVAL_TIMEOUT_MS,
   SAMPLE,
+  SCHEDULE_INTERVAL_MINUTES,
   UNPORTED_SECTIONS,
 } from '../../helpers/journey-fixtures.js';
 import { activeProject, listFixtureProjects, STALE_AGE_MS, staleProjects, setActiveProject } from '../../helpers/journey-project.js';
@@ -67,7 +71,6 @@ import {
 import {
   consumerRow,
   deleteAllConsumers,
-  deployLatestBuild,
   dismissStrayDialog,
   deploymentStatus,
   envCard,
@@ -77,6 +80,7 @@ import {
   probeEndpoint,
   requireActiveDeployment,
   requireAutomationReady,
+  requireSampleActive,
   serverResponseCode,
   showAllExecutions,
   swaggerOperation,
@@ -317,8 +321,10 @@ test.describe('04 deploy a sample @smoke', () => {
     await expect(page.getByRole('heading', { name: SAMPLE })).toBeVisible({ timeout: 2 * 60_000 });
   });
 
-  test('TC_IP_DEPLOY_003 the integration overview reports a build', async () => {
-    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 2 * 60_000 });
+  test('TC_IP_DEPLOY_003 the overview shows the environment card and no build, as the sample runs from its image', async () => {
+    await expect(envCard(page), `no ${ENV} card on ${SAMPLE}`).toBeVisible({ timeout: 2 * 60_000 });
+    // Component.tsx hides the build card for a prebuilt integration, which a sample with an image is.
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toHaveCount(0);
   });
 
   test('TC_IP_DEPLOY_004 the sample appears in the project with the table columns', async () => {
@@ -329,17 +335,6 @@ test.describe('04 deploy a sample @smoke', () => {
       await expect(table.getByRole('columnheader', { name: column, exact: true })).toBeVisible();
     }
     await expect(integrationRow(page, SAMPLE)).toHaveCount(1);
-  });
-
-  test('TC_IP_DEPLOY_005 the sample build completes', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + 2 * 60_000);
-    await openIntegration(page, SAMPLE);
-    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
-
-    const status = await waitForBuildToSettle(page);
-    test.info().annotations.push({ type: 'build', description: `${SAMPLE}: ${status}` });
-    // A build that never settles already fails the run, so one that settles on Failed must too.
-    expect(status, `${SAMPLE} build ended as ${status}`).toMatch(/^Completed/);
   });
 });
 
@@ -356,18 +351,11 @@ test.describe('04b endpoint and consumers @smoke', () => {
     await openIntegration(page, SAMPLE);
   });
 
-  // Serial: a build that never completed leaves nothing to test, so one failure reports the cause once.
-  test('TC_IP_DEPLOY_006 the latest build reports Completed', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + 2 * 60_000);
-    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
-    const status = await waitForBuildToSettle(page);
-    expect(status, `${SAMPLE} build ended as ${status}`).toMatch(/^Completed/);
-  });
-
+  // Serial: a deployment that never went Active leaves nothing to test, so one failure reports the cause once.
   test('TC_IP_DEPLOY_007 the deployment settles out of In Progress into Active', async () => {
-    test.setTimeout(DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(DEPLOY_TIMEOUT_MS + 3 * 60_000);
+    // No Deploy to press: Quick deploy started the deployment from the sample's image.
     await expect(envCard(page), `no ${ENV} card on ${SAMPLE}`).toBeVisible({ timeout: 2 * 60_000 });
-    await deployLatestBuild(page);
     await expect(deploymentStatus(page)).toHaveText(/^(Active|Error)$/, { timeout: DEPLOY_TIMEOUT_MS });
     const status = (await deploymentStatus(page).textContent())?.trim() ?? '';
     test.info().annotations.push({ type: 'deployment', description: `${SAMPLE} in ${ENV}: ${status}` });
@@ -456,9 +444,9 @@ test.describe('04c test console @smoke', () => {
     await openIntegration(page, SAMPLE);
   });
 
-  test('TC_IP_TEST_001 the build completed and the deployment is Active', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
-    await requireActiveDeployment(page);
+  test('TC_IP_TEST_001 the deployment is Active', async () => {
+    test.setTimeout(DEPLOY_TIMEOUT_MS + 3 * 60_000);
+    await requireSampleActive(page);
   });
 
   test('TC_IP_TEST_002 the env card offers Test, which opens the Test Console', async () => {
@@ -525,7 +513,7 @@ test.describe('04c test console @smoke', () => {
   });
 });
 
-// 04d — an MI automation deployed from Browse samples: schedule it, then watch it run
+// 04d — an automation sample deployed from its image: schedule it, then watch it run
 
 async function stopSchedule(page: Page): Promise<void> {
   await envCard(page).getByRole('button', { name: 'Stop schedule' }).click();
@@ -545,7 +533,7 @@ test.describe('04d schedule an automation @smoke', () => {
     if (alreadyDeployed) await openIntegration(page, AUTOMATION);
   });
 
-  // Serial mode skips TC_IP_AUTO_007 once an earlier test fails, and a live one-minute schedule would keep firing on the shared org.
+  // Serial mode skips TC_IP_AUTO_007 once an earlier test fails, and a live schedule would keep firing on the shared org.
   test.afterAll(async () => {
     await dismissStrayDialog(page);
     if (
@@ -576,33 +564,27 @@ test.describe('04d schedule an automation @smoke', () => {
     if (await stop.isVisible()) await stopSchedule(page);
   });
 
-  test('TC_IP_AUTO_001 Browse samples offers the Person Lookup Automation MI sample', async () => {
-    test.setTimeout(3 * 60_000);
+  test('TC_IP_AUTO_001 the Samples tab lists Scheduled Logger', async () => {
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
     await reachCreateControl(page, samplesTab(page));
     await samplesTab(page).click();
-    await page.getByRole('button', { name: 'Explore more samples', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Browse samples' })).toBeVisible({ timeout: 30_000 });
-
-    await page.getByPlaceholder('Search samples').fill(AUTOMATION);
-    // The card title appends the technology in brackets: "<name> (WSO2 Integrator: MI)".
-    await expect(page.getByText(`${AUTOMATION} (${MI_TECHNOLOGY})`, { exact: true }), `the samples catalog offers no ${AUTOMATION} MI sample`).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('button', { name: 'Quick deploy' }), 'the search should narrow the grid to this one sample').toHaveCount(1);
+    await expect(page.getByText(AUTOMATION, { exact: true })).toBeVisible({ timeout: 30_000 });
   });
 
-  test('TC_IP_AUTO_002 Quick deploy provisions the automation and lands on its overview', async () => {
+  test('TC_IP_AUTO_002 Deploy provisions the automation and lands on its overview', async () => {
     test.setTimeout(4 * 60_000);
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
-    // Unscoped on purpose: TC_IP_AUTO_001 left the search narrowed to this one card, and serial mode keeps it so.
-    await page.getByRole('button', { name: 'Quick deploy' }).click();
+    // Scoped to the card: the sidebar's Deploy page and each sample's Deploy button share a name.
+    await cardFor(page, AUTOMATION, 'Deploy').click();
 
     // The deploy runs through a progress page before settling on the integration's overview.
     await expect(page.getByRole('heading', { name: AUTOMATION }), 'the deploy did not land on the automation overview').toBeVisible({ timeout: 2 * 60_000 });
   });
 
-  test('TC_IP_AUTO_003 the build completed and the automation offers Schedule and Test', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + MI_DEPLOY_TIMEOUT_MS + 2 * 60_000);
+  test('TC_IP_AUTO_003 the automation runs from its image and offers Schedule and Test', async () => {
+    test.setTimeout(MI_DEPLOY_TIMEOUT_MS + 3 * 60_000);
     await requireAutomationReady(page);
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toHaveCount(0);
   });
 
   test('TC_IP_AUTO_004 the automation starts with no schedule', async () => {
@@ -610,13 +592,13 @@ test.describe('04d schedule an automation @smoke', () => {
     await expect(envCard(page).getByRole('button', { name: 'Schedule', exact: true })).toBeVisible();
   });
 
-  test('TC_IP_AUTO_005 scheduling it every minute takes effect', async () => {
+  test('TC_IP_AUTO_005 scheduling it every five minutes takes effect', async () => {
     await envCard(page).getByRole('button', { name: 'Schedule', exact: true }).click();
     const drawer = page.getByRole('dialog').filter({ hasText: 'Repeat beginning of every' });
     await expect(drawer).toBeVisible({ timeout: 30_000 });
 
     // BY INTERVAL is the drawer's first tab and its default.
-    await drawer.getByRole('textbox').first().fill('1');
+    await drawer.getByRole('textbox').first().fill(String(SCHEDULE_INTERVAL_MINUTES));
     await drawer.getByRole('combobox').first().click();
     await page.getByRole('option', { name: 'Minute', exact: true }).click();
     await drawer.getByRole('button', { name: 'Update', exact: true }).click();
@@ -625,7 +607,7 @@ test.describe('04d schedule an automation @smoke', () => {
     await expect(envCard(page).getByText(NO_SCHEDULE)).toHaveCount(0);
   });
 
-  test('TC_IP_AUTO_006 at least five executions are reported within eight minutes', async () => {
+  test('TC_IP_AUTO_006 at least three executions are reported within twenty minutes', async () => {
     test.setTimeout(EXECUTIONS_WATCH_MS + 3 * 60_000);
     const deadline = Date.now() + EXECUTIONS_WATCH_MS;
     let seen = 0;
@@ -642,11 +624,74 @@ test.describe('04d schedule an automation @smoke', () => {
     }
 
     test.info().annotations.push({ type: 'executions', description: `${AUTOMATION}: ${seen} finished in ${Math.round(EXECUTIONS_WATCH_MS / 60_000)}m` });
-    expect(seen, `only ${seen} execution(s) finished — a one-minute schedule should produce at least ${EXECUTIONS_TARGET}`).toBeGreaterThanOrEqual(EXECUTIONS_TARGET);
+    expect(seen, `only ${seen} execution(s) finished — a ${SCHEDULE_INTERVAL_MINUTES}-minute schedule should produce at least ${EXECUTIONS_TARGET}`).toBeGreaterThanOrEqual(EXECUTIONS_TARGET);
   });
 
   test('TC_IP_AUTO_007 the schedule is stopped again', async () => {
     await stopSchedule(page);
+  });
+});
+
+// 04e — an MI automation imported from source, which a sample cannot cover: its build has to complete
+
+test.describe('04e MI Automation @smoke', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  // Set in beforeAll: an automation an earlier run imported has its build checked rather than imported again.
+  let alreadyImported = false;
+
+  test.beforeAll(async () => {
+    await enterProjectOrSkip(page, orgHandler);
+    await waitForIntegrationsToLoad(page);
+    alreadyImported = await isPresent(page, MI_AUTOMATION);
+  });
+
+  test('TC_IP_MIAUTO_001 the import form resolves the samples repository and the MI sub path', async () => {
+    test.setTimeout(3 * 60_000);
+    test.skip(alreadyImported, `${MI_AUTOMATION} is already in the project`);
+    const importButton = page.getByRole('button', { name: 'Import from a public repository' });
+    await reachCreateControl(page, importButton);
+    await importButton.click();
+    await expect(page.getByRole('heading', { name: 'Import an integration' })).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole('textbox', { name: 'Repository URL' }).fill(MI_AUTOMATION_REPO_URL);
+    await expect(page.getByRole('combobox', { name: /^Branch/ }), 'the repository did not resolve into a branch — GitHub public API rate limit is the usual cause').toContainText('main', { timeout: 60_000 });
+
+    await page.getByRole('textbox', { name: 'Repository sub path' }).click();
+    const picker = page.getByRole('dialog').filter({ hasText: 'Repository sub path' });
+    // One click per level: selecting a folder in the tree also expands it. Prefix match, because an expanded folder's name carries its children's.
+    for (const folder of MI_AUTOMATION_SUB_PATH) {
+      await picker.getByRole('treeitem', { name: new RegExp(`^${folder}`) }).click();
+    }
+    await picker.getByRole('button', { name: 'Continue', exact: true }).click();
+
+    await expect(page.getByRole('textbox', { name: 'Repository sub path' })).toHaveValue(`/${MI_AUTOMATION_SUB_PATH.join('/')}`);
+    await expect(page.getByRole('textbox', { name: 'Integration name' })).toHaveValue(MI_AUTOMATION);
+  });
+
+  test('TC_IP_MIAUTO_002 WSO2 Integrator: MI is detected and importing provisions the automation', async () => {
+    test.setTimeout(4 * 60_000);
+    test.skip(alreadyImported, `${MI_AUTOMATION} is already in the project`);
+    await expect(page.getByText(MI_TECHNOLOGY, { exact: true })).toBeVisible({ timeout: 60_000 });
+    await page.getByRole('button', { name: /^Automation/ }).click();
+
+    // The cards expose no selected state, so an enabled submit (it needs a technology) is the closest check that detection picked one.
+    const submit = page.getByRole('button', { name: 'Import integration' });
+    await expect(submit, 'Import integration stayed disabled — technology detection did not select WSO2 Integrator: MI').toBeEnabled({ timeout: 60_000 });
+    await submit.click();
+
+    await expect(page.getByRole('heading', { name: MI_AUTOMATION }), 'the import did not land on the automation overview').toBeVisible({ timeout: 2 * 60_000 });
+  });
+
+  test('TC_IP_MIAUTO_003 the build reaches Completed', async () => {
+    test.setTimeout(BUILD_TIMEOUT_MS + 3 * 60_000);
+    if (alreadyImported) await openIntegration(page, MI_AUTOMATION);
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 2 * 60_000 });
+
+    const status = await waitForBuildToSettle(page);
+    test.info().annotations.push({ type: 'build', description: `${MI_AUTOMATION}: ${status}` });
+    // A build that never settles already fails the run, so one that settles on Failed must too.
+    expect(status, `${MI_AUTOMATION} build ended as ${status}`).toMatch(/^Completed/);
   });
 });
 
@@ -1057,6 +1102,12 @@ test.describe('08 clean up @smoke', () => {
     await deleteIntegration(page, AUTOMATION);
   });
 
+  test('TC_IP_CLEAN_005 the imported MI automation is removed and its row disappears', async () => {
+    test.setTimeout(REMOVAL_TIMEOUT_MS + 60_000);
+    test.skip(!(await isPresent(page, MI_AUTOMATION)), `${MI_AUTOMATION} is not in the project`);
+    await deleteIntegration(page, MI_AUTOMATION);
+  });
+
   test('TC_IP_CLEAN_003 the imported agent is removed and its row disappears', async () => {
     test.setTimeout(REMOVAL_TIMEOUT_MS + 60_000);
     const removed = await deleteMatchingIntegrations(page, AGENT_NAME_PATTERN);
@@ -1066,7 +1117,7 @@ test.describe('08 clean up @smoke', () => {
   test('TC_IP_CLEAN_004 the project reports no integrations left', async () => {
     test.setTimeout(REMOVAL_TIMEOUT_MS + 60_000);
     await waitForDeletionsToFinish(page);
-    for (const name of [SAMPLE, AUTOMATION]) {
+    for (const name of [SAMPLE, AUTOMATION, MI_AUTOMATION]) {
       await expect(integrationRow(page, name), `${name} is still listed`).toHaveCount(0, { timeout: 60_000 });
     }
     await expect(page.getByRole('row').filter({ hasText: AGENT_NAME_PATTERN }), 'the imported agent is still listed').toHaveCount(0, { timeout: 60_000 });

@@ -55,6 +55,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
   'ballerinaFileIntegration',
   'miFileIntegration',
   'byoiService',
+  'voiceAgent',
 ]);
 
 /**
@@ -78,7 +79,7 @@ export function isSupportedIntegration(displayType: string, componentSubType: st
 }
 
 export function getNonIntegrationPlatform(originCloud?: string): string {
-  return originCloud === 'bijira' ? 'WSO2 API Platform' : 'WSO2 Developer Platform';
+  return originCloud === 'bijira' ? 'API Management' : 'WSO2 Developer Platform';
 }
 
 /**
@@ -163,6 +164,8 @@ export function getDisplayLabel(displayType: string, componentSubType: string | 
     case 'miJob':
     case 'buildpackJob':
       return 'Manual Task';
+    case 'voiceAgent':
+      return 'Voice Agent';
   }
   // Foreign-runtime components arrive as lower(buildpackType)+Cap(componentType), e.g. 'otherAiAgent'.
   if (displayType?.startsWith(OTHER_BUILDPACK)) return 'Other';

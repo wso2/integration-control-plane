@@ -24,7 +24,6 @@ import {
   dataSourceLabel,
   dataSourceNameFor,
   embeddingFromConfig,
-  ingestionNotice,
   isEditedSettingsValid,
   isManualSchedule,
   isNameValid,
@@ -33,6 +32,7 @@ import {
   knowledgeBaseSummary,
   secretsForUpdate,
   retrievalAccessReason,
+  knowledgeBaseWriteBlockedReason,
   retrievalUnavailableReason,
   vectorStoreFromConfig,
 } from './knowledgeBase';
@@ -167,10 +167,27 @@ describe('isNameValid', () => {
   });
 });
 
+describe('knowledgeBaseWriteBlockedReason', () => {
+  it.each([
+    ['ACTIVE', 'add-data-source', null],
+    ['IN_PROGRESS', 'save', null],
+    ['CREATING', 'add-data-source', 'The knowledge base is still being created. Try again once it is.'],
+    ['CREATING', 'save', 'The knowledge base is still being created. Try again once it is.'],
+    ['CREATING', 'delete', 'The knowledge base is still being created. Try again once it is.'],
+    ['FAILED', 'add-data-source', 'The knowledge base could not be created. Delete it and create it again.'],
+    ['FAILED', 'save', 'The knowledge base could not be created. Delete it and create it again.'],
+    ['FAILED', 'delete', null],
+  ] as const)('%s, %s', (status, write, reason) => {
+    expect(knowledgeBaseWriteBlockedReason({ status }, write)).toBe(reason);
+  });
+});
+
 describe('retrievalUnavailableReason', () => {
   it.each([
     [{ status: 'ACTIVE' }, null],
     [{ status: 'IN_PROGRESS' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
+    [{ status: 'CREATING' }, 'The knowledge base is still being created. You can query it once it is active.'],
+    [{ status: 'FAILED' }, 'The knowledge base could not be created, so it cannot be queried.'],
     [{ status: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
     [{ status: 'ERROR' }, 'The knowledge base service failed to deploy, so it cannot be queried.'],
   ])('%j', (kb, reason) => {
@@ -216,20 +233,5 @@ describe('isManualSchedule', () => {
     ['*/30 * * * *', false],
   ])('%j → %s', (cron, manual) => {
     expect(isManualSchedule(cron)).toBe(manual);
-  });
-});
-
-describe('ingestionNotice', () => {
-  it('is null when every first run started, or none was asked for', () => {
-    expect(ingestionNotice([{ displayName: 'Drive', ingestionStarted: true }, { displayName: 'S3' }])).toBeNull();
-  });
-
-  it('names each source whose first run did not start', () => {
-    expect(
-      ingestionNotice([
-        { displayName: 'Drive', ingestionStarted: false, ingestionError: 'Run it with Ingest.' },
-        { displayName: 'S3', ingestionStarted: false },
-      ]),
-    ).toEqual({ ingestionNotice: 'Drive: Run it with Ingest. S3: its first ingestion could not be started. Run it with Ingest.' });
   });
 });

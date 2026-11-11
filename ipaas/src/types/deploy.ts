@@ -48,6 +48,8 @@ export interface BuildAreaProps {
    */
   /** A workflow integration, which deploys only once the platform's workflow runtime is ready. */
   isWorkflow?: boolean;
+  /** An MCP server: the AI gateway may front its endpoints, which are then public only. */
+  isMcpServer?: boolean;
   hideEndpoints?: boolean;
 }
 
@@ -70,6 +72,8 @@ export interface DeployEnvironmentCardProps {
   displayType?: string;
   /** A workflow integration: shows the workflow runtime it runs on, and promotes only once the runtime is ready. */
   isWorkflow?: boolean;
+  /** An MCP server: the AI gateway may front its endpoints, which are then public only. */
+  isMcpServer?: boolean;
   /** An AI agent, automation or workflow: shows whether it is published to the environment's User Portal, with Publish or Unpublish. */
   publishesToUserPortal?: boolean;
   /** Which limits a schedule set here is held to; an automation's unless set. */

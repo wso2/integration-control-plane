@@ -60,8 +60,9 @@ export function useDeployPrebuiltIntegration() {
   deployImageRef.current = deployImage;
   deleteComponentRef.current = deleteComponent;
 
-  const deploy = useCallback(async (input: DeployPrebuiltIntegrationInput) => {
-    const { integration, orgHandler, projectId, configValues } = input;
+  // Resolves to the new component's handler, or null when the deploy failed.
+  const deploy = useCallback(async (input: DeployPrebuiltIntegrationInput): Promise<string | null> => {
+    const { integration, orgHandler, projectId, configValues, creation } = input;
     setState({ progress: 0, stepLabel: 'Checking name availability…', error: null, errorSeverity: 'error', isDeploying: true, isSuccess: false, componentHandler: null, configSaveError: false });
 
     let createdComponentId: string | null = null;
@@ -87,7 +88,7 @@ export function useDeployPrebuiltIntegration() {
         isPublicRepo: true,
         enableAutoDeploy: false,
         isPrebuilt: true,
-        creation: { method: 'from-prebuilt', prebuiltSlug: slug },
+        creation: creation ?? { method: 'from-prebuilt', prebuiltSlug: slug },
       });
       createdComponentId = component.id;
 
@@ -122,6 +123,7 @@ export function useDeployPrebuiltIntegration() {
       });
 
       setState((s) => ({ ...s, progress: 100, stepLabel: 'Deployed!', error: null, isDeploying: false, isSuccess: true, componentHandler: component.handler }));
+      return component.handler;
     } catch (err) {
       // Log the primary failure before rolling back — otherwise the actual cause
       // (name check, create, deploy, …) is lost and only the generic toast remains.
@@ -140,6 +142,7 @@ export function useDeployPrebuiltIntegration() {
         errorSeverity: isQuotaError(err) ? 'warning' : 'error',
         isDeploying: false,
       }));
+      return null;
     }
   }, []);
 

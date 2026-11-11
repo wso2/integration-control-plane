@@ -59,6 +59,7 @@ export default function DeployEnvironmentCard({
   hideEndpoints = false,
   displayType,
   isWorkflow = false,
+  isMcpServer = false,
   publishesToUserPortal = false,
   scheduleKind = 'automation',
   env,
@@ -367,7 +368,7 @@ export default function DeployEnvironmentCard({
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
           <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
-          {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} componentId={componentId} environment={env.id} envName={env.name} />}
+          {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={env.id} envName={env.name} isWorkflow={isWorkflow} />}
         </CardContent>
 
         {showPromote && (
@@ -384,6 +385,7 @@ export default function DeployEnvironmentCard({
                     deploymentPipelineId={deploymentPipelineId}
                     sourceEnvId={env.id}
                     targetEnvId={nextEnvId}
+                    isWorkflow={isWorkflow}
                     icon={<ArrowRight size={14} />}
                     onPromoteStarted={onPromoteStarted}
                     onPromoteSettled={onPromoteSettled}
@@ -397,6 +399,7 @@ export default function DeployEnvironmentCard({
 
       <ConfigureDrawer
         isWorkflow={isWorkflow}
+        isMcpServer={isMcpServer}
         open={configureOpen}
         onClose={() => setConfigureOpen(false)}
         orgHandler={orgHandler}
@@ -432,7 +435,18 @@ export default function DeployEnvironmentCard({
       <DeploymentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} orgUuid={orgUuid} projectId={projectId} componentId={componentId} versionId={versionId} environmentId={env.id} envName={env.name} />
 
       {showEndpoints && (
-        <EndpointsDrawer open={endpointsOpen} onClose={() => setEndpointsOpen(false)} endpoints={endpoints} isLoading={endpointsLoading} envName={env.name} projectId={projectId} componentId={componentId} environmentId={env.id} versionId={versionId} />
+        <EndpointsDrawer
+          open={endpointsOpen}
+          onClose={() => setEndpointsOpen(false)}
+          endpoints={endpoints}
+          isLoading={endpointsLoading}
+          envName={env.name}
+          projectId={projectId}
+          componentId={componentId}
+          environmentId={env.id}
+          versionId={versionId}
+          isMcpServer={isMcpServer}
+        />
       )}
     </>
   );

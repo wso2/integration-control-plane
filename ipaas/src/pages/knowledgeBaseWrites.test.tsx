@@ -23,7 +23,7 @@ import KnowledgeBases from './KnowledgeBases';
 import KnowledgeBaseDetails from './KnowledgeBaseDetails';
 import DeployButton from '../components/Overview/_shared/DeployButton';
 import WorkflowRuntimeRow from '../components/Deploy/DeployEnvironmentCard/WorkflowRuntimeRow';
-import { button, flush, renderWithScopes } from '../test/renderWithScopes';
+import { button, flush, reasonFor, renderWithScopes } from '../test/renderWithScopes';
 import { DEVELOPER, PLATFORM_ENGINEER, VIEWER } from '../test/roles';
 import type { DeployActionProps } from '../types/integration';
 
@@ -101,6 +101,30 @@ describe('knowledge bases', () => {
 
   it('offers a Viewer nothing, and says why retrieval is unavailable', async () => {
     expect(await detailsWrites(VIEWER)).toEqual({ writes: [], refusedRetrieval: true });
+  });
+
+  // The BFF refuses these with 409 while the create runs, and once it failed all but the delete.
+  it.each([
+    ['ACTIVE', { Delete: null, 'Add Data Source': null, Save: null }],
+    ['CREATING', { Delete: 'The knowledge base is still being created. Try again once it is.', 'Add Data Source': 'The knowledge base is still being created. Try again once it is.', Save: 'The knowledge base is still being created. Try again once it is.' }],
+    ['FAILED', { Delete: null, 'Add Data Source': 'The knowledge base could not be created. Delete it and create it again.', Save: 'The knowledge base could not be created. Delete it and create it again.' }],
+  ])('holds back the writes a %s knowledge base would refuse, and says why', async (status, want) => {
+    // Stored settings the form accepts as they are, so only the create's state can hold Save back.
+    const stored = { config: kb.config, secretKeys: kb.secretKeys };
+    kb.config = { VECTORDB_PROVIDER: 'pinecone', COLLECTION_NAME: 'docs', EMBEDDING_MODEL_PROVIDER: 'openai', EMBEDDING_MODEL: 'text-embedding-3-small' } as never;
+    kb.secretKeys = ['PINECONE_APIKEY', 'EMBEDDING_MODEL_APIKEY'] as never;
+    kb.status = status;
+    try {
+      const c = await open(<KnowledgeBaseDetails {...org} />, PLATFORM_ENGINEER);
+      const state = (name: string) => (button(c, name)?.disabled ? reasonFor(button(c, name)) : null);
+      const overview = { Delete: state('Delete'), 'Add Data Source': state('Add Data Source') };
+      await openTab(c, 'Configurations');
+      // The form says why above its Save, rather than in a tooltip.
+      const save = button(c, 'Save')?.disabled ? ([...c.querySelectorAll('[role="alert"]')].map((a) => a.textContent).find((t) => t === want.Save) ?? 'no reason shown') : null;
+      expect({ ...overview, Save: save }).toEqual(want);
+    } finally {
+      Object.assign(kb, stored, { status: 'ACTIVE' });
+    }
   });
 });
 

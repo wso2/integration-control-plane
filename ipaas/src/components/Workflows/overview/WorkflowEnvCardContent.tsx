@@ -20,6 +20,7 @@ import { Alert, AlertTitle, Box, Button, MenuItem, Select, Skeleton, Stack, Typo
 import { useQuery } from '@tanstack/react-query';
 import { useState, type JSX, type ReactNode } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router';
+import { useUserPortalServed } from '../../../hooks/useUserPortal';
 import { hasComponent, useScope, type ComponentScope } from '../../../nav';
 import { retryWorkflowRead } from '../api/http';
 import { workflowKeys } from '../api/queryKeys';
@@ -76,6 +77,7 @@ function WorkflowEnvCardSkeleton(): JSX.Element {
 
 /** The definition picker, its link to the Workflows list and its Start action, and the selected definition's figures. */
 function WorkflowDefinitions({ api, scope, search, envId }: { api: ReadyWorkflowApi; scope: ComponentScope; search: string; envId: string }): JSX.Element {
+  const portalServed = useUserPortalServed(envId);
   const { client, connection } = api;
   const [picked, setPicked] = useState<string | null>(null);
   const [startOpen, setStartOpen] = useState(false);
@@ -141,7 +143,7 @@ function WorkflowDefinitions({ api, scope, search, envId }: { api: ReadyWorkflow
         </Typography>
       )}
 
-      <WorkflowStatsStrip client={client} scopeId={connection.scopeId} workflowType={selected?.workflowType} runsLink={links.runs} tasksLink={links.tasks} />
+      <WorkflowStatsStrip client={client} scopeId={connection.scopeId} workflowType={selected?.workflowType} runsLink={links.runs} tasksLink={links.tasks} portalServed={portalServed} />
 
       {/* The run just started opens on the Workflows page, in this card's environment and track. */}
       <StartWorkflowDialog

@@ -29,6 +29,9 @@ export const GitRefType = {
 } as const;
 export type GitRefType = (typeof GitRefType)[keyof typeof GitRefType];
 
+/** Mirrors ipaas-service's openChoreoAutoDeploy: on lifts the MI hold in isAutoDeployOffered. */
+export const AUTO_DEPLOY_AVAILABLE = false;
+
 export const BUILD_STAGES = [
   { key: 'init' as const, label: 'Initialization' },
   { key: 'build' as const, label: 'Build source & test' },

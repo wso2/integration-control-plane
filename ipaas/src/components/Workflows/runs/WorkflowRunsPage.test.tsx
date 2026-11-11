@@ -33,6 +33,8 @@ vi.mock('../routing/useWorkflowRoutes', async (importOriginal) => ({
   useWorkflowRoutes: () => ({ goToWorkflowRuns: vi.fn() }),
 }));
 // The execution view has its own reads; here only which run it is handed matters.
+// Where the User Portal is served is read from its own route, which isn't under test here.
+vi.mock('../../../hooks/useUserPortal', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../hooks/useUserPortal')>()), useUserPortalServed: () => true }));
 vi.mock('./WorkflowRunDetailDrawer', () => ({ default: ({ run }: { run: WorkflowInstanceSummary | null }) => <output>{run ? `drawer: ${run.runId} ${run.status}` : 'drawer closed'}</output> }));
 
 const run = (runId: string, workflowType: string, startTime: string, patch: Partial<WorkflowInstanceSummary> = {}): WorkflowInstanceSummary => ({
@@ -80,6 +82,8 @@ async function flush() {
 
 async function renderPage(url: string, client: WorkflowClient) {
   const slot = {
+    scope: { org: 'acme', project: 'shop', component: 'orders' },
+    component: { id: 'orders' },
     environment: { id: 'development', name: 'Development' },
     api: { client, connection: { status: 'ready', scopeId: 'scope', runtime: { taskQueue: 'orders' } } },
   } as unknown as WorkflowPageSlotProps;

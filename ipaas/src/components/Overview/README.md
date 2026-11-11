@@ -59,11 +59,14 @@ Overview/
 │   ├── HeaderStatus.tsx         status dot + Configure / Configure-to-Continue
 │   ├── EnvCardActions.tsx       Test (→ test/agent-chat) · View Logs · Stop/Start
 │   └── EnvCardBody.tsx          shared EndpointUrlsPanel (non-critical) + <AgentChat>
+├── voice-agent/                 status dot / View logs·Stop·Start / token service URL +
+│                                in-browser LiveKit voice tester (components/VoiceAgent/)
 ├── mcp-server/                  MCP Server + MCP Proxy (registry maps both here):
 │   │                            tools list via the MCP SDK + Configure Policies action
 │   ├── HeaderStatus.tsx  EnvCardActions.tsx  EnvCardBody.tsx  OverviewHeaderActions.tsx
 │   └── McpToolTile.tsx / McpToolDrawer.tsx  (reuse _shared/bodies/OperationTile + OperationHeader)
-├── workflow/                    integration-as-api header slots; the webhook body (endpoints +
+├── workflow/                    integration-as-api's status + actions minus Test (`hideTest`); the
+│                                User Portal switch in the footer; the webhook body (endpoints +
 │                                insights) with the workflow content between them once the
 │                                deployment is active (Workflows/overview/: definitions + figures)
 └── registry.ts                  IntegrationType → () => import('./<type>')  (one chunk per type)
@@ -176,7 +179,7 @@ flags**. See **Structure** above for the concrete layout.
 
 Only the **Overview** surface (`src/components/Overview/`) is built fully this way today.
 The types with a real Overview module are **automation, integration-as-api,
-file-integration, event-integration, ai-agent, and mcp-server** (the latter shared by
+file-integration, event-integration, ai-agent, voice-agent, and mcp-server** (the latter shared by
 both `mcp-server` and `mcp-proxy` via the registry) — gated by `MIGRATED_INTEGRATION_TYPES`
 in `pages/Component.tsx`; the rest fall back to `UnsupportedFallback`.
 

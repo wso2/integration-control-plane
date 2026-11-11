@@ -17,7 +17,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { aiGatewayAccessOf, aiGatewayNotice, mcpTransportUrlOf, mcpUrlOf } from './mcpGateway';
+import type { EnvEndpoint } from '../types/component';
+import { aiGatewayAccessOf, mcpTestEndpoints, mcpTransportUrlOf, mcpUrlOf } from './mcpGateway';
 
 const coded = (status: number, code: string) => ({ status, code, body: JSON.stringify({ code }) });
 
@@ -60,20 +61,14 @@ describe('mcpUrlOf', () => {
   });
 });
 
-describe('aiGatewayNotice', () => {
-  it.each([
-    ['not published', { binding: null }, 'api-key' as const, 'info', /isn't published/],
-    ['no gateway', { binding: { deploymentStatusReason: 'NO_GATEWAY' } }, 'api-key' as const, 'info', /no AI gateway/],
-    ['deploying', { binding: { deploymentStatus: 'Deploying' as const } }, 'api-key' as const, 'info', /Publishing/],
-    ['failed', { binding: { deploymentStatus: 'Failed' as const, deploymentStatusReason: 'CONTEXT_IN_USE' } }, 'none' as const, 'warning', /failed \(CONTEXT_IN_USE\)/],
-    ['deployed with an api key', { binding: { deploymentStatus: 'Deployed' as const } }, 'api-key' as const, 'info', /only to the Agent Manager agents/],
-  ])('%s', (_, access, mode, severity, text) => {
-    const notice = aiGatewayNotice(access, mode);
-    expect(notice?.severity).toBe(severity);
-    expect(notice?.text).toMatch(text);
+describe('mcpTestEndpoints', () => {
+  const ep = (id: string, publicUrl?: string) => ({ id, publicUrl }) as EnvEndpoint;
+
+  it('offers the endpoints with a public URL', () => {
+    expect(mcpTestEndpoints([ep('mcp', 'https://apip/orders/v1.0'), ep('admin')]).map((e) => e.id)).toEqual(['mcp']);
   });
 
-  it('has nothing to say about a deployed, open MCP server', () => {
-    expect(aiGatewayNotice({ binding: { deploymentStatus: 'Deployed' } }, 'none')).toBeNull();
+  it('offers every endpoint when none has one, as on the AI gateway', () => {
+    expect(mcpTestEndpoints([ep('mcp-service'), ep('admin')]).map((e) => e.id)).toEqual(['mcp-service', 'admin']);
   });
 });

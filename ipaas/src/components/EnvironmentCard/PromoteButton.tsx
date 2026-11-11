@@ -25,7 +25,9 @@ import { useComponentDeployment, usePromote } from '../../hooks/useDeployments';
 import { pendingApiChange, PENDING_API_CHANGE_TOOLTIP } from '../../utils/promotion';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useCan } from '../../hooks/useCan';
+import { useUserPortalPublications } from '../../hooks/useUserPortal';
 import { Scopes } from '../../constants/permissions';
+import { isUserPortalUnavailable } from '../../utils/apiErrors';
 
 interface PromoteButtonProps {
   orgHandler: string;
@@ -40,16 +42,27 @@ interface PromoteButtonProps {
   onPromoteSettled?: () => void;
   /** Why the promote cannot run yet, when something outside this deployment holds it back. */
   blockedReason?: string;
+  /** A workflow's API security, which a promotion carries, depends on where it is published to the User Portal. */
+  isWorkflow?: boolean;
 }
 
-export default function PromoteButton({ orgHandler, projectId, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason }: PromoteButtonProps) {
+/**
+ * What promoting a workflow does to the console's workflow views in the target. `carried`: it is published to the User
+ * Portal in the source, so its Management API takes only User Portal sign-ins there, and the promotion carries that to a
+ * target it isn't published in. `unchecked`: where it is published couldn't be read.
+ */
+type PortalSignIn = 'carried' | 'unchecked' | null;
+
+export default function PromoteButton({ orgHandler, projectId, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason, isWorkflow = false }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
   const links = useIntegrationLinks(projectId, componentId, true);
+  // Read only when promoting, as the resource values are.
+  const publications = useUserPortalPublications(componentId, { enabled: false });
   const [checking, setChecking] = useState(false);
-  const [confirming, setConfirming] = useState<{ withoutValues: string[]; unchecked: boolean } | null>(null);
+  const [confirming, setConfirming] = useState<{ withoutValues: string[]; unchecked: boolean; portal: PortalSignIn } | null>(null);
   const can = useCan();
 
   const deploymentsLoading = sourceLoading || targetLoading;
@@ -67,10 +80,12 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   // The target starts the release with the resources it carries: decide on a read made now, not on a cached or pending one.
   const checkThenPromote = async () => {
     setChecking(true);
-    const read = await links.refetch();
+    const [read, published] = await Promise.all([links.refetch(), isWorkflow ? publications.refetch() : null]);
     setChecking(false);
     const withoutValues = read.isSuccess ? promoteWithoutValues(read.data, sourceEnvId, targetEnvId) : [];
-    if (!read.isSuccess || withoutValues.length > 0) setConfirming({ withoutValues, unchecked: !read.isSuccess });
+    // A failed read can still hold what an earlier one answered: decide on this one.
+    const portal = published ? portalSignIn(published.isSuccess ? published.data.environments : undefined, published.error, sourceEnvId, targetEnvId) : null;
+    if (!read.isSuccess || withoutValues.length > 0 || portal) setConfirming({ withoutValues, unchecked: !read.isSuccess, portal });
     else handlePromote();
   };
 
@@ -126,6 +141,13 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
               {r} has no values in {targetEnvId}.
             </Typography>
           ))}
+          {confirming?.portal === 'carried' && (
+            <Typography variant="body2">
+              This workflow is published to the User Portal in {sourceEnvId}, so its Workflow Management API takes only User Portal sign-ins there, and promoting carries that to {targetEnvId}. Until it&apos;s published to the User Portal in {targetEnvId} too,
+              the console&apos;s workflow views won&apos;t work there.
+            </Typography>
+          )}
+          {confirming?.portal === 'unchecked' && <Typography variant="body2">Couldn&apos;t check where this workflow is published to the User Portal.</Typography>}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirming(null)}>Cancel</Button>
@@ -136,4 +158,13 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
       </Dialog>
     </>
   );
+}
+
+/**
+ * What the promotion does to a workflow's User Portal sign-in in the target, from the environments it is published in, or
+ * the read's failure. A BFF that serves no User Portal publishes nowhere.
+ */
+function portalSignIn(published: string[] | undefined, error: unknown, source: string, target: string): PortalSignIn {
+  if (!published) return error && !isUserPortalUnavailable(error) ? 'unchecked' : null;
+  return published.includes(source) && !published.includes(target) ? 'carried' : null;
 }

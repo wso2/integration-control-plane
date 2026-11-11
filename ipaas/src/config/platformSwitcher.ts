@@ -26,10 +26,10 @@ export const CURRENT_PLATFORM = 'integration-platform';
 
 /** The platforms, in display order. */
 export const PLATFORMS = [
-  { id: 'agent-manager', name: 'Agent Manager' },
-  { id: 'api-platform', name: 'API Platform' },
-  { id: 'integration-platform', name: 'Integration Platform' },
-  { id: 'identity-platform', name: 'Identity Platform' },
+  { id: 'agent-manager', name: 'Agent Management' },
+  { id: 'api-platform', name: 'API Management' },
+  { id: 'integration-platform', name: 'Integration' },
+  { id: 'identity-platform', name: 'Identity & Access Management' },
 ] as const;
 
 export type PlatformId = (typeof PLATFORMS)[number]['id'];
