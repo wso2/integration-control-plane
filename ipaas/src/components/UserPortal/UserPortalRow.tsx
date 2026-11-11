@@ -17,19 +17,18 @@
  */
 
 import { Box, Button, Chip, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { useEffect, useState, type JSX } from 'react';
+import type { JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
-import { useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
+import { useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { DEPLOY_REFUSAL, refusalText, shownRefusals, unpublishingText, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
-import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
+import { DEPLOY_REFUSAL, shownRefusals, unpublishingText, userPortalIsOff } from '../../utils/userPortal';
 import PublishButton from './PublishButton';
 import PublishRefusals from './PublishRefusals';
 import RejectedScopes from './RejectedScopes';
 import * as styles from './UserPortal.styles';
-import UnpublishNote from './UnpublishNote';
 import { usePublishFlow } from './usePublishFlow';
+import { useUnpublishFlow } from './useUnpublishFlow';
 import UserPortalOffRow from './UserPortalOffRow';
 
 interface UserPortalRowProps {
@@ -55,16 +54,10 @@ interface UserPortalRowProps {
  */
 export default function UserPortalRow({ orgHandler, projectId, componentId, environment, envName, isWorkflow = false }: UserPortalRowProps): JSX.Element | null {
   const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
-  const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
-  const [confirmUnpublish, setConfirmUnpublish] = useState(false);
+  // Each clears what the other left on the row as it starts.
+  const unpublish = useUnpublishFlow({ componentId, projectId, environment, envName, isWorkflow, onStart: () => publish.reset() });
   const publish = usePublishFlow({ componentId, environment, envName, isWorkflow, onStart: () => unpublish.reset() });
-  // A finish refused earlier no longer stands once a run has started, or the workflow is published again.
-  const { reset: resetUnpublish } = unpublish;
-  const settledElsewhere = !!data?.unpublishing || !!data?.published;
-  useEffect(() => {
-    if (settledElsewhere) resetUnpublish();
-  }, [settledElsewhere, resetUnpublish]);
 
   if (isLoading) return <Skeleton variant="rounded" height={40} sx={styles.rowSx} />;
   // A BFF that serves no User Portal has nothing to publish to.
@@ -87,27 +80,11 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
 
   const reasons = shownRefusals(data.reasons);
   const pending = publish.isPending || unpublish.isPending;
-  const closeUnpublish = () => {
-    unpublish.reset();
-    setConfirmUnpublish(false);
-  };
-  const startUnpublish = () => {
-    publish.reset();
-    unpublish.mutate({ componentId, environment }, { onSuccess: () => setConfirmUnpublish(false) });
-  };
-  // Unpublishing again finishes giving the workflow back; it is out of the User Portal already, so it isn't confirmed.
-  const finishUnpublish = () => {
-    publish.reset();
-    unpublish.mutate({ componentId, environment });
-  };
-  const unpublishFailure = !data.published && !data.publishing && !data.unpublishing && data.unpublishError ? refusalText(data.unpublishError, envName) : null;
-  // Only while it is unpublished: a finish unpublishes, and is never offered on a published workflow.
-  const finishError = !data.published && !data.unpublishing && unpublish.isError && !confirmUnpublish ? userPortalErrorText(unpublish.error, envName) : null;
 
   const action = data.published ? (
     <Tooltip title={canDeploy ? '' : DEPLOY_REFUSAL}>
       <span>
-        <Button size="small" color="inherit" onClick={() => setConfirmUnpublish(true)} disabled={!canDeploy || pending}>
+        <Button size="small" color="inherit" onClick={unpublish.request} disabled={!canDeploy || pending}>
           Unpublish
         </Button>
       </span>
@@ -145,14 +122,13 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
       )}
       <RejectedScopes scopes={publish.rejectedScopes} sx={styles.rowNoteSx} />
 
-      {/* A finish that is refused has no dialog open, so the row shows why. */}
-      {(finishError || unpublishFailure) && (
+      {unpublish.failure && (
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={styles.rowNoteSx}>
           <Typography variant="caption" color="error">
-            {finishError ?? unpublishFailure}
+            {unpublish.failure}
           </Typography>
           {canDeploy && (
-            <Button size="small" color="inherit" onClick={finishUnpublish} disabled={pending} sx={{ flexShrink: 0 }}>
+            <Button size="small" color="inherit" onClick={unpublish.finish} disabled={pending} sx={{ flexShrink: 0 }}>
               Finish unpublishing
             </Button>
           )}
@@ -160,17 +136,7 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
       )}
 
       {publish.dialog}
-
-      {confirmUnpublish && (
-        <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
-          <UnpublishNote isWorkflow={isWorkflow} projectId={projectId} environment={environment} envName={envName} />
-          {unpublish.isError && (
-            <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
-              {userPortalErrorText(unpublish.error, envName)}
-            </Typography>
-          )}
-        </ConfirmDeleteDialog>
-      )}
+      {unpublish.dialog}
     </Box>
   );
 }

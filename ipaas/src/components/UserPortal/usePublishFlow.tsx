@@ -30,6 +30,8 @@ interface PublishFlowOptions {
   isWorkflow?: boolean;
   /** Runs as a publish is asked for, before it is confirmed, so what the last one left on screen goes. */
   onStart?: () => void;
+  /** Runs when a publish is done within its request, with the scopes the User Portal couldn't hold. */
+  onPublished?: (rejectedScopes: string[]) => void;
 }
 
 export interface PublishFlow {
@@ -63,7 +65,7 @@ export interface PublishFlow {
  * the User Portal's scopes in step can take a while: the flow stays pending, and the publishability, which survives a
  * page reload, says when it ends and how.
  */
-export function usePublishFlow({ componentId, environment, envName, isWorkflow = false, onStart }: PublishFlowOptions): PublishFlow {
+export function usePublishFlow({ componentId, environment, envName, isWorkflow = false, onStart, onPublished }: PublishFlowOptions): PublishFlow {
   const publish = usePublishToUserPortal();
   const { data: report } = useUserPortalPublishability(componentId, environment);
   const publishing = !!report?.publishing;
@@ -77,6 +79,7 @@ export function usePublishFlow({ componentId, environment, envName, isWorkflow =
         onSuccess: (out) => {
           setConfirming(false);
           setRejectedScopes(out.rejectedScopes);
+          if (!out.publishing) onPublished?.(out.rejectedScopes);
         },
       },
     );

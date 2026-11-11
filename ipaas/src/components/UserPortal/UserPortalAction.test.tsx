@@ -112,17 +112,15 @@ describe("the env card's User Portal action", () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  it('confirms a publish the rules allow, then reports scopes the portal could not take on the card', async () => {
+  // As the deploy page and the workflow pages do (usePublishFlow): only a publish that redeploys a workflow asks first.
+  it('publishes what redeploys nothing at once, then reports scopes the portal could not take on the card', async () => {
     publishability.mockResolvedValue(publishable);
     publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await action(DEVELOPER);
     await act(async () => toggle(container)?.click());
-    expect(dialog(container)?.textContent).toContain('Publish to the User Portal in Production?');
-    expect(publish).not.toHaveBeenCalled();
-    await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
-    expect(publish).toHaveBeenCalledWith('orders', 'production');
     expect(dialog(container)).toBeNull();
+    expect(publish).toHaveBeenCalledWith('orders', 'production');
     expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Published to the User Portal in Production.', severity: 'success', detail: expect.stringContaining('bad scope') }));
   });
 
@@ -138,10 +136,20 @@ describe("the env card's User Portal action", () => {
     expect(publish).toHaveBeenCalledWith('orders', 'production');
   });
 
-  it('keeps the confirm dialog open on a refused publish, worded from its code', async () => {
+  it('says why a publish was refused on the switch, worded from its code', async () => {
     publishability.mockResolvedValue(publishable);
     publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"the integration is not deployed in this environment; deploy it first"}'));
     const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await flush();
+    expect(container.querySelector('label')?.getAttribute('aria-label')).toBe('Deploy it to Production first. The User Portal lists only what runs there.');
+    expect(onNotify).not.toHaveBeenCalled();
+  });
+
+  it('keeps the confirm dialog open on a refused publish of a workflow, worded from its code', async () => {
+    publishability.mockResolvedValue({ ...publishable, redeploys: true });
+    publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"the integration is not deployed in this environment; deploy it first"}'));
+    const container = await action(DEVELOPER, true);
     await act(async () => toggle(container)?.click());
     await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
@@ -151,9 +159,9 @@ describe("the env card's User Portal action", () => {
 
   // The integration got published but its scopes didn't sync: the read after the publish says it is published.
   it('keeps the error in the confirm dialog when a partial publish changes the state, and not in the next one', async () => {
-    publishability.mockResolvedValueOnce(publishable).mockResolvedValue({ ...publishable, published: true });
+    publishability.mockResolvedValueOnce({ ...publishable, redeploys: true }).mockResolvedValue({ ...publishable, redeploys: true, published: true });
     publish.mockRejectedValue(new BffError(500, '{"code":"USER_PORTAL_SCOPES_NOT_SYNCED","message":"the user portal scopes could not be updated"}'));
-    const container = await action(DEVELOPER);
+    const container = await action(DEVELOPER, true);
     await act(async () => toggle(container)?.click());
     await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
