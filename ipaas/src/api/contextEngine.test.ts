@@ -82,7 +82,7 @@ describe('engines', () => {
     bff.put.mockResolvedValueOnce({ api: true, mcp: false });
 
     await expect(setContextEngineAccess(ENGINE, { mcp: false })).resolves.toEqual({ api: true, mcp: false });
-    expect(bff.put).toHaveBeenCalledWith('/context-engines/docs/environments/development/access', { mcp: false });
+    expect(bff.put).toHaveBeenCalledWith('/context-engines/docs/access', { mcp: false });
   });
 
   it('reads an engine that is still starting from the BFF alone', async () => {
