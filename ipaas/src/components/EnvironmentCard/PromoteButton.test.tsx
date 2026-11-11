@@ -25,8 +25,16 @@ import type { LinkableResource } from '../../types/configuration';
 
 const deployments: Record<string, { releaseId: string; build: { buildId: string } } | undefined> = {};
 const mutate = vi.hoisted(() => vi.fn());
+// Each environment's API gateway state, `pending` while its read is under way, and the environments it was read for.
+const gateway = vi.hoisted(() => ({ states: {} as Record<string, unknown>, read: [] as string[] }));
 vi.mock('../../hooks/useDeployments', () => ({
   useComponentDeployment: (_o: string, _u: string, _c: string, _v: string, env: string) => ({ data: deployments[env], isLoading: false }),
+  useProxyReconciliation: (_o: string, _u: string, _c: string, _v: string, env: string, _p: string, { enabled }: { enabled: boolean }) => {
+    if (!enabled) return { data: undefined, isLoading: false };
+    gateway.read.push(env);
+    const state = gateway.states[env];
+    return state === 'pending' ? { data: undefined, isLoading: true } : { data: state ?? null, isLoading: false };
+  },
   usePromote: () => ({ mutate, isPending: false }),
 }));
 vi.mock('../../hooks/useOrgUuid', () => ({ useOrgUuid: () => 'org' }));
@@ -79,6 +87,8 @@ beforeEach(() => {
   read.result = answered();
   portal.result = publishedIn();
   portal.reads = 0;
+  gateway.states = {};
+  gateway.read = [];
   deployments.development = { releaseId: 'sftask-784445f4b4', build: { buildId: 'b1' } };
   deployments.production = { releaseId: 'sftask-66d97f5f4d', build: { buildId: 'b1' } };
   container = document.createElement('div');
@@ -101,6 +111,28 @@ describe('PromoteButton', () => {
     await render();
     expect(button().disabled).toBe(true);
     expect(container.querySelector('[title]')!.getAttribute('title')).toBe('Already deployed in target environment');
+  });
+
+  it('reads no API gateway state for environments on different releases', async () => {
+    await render();
+    expect(gateway.read).toEqual([]);
+  });
+
+  it('waits for the API gateway state of two environments on the same release, saying nothing meanwhile', async () => {
+    deployments.production = { releaseId: 'sftask-784445f4b4', build: { buildId: 'b1' } };
+    gateway.states.production = 'pending';
+    await render();
+    expect(gateway.read).toEqual(['development', 'production']);
+    expect(button().disabled).toBe(true);
+    expect(container.querySelector('[title]')!.getAttribute('title')).toBe('');
+  });
+
+  it('offers the release the target already runs when the API gateway holds a change for it', async () => {
+    deployments.production = { releaseId: 'sftask-784445f4b4', build: { buildId: 'b1' } };
+    gateway.states.production = { status: 'PENDING_PROMOTION', endpoints: [] };
+    await render();
+    expect(button().disabled).toBe(false);
+    expect(container.querySelector('[title]')!.getAttribute('title')).toBe('A visibility change for the target applies with this promotion');
   });
 
   it('promotes once the links read finds every resource has values in the target', async () => {

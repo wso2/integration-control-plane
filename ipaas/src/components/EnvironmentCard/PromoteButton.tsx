@@ -21,7 +21,7 @@ import { ArrowDown } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ReactNode } from 'react';
 import { useIntegrationLinks } from '../../hooks/useConfiguration';
 import { promoteWithoutValues } from '../../utils/integrationLinks';
-import { useComponentDeployment, usePromote } from '../../hooks/useDeployments';
+import { useComponentDeployment, usePromote, useProxyReconciliation } from '../../hooks/useDeployments';
 import { pendingApiChange, PENDING_API_CHANGE_TOOLTIP } from '../../utils/promotion';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useCan } from '../../hooks/useCan';
@@ -67,14 +67,19 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const [confirming, setConfirming] = useState<{ withoutValues: string[]; unchecked: boolean; portal: PortalSignIn } | null>(null);
   const can = useCan();
 
-  const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
   const sourceReleaseId = sourceDeployment?.releaseId;
   // The release, not the build: a ComponentType update gives the same build a new release. Two environments on the
   // same release can still differ in API settings or visibility, which only a promotion carries.
-  const sameRelease = !deploymentsLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
-  const apiChange = sameRelease ? pendingApiChange(sourceDeployment?.proxyReconciliation, targetDeployment?.proxyReconciliation) : null;
-  const alreadyPromoted = sameRelease && !apiChange;
+  const sameRelease = !sourceLoading && !targetLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
+  // Only environments on the same release need the API gateway's state to tell, and it is slow to read, so only they read it.
+  const sourceGateway = useProxyReconciliation(orgHandler, orgUuid, componentId, versionId, sourceEnvId, projectId, { enabled: sameRelease });
+  const targetGateway = useProxyReconciliation(orgHandler, orgUuid, componentId, versionId, targetEnvId, projectId, { enabled: sameRelease });
+  const gatewayLoading = sameRelease && (sourceGateway.isLoading || targetGateway.isLoading);
+  const loading = sourceLoading || targetLoading || gatewayLoading;
+  // A state that could not be read counts as no API change.
+  const apiChange = sameRelease && !gatewayLoading ? pendingApiChange(sourceGateway.data, targetGateway.data) : null;
+  const alreadyPromoted = sameRelease && !gatewayLoading && !apiChange;
 
   const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted && !blockedReason;
@@ -129,7 +134,7 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
     <>
       <Tooltip title={tooltipTitle}>
         <span>
-          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || checking || promote.isPending} onClick={checkThenPromote}>
+          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={loading || !canPromote || checking || promote.isPending} onClick={checkThenPromote}>
             {checking ? 'Checking…' : promote.isPending ? 'Promoting…' : 'Promote'}
           </Button>
         </span>

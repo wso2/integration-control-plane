@@ -19,7 +19,7 @@
 import { Alert, Box, Button, CircularProgress, Divider, Typography } from '@wso2/oxygen-ui';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useApiDefinition, useComponentDeployment, useEnvEndpoints, useRetryProxyReconciliation } from '../../../hooks/useDeployments';
+import { useApiDefinition, useComponentDeployment, useEnvEndpoints, useProxyReconciliation, useRetryProxyReconciliation } from '../../../hooks/useDeployments';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import type { EnvCardBodyProps } from '../../../types/integration';
@@ -64,15 +64,16 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const gatewayExposureEnabled = gatewayExposure.state === 'enabled' || gatewayExposure.state === 'unknown';
 
   // The API gateway's state for this environment's release; polled while it is being updated.
-  const { data: deployment } = useComponentDeployment(orgHandler, orgUuid, component.id, versionId, env.id, {
-    refetchInterval: (query) => (isProxyReconciliationActive(query.state.data?.proxyReconciliation) ? 3_000 : false),
+  const { data: gateway } = useProxyReconciliation(orgHandler, orgUuid, component.id, versionId, env.id, projectId, {
+    enabled: hasDeployment,
+    refetchInterval: (query) => (isProxyReconciliationActive(query.state.data) ? 3_000 : false),
   });
-  const reconciliation = proxyReconciliationNotice(deployment?.proxyReconciliation);
+  const reconciliation = proxyReconciliationNotice(gateway);
   const retryReconciliation = useRetryProxyReconciliation(component.id, env.id, projectId, versionId);
   // A failed retry explains the status it was tried on; once the status moves on, that status speaks for itself.
-  const [retryFailedOn, setRetryFailedOn] = useState<ProxyReconciliationStatus | undefined>();
+  const [retryFailedOn, setRetryFailedOn] = useState<ProxyReconciliationStatus | null | undefined>();
   const retry = () => {
-    const triedOn = deployment?.proxyReconciliation;
+    const triedOn = gateway;
     retryReconciliation.mutate(undefined, { onError: () => setRetryFailedOn(triedOn) });
   };
 
@@ -188,7 +189,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
               </Button>
             ) : undefined
           }>
-          {retryReconciliation.isError && retryFailedOn === deployment?.proxyReconciliation ? friendlyApiError(retryReconciliation.error, 'Could not retry the API gateway update.') : reconciliation.text}
+          {retryReconciliation.isError && retryFailedOn === gateway ? friendlyApiError(retryReconciliation.error, 'Could not retry the API gateway update.') : reconciliation.text}
         </Alert>
       )}
 
