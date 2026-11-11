@@ -37,7 +37,8 @@
 
 import { getAccessToken } from '#auth';
 import { contextEngineClient, isAccessTokenExpired, refreshAccessToken } from './httpClients';
-import { CONTEXT_ENGINE_ID, CONTEXT_ENGINE_LOCAL_KEY, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS, DEFAULT_CONTEXT_ENGINE_NAME } from '../../constants/contextEngine';
+import { clearQuestions } from '../../hooks/contextQuestions';
+import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX, CONTEXT_ENGINE_ID, CONTEXT_ENGINE_LOCAL_KEY, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS, DEFAULT_CONTEXT_ENGINE_NAME } from '../../constants/contextEngine';
 import { audienceMappingFromRules, deliveryIdentity, engineMessage, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toSourceRegistration } from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
@@ -360,9 +361,9 @@ const toExposure = (raw: RawEngine | null): ContextEngineExposure => ({ api: raw
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
-  lancedb: { label: 'LanceDB', detail: 'Engine managed · embedded' },
-  sqlite: { label: 'SQLite', detail: 'Engine managed · embedded' },
-  kuzu: { label: 'Kuzu', detail: 'Engine managed · embedded' },
+  lancedb: { label: 'LanceDB', detail: 'Engine managed · built in' },
+  sqlite: { label: 'SQLite', detail: 'Engine managed · built in' },
+  kuzu: { label: 'Kuzu', detail: 'Engine managed · built in' },
   pgvector: { label: 'PostgreSQL + pgvector', detail: 'External' },
   postgres: { label: 'PostgreSQL', detail: 'External' },
   neo4j: { label: 'Neo4j', detail: 'External' },
@@ -568,7 +569,25 @@ export async function deleteContextEngine(engineId: string): Promise<ContextJobH
   } catch {
     throw new Error("Couldn't forget the engine: this browser's storage is unavailable.");
   }
+  forgetEngineBrowserState(engineId);
   return null;
+}
+
+/**
+ * Drop what this browser kept about an engine: its recent questions and its getting-started flags. Every engine
+ * this console creates has the same id, so without this a new engine would inherit them.
+ */
+function forgetEngineBrowserState(engineId: string): void {
+  clearQuestions(engineId);
+  try {
+    const prefixes = [CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX].map((p) => `${p}${engineId}`);
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (k && prefixes.some((p) => k === p || k.startsWith(`${p}:`))) localStorage.removeItem(k);
+    }
+  } catch {
+    // Storage unavailable: the flags are also scoped by creation time, so a new engine still starts clean.
+  }
 }
 
 /** The engine's models come from its environment; changing them is a redeploy. */

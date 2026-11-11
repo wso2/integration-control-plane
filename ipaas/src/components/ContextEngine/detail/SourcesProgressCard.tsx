@@ -22,22 +22,10 @@ import { useSourceUploads } from '../../../hooks/contextUploads';
 import type { JSX } from 'react';
 import { useContextEngineProgress } from '../../../hooks/useContextEngine';
 import { SOURCE_PROGRESS_LABEL, SOURCE_PROGRESS_TONE } from '../../../constants/contextEngine';
-import {
-  formatProgressPercent,
-  isSourceProgressActive,
-  overallProgress,
-  progressHeadline,
-  sourceFailureNotice,
-  sourceIndexingText,
-  sourceProgressDetail,
-  sourceProgressStatus,
-  sourceProgressValue,
-  sourceSyncText,
-  sourceTypeName,
-  summarizeEngineProgress,
-} from '../../../utils/contextEngine';
+import { formatProgressPercent, isSourceProgressActive, sourceFailureNotice, sourceProgressDetail, sourceProgressStatus, sourceProgressValue, sourceSyncText, sourceTypeName, summarizeEngineProgress } from '../../../utils/contextEngine';
 import SourceMark from '../SourceMark';
-import { mutedSx, progressBarSx, progressCaptionSx, progressHeadlineSx, progressOverallSx, sourceProgressBodySx, sourceProgressHeadSx, sourceProgressRowSx, summaryCardHeaderSx, summaryCardSx } from '../styles';
+import SectionCard from '../SectionCard';
+import { mutedSx, progressBarSx, progressCaptionSx, progressHeadlineSx, sourceProgressBodySx, sourceProgressHeadSx, sourceProgressRowSx } from '../styles';
 import type { ContextSource, SourceProgress } from '../../../types/contextEngine';
 
 interface SourcesProgressCardProps {
@@ -79,40 +67,42 @@ function ProgressChip({ progress }: { progress: SourceProgress }): JSX.Element {
   return <Chip size="small" variant="outlined" color={SOURCE_PROGRESS_TONE[status]} icon={active ? <CircularProgress size={10} color="inherit" aria-hidden /> : undefined} label={label} />;
 }
 
-function ProgressBody({ source, progress }: { source: ContextSource; progress: SourceProgress }): JSX.Element {
+/** The one-line summary after the source type: what is in the index, or what is happening now. */
+function rowSummary(source: ContextSource, p: SourceProgress): string {
+  const status = sourceProgressStatus(p);
+  const ix = p.indexing;
+  const n = (v: number) => v.toLocaleString('en-US');
+  const items = (v: number) => `${n(v)} ${v === 1 ? 'item' : 'items'}`;
+  if (status === 'waiting') return source.type === 'upload' ? 'No files yet. Upload files to bring data in.' : 'No sync yet. Data appears after the first sync.';
+  if (status === 'empty') return sourceProgressDetail(p);
+  if (status === 'reading' || status === 'processing') {
+    const { total, succeeded, failed } = p.processing;
+    return total > 0 ? `${n(succeeded + failed)} of ${items(total)} processed${p.reading.state === 'reading' ? ' so far' : ''}` : 'Waiting for the first items';
+  }
+  const parts: string[] = [];
+  if (ix.state === 'ok' && ix.expected) parts.push(ix.indexed === ix.expected ? `${items(ix.indexed ?? 0)} indexed` : `${n(ix.indexed ?? 0)} of ${items(ix.expected)} indexed`);
+  else parts.push(`${items(p.records.active)} stored`);
+  const failed = (ix.state === 'ok' ? ix.failed : null) ?? p.processing.failed;
+  if (failed) parts.push(`${n(failed)} failed`);
+  const sync = sourceSyncText(p);
+  if (sync) parts.push(sync);
+  return parts.join(' · ');
+}
+
+/** A bar only while the source is moving; a failure as one sentence. Nothing else under the row. */
+function ProgressBody({ source, progress }: { source: ContextSource; progress: SourceProgress }): JSX.Element | null {
   const status = sourceProgressStatus(progress);
   const value = sourceProgressValue(progress);
-  const sync = sourceSyncText(progress);
-  const indexing = sourceIndexingText(progress);
   const notice = sourceFailureNotice(progress);
+  const moving = status === 'reading' || status === 'processing' || status === 'indexing';
+  if (!moving && !notice) return null;
   return (
     <Box sx={sourceProgressBodySx}>
-      {status !== 'waiting' && status !== 'empty' && (
-        <LinearProgress
-          variant={value === null ? 'indeterminate' : 'determinate'}
-          value={value ?? undefined}
-          color={status === 'attention' ? 'warning' : status === 'processed' ? 'success' : 'primary'}
-          aria-label={`${source.name} progress`}
-          sx={progressBarSx}
-        />
-      )}
-      <Typography variant="caption" sx={progressCaptionSx}>
-        {sourceProgressDetail(progress)}
-      </Typography>
-      {sync && (
-        <Typography variant="caption" sx={progressCaptionSx}>
-          {sync}
-        </Typography>
-      )}
-      {indexing && (
-        <Typography variant="caption" sx={progressCaptionSx}>
-          {indexing}
-        </Typography>
-      )}
+      {moving && <LinearProgress variant={value === null ? 'indeterminate' : 'determinate'} value={value ?? undefined} aria-label={`${source.name} progress`} sx={progressBarSx} />}
       {notice && (
-        <Alert severity="warning" variant="outlined" sx={{ mt: 1 }}>
+        <Typography variant="caption" sx={{ ...progressCaptionSx, color: 'warning.dark' }}>
           {notice}
-        </Alert>
+        </Typography>
       )}
     </Box>
   );
@@ -135,25 +125,32 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
       )
     : null;
   const visible = summary ? summary.sourceCount - summary.hidden : 0;
-  const overall = available ? overallProgress(progress.sources) : null;
+  const attention = available ? progress.sources.filter((p) => sources.some((src) => src.id === p.sourceId) && sourceProgressStatus(p) === 'attention').length : 0;
 
   return (
-    <Box id={id} sx={summaryCardSx}>
-      <Box sx={summaryCardHeaderSx}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Sources ({sources.length})
-        </Typography>
-        {progressQuery.isLoading && sources.length > 0 && (
-          <Box sx={progressHeadlineSx}>
-            <CircularProgress size={12} color="inherit" aria-hidden />
-            <Typography variant="caption">Loading progress…</Typography>
-          </Box>
-        )}
+    <SectionCard
+      id={id}
+      title={`Sources (${sources.length})`}
+      action={
         <Stack direction="row" alignItems="center" gap={1.5}>
-          {summary && sources.length > 0 && (
+          {progressQuery.isLoading && sources.length > 0 && (
+            <Box sx={progressHeadlineSx}>
+              <CircularProgress size={12} color="inherit" aria-hidden />
+              <Typography variant="caption">Loading progress…</Typography>
+            </Box>
+          )}
+          {summary && (summary.active > 0 || attention > 0) && (
             <Box sx={progressHeadlineSx} aria-live="polite">
               {summary.active > 0 && <CircularProgress size={12} color="inherit" aria-hidden />}
-              <Typography variant="caption">{progressHeadline(summary)}</Typography>
+              <Typography variant="caption">
+                {summary.active > 0 && `Syncing ${summary.active} of ${visible}`}
+                {summary.active > 0 && attention > 0 && ' · '}
+                {attention > 0 && (
+                  <Box component="span" sx={{ color: 'warning.dark' }}>
+                    {attention} need{attention === 1 ? 's' : ''} attention
+                  </Box>
+                )}
+              </Typography>
             </Box>
           )}
           {onAddSource && (
@@ -162,12 +159,10 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
             </Button>
           )}
         </Stack>
-      </Box>
-
+      }>
       {progressQuery.isError && (
         <Alert
           severity="warning"
-          variant="outlined"
           sx={{ mb: 1.5 }}
           action={
             <Button size="small" color="inherit" onClick={() => void progressQuery.refetch()}>
@@ -176,20 +171,6 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
           }>
           Couldn&apos;t load source progress.
         </Alert>
-      )}
-
-      {summary && overall && visible > 1 && (
-        <Box sx={progressOverallSx}>
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>
-              Syncing {summary.active} of {visible} sources
-            </Typography>
-            <Typography variant="caption" sx={mutedSx}>
-              {overall.text}
-            </Typography>
-          </Stack>
-          <LinearProgress variant={overall.value === null ? 'indeterminate' : 'determinate'} value={overall.value ?? undefined} aria-label="All sources progress" sx={progressBarSx} />
-        </Box>
       )}
 
       {sources.length === 0 ? (
@@ -208,8 +189,8 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
                     <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
                       {s.name}
                     </Typography>
-                    <Typography variant="caption" sx={mutedSx}>
-                      {sourceTypeName(s.type)}
+                    <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }}>
+                      {p ? `${sourceTypeName(s.type)} · ${rowSummary(s, p)}` : sourceTypeName(s.type)}
                     </Typography>
                   </Box>
                 </Stack>
@@ -237,6 +218,6 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
           );
         })
       )}
-    </Box>
+    </SectionCard>
   );
 }

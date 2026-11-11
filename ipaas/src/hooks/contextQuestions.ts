@@ -39,7 +39,15 @@ function read(engineId: string): AskedQuestion[] {
   try {
     const raw = localStorage.getItem(key(engineId));
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    list = Array.isArray(parsed) ? parsed.filter((q): q is AskedQuestion => typeof q?.queryId === 'string' && typeof q?.question === 'string') : EMPTY;
+    const valid = Array.isArray(parsed) ? parsed.filter((q): q is AskedQuestion => typeof q?.queryId === 'string' && typeof q?.question === 'string') : [];
+    // Lists saved before repeats were merged can hold the same question twice; keep the newest of each.
+    const seen = new Set<string>();
+    list = valid.filter((q) => {
+      const k = `${q.mode}|${q.question.trim().toLowerCase()}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   } catch {
     list = EMPTY;
   }
@@ -59,7 +67,9 @@ function write(engineId: string, list: AskedQuestion[]): void {
 
 /** Keep a question, newest first; asking it again replaces the older entry. */
 export function rememberQuestion(question: AskedQuestion): void {
-  write(question.engineId, [question, ...read(question.engineId).filter((q) => q.queryId !== question.queryId)].slice(0, ASKED_QUESTIONS_MAX));
+  // Asking the same question again in the same mode replaces the older entry too, so the list does not repeat itself.
+  const same = (q: AskedQuestion) => q.queryId === question.queryId || (q.mode === question.mode && q.question.trim().toLowerCase() === question.question.trim().toLowerCase());
+  write(question.engineId, [question, ...read(question.engineId).filter((q) => !same(q))].slice(0, ASKED_QUESTIONS_MAX));
 }
 
 /** Update what a stored question now shows, e.g. after a reopen withheld its answer. */

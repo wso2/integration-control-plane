@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Stack, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_HINT, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { engineDescriptionError, engineNameError } from '../../../utils/contextEngine';
 import { fieldStackSx, stepHeadingSx, stepHintSx } from '../styles';
+import TextField from '../../common/TextField';
 
 interface NameStepProps {
   name: string;
@@ -38,7 +39,7 @@ export default function NameStep({ name, description, onNameChange, onDescriptio
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
-        Name
+        Define Engine
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
         Give the engine a name your team will recognise.

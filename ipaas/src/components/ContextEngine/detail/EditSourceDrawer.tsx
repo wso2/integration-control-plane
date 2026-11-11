@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../../constants/contextEngine';
@@ -30,6 +30,7 @@ import OwnerAccessButton from './OwnerAccessButton';
 import SourceMark from '../SourceMark';
 import { connectorHeaderSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fieldStackSx, filesDrawerSx, mutedSx } from '../styles';
 import type { ContextSource, FileVisibility } from '../../../types/contextEngine';
+import TextField from '../../common/TextField';
 
 interface EditSourceDrawerProps {
   engineId: string;
@@ -41,6 +42,8 @@ interface EditSourceDrawerProps {
   queryRoles: string[];
   open: boolean;
   onClose: () => void;
+  /** Called with the saved name after a successful save, before the drawer closes. */
+  onSaved?: (name: string) => void;
 }
 
 /**
@@ -49,7 +52,7 @@ interface EditSourceDrawerProps {
  * browser last saved; saving replaces the whole set. A File Upload source has no
  * rules to edit: each file's visibility is chosen in the Files drawer.
  */
-export default function EditSourceDrawer({ engineId, orgHandle, source, otherNames, queryRoles, open, onClose }: EditSourceDrawerProps): JSX.Element {
+export default function EditSourceDrawer({ engineId, orgHandle, source, otherNames, queryRoles, open, onClose, onSaved }: EditSourceDrawerProps): JSX.Element {
   const isUpload = source.type === 'upload';
   // With roles turned off the drawer only renames, so a source registered earlier with some roles keeps them.
   const editsRules = !isUpload && ROLE_VISIBILITY_ENABLED;
@@ -70,7 +73,15 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
   const forbidden = update.error instanceof HttpError && update.error.status === 403;
 
   const save = () => {
-    update.mutate({ sourceId: source.id, name: name.trim(), ...(editsRules && visibilityTouched ? { audience: rules } : {}) }, { onSuccess: onClose });
+    update.mutate(
+      { sourceId: source.id, name: name.trim(), ...(editsRules && visibilityTouched ? { audience: rules } : {}) },
+      {
+        onSuccess: () => {
+          onSaved?.(name.trim());
+          onClose();
+        },
+      },
+    );
   };
 
   return (
@@ -114,9 +125,7 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
           </Box>
         ) : (
           <>
-            <Alert severity="info" variant="outlined">
-              The engine does not report a source&apos;s current visibility. Leave this as it is to keep the source&apos;s rules. Changing it replaces who can see this content.
-            </Alert>
+            <Alert severity="info">The engine does not report a source&apos;s current visibility. Leave this as it is to keep the source&apos;s rules. Changing it replaces who can see this content.</Alert>
             <FileVisibilityField
               id="edit-source-visibility"
               label="Who can see this content"
@@ -128,16 +137,12 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
                 setVisibilityTouched(true);
               }}
             />
-            {noRules && (
-              <Alert severity="warning" variant="outlined">
-                No role can query this engine yet, so there is no one to map this content to. Grant query access first, or leave the visibility as it is.
-              </Alert>
-            )}
+            {noRules && <Alert severity="warning">No role can query this engine yet, so there is no one to map this content to. Grant query access first, or leave the visibility as it is.</Alert>}
           </>
         )}
 
         {update.isError && (
-          <Alert severity="error" variant="outlined" action={forbidden ? <OwnerAccessButton engineId={engineId} onGranted={save} /> : undefined}>
+          <Alert severity="error" action={forbidden ? <OwnerAccessButton engineId={engineId} onGranted={save} /> : undefined}>
             {forbidden ? 'Changing a source needs the manage permission on this engine.' : engineMessage(update.error, "Couldn't save the source.")}
           </Alert>
         )}

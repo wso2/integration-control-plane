@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { ChevronRight, Upload } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, Typography } from '@wso2/oxygen-ui';
+import { ChevronDown, ChevronUp, Upload } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useRef, useState, type JSX } from 'react';
 import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
@@ -27,8 +27,9 @@ import FileVisibilityField from './files/FileVisibilityField';
 import VisibilityComingSoon from './files/VisibilityComingSoon';
 import { StagedFilesSection, StagedVisibilityField } from './files/StagedFilesSection';
 import SourceMark from './SourceMark';
-import { connectorHeaderSx, fieldGroupBodySx, fieldGroupChevronSx, fieldGroupToggleSx, fieldStackSx } from './styles';
+import { connectorFieldStackSx, connectorHeaderSx, fieldGroupBodySx, fieldGroupSx, fieldGroupToggleSx } from './styles';
 import type { ContextSourceConfig, SourceConnector, SourceFieldDef } from '../../types/contextEngine';
+import TextField from '../common/TextField';
 
 interface ConnectorFormProps {
   orgHandle: string;
@@ -178,7 +179,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
         )}
       </Box>
 
-      <Stack sx={fieldStackSx}>
+      <Stack sx={connectorFieldStackSx}>
         <TextField
           label="Source Name"
           required
@@ -195,10 +196,12 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
           const group = section.group;
           const collapsed = collapsedGroups[group] ?? !!section.collapsed;
           return (
-            <Box key={group}>
-              <ButtonBase sx={fieldGroupToggleSx} aria-expanded={!collapsed} onClick={() => setCollapsedGroups((c) => ({ ...c, [group]: !collapsed }))}>
-                <ChevronRight size={14} style={fieldGroupChevronSx(!collapsed)} />
-                {group}
+            <Box key={group} sx={fieldGroupSx}>
+              <ButtonBase sx={fieldGroupToggleSx(!collapsed)} aria-expanded={!collapsed} onClick={() => setCollapsedGroups((c) => ({ ...c, [group]: !collapsed }))}>
+                <Typography variant="subtitle2" component="span" sx={{ fontWeight: 600 }}>
+                  {group}
+                </Typography>
+                {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
               </ButtonBase>
               <Collapse in={!collapsed} unmountOnExit>
                 <Stack sx={fieldGroupBodySx}>{section.fields.map(renderField)}</Stack>

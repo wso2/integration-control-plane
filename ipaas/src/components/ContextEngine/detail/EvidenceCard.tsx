@@ -19,14 +19,17 @@
 import { Box, Chip, IconButton, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, ExternalLink, Link as LinkIcon } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { absoluteUrl, evidencePlace, sourceTypeName, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
+import { absoluteUrl, evidencePlace, isOpaqueRecordId, passageExcerpt, queryTerms, sourceTypeName, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
+import PassageText from './PassageText';
 import SourceMark from '../SourceMark';
 import { evidenceCardSx, mutedSx, passageSx } from '../styles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
 
 /** Where a passage sits: the item, then a JSON path as code, lines or sentences, and its section. */
-export function EvidencePlace({ evidence, showRecord = true }: { evidence: ContextEvidence; showRecord?: boolean }): JSX.Element {
+export function EvidencePlace({ evidence, showRecord: wantRecord = true }: { evidence: ContextEvidence; showRecord?: boolean }): JSX.Element {
   const place = evidencePlace(evidence);
+  // An id such as a Drive file id tells the reader nothing, so the source name above stands for it.
+  const showRecord = wantRecord && !isOpaqueRecordId(evidence.recordId);
   return (
     <Typography component="span" variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexWrap: 'wrap' }}>
       {showRecord && <span>{evidence.recordId}</span>}
@@ -54,6 +57,8 @@ interface EvidenceCardProps {
   href: string;
   onOpen: () => void;
   id?: string;
+  /** The question asked, so its words can be shown in bold. */
+  question?: string;
 }
 
 /**
@@ -61,7 +66,7 @@ interface EvidenceCardProps {
  * and the text. Copy link and Open lead to the passage page, which checks
  * access again whenever it opens.
  */
-export default function EvidenceCard({ evidence, n, source, href, onOpen, id }: EvidenceCardProps): JSX.Element {
+export default function EvidenceCard({ evidence, n, source, href, onOpen, id, question = '' }: EvidenceCardProps): JSX.Element {
   const [copied, setCopied] = useState(false);
   const copy = () =>
     navigator.clipboard?.writeText(absoluteUrl(href)).then(() => {
@@ -100,7 +105,7 @@ export default function EvidenceCard({ evidence, n, source, href, onOpen, id }: 
         </Stack>
       </Stack>
       <Typography variant="body2" sx={passageSx}>
-        “{evidence.passage}”
+        “<PassageText text={passageExcerpt(evidence.passage, queryTerms(question))} terms={queryTerms(question)} />”
       </Typography>
     </Box>
   );

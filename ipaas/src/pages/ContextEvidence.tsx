@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, /* Chip, */ CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, /* Chip, */ CircularProgress, Grid, PageContent, Stack, Typography, Paper } from '@wso2/oxygen-ui';
 import { ArrowLeft, /* Check, */ ChevronRight, Hash, /* Link as LinkIcon, */ MessageSquare, Unlink /* , Users */ } from '@wso2/oxygen-ui-icons-react';
 import { /* useState, */ type JSX /* , type ReactNode */ } from 'react';
 import { useLocation, useParams } from 'react-router';
@@ -119,7 +119,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
       <PageContent sx={wrapSx}>
         {back}
         {gone ? (
-          <Box sx={{ ...summaryCardSx, height: 'auto', maxWidth: 620, p: 3.5 }}>
+          <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto', maxWidth: 620, p: 3.5 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Unlink size={22} aria-hidden />
             </Box>
@@ -137,7 +137,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 {backTarget.label}
               </Button>
             </Stack>
-          </Box>
+          </Paper>
         ) : (
           <Alert
             severity="error"
@@ -210,7 +210,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
         </Alert>
       )}
 
-      <Box sx={{ ...summaryCardSx, height: 'auto', mt: 3 }}>
+      <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto', mt: 3 }}>
         <Box sx={summaryCardHeaderSx}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
             Provenance
@@ -227,12 +227,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
           <ChainStep label="Passage" value={primaryPlace(ev)} detail={passageDetail || undefined} mono={!!l?.path} />
           */}
         </Stack>
-      </Box>
+      </Paper>
 
       <Grid container spacing={2} sx={{ mt: 2 }}>
         {/* Full width while the side cards are hidden; it was md: 7 beside them. */}
         <Grid size={{ xs: 12 }}>
-          <Box sx={{ ...summaryCardSx, height: 'auto' }}>
+          <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto' }}>
             <Box sx={summaryCardHeaderSx}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                 Evidence
@@ -262,12 +262,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 {ev.passage}
               </Typography>
             )}
-          </Box>
+          </Paper>
         </Grid>
         {/* The "Where it is" and "Who can open this link" cards, hidden for now.
         <Grid size={{ xs: 12, md: 5 }}>
           <Stack gap={2}>
-            <Box sx={{ ...summaryCardSx, height: 'auto' }}>
+            <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto' }}>
               <Box sx={summaryCardHeaderSx}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                   Where it is
@@ -294,8 +294,8 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 </Row>
               )}
               <Row label="Version">{evidenceVersionLabel(ev.sourceVersion)}</Row>
-            </Box>
-            <Box sx={{ ...summaryCardSx, height: 'auto' }}>
+            </Paper>
+            <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto' }}>
               <Stack direction="row" gap={1.25} alignItems="flex-start">
                 <Users size={18} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
                 <Box>
@@ -307,7 +307,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                   </Typography>
                 </Box>
               </Stack>
-            </Box>
+            </Paper>
           </Stack>
         </Grid>
         */}

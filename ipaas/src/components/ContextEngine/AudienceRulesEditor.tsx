@@ -16,13 +16,14 @@
  * under the License.
  */
 
-import { Box, Button, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, IconButton, MenuItem, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useRoles } from '../../hooks/useAuth';
 import { audienceError } from '../../utils/contextEngine';
 import { audienceRowSx, audienceSectionSx, fieldStackSx } from './styles';
 import type { AudienceRule } from '../../types/contextEngine';
+import TextField from '../common/TextField';
 
 interface AudienceRulesEditorProps {
   orgHandle: string;

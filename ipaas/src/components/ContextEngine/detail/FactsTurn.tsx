@@ -31,6 +31,8 @@ interface FactsTurnProps {
   onOpen: (evidence: ContextEvidence) => void;
   /** The Graph tab URL that lights the facts' part of the graph; with a passage, that passage opens chosen. */
   graphHrefFor: (evidence?: ContextEvidence) => string;
+  /** The question asked, for the excerpts. */
+  question?: string;
 }
 
 /**
@@ -39,7 +41,7 @@ interface FactsTurnProps {
  * a passage in the rail, lights both; clicking either pins it until it is
  * clicked again or Esc is pressed.
  */
-export default function FactsTurn({ facts, evidence, sources, hrefFor, onOpen, graphHrefFor }: FactsTurnProps): JSX.Element {
+export default function FactsTurn({ facts, evidence, sources, hrefFor, onOpen, graphHrefFor, question }: FactsTurnProps): JSX.Element {
   const [active, setActive] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
 
@@ -59,7 +61,7 @@ export default function FactsTurn({ facts, evidence, sources, hrefFor, onOpen, g
       <Box sx={{ minWidth: 0 }}>
         <GraphFacts facts={facts} evidence={evidence} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
       </Box>
-      <EvidenceRail evidence={evidence} sources={sources} active={active} pinned={pinned} hrefFor={hrefFor} onHover={setActive} onPin={togglePin} onOpen={onOpen} graphHrefFor={graphHrefFor} />
+      <EvidenceRail question={question} evidence={evidence} sources={sources} active={active} pinned={pinned} hrefFor={hrefFor} onHover={setActive} onPin={togglePin} onOpen={onOpen} graphHrefFor={graphHrefFor} />
     </Box>
   );
 }

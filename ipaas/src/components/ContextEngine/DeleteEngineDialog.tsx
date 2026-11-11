@@ -16,10 +16,9 @@
  * under the License.
  */
 
-import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Database, KeyRound, MessageSquare, Upload } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX, type ReactNode } from 'react';
-import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
+import { useRef, useState, type JSX, type ReactNode } from 'react';
 import { wrapSx } from './styles';
 
 interface DeleteEngineDialogProps {
@@ -74,51 +73,51 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
 export default function DeleteEngineDialog({ name, sourceCount, isPending, error, onConfirm, onClose, forgetOnly = false }: DeleteEngineDialogProps): JSX.Element {
   const [typed, setTyped] = useState('');
   const matches = typed.trim() === name.trim();
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <ConfirmDeleteDialog
-      title={
-        <>
-          Delete{' '}
-          <Box component="strong" sx={wrapSx}>
-            {name}
-          </Box>
-          ?
-        </>
-      }
-      onConfirm={() => matches && onConfirm()}
-      onClose={onClose}
-      isPending={isPending}
-      confirmDisabled={!matches}
-      confirmLabel="Delete engine"
-      pendingLabel={forgetOnly ? 'Deleting…' : 'Starting…'}>
-      {forgetOnly ? (
-        <Typography variant="body2" color="text.secondary">
-          Its data stays in the engine's databases. A new engine picks it up again.
-        </Typography>
-      ) : (
-        <DeletesEverything sourceCount={sourceCount} />
-      )}
-      <TextField
-        fullWidth
-        size="small"
-        autoFocus
-        label={
+    // The dialog's focus trap takes focus as it opens, so autoFocus alone loses it; focus the field once the dialog is in.
+    <Dialog open onClose={isPending ? undefined : onClose} maxWidth="sm" fullWidth slotProps={{ transition: { onEntered: () => inputRef.current?.focus() } }}>
+      <DialogTitle>
+        Are you sure you want to remove the context engine &lsquo;
+        <Box component="strong" sx={wrapSx}>
+          {name}
+        </Box>
+        &rsquo;?
+      </DialogTitle>
+      <DialogContent>
+        {forgetOnly ? (
+          <DialogContentText sx={{ mb: 2 }}>Its data stays in the engine&apos;s databases, and a new engine picks it up again. Please type in the context engine name below to confirm.</DialogContentText>
+        ) : (
           <>
-            Type <strong>{name}</strong> to confirm
+            <DeletesEverything sourceCount={sourceCount} />
+            <DialogContentText sx={{ mt: 2, mb: 2 }}>Please type in the context engine name below to confirm.</DialogContentText>
           </>
-        }
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && matches && !isPending) onConfirm();
-        }}
-        sx={{ mt: 2.5 }}
-      />
-      {error && (
-        <Alert severity="error" variant="outlined" sx={{ mt: 2 }}>
-          {error}
-        </Alert>
-      )}
-    </ConfirmDeleteDialog>
+        )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <TextField
+          autoFocus
+          inputRef={inputRef}
+          fullWidth
+          placeholder="Enter context engine name to confirm"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && matches && !isPending) onConfirm();
+          }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button variant="outlined" onClick={onClose} disabled={isPending}>
+          Cancel
+        </Button>
+        <Button variant="contained" color="error" disabled={!matches || isPending} startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={onConfirm}>
+          {isPending ? 'Deleting...' : 'Delete'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Grid, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Grid, MenuItem, Select, Stack, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { blankLlm, contextLogoUrl, LLM_PROVIDERS } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
@@ -24,6 +24,7 @@ import SelectableCard from '../../common/SelectableCard';
 import SecretField from '../../common/SecretField';
 import { fieldStackSx, stepHeadingSx, stepHintSx, tileGridSx } from '../styles';
 import type { LlmConfig } from '../../../types/contextEngine';
+import TextField from '../../common/TextField';
 
 interface LlmModelStepProps {
   value: LlmConfig | null;

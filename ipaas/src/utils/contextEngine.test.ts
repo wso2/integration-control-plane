@@ -19,6 +19,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
+  restoreCase,
   audienceMappingFromRules,
   sourceAsConfig,
   checkStagedFile,
@@ -827,7 +828,7 @@ describe('storage', () => {
   });
 
   it('summarizes each mode in two lines', () => {
-    expect(summarizeStorage('graph', { mode: 'managed' })).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · embedded' });
+    expect(summarizeStorage('graph', { mode: 'managed' })).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · built in' });
     expect(summarizeStorage('vector', { mode: 'infrastructure', serverId: 's1', serverName: 'support-vectors', database: 'context_vectors' })).toEqual({ primary: 'support-vectors', secondary: 'pgvector · context_vectors' });
     expect(summarizeStorage('graph', { mode: 'external', uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'u', password: 'p' })).toEqual({ primary: 'Neo4j', secondary: 'graph.internal:7687 · neo4j' });
   });
@@ -1394,5 +1395,20 @@ describe('uploadSourceTitle', () => {
   it('says how many failed once nothing is running', () => {
     expect(uploadSourceTitle(of('searchable', 'failed'), 'Docs')).toBe('2 files uploaded to “Docs” · 1 failed');
     expect(uploadSourceTitle(of('searchable'), 'Docs')).toBe('1 file uploaded to “Docs”');
+  });
+});
+
+describe('restoreCase', () => {
+  it('takes the spelling from inside a sentence', () => {
+    expect(restoreCase('seeing ai', ['Apps such as Seeing AI describe scenes.'])).toBe('Seeing AI');
+  });
+
+  it('does not keep a capital that only opens a sentence', () => {
+    expect(restoreCase('vista spaces', ['Vista spaces are wide views.'])).toBe('vista spaces');
+    expect(restoreCase('vista spaces', ['Vista spaces are wide. We study vista spaces here.'])).toBe('vista spaces');
+  });
+
+  it('keeps a capital beyond the first letter even at a sentence start', () => {
+    expect(restoreCase('scene2audio', ['Scene2Audio converts images.'])).toBe('Scene2Audio');
   });
 });

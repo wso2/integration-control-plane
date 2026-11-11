@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, /* Chip, */ CircularProgress, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { Alert, Box, Button, /* Chip, */ CircularProgress, IconButton, Skeleton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Braces, Copy, Eraser, EyeOff, History, Info, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
+import { useMemo, useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
-import { useAskedFlag, useContextPermissions, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
+import { useAskedFlag, useContextPermissions, useQueryContextEngine, useReopenContextQuery, useContextPrincipal } from '../../../hooks/useContextEngine';
+import { rememberedSourceRules } from '../../../hooks/contextUploads';
 import { clearQuestions, forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
 import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
 import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MODES } from '../../../constants/contextEngine';
@@ -90,7 +91,7 @@ function SectionHeading({ title, caption }: { title: string; caption?: string })
 export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps): JSX.Element {
   const navigate = useAppNavigate();
   const [params, setSearchParams] = useSearchParams();
-  const { markAsked } = useAskedFlag(engine.id);
+  const { markAsked } = useAskedFlag(engine.id, engine.createdAt);
   // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
   // Until a mode is chosen the engine's default holds, and a stored Answer gives way when the engine offers no answers.
   const { turns, mode: chosenMode, pending, failure } = usePlaygroundConversation(engine.id);
@@ -100,19 +101,36 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
   const permissions = useContextPermissions(engine.id);
   const canQuery = !permissions.data || permissions.data.includes('context.read');
+  // Whether the asker can read anything at all: each source maps its labels to roles, and a passage is readable
+  // only to someone in one of those roles. Known only for sources whose rules this browser saved; otherwise assume yes.
+  const principal = useContextPrincipal();
+  const readsNothing = useMemo(() => {
+    const groups = principal.data?.groups;
+    if (!groups || engine.sources.length === 0) return false;
+    return engine.sources.every((s) => {
+      const rules = rememberedSourceRules(s.id);
+      return rules.length > 0 && !rules.some((r) => groups.includes(r.role));
+    });
+  }, [principal.data, engine.sources]);
   const canGrantSelf = !!permissions.data?.includes('access.manage');
   // "Ask about this" on a passage page lands here with the question in the URL.
   const [question, setQuestion] = useState(() => params.get('q')?.trim() ?? '');
   const [copied, setCopied] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ severity: 'info' | 'error'; message: string } | null>(null);
   const query = useQueryContextEngine();
   const reopen = useReopenContextQuery();
   // The question being reopened, kept here because the mutation's own pending state goes stale with its observer.
   const [openingId, setOpeningId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const asked = useAskedQuestions(engine.id);
+  // The placeholder for a question being answered, scrolled into view when it is asked so the answer lands in sight.
+  const pendingRef = useRef<HTMLDivElement>(null);
+  const allAsked = useAskedQuestions(engine.id);
+  // The console runs one engine instance with a fixed id, so the list also holds questions asked of engines deleted
+  // before this one was created; show only those asked since. Both times are ISO strings in UTC, so they compare as text.
+  const asked = useMemo(() => (engine.createdAt ? allAsked.filter((q) => q.askedAt >= engine.createdAt) : allAsked), [allAsked, engine.createdAt]);
   const sourcesById = new Map(engine.sources.map((s) => [s.id, s]));
-  const llmModel = engine.models.llm?.model;
+  // The provider is named elsewhere, so "openai/gpt-5-mini" reads as "gpt-5-mini", as on the Overview.
+  const llmModel = engine.models.llm?.model?.replace(/^[^/]+\//, '');
 
   const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !asking && openingId === null;
   // const suggestions = suggestedQuestions(engine);
@@ -125,6 +143,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || asking || openingId !== null) return;
     setNotice(null);
     const token = startQuestion(engine.id, q, askMode);
+    // The question now sits in the thread, so the box empties; it comes back if asking fails.
+    setQuestion('');
+    window.requestAnimationFrame(() => pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
     query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT }).then(
       (result) => {
@@ -133,7 +154,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         markAsked();
         if (finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } })) setQuestion('');
       },
-      (error: unknown) => void finishQuestion(engine.id, token, { error }),
+      (error: unknown) => {
+        if (finishQuestion(engine.id, token, { error })) setQuestion((current) => current || q);
+      },
     );
   };
 
@@ -156,13 +179,19 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         (e: unknown) => {
           if (e instanceof HttpError && e.status === 404) {
             forgetQuestion(engine.id, q.queryId);
-            setNotice('That question is no longer stored on the engine, so it was removed from your list.');
-          } else setNotice("Couldn't open that question. Please try again.");
+            setNotice({ severity: 'info', message: 'That question is no longer stored on the engine, so it was removed from your list.' });
+          } else setNotice({ severity: 'error', message: "Couldn't open that question. Please try again." });
         },
       )
       .finally(() => setOpeningId((current) => (current === q.queryId ? null : current)));
   };
 
+  const copyIds = (queryId: string, traceId: string) => {
+    void navigator.clipboard?.writeText(`query ${queryId}\ntrace ${traceId}`).then(() => {
+      setCopied(`ids-${queryId}`);
+      window.setTimeout(() => setCopied((c) => (c === `ids-${queryId}` ? null : c)), 1500);
+    });
+  };
   const copyResult = (turn: PlaygroundTurn) => {
     const text = turn.result.answer && !turn.result.answerWithheld ? turn.result.answer : turn.result.evidence.map((e, i) => `[${i + 1}] ${e.passage}`).join('\n');
     navigator.clipboard?.writeText(text).then(() => {
@@ -206,7 +235,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     const answered = !!answerText;
     const lost = t.reopened ? Math.max(0, t.reopened.passagesThen - n) : 0;
     // Full cards for passages, a hidden answer or an answer the engine declined; an answer gets its rail instead.
-    const cards = result.evidence.map((ev, idx) => <EvidenceCard key={ev.id} evidence={ev} n={idx + 1} source={sourcesById.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => openEvidence(ev)} />);
+    const cards = result.evidence.map((ev, idx) => <EvidenceCard key={ev.id} question={t.question} evidence={ev} n={idx + 1} source={sourcesById.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => openEvidence(ev)} />);
 
     let body: JSX.Element;
     let summary: string;
@@ -234,19 +263,19 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else if (answerText) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = <AnsweredTurn answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
+      body = <AnsweredTurn question={t.question} answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
-      body = (
-        <Alert severity="info" variant="outlined">
-          No passages you can read matched this question.
-        </Alert>
+      body = readsNothing ? (
+        <Alert severity="info">Nothing came back because you can&apos;t read any content in this engine. Its sources are shared with roles you&apos;re not in.</Alert>
+      ) : (
+        <Alert severity="info">No passages matched this question. Try different words.</Alert>
       );
     } else if (t.mode === 'answer') {
       summary = `No answer · ${n} passage${n === 1 ? '' : 's'} checked`;
       body = (
         <>
-          <Alert severity="info" variant="outlined">
+          <Alert severity="info">
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               No answer from the passages you can read
             </Typography>
@@ -258,10 +287,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else {
       const f = result.facts.length;
-      summary = `${n} passage${n === 1 ? '' : 's'}${f ? ` · ${f} evidence` : ''}`;
+      summary = `${n} passage${n === 1 ? '' : 's'}${f ? ` · ${f} fact${f === 1 ? '' : 's'}` : ''}`;
       // With graph facts, the passages move to a rail beside them, as an answer's do; without, they are the whole result.
       body = f ? (
-        <FactsTurn facts={result.facts} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} graphHrefFor={(ev) => derivationHref(result.queryId, ev)} />
+        <FactsTurn question={t.question} facts={result.facts} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} graphHrefFor={(ev) => derivationHref(result.queryId, ev)} />
       ) : (
         <>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
@@ -296,11 +325,19 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             </Box>
           )}
           <Box sx={answerFooterSx}>
-            <Typography variant="caption" sx={mutedSx}>
-              {summary} · query {result.queryId} · trace {result.traceId}
-            </Typography>
+            <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
+              <Typography variant="caption" sx={mutedSx}>
+                {summary}
+              </Typography>
+              {/* The ids are for debugging against the API: out of the outcome line, one click copies them. */}
+              <Tooltip title={copied === `ids-${result.queryId}` ? 'Copied' : `Query ${result.queryId} · Trace ${result.traceId}. Click to copy.`}>
+                <IconButton size="small" aria-label="Copy query and trace IDs" onClick={() => copyIds(result.queryId, result.traceId)}>
+                  <Info size={14} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
             <Stack direction="row" gap={1}>
-              <Button size="small" variant="text" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
+              <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
                 {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
               </Button>
               <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
@@ -318,49 +355,25 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   return (
     <Box ref={rootRef} sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 900px) minmax(260px, 320px)' }, gap: 3, alignItems: 'start', scrollMarginTop: 24 }}>
       <Stack gap={3} sx={{ minWidth: 0 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
-          <Typography variant="body2" sx={mutedSx}>
-            {CONTEXT_QUERY_MODES.find((m) => m.value === mode)?.hint}
-          </Typography>
-          <Stack direction="row" alignItems="center" gap={1}>
-            <ToggleButtonGroup
-              exclusive
-              size="small"
-              value={mode}
-              onChange={(_e, next: ContextQueryMode | null) => {
-                if (next) setMode(next);
-              }}
-              aria-label="Query mode">
-              {CONTEXT_QUERY_MODES.map((m) =>
-                m.value !== 'answer' || engine.exposure.answers ? (
-                  <ToggleButton key={m.value} value={m.value}>
-                    {m.label}
-                  </ToggleButton>
-                ) : (
-                  <Tooltip key={m.value} title="Answers are off for this engine.">
-                    <span>
-                      <ToggleButton value={m.value} disabled>
-                        {m.label}
-                      </ToggleButton>
-                    </span>
-                  </Tooltip>
-                ),
-              )}
-            </ToggleButtonGroup>
-            {turns.length > 0 && (
-              <Tooltip title="Clear conversation">
-                <span>
-                  <IconButton size="small" aria-label="Clear conversation" disabled={openingId !== null} onClick={() => clearTurns(engine.id)}>
-                    <Eraser size={16} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            )}
+        {turns.length > 0 && (
+          <Stack direction="row" justifyContent="flex-end">
+            <Tooltip title="Clear conversation">
+              <span>
+                <IconButton size="small" aria-label="Clear conversation" disabled={openingId !== null} onClick={() => clearTurns(engine.id)}>
+                  <Eraser size={16} />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Stack>
-        </Stack>
+        )}
+
+        {canQuery && readsNothing && (
+          // Said before the first question, so an empty result is not mistaken for a missing answer (round 1, 9.2).
+          <Alert severity="info">You can&apos;t read any content in this engine yet. Its sources are shared with roles you&apos;re not in. Ask an engine manager to share them with one of your roles.</Alert>
+        )}
 
         {!canQuery && (
-          <Alert severity="info" variant="outlined" action={canGrantSelf ? <OwnerAccessButton engineId={engine.id} /> : undefined}>
+          <Alert severity="info" action={canGrantSelf ? <OwnerAccessButton engineId={engine.id} /> : undefined}>
             You can&apos;t ask this engine questions. Ask an engine manager for access.
           </Alert>
         )}
@@ -380,16 +393,35 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
 
         {turns.map(renderTurn)}
 
+        {pending && (
+          // The question joins the thread as soon as it is sent, with a placeholder saying what the engine is doing.
+          <Stack ref={pendingRef} gap={1.5} sx={{ scrollMarginTop: 24 }}>
+            <Box sx={questionBubbleSx}>
+              <Typography variant="body2">{pending.question}</Typography>
+            </Box>
+            <Box sx={answerCardSx} aria-live="polite" aria-busy="true">
+              <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
+                <CircularProgress size={14} aria-hidden />
+                <Typography variant="body2" sx={mutedSx}>
+                  {pending.mode === 'answer' ? 'Finding passages and writing the answer…' : 'Finding passages…'}
+                </Typography>
+              </Stack>
+              <Skeleton variant="text" width="92%" />
+              <Skeleton variant="text" width="85%" />
+              <Skeleton variant="text" width="60%" />
+            </Box>
+          </Stack>
+        )}
+
         {notice && (
-          <Alert severity="info" variant="outlined" onClose={() => setNotice(null)}>
-            {notice}
+          <Alert severity={notice.severity} onClose={() => setNotice(null)}>
+            {notice.message}
           </Alert>
         )}
 
         {failure && (
           <Alert
             severity="error"
-            variant="outlined"
             onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
             action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
             {queryFailure(failure.error, failure.mode).message}
@@ -409,7 +441,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) ask();
+                // Enter asks, Shift+Enter adds a line, like other chat boxes; never while an input method is composing.
+                if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
+                e.preventDefault();
+                ask();
               }}
               inputProps={{ 'aria-label': 'Question', maxLength: CONTEXT_QUERY_MAX_LENGTH }}
             />
@@ -417,9 +452,44 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               {asking ? 'Asking…' : 'Ask'}
             </Button>
           </Box>
-          <Typography variant="caption" sx={{ ...mutedSx, ml: 1.75 }}>
-            ⌘/Ctrl + Enter to ask
-          </Typography>
+          {/* What the next question returns: a setting of the question box, not a view of the results above (round 1, 9.7). */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap" sx={{ ml: 1.75 }}>
+            <Stack direction="row" alignItems="center" gap={1}>
+              <Typography variant="caption" sx={{ ...mutedSx, fontWeight: 600 }}>
+                Ask for
+              </Typography>
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={mode}
+                onChange={(_e, next: ContextQueryMode | null) => {
+                  if (next) setMode(next);
+                }}
+                aria-label="Ask for">
+                {CONTEXT_QUERY_MODES.map((m) =>
+                  m.value !== 'answer' || engine.exposure.answers ? (
+                    <ToggleButton key={m.value} value={m.value} sx={{ textTransform: 'none', py: 0.25 }}>
+                      {m.label}
+                    </ToggleButton>
+                  ) : (
+                    <Tooltip key={m.value} title="Answers are off for this engine.">
+                      <span>
+                        <ToggleButton value={m.value} disabled sx={{ textTransform: 'none', py: 0.25 }}>
+                          {m.label}
+                        </ToggleButton>
+                      </span>
+                    </Tooltip>
+                  ),
+                )}
+              </ToggleButtonGroup>
+              <Typography variant="caption" sx={mutedSx}>
+                {CONTEXT_QUERY_MODES.find((m) => m.value === mode)?.hint}
+              </Typography>
+            </Stack>
+            <Typography variant="caption" sx={mutedSx}>
+              Enter to ask · Shift+Enter for a new line
+            </Typography>
+          </Stack>
         </Stack>
       </Stack>
 

@@ -16,13 +16,14 @@
  * under the License.
  */
 
-import { Box, Checkbox, FormControlLabel, Link, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Box, Checkbox, FormControlLabel, Link, MenuItem, Select, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX, type ReactNode } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { isCustomModel } from '../../../utils/contextEngine';
 import SelectableCard from '../../common/SelectableCard';
 import SecretField from '../../common/SecretField';
 import { modelColumnSx, modelTileGridSx } from '../styles';
+import TextField from '../../common/TextField';
 
 /** The fields every model config shares, whichever provider union it belongs to. */
 export interface ModelLike {

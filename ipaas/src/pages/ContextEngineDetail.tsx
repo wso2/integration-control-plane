@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, PageContent, PageTitle, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
@@ -35,6 +35,8 @@ import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
 import GraphTab from '../components/ContextEngine/detail/GraphTab';
 import ApiTab from '../components/ContextEngine/detail/ApiTab';
 import McpTab from '../components/ContextEngine/detail/McpTab';
+import ApiMockTab from '../components/ContextEngine/detail/mock/ApiMockTab';
+import McpMockTab from '../components/ContextEngine/detail/mock/McpMockTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
 import type { CreateContextEngineLocationState } from './CreateContextEngine';
 import type { ContextEngineTabKey } from '../types/contextEngine';
@@ -47,6 +49,9 @@ const TABS: { value: ContextEngineTabKey; label: string }[] = [
   { value: 'graph', label: 'Graph' },
   { value: 'api', label: 'API' },
   { value: 'mcp', label: 'MCP' },
+  // MOCK: proposed layouts for the API and MCP tabs, for the team to compare with the real ones.
+  { value: 'api-mock', label: 'API Mock' },
+  { value: 'mcp-mock', label: 'MCP Mock' },
   // { value: 'access', label: 'Access' },
 ];
 
@@ -127,7 +132,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
     setDeleteError(null);
     remove.mutate(engine.id, {
       // Without a deletion job the engine is gone from this console at once.
-      onSuccess: (handle) => (handle ? setConfirmDelete(false) : navigate(base)),
+      onSuccess: (handle) => (handle ? setConfirmDelete(false) : navigate(base, { state: { engineDeleted: true, engineName: engine.name } })),
       onError: (e) =>
         setDeleteError(
           e instanceof HttpError && e.status === 403
@@ -144,27 +149,21 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   return (
     <PageContent sx={wrapSx}>
       {back}
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <Typography variant="h5" sx={{ fontWeight: 600 }} noWrap>
-              {engine.name}
-            </Typography>
+      {/* The console's page header, as on the Context Engines list and the project pages. */}
+      <PageTitle>
+        <PageTitle.Header>
+          <Stack component="span" direction="row" alignItems="center" gap={1.5}>
+            {engine.name}
             <EngineStateChip state={engine.state} />
           </Stack>
-          {engine.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {engine.description}
-            </Typography>
-          )}
-        </Box>
-      </Stack>
+        </PageTitle.Header>
+        {engine.description && <PageTitle.SubHeader>{engine.description}</PageTitle.SubHeader>}
+      </PageTitle>
 
       {deleting &&
         (deletionFailed ? (
           <Alert
             severity="error"
-            variant="outlined"
             sx={{ mb: 3 }}
             action={
               <Button color="inherit" size="small" disabled={remove.isPending} onClick={onDelete}>
@@ -177,7 +176,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             {DELETION_FAILURE_TEXT}
           </Alert>
         ) : (
-          <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+          <Alert severity="warning" sx={{ mb: 3 }}>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               This engine is being deleted
             </Typography>
@@ -186,7 +185,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
 
       {warnings.length > 0 && (
-        <Alert severity="warning" variant="outlined" onClose={() => setWarnings([])} sx={{ mb: 3 }}>
+        <Alert severity="warning" onClose={() => setWarnings([])} sx={{ mb: 3 }}>
           The engine was created, but not every step completed:
           <Box component="ul" sx={{ m: 0, mt: 1, pl: 2.5 }}>
             {warnings.map((w) => (
@@ -197,7 +196,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
       )}
 
       {deleteError && !confirmDelete && (
-        <Alert severity="error" variant="outlined" onClose={() => setDeleteError(null)} sx={{ mb: 3 }}>
+        <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 3 }}>
           {deleteError}
         </Alert>
       )}
@@ -213,6 +212,8 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
       {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'api' && <ApiTab engine={engine} />}
       {shownTab === 'mcp' && <McpTab engine={engine} />}
+      {shownTab === 'api-mock' && <ApiMockTab engine={engine} orgHandle={scope.org} />}
+      {shownTab === 'mcp-mock' && <McpMockTab engine={engine} />}
       {/* {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />} */}
 
       {confirmDelete && (

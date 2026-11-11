@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, IconButton, PageContent, PageTitle, Stack } from '@wso2/oxygen-ui';
+import { ArrowLeft, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
@@ -41,7 +41,7 @@ import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
-const STEP_LABELS = ['Name', 'Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Review & Create'];
+const STEP_LABELS = ['Define Engine', 'Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Review & Create'];
 const LAST_STEP = STEP_LABELS.length - 1;
 const MODELS_STEP = STEP_LABELS.indexOf('Configure Models');
 const STORAGE_STEP = STEP_LABELS.indexOf('Configure Storage');
@@ -74,7 +74,6 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   // Set once the engine exists and staged files are being handed to it; the steps give way to the setup card.
   const [setup, setSetup] = useState<SetupState | null>(null);
   const [showRestored, setShowRestored] = useState(restored);
-  const [leaveOpen, setLeaveOpen] = useState(false);
   const create = useCreateContextEngine();
   const engines = useContextEngines();
   const { data: orgRoles } = useRoles(scope.org);
@@ -99,7 +98,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     return <ComingSoon title="Already set up" description="This console's context engine has already been created. Only one engine is supported for now." />;
   }
 
-  // Why each step's Next is disabled — shown beside the button so the user never guesses.
+  // What still blocks each step; a step's Next is enabled once its entry is null.
   const setupBlockers: (string | null)[] = [
     nameStepBlocker(form.name, form.description),
     sourcesStepBlocker(form.sources),
@@ -112,10 +111,13 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const stepValid = stepBlocker.map((b) => b === null);
   const canCreate = stepValid.every(Boolean);
 
-  const leave = (discard: boolean) => {
-    if (discard) draft.clear();
-    setLeaveOpen(false);
-    navigate(base);
+  // A restored draft can be thrown away where it comes back, rather than by asking on the way out:
+  // every exit keeps the draft, so Back and Cancel leave straight away like any other link.
+  const discardDraft = () => {
+    draft.clear();
+    dispatch({ type: 'reset' });
+    setActiveStep(0);
+    setShowRestored(false);
   };
 
   const submit = () => {
@@ -161,7 +163,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent sx={wrapSx}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !setup ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(base)} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
       <PageTitle>
@@ -187,13 +189,26 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           </Box>
           <Box sx={{ flex: 1, maxWidth: activeStep === MODELS_STEP || activeStep === STORAGE_STEP ? 1080 : 960, mt: 2 }}>
             {showRestored && (
-              <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
+              <Alert
+                severity="info"
+                // MUI drops the close button when an action is set, so both sit in the action slot.
+                action={
+                  <Stack direction="row" alignItems="center" gap={0.5}>
+                    <Button color="inherit" size="small" onClick={discardDraft}>
+                      Discard draft
+                    </Button>
+                    <IconButton color="inherit" size="small" aria-label="Close" onClick={() => setShowRestored(false)}>
+                      <X size={16} />
+                    </IconButton>
+                  </Stack>
+                }
+                sx={{ mb: 3 }}>
                 Draft restored. Re-enter API keys and tokens.
               </Alert>
             )}
 
             {error && (
-              <Alert severity="error" variant="outlined" onClose={() => setError(null)} sx={{ mb: 3 }}>
+              <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
                 {error}
               </Alert>
             )}
@@ -229,7 +244,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} draftSavedAt={draft.savedAt} onEdit={setActiveStep} />}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
-              <Button variant="outlined" disabled={create.isPending} onClick={activeStep === 0 ? () => (dirty ? setLeaveOpen(true) : navigate(base)) : () => setActiveStep((s) => Math.max(0, s - 1))}>
+              <Button variant="outlined" disabled={create.isPending} onClick={activeStep === 0 ? () => navigate(base) : () => setActiveStep((s) => Math.max(0, s - 1))}>
                 {activeStep === 0 ? 'Cancel' : 'Back'}
               </Button>
               {activeStep < LAST_STEP ? (
@@ -241,31 +256,10 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                   {create.isPending ? 'Creating…' : 'Create Context Engine'}
                 </Button>
               )}
-              {stepBlocker[activeStep] && (
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                  {stepBlocker[activeStep]}
-                </Typography>
-              )}
             </Stack>
           </Box>
         </Stack>
       )}
-
-      <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Leave without creating?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Your draft is kept for this tab. API keys and tokens are not.</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLeaveOpen(false)}>Stay</Button>
-          <Button color="error" onClick={() => leave(true)}>
-            Discard draft
-          </Button>
-          <Button variant="contained" onClick={() => leave(false)}>
-            Keep draft and leave
-          </Button>
-        </DialogActions>
-      </Dialog>
     </PageContent>
   );
 }

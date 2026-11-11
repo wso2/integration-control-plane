@@ -16,14 +16,16 @@
  * under the License.
  */
 
-import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import { Alert, Box, Stack, Typography } from '@wso2/oxygen-ui';
+import { useEffect, type JSX } from 'react';
+import { useConnectViewedFlag } from '../../../hooks/useContextEngine';
 import { useSearchParams } from 'react-router';
 import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
 import SurfaceHeader from './SurfaceHeader';
 import { endpointFieldSx, endpointRowSx, mutedSx } from '../styles';
 import type { ContextEngineDetail } from '../../../types/contextEngine';
+import TextField from '../../common/TextField';
 
 interface ApiTabProps {
   engine: ContextEngineDetail;
@@ -31,6 +33,9 @@ interface ApiTabProps {
 
 /** Expose as API — the engine's public endpoints, how to authenticate, and a ready-to-run request. */
 export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
+  // Opening this tab is what completes the Overview's Connect an agent step.
+  const { markConnectViewed } = useConnectViewedFlag(engine.id, engine.createdAt);
+  useEffect(() => markConnectViewed(), [markConnectViewed]);
   const [params] = useSearchParams();
   // "Use in API" on the Playground lands here with the question, and the answer route when it was asked for an answer.
   const question = params.get('q')?.trim() || undefined;
@@ -56,9 +61,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
       ))}
 
       <Stack gap={2} sx={{ mb: 3 }}>
-        <Alert severity="info" variant="outlined">
-          Send the caller's platform bearer token. Callers get only items they may read.
-        </Alert>
+        <Alert severity="info">Send the caller's platform bearer token. Callers get only items they may read.</Alert>
         <Typography variant="body2" sx={mutedSx}>
           Send <code>{'{"question": "…"}'}</code>. In <code>answer</code>, <code>[n]</code> cites the nth passage. With no answer, <code>state</code> is <code>"insufficient_evidence"</code>.
         </Typography>

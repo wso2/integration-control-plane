@@ -51,7 +51,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
         Configure Storage
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        Where the engine keeps its data. Engine managed stores are embedded and need no setup. Pick a server from Infrastructure when you want shared, backed-up storage you already operate.
+        Where the engine keeps its data. The defaults are built in and need no setup. Use your own server only if you need shared or backed-up storage.
       </Typography>
 
       <Box sx={storageGridSx}>

@@ -310,13 +310,9 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
       </Box>
 
       <Box sx={drawerBodySx}>
-        {notice && (
-          <Alert severity="warning" variant="outlined">
-            {notice}
-          </Alert>
-        )}
+        {notice && <Alert severity="warning">{notice}</Alert>}
         {forbidden && (
-          <Alert severity="warning" variant="outlined" action={<OwnerAccessButton engineId={engineId} onGranted={() => retryForbidden(engineId, source.id)} />}>
+          <Alert severity="warning" action={<OwnerAccessButton engineId={engineId} onGranted={() => retryForbidden(engineId, source.id)} />}>
             Uploading needs upload access to this engine. As an access manager you can give it to yourself.
           </Alert>
         )}
@@ -459,7 +455,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
             Its content will no longer appear in search results or answers.
           </Typography>
           {removeError && (
-            <Alert severity="error" variant="outlined" sx={{ mt: 1.5 }}>
+            <Alert severity="error" sx={{ mt: 1.5 }}>
               {removeError}
             </Alert>
           )}

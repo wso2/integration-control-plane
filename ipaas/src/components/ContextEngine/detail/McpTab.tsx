@@ -18,8 +18,8 @@
 
 import { Alert, Box, Button, ListingTable, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type JSX } from 'react';
-import { useContextEngineBearer } from '../../../hooks/useContextEngine';
+import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useConnectViewedFlag, useContextEngineBearer } from '../../../hooks/useContextEngine';
 import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
 import { buildMcpClientConfigs, mcpEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
@@ -37,6 +37,9 @@ const toolsTableSx = { border: '1px solid', borderColor: 'divider', borderRadius
 
 /** Expose as MCP — endpoint, a config per client, an in-place test, and the tools agents get. */
 export default function McpTab({ engine }: McpTabProps): JSX.Element {
+  // Opening this tab is what completes the Overview's Connect an agent step.
+  const { markConnectViewed } = useConnectViewedFlag(engine.id, engine.createdAt);
+  useEffect(() => markConnectViewed(), [markConnectViewed]);
   const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
   const endpoint = mcpEndpointUrl(base);
   const configs = useMemo(() => buildMcpClientConfigs(base, engine.name), [base, engine.name]);
@@ -112,9 +115,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
           </ListingTable>
         </ListingTable.Container>
 
-        <Alert severity="info" variant="outlined">
-          Agents see only what their user may see.
-        </Alert>
+        <Alert severity="info">Agents see only what their user may see.</Alert>
       </Box>
     </Box>
   );

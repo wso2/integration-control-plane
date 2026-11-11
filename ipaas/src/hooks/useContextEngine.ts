@@ -45,6 +45,7 @@ import { IS_WIP } from '../features';
 import { getAccessToken } from '#auth';
 import {
   CONTEXT_ENGINE_ASKED_KEY_PREFIX,
+  CONTEXT_ENGINE_CONNECT_KEY_PREFIX,
   CONTEXT_ENGINE_DELETION_KEY_PREFIX,
   CONTEXT_ENGINE_DRAFT_KEY_PREFIX,
   CONTEXT_JOB_TERMINAL_STATES,
@@ -430,14 +431,29 @@ export function useContextEngineDraft(orgHandle: string) {
 }
 
 /** Whether this user has asked the engine anything yet — drives the "Ask it something" checklist step. */
-export function useAskedFlag(engineId: string) {
-  const key = `${CONTEXT_ENGINE_ASKED_KEY_PREFIX}${engineId}`;
-  const [asked, setAsked] = useState(() => readStorage(local, key) === 'true');
-  const markAsked = useCallback(() => {
+/**
+ * A per-engine flag kept in this browser. Keyed by the engine's id and its creation time: the console runs one
+ * engine instance with a fixed id, so without the time a flag set on a deleted engine would carry over to the next.
+ */
+function useEngineFlag(prefix: string, engineId: string, createdAt = '') {
+  const key = `${prefix}${engineId}${createdAt ? `:${createdAt}` : ''}`;
+  const [value, setValue] = useState(() => readStorage(local, key) === 'true');
+  const mark = useCallback(() => {
     writeStorage(local, key, 'true');
-    setAsked(true);
+    setValue(true);
   }, [key]);
+  return [value, mark] as const;
+}
+
+export function useAskedFlag(engineId: string, createdAt?: string) {
+  const [asked, markAsked] = useEngineFlag(CONTEXT_ENGINE_ASKED_KEY_PREFIX, engineId, createdAt);
   return { asked, markAsked };
+}
+
+/** Whether the user has opened this engine's API or MCP tab, for the Connect an agent step. */
+export function useConnectViewedFlag(engineId: string, createdAt?: string) {
+  const [connectViewed, markConnectViewed] = useEngineFlag(CONTEXT_ENGINE_CONNECT_KEY_PREFIX, engineId, createdAt);
+  return { connectViewed, markConnectViewed };
 }
 
 /** The bearer credential the browser would send to the engine — the dev token when configured, else the platform token, read once it resolves. */
