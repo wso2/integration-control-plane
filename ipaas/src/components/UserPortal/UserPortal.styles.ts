@@ -78,7 +78,7 @@ export const cardSideActionAnchorSx = { display: 'inline-flex', flexShrink: 0 } 
 // then takes no space, so the card doesn't end in an empty gap.
 export const footerSx = { mt: 2, '&:empty': { display: 'none' } } as const;
 
-// The publishing rules a refusal lists.
+// A note under the switch, such as the scopes the User Portal can't hold, and the publishing rules a refusal lists.
 export const rowNoteSx = { mt: 0.5 } as const;
 
 export const reasonSx = { display: 'flex', gap: 0.75, alignItems: 'flex-start' } as const;

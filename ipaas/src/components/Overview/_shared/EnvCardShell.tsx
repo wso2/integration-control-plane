@@ -28,8 +28,8 @@ import type { EnvCardSlotProps, IntegrationModule } from '../../../types/integra
 import { deploymentPollIntervalUntil, REQUESTED_POLL_WINDOW_MS } from '../../../utils/deploymentStatus';
 import DeployButton from './DeployButton';
 import EnvCardHeader from './EnvCardHeader';
-import EnvCardNotice from './EnvCardNotice';
-import { useEnvCardNotification } from './useEnvCardNotification';
+import EnvCardNotice from '../../EnvironmentCard/EnvCardNotice';
+import { useEnvCardNotification } from '../../EnvironmentCard/useEnvCardNotification';
 import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 
 interface EnvCardShellProps {

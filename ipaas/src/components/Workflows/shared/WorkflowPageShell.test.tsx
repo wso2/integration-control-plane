@@ -66,7 +66,15 @@ vi.mock('../../../hooks/useDeployments', () => ({
     return { data: { releaseId: 'release-1', deploymentStatusV2: 'ACTIVE' }, isLoading: false };
   },
 }));
-vi.mock('../../UserPortal/UserPortalPrompt', () => ({ default: ({ environment }: { environment: { id: string } }) => <span>{`User Portal prompt for ${environment.id}`}</span> }));
+// The prompt reports a publish through the page, as the real one does.
+vi.mock('../../UserPortal/UserPortalPrompt', () => ({
+  default: ({ environment, onNotify }: { environment: { id: string }; onNotify: (notification: { text: string; severity: 'success' }) => void }) => (
+    <span>
+      {`User Portal prompt for ${environment.id}`}
+      <button onClick={() => onNotify({ text: `Published to the User Portal in ${environment.id}.`, severity: 'success' })}>Publish</button>
+    </span>
+  ),
+}));
 vi.mock('../api/useWorkflowApi', () => ({
   useWorkflowApi: (target: unknown) => {
     state.targets.push(target);
@@ -150,6 +158,20 @@ describe('WorkflowPageShell', () => {
 
     state.api = pending({ status: 'unavailable', reason: 'not-exposed', notice: { severity: 'info', text: 'Not exposed yet.' }, action: null });
     expect(await renderShell()).not.toContain('User Portal prompt');
+  });
+
+  // Once published, the management API takes only User Portal sign-ins, so the content the prompt is part of is replaced.
+  it("keeps the User Portal prompt's notice above the content once a publish replaces it", async () => {
+    state.api = pending({ status: 'unavailable', reason: 'secured-by-promotion', notice: { severity: 'info', text: 'Security comes by promotion.' }, action: null });
+    await renderShell('/?env=production');
+    const publish = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Publish');
+    await act(async () => publish?.click());
+
+    state.api = pending({ status: 'unavailable', reason: 'published-to-user-portal', notice: { severity: 'info', text: 'Published here.' }, action: null });
+    const text = await renderShell('/?env=production');
+    expect(text).toContain('Published here.');
+    expect(text).not.toContain('User Portal prompt');
+    expect(text).toContain('Published to the User Portal in production.');
   });
 
   it('shows a placeholder for the environment shown, reading no deployment and making no connection', async () => {

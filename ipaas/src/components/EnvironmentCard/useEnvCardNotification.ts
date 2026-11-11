@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { EnvCardNotification } from '../../../types/integration';
+import type { EnvCardNotification } from '../../types/integration';
 
 export interface EnvCardNotificationState {
   /** The notice on show, or null. */
@@ -29,8 +29,9 @@ export interface EnvCardNotificationState {
 }
 
 /**
- * An environment card's transient success or error notice, raised by the card's actions through `onNotify` and shown
- * by `EnvCardNotice`. The Overview and Deploy cards share it, so a notice reads and times out the same on both.
+ * An environment card's transient success or error notice, raised by its actions through `onNotify` and shown by
+ * `EnvCardNotice`. The Overview and Deploy cards and the workflow pages share it, so a notice reads and times out the
+ * same on each.
  */
 export function useEnvCardNotification(): EnvCardNotificationState {
   const [notification, setNotification] = useState<EnvCardNotification | null>(null);

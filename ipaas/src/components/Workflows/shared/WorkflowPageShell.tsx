@@ -23,6 +23,8 @@ import type { JSX, ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import DeploymentTrackBar from '../../DeploymentTrackBar';
 import EmptyListing from '../../EmptyListing';
+import EnvCardNotice from '../../EnvironmentCard/EnvCardNotice';
+import { useEnvCardNotification } from '../../EnvironmentCard/useEnvCardNotification';
 import NotDeployedAlert from '../../NotDeployedAlert';
 import NotFound from '../../NotFound';
 import UserPortalPrompt from '../../UserPortal/UserPortalPrompt';
@@ -36,6 +38,7 @@ import { useSelectedTrack } from '../../../hooks/useSelectedTrack';
 import { broaden, overviewUrl, resourceUrl, type ComponentScope } from '../../../nav';
 import type { Component } from '../../../types/component';
 import type { Environment } from '../../../types/environment';
+import type { EnvCardNotification } from '../../../types/integration';
 import type { NotDeployedPurpose } from '../../../utils/deploymentNotice';
 import { isNotFoundError } from '../../../utils/apiErrors';
 import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
@@ -55,6 +58,11 @@ export interface WorkflowPagePlaceholderProps {
   /** The environment shown; its id is what `?env=` links carry. */
   environment: Environment;
   environments: Environment[];
+  /**
+   * Shows a notice above the page's content, such as how a User Portal publish went. It outlives the content, which a
+   * publish replaces: once published, the management API answers only User Portal sign-ins.
+   */
+  onNotify: (notification: EnvCardNotification) => void;
 }
 
 /** What a workflow page's content gets once the management API answers. */
@@ -151,6 +159,7 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
   const { data: component, isLoading: loadingComponent, error: componentError, refetch: refetchComponent } = useComponentByHandler(projectId, scope.component);
   const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError, refetch: refetchEnvironments } = useEnvironments(orgUuid, projectId);
   const { trackId } = useSelectedTrack(component);
+  const { notification, onNotify, dismiss } = useEnvCardNotification();
 
   const [params, setParams] = useSearchParams();
   const linkedEnvId = params.get(WORKFLOW_ENV_PARAM);
@@ -200,11 +209,11 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
   } else if (!environment) {
     body = <EmptyListing icon={<Layers size={48} />} title="No environments" description="This project has no environments yet, so there is nowhere this integration runs." />;
   } else if (placeholder) {
-    body = placeholder({ scope, component, environment, environments });
+    body = placeholder({ scope, component, environment, environments, onNotify });
   } else {
     body = (
-      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt orgHandler={scope.org} projectId={component.projectId} componentId={component.id} environment={environment} />}>
-        {(ready) => children({ scope, component, environment, environments, api: ready })}
+      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt orgHandler={scope.org} projectId={component.projectId} componentId={component.id} environment={environment} onNotify={onNotify} />}>
+        {(ready) => children({ scope, component, environment, environments, onNotify, api: ready })}
       </ConnectionBody>
     );
   }
@@ -221,6 +230,7 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
           </PageTitle>
           {api.client && <RefreshControls scopeId={api.connection.scopeId} />}
         </Stack>
+        <EnvCardNotice notification={notification} onClose={dismiss} sx={styles.notice} />
         {body}
       </PageContent>
     </Box>

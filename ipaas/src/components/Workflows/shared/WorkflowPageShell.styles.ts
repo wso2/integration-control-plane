@@ -21,6 +21,9 @@ export const page = { display: 'flex', flexDirection: 'column', minHeight: 0 } a
 
 export const titleRow = { mb: 3 } as const;
 
+// A notice from the page's content, such as a User Portal publish's, above it.
+export const notice = { mb: 2 } as const;
+
 export const connecting = { display: 'block', mb: 1.5 } as const;
 
 export const toolbar = { display: 'flex', alignItems: 'center', gap: 2, mb: 2 } as const;

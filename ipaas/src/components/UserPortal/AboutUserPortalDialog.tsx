@@ -24,8 +24,8 @@ import { useCan } from '../../hooks/useCan';
 import { userPortalUrl } from '../../nav';
 import * as styles from './UserPortal.styles';
 
-export const ABOUT_USER_PORTAL = 'About the User Portal';
-export const ASK_AN_ADMIN = 'Ask an admin to turn it on.';
+const ABOUT_USER_PORTAL = 'About the User Portal';
+const ASK_AN_ADMIN = 'Ask an admin to turn it on.';
 
 interface AboutUserPortalDialogProps {
   orgHandler: string;

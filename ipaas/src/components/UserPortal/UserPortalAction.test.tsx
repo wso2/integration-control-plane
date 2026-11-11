@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import { focusManager } from '@tanstack/react-query';
 import { act } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -252,6 +253,43 @@ describe("the env card's User Portal action", () => {
       expect(dialog(container)?.textContent).toContain(says);
       expect(dialog(container)?.textContent).not.toContain('keeps running');
       unmount();
+    }
+  });
+
+  // A sync publish's scopes come only in its answer; a background one's, in the publishability, which outlives a reload.
+  it('keeps the scopes the portal could not hold in view while published, and only then', async () => {
+    publishability.mockResolvedValue({ ...publishable, published: true, rejectedScopes: ['bad scope'] });
+    let container = await action(DEVELOPER);
+    expect(container.textContent).toContain("The User Portal can't hold this scope, so its users' tokens never carry it: bad scope.");
+    unmount();
+
+    publishability.mockResolvedValue({ ...publishable, rejectedScopes: ['bad scope'] });
+    container = await action(DEVELOPER);
+    expect(container.textContent).not.toContain('bad scope');
+  });
+
+  // The confirmation reads the publishability as it is read again, so a publish that has come to redeploy a workflow,
+  // say after its API security changed in another tab, is never confirmed without the warning.
+  it('warns of a redeploy the publishability comes to report while the confirmation is open', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      publishability.mockResolvedValueOnce(publishable).mockResolvedValue({ ...publishable, redeploys: true });
+      const container = await action(DEVELOPER, true);
+      await act(async () => toggle(container)?.click());
+      expect(dialog(container)?.textContent).toContain("The User Portal's users will see this integration there.");
+
+      // Past the read's stale time, the tab comes back into focus and the publishability is read again.
+      vi.setSystemTime(Date.now() + 31_000);
+      await act(async () => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await flush();
+      expect(publishability).toHaveBeenCalledTimes(2);
+      expect(dialog(container)?.textContent).toContain('will be redeployed in Production');
+    } finally {
+      focusManager.setFocused(undefined);
+      vi.useRealTimers();
     }
   });
 

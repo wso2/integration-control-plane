@@ -35,9 +35,9 @@ interface PublishFlowOptions {
 }
 
 export interface PublishFlow {
-  /** Asks to confirm a publish, then publishes; the confirmation warns of a workflow's redeploy (its publishability's `redeploys`). */
-  request: (redeploys: boolean) => void;
-  /** The confirmation, while it is open; render it beside the button. */
+  /** Asks to confirm a publish, then publishes. */
+  request: () => void;
+  /** The confirmation, while it is open; render it beside the control that asks for it. */
   dialog: ReactNode;
   /**
    * Why the last publish failed in the background, worded for the reader, while the publishability still reports it. A
@@ -49,6 +49,8 @@ export interface PublishFlow {
    * the reader; null when neither is running.
    */
   progress: string | null;
+  /** Scopes the last publish's endpoints require that the User Portal couldn't hold (`RejectedScopes` says so). */
+  rejectedScopes: string[];
   /** A publish is being sent, or is finishing in the background. */
   isPending: boolean;
   /** Clears the last publish's outcome. */
@@ -59,45 +61,54 @@ export interface PublishFlow {
  * Publishing an integration to an environment's User Portal, as every place in the console offers it. Every publish is
  * confirmed first, as an unpublish is (`PublishDialog`). One that redeploys a workflow so its Workflow Management API
  * takes only User Portal sign-ins turns the console's workflow management off in the environment, which its
- * confirmation warns of. An AI agent's or a workflow's publish finishes in the background after it is accepted, as bringing
- * the User Portal's scopes in step can take a while: the flow stays pending, and the publishability, which survives a
- * page reload, says when it ends and how.
+ * confirmation warns of while the publishability says so. An AI agent's or a workflow's publish finishes in the
+ * background after it is accepted, as bringing the User Portal's scopes in step can take a while: the flow stays
+ * pending, and the publishability, which survives a page reload, says when it ends and how.
  */
 export function usePublishFlow({ componentId, environment, envName, isWorkflow = false, onStart, onPublished }: PublishFlowOptions): PublishFlow {
   const publish = usePublishToUserPortal();
   const { data: report } = useUserPortalPublishability(componentId, environment);
   const publishing = !!report?.publishing;
-  // The open confirmation, with whether the publish it confirms redeploys a workflow.
-  const [confirming, setConfirming] = useState<{ redeploys: boolean } | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [rejectedScopes, setRejectedScopes] = useState<string[]>([]);
 
   const start = () => {
     publish.mutate(
       { componentId, environment },
       {
         onSuccess: (out) => {
-          setConfirming(null);
+          setConfirming(false);
+          setRejectedScopes(out.rejectedScopes);
           if (!out.publishing) onPublished?.(out.rejectedScopes);
         },
       },
     );
   };
-  const request = (redeploys: boolean) => {
+  const request = () => {
     onStart?.();
     publish.reset();
-    setConfirming({ redeploys });
+    setRejectedScopes([]);
+    setConfirming(true);
   };
   const backgroundError = report && !report.publishing && !report.published && report.publishError ? refusalText(report.publishError, envName) : null;
   const close = () => {
     publish.reset();
-    setConfirming(null);
+    setConfirming(false);
   };
 
   return {
     request,
-    dialog: confirming ? <PublishDialog envName={envName} redeploys={confirming.redeploys} onConfirm={start} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} /> : null,
+    // The warning follows the publishability as it is read again while the confirmation is open, so a publish that has
+    // come to redeploy a workflow is never confirmed without it.
+    dialog: confirming && report ? <PublishDialog envName={envName} redeploys={report.redeploys} onConfirm={start} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} /> : null,
     error: publish.isPending ? null : backgroundError,
     progress: publishing ? publishingText(envName, isWorkflow) : report?.unpublishing ? unpublishingText(envName, isWorkflow) : null,
+    // The sync answer's scopes, or those of the background publish the report carries, only while it is published.
+    rejectedScopes: rejectedScopes.length > 0 ? rejectedScopes : report?.published ? report.rejectedScopes : [],
     isPending: publish.isPending || publishing,
-    reset: () => publish.reset(),
+    reset: () => {
+      publish.reset();
+      setRejectedScopes([]);
+    },
   };
 }

@@ -44,6 +44,8 @@ const enable = vi.mocked(api.enableUserPortal);
 const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const publish = vi.mocked(api.publishToUserPortal);
 const unpublish = vi.mocked(api.unpublishFromUserPortal);
+// What the prompt reports to the page, which shows it above its content.
+const onNotify = vi.fn();
 
 const ACTIVE: UserPortal = { environment: 'production', state: 'active', url: 'https://portal.example/acme' };
 const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
@@ -66,7 +68,7 @@ beforeEach(() => {
 async function prompt(scopes: string[]) {
   const r = await renderWithScopes(
     <MemoryRouter>
-      <UserPortalPrompt orgHandler="acme" projectId="shop" componentId="orders" environment={{ id: 'production', name: 'Production', critical: true }} />
+      <UserPortalPrompt orgHandler="acme" projectId="shop" componentId="orders" environment={{ id: 'production', name: 'Production', critical: true }} onNotify={onNotify} />
     </MemoryRouter>,
     scopes,
   );
@@ -106,7 +108,7 @@ describe('the way to a workflow in the User Portal', () => {
     expect(container.textContent).toContain("The User Portal can't use Production.");
   });
 
-  it('reports a publish from the switch in a notice, with the scopes the portal could not hold', async () => {
+  it('reports a publish from the switch to the page, and keeps the scopes the portal could not hold in view', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValueOnce({ ...PUBLISHABLE, redeploys: false }).mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
     publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
@@ -115,9 +117,10 @@ describe('the way to a workflow in the User Portal', () => {
     expect(publish).not.toHaveBeenCalled();
     await act(async () => button(container, 'Publish')?.click());
     await flush();
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Published to the User Portal in Production.');
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('bad scope');
+    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Published to the User Portal in Production.', severity: 'success', detail: expect.stringContaining('bad scope') }));
     expect(toggle(container)?.checked).toBe(true);
+    // The notice goes; the scopes stay in view while it is published.
+    expect(container.textContent).toContain('bad scope');
   });
 
   it("leaves the last environment's failed publish behind when another is shown", async () => {
@@ -128,7 +131,7 @@ describe('the way to a workflow in the User Portal', () => {
     function Switching() {
       const [env, setEnv] = useState('production');
       show = setEnv;
-      return <UserPortalPrompt orgHandler="acme" projectId="shop" componentId="orders" environment={{ id: env, name: env === 'production' ? 'Production' : 'Development', critical: false }} />;
+      return <UserPortalPrompt orgHandler="acme" projectId="shop" componentId="orders" environment={{ id: env, name: env === 'production' ? 'Production' : 'Development', critical: false }} onNotify={onNotify} />;
     }
     const r = await renderWithScopes(
       <MemoryRouter>
@@ -300,8 +303,8 @@ describe('a publish that finishes in the background, from the prompt', () => {
     await poll();
     await flush();
     expect(container.textContent).toContain('Open User Portal');
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Published to the User Portal in Production.');
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('bad scope');
+    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Published to the User Portal in Production.', severity: 'success', detail: expect.stringContaining('bad scope') }));
+    expect(container.textContent).toContain('bad scope');
   });
 
   it('follows a publish running at load, and words the failure it ends with', async () => {
@@ -314,8 +317,7 @@ describe('a publish that finishes in the background, from the prompt', () => {
     publishability.mockResolvedValue({ ...PUBLISHABLE, publishError: { code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'interrupted' } });
     await poll();
     await flush();
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Could not publish to the User Portal in Production.');
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Publishing didn't finish. Publish again.");
+    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Could not publish to the User Portal in Production.', severity: 'error', detail: "Publishing didn't finish. Publish again." }));
     expect(toggle(container)?.disabled).toBe(false);
   });
 });

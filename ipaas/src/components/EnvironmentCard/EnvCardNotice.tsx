@@ -18,7 +18,7 @@
 
 import { Alert, AlertTitle, type SxProps, type Theme } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import type { EnvCardNotification } from '../../../types/integration';
+import type { EnvCardNotification } from '../../types/integration';
 
 const defaultSx = { mt: 2 } as const;
 

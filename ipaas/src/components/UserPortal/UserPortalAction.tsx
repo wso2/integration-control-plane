@@ -27,6 +27,7 @@ import { isUserPortalUnavailable } from '../../utils/apiErrors';
 import { DEPLOY_REFUSAL, refusalText, rejectedScopesText, shownRefusals, userPortalIsOff } from '../../utils/userPortal';
 import AboutUserPortalDialog from './AboutUserPortalDialog';
 import PublishRefusals from './PublishRefusals';
+import RejectedScopes from './RejectedScopes';
 import { usePublishFlow } from './usePublishFlow';
 import { useUnpublishFlow } from './useUnpublishFlow';
 import UserPortalActionSkeleton from './UserPortalActionSkeleton';
@@ -93,6 +94,8 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
   return (
     <>
       {action()}
+      {/* While published, the scopes its users' tokens can't carry, so a refused call there has its reason in view. */}
+      {data?.published && <RejectedScopes scopes={publish.rejectedScopes} sx={styles.rowNoteSx} />}
       {/*
         The dialogs sit outside the action's states. A publish or unpublish, even a failed one, reads the
         publishability again, and a partial one changes the state (published, with its scopes not synced).
@@ -145,9 +148,10 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
     const { published } = data;
     const publishing = publish.isPending;
     const unpublishing = data.unpublishing;
-    // A refused or failed publish, or an unpublish whose work failed, until the next one; a published one has outlived it.
+    // A publish that failed in the background, or an unpublish whose work failed, until the next one; a published one has
+    // outlived it. A refused publish shows its refusal in the confirmation instead.
     const failure = published ? null : (publish.error ?? unpublish.failure);
-    const toggle = () => (published ? unpublish.request() : data.publishable ? publish.request(data.redeploys) : openDialog('refusals'));
+    const toggle = () => (published ? unpublish.request() : data.publishable ? publish.request() : openDialog('refusals'));
     // The switch's label stays short, so what a publish or unpublish is doing, or why the last one failed, goes in its tooltip.
     const tooltip = !canDeploy ? DEPLOY_REFUSAL : (publish.progress ?? failure ?? `${published ? 'Unpublish from' : 'Publish to'} the User Portal in ${envName}`);
     return (
