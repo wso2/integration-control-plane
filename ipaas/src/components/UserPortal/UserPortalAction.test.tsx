@@ -367,6 +367,15 @@ describe('an unpublish that gives the workflow back in the background', () => {
     expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Unpublished from the User Portal in Production.', severity: 'success' }));
   });
 
+  // Each part is sized by what it stands in for, so the footer keeps its size when the switch arrives.
+  it('holds the switch’s place while it loads, shaped as the switch and its label', async () => {
+    publishability.mockReturnValue(new Promise(() => {}));
+    const container = await action(DEVELOPER, true);
+    const placeholder = container.querySelector('[role="status"][aria-label="Loading the User Portal"]');
+    expect(placeholder?.textContent).toContain('Publish to User Portal');
+    expect(placeholder?.querySelector('input[type="checkbox"]')).not.toBeNull();
+  });
+
   it('reports a failed switch back once, and finishes it without asking again', async () => {
     const unpublishError = { code: 'USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED', message: 'unpublish it again' };
     publishability.mockResolvedValue(running);

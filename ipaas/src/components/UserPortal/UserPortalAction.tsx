@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Link, Skeleton, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Link, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { CircleAlert, ExternalLink, Info, Users } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
@@ -29,6 +29,7 @@ import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import AboutUserPortalDialog from './AboutUserPortalDialog';
 import PublishWorkflowDialog from './PublishWorkflowDialog';
 import UnpublishNote from './UnpublishNote';
+import UserPortalActionSkeleton from './UserPortalActionSkeleton';
 import * as styles from './UserPortal.styles';
 import UserPortalReason from './UserPortalReason';
 
@@ -179,7 +180,7 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
   );
 
   function action(): JSX.Element | null {
-    if (isLoading) return <Skeleton variant="rounded" width={88} height={30} />;
+    if (isLoading) return <UserPortalActionSkeleton />;
     // A failed refetch keeps the last known state in `data`, so the switch stays while there is one.
     if (!data) {
       // A BFF that serves no User Portal has nothing to publish to.

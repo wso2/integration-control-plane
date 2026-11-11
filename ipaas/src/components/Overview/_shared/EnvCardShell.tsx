@@ -186,7 +186,8 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
 
         <ReleaseLinks projectId={projectId} componentId={component.id} env={slotProps.envTemplateId} />
 
-        {EnvCardSharedAction && !loadingDeployment && <EnvCardSharedAction {...slotProps} />}
+        {/* Rendered while the deployment loads too, holding its place with its own placeholder (see EnvCardSharedAction). */}
+        {EnvCardSharedAction && <EnvCardSharedAction {...slotProps} />}
       </CardContent>
     </Card>
   );
