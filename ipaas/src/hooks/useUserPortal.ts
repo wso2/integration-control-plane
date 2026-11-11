@@ -17,10 +17,11 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublications, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
-import type { UserPortal, UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
+import type { UserPortal, UserPortalPublications, UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
 import { isUserPortalUnavailable } from '../utils/apiErrors';
+import { invalidateEndpointSettings } from './useConsumers';
 
 const ROOT_KEY = 'userPortal';
 
@@ -92,14 +93,31 @@ export const useEnableUserPortal = () => useWritePortal(enableUserPortal);
 export const useDisableUserPortal = () => useWritePortal(disableUserPortal);
 
 /**
+ * A publish or an unpublish that ran in the background switched the workflow's Management API between the console's API
+ * key and the User Portal's sign-in, so every view of its endpoint security in environment reads it again once that
+ * ends. It is done where the reads that see the end land, rather than in one view, so the views that never saw the run
+ * aren't left with the security from before it.
+ */
+function rereadSecurityOnceSettled(qc: QueryClient, componentId: string, environment: string, wasRunning: boolean, isRunning: boolean): void {
+  if (wasRunning && !isRunning) invalidateEndpointSettings(qc, componentId, environment);
+}
+
+/**
  * Whether the integration is, and can be, published to the environment's User Portal. It is read again every few seconds
  * while a background publish or unpublish is running, and while `rereadWhile` holds for the report read last, as a
  * settling portal is.
  */
 export function useUserPortalPublishability(componentId: string, environment: string, { rereadWhile }: { rereadWhile?: (report: UserPortalPublishability) => boolean } = {}) {
+  const qc = useQueryClient();
+  const queryKey = [ROOT_KEY, 'publishability', componentId, environment];
   return useQuery({
-    queryKey: [ROOT_KEY, 'publishability', componentId, environment],
-    queryFn: () => fetchUserPortalPublishability(componentId, environment),
+    queryKey,
+    queryFn: async () => {
+      const before = qc.getQueryData<UserPortalPublishability>(queryKey);
+      const report = await fetchUserPortalPublishability(componentId, environment);
+      rereadSecurityOnceSettled(qc, componentId, environment, !!before && (before.publishing || before.unpublishing), report.publishing || report.unpublishing);
+      return report;
+    },
     enabled: !!componentId && !!environment,
     retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
     staleTime: 30_000,
@@ -113,9 +131,16 @@ export function useUserPortalPublishability(componentId: string, environment: st
  * given back to the console: they are read again every few seconds until that ends.
  */
 export function useUserPortalPublications(componentId: string, { enabled = true }: { enabled?: boolean } = {}) {
+  const qc = useQueryClient();
+  const queryKey = [ROOT_KEY, 'publications', componentId];
   return useQuery({
-    queryKey: [ROOT_KEY, 'publications', componentId],
-    queryFn: () => fetchUserPortalPublications(componentId),
+    queryKey,
+    queryFn: async () => {
+      const before = qc.getQueryData<UserPortalPublications>(queryKey);
+      const publications = await fetchUserPortalPublications(componentId);
+      for (const environment of before?.unpublishing ?? []) rereadSecurityOnceSettled(qc, componentId, environment, true, publications.unpublishing.includes(environment));
+      return publications;
+    },
     enabled: enabled && !!componentId,
     retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
     staleTime: 30_000,
@@ -126,14 +151,16 @@ export function useUserPortalPublications(componentId: string, { enabled = true 
 interface BackgroundOutcomeHandlers {
   onPublished: (rejectedScopes: string[]) => void;
   onFailed: (error: UserPortalRefusal) => void;
-  /** The workflow couldn't be given back to the console after an unpublish. */
+  /** An unpublish's work after its response finished: the scopes are in step, and the workflow is given back. */
+  onUnpublished: () => void;
+  /** The scopes, or giving the workflow back to the console, failed after an unpublish. */
   onUnpublishFailed: (error: UserPortalRefusal) => void;
 }
 
 /**
- * Runs `onPublished` or `onFailed` once when a background publish this page saw running ends, and `onUnpublishFailed`
- * when a background unpublish ends without giving the workflow back. One that was already over when the page loaded
- * reports nothing, and neither does a re-read of the same outcome.
+ * Runs `onPublished` or `onFailed` once when a background publish this page saw running ends, and `onUnpublished` or
+ * `onUnpublishFailed` when a background unpublish does. One that was already over when the page loaded reports nothing,
+ * and neither does a re-read of the same outcome.
  */
 export function useBackgroundPublishOutcome(componentId: string, environment: string, handlers: BackgroundOutcomeHandlers) {
   const { data: report } = useUserPortalPublishability(componentId, environment);
@@ -153,8 +180,9 @@ export function useBackgroundPublishOutcome(componentId: string, environment: st
     if (ended === 'publishing') {
       if (report.published) latest.current.onPublished(report.rejectedScopes);
       else if (report.publishError) latest.current.onFailed(report.publishError);
-    } else if (ended === 'unpublishing' && report.unpublishError) {
-      latest.current.onUnpublishFailed(report.unpublishError);
+    } else if (ended === 'unpublishing') {
+      if (report.unpublishError) latest.current.onUnpublishFailed(report.unpublishError);
+      else if (!report.published) latest.current.onUnpublished();
     }
   }, [report]);
 }

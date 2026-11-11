@@ -109,6 +109,7 @@ interface BffUserPortalPublishability {
 interface BffUserPortalPublications {
   environments?: string[];
   unpublishing?: string[];
+  notGivenBack?: string[];
 }
 
 // models.UserPortalPublication.
@@ -137,7 +138,7 @@ export const toUserPortalPublishability = (p: BffUserPortalPublishability): User
   rejectedScopes: p.rejectedScopes ?? [],
 });
 
-export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [], unpublishing: p.unpublishing ?? [] });
+export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [], unpublishing: p.unpublishing ?? [], notGivenBack: p.notGivenBack ?? [] });
 
 /** The environments the integration is published to the User Portal in. */
 export const fetchUserPortalPublications = (componentId: string): Promise<UserPortalPublications> => bff.get<BffUserPortalPublications>(`/components/${seg(componentId)}/user-portal`).then(toUserPortalPublications);

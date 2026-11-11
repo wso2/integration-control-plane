@@ -81,6 +81,8 @@ export interface UserPortalPublications {
   environments: string[];
   /** The environments a workflow was unpublished from and is still being redeployed in to take the console's API key again. */
   unpublishing: string[];
+  /** The environments a workflow was unpublished from but couldn't be redeployed in to take the console's API key again. */
+  notGivenBack: string[];
 }
 
 /** The outcome of a publish or an unpublish. */

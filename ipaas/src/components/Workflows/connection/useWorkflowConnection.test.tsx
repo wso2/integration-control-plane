@@ -50,9 +50,13 @@ const access = vi.hoisted(() => {
 });
 const testAccessCalls = vi.hoisted(() => [] as unknown[][]);
 const endpoints = vi.hoisted(() => ({ list: [] as EnvEndpoint[], releaseIds: [] as string[] }));
-// The environments the integration is published to the User Portal in, and those it is being given back to the console
-// in after an unpublish, or what reading them failed with.
-const publications = vi.hoisted(() => ({ environments: [] as string[], unpublishing: [] as string[], error: null as unknown, refetch: vi.fn(), portalUrl: undefined as string | undefined }));
+// The environments the integration is published to the User Portal in, those it is being given back to the console in
+// after an unpublish, and those it couldn't be given back in, or what reading them failed with.
+const publications = vi.hoisted(() => ({ environments: [] as string[], unpublishing: [] as string[], notGivenBack: [] as string[], error: null as unknown, refetch: vi.fn(), portalUrl: undefined as string | undefined }));
+// The unpublish that finishes giving it back, and whether the role may deploy.
+const finish = vi.hoisted(() => ({ mutate: vi.fn(), isPending: false, isError: false, error: null as unknown }));
+const role = vi.hoisted(() => ({ canDeploy: true }));
+vi.mock('../../../hooks/useCan', () => ({ useCan: () => () => role.canDeploy }));
 
 vi.mock('../../../hooks/useDeployments', () => ({
   useEnvEndpoints: (_componentId: string, _trackId: string | undefined, releaseId: string) => {
@@ -64,7 +68,8 @@ vi.mock('../../../hooks/useUserPortal', () => ({
   useUserPortalPublications: () =>
     publications.error
       ? { data: undefined, isPending: false, isError: true, error: publications.error, refetch: publications.refetch }
-      : { data: { environments: publications.environments, unpublishing: publications.unpublishing }, isPending: false, isError: false, error: null, refetch: publications.refetch },
+      : { data: { environments: publications.environments, unpublishing: publications.unpublishing, notGivenBack: publications.notGivenBack }, isPending: false, isError: false, error: null, refetch: publications.refetch },
+  useUnpublishFromUserPortal: () => finish,
   useUserPortals: (environments: string[]) => environments.map((environment) => ({ data: { environment, state: 'active', url: publications.portalUrl } })),
 }));
 vi.mock('../../../hooks/useEndpointTestAccess', () => ({
@@ -174,7 +179,10 @@ beforeEach(() => {
   testAccessCalls.length = 0;
   publications.environments = [];
   publications.unpublishing = [];
+  publications.notGivenBack = [];
   publications.error = null;
+  finish.mutate.mockReset();
+  role.canDeploy = true;
   publications.refetch.mockReset();
   publications.portalUrl = undefined;
   rendered = undefined;
@@ -223,10 +231,9 @@ describe('useWorkflowConnection', () => {
   });
 
   // Unpublishing answers before the workflow is redeployed to take the console's key, so the views wait for that rather
-  // than offer to switch the API to API key, then read its security again.
-  it('waits while an unpublished workflow is given back to the console, then reads its security again', async () => {
+  // than offer to switch the API to API key. The User Portal reads have its security read again once it ends.
+  it('waits while an unpublished workflow is given back to the console, then connects', async () => {
     publications.unpublishing = ['development'];
-    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
     mount();
     await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'unpublishing-from-user-portal', notice: { severity: 'info' }, action: null }));
     expect(testAccessCalls.every(([, options]) => (options as { mint: boolean }).mint === false)).toBe(true);
@@ -235,7 +242,23 @@ describe('useWorkflowConnection', () => {
     publications.unpublishing = [];
     mount();
     await vi.waitFor(() => expect(status()).toBe('ready'));
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['endpoint-security', 'orders', 'development'] });
+  });
+
+  // Its API may still take only User Portal sign-ins, so a switch to API key would leave the workflow refusing the key.
+  it('offers to finish unpublishing a workflow that could not be given back, rather than switching its API', async () => {
+    publications.notGivenBack = ['development'];
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'not-given-back', notice: { severity: 'warning' }, action: { label: 'Finish unpublishing' } }));
+    expect(testAccessCalls.every(([, options]) => (options as { mint: boolean }).mint === false)).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+    const { connection } = current();
+    if (connection.status !== 'unavailable' || !connection.action || !('run' in connection.action)) throw new Error('expected a finish to run');
+    connection.action.run();
+    expect(finish.mutate).toHaveBeenCalledWith({ componentId: 'orders', environment: 'development' });
+
+    role.canDeploy = false;
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'not-given-back', action: null }));
   });
 
   it('connects as before to a workflow published to the User Portal only in another environment', async () => {

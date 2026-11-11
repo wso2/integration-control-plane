@@ -82,11 +82,14 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
       // Scopes the endpoints require that the portal's users' tokens can't carry.
       detail: rejectedScopes.length > 0 ? rejectedScopesText(rejectedScopes) : undefined,
     });
+  // Reported as a publish is: at once, or when the work after the response ends (useBackgroundPublishOutcome).
+  const notifyUnpublished = () => onNotify({ text: `Unpublished from the User Portal in ${envName}.`, severity: 'success' });
   // A publish that finishes in the background is reported when the publishability says it ended, so it is also
   // reported after a page reload.
   useBackgroundPublishOutcome(componentId, environment, {
     onPublished: notifyPublished,
     onFailed: (failure) => onNotify({ text: `Could not publish to the User Portal in ${envName}.`, severity: 'error', detail: refusalText(failure, envName) }),
+    onUnpublished: notifyUnpublished,
     onUnpublishFailed: (failure) => onNotify({ text: `Could not finish unpublishing from the User Portal in ${envName}.`, severity: 'error', detail: refusalText(failure, envName) }),
   });
   const startPublish = () =>
@@ -99,7 +102,16 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
         },
       },
     );
-  const startUnpublish = () => unpublish.mutate({ componentId, environment }, { onSuccess: close });
+  const startUnpublish = () =>
+    unpublish.mutate(
+      { componentId, environment },
+      {
+        onSuccess: ({ unpublishing }) => {
+          close();
+          if (!unpublishing) notifyUnpublished();
+        },
+      },
+    );
   // Unpublishing again finishes giving the workflow back; it is out of the User Portal already, so it isn't confirmed.
   // No dialog is open to show a refusal in, so the card does.
   const finishUnpublish = () =>

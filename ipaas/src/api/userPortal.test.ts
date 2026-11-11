@@ -135,7 +135,7 @@ describe('toUserPortalPublishability', () => {
 
 describe('toUserPortalPublications', () => {
   it('reads an integration the BFF lists no environments for as published nowhere', () => {
-    expect(toUserPortalPublications({})).toEqual({ environments: [], unpublishing: [] });
-    expect(toUserPortalPublications({ environments: ['development'], unpublishing: ['production'] })).toEqual({ environments: ['development'], unpublishing: ['production'] });
+    expect(toUserPortalPublications({})).toEqual({ environments: [], unpublishing: [], notGivenBack: [] });
+    expect(toUserPortalPublications({ environments: ['development'], unpublishing: ['production'], notGivenBack: ['staging'] })).toEqual({ environments: ['development'], unpublishing: ['production'], notGivenBack: ['staging'] });
   });
 });

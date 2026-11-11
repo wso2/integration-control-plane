@@ -325,11 +325,32 @@ describe("the deploy card's row after an unpublish that gives a workflow back in
   const unpublished: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
   const unpublish = vi.mocked(api.unpublishFromUserPortal);
 
-  it('says the workflow is being given back, with nothing to publish meanwhile', async () => {
+  it('says the workflow is being given back, with nothing to publish meanwhile, and why in the button’s tooltip', async () => {
     publishability.mockResolvedValue({ ...unpublished, publishable: false, unpublishing: true });
     const container = await row(DEVELOPER, true);
     expect(container.textContent).toContain("Unpublished from the User Portal in Production. The workflow is redeployed to take the console's API key again");
     expect(button(container, 'Publish')?.disabled).toBe(true);
+    // The rules aren't listed while it runs, so the tooltip doesn't point at them.
+    expect(reasonFor(button(container, 'Publish'))).toContain("redeployed to take the console's API key again");
+  });
+
+  it('drops a refused finish once a run starts, and never offers one on a published workflow', async () => {
+    const failed = { ...unpublished, unpublishError: { code: 'USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED', message: 'x' } };
+    publishability.mockResolvedValue(failed);
+    unpublish.mockRejectedValue(new BffError(500, '{"message":"boom"}'));
+    const container = await row(DEVELOPER, true);
+    await act(async () => button(container, 'Finish unpublishing')?.click());
+    await flush();
+    expect(container.textContent).toContain('boom');
+    expect(button(container, 'Finish unpublishing')).toBeDefined();
+
+    // Meanwhile it is published again from elsewhere, which the re-read after the next refused finish finds.
+    publishability.mockResolvedValue({ ...unpublished, published: true });
+    await act(async () => button(container, 'Finish unpublishing')?.click());
+    await flush();
+    expect(container.textContent).not.toContain('boom');
+    expect(button(container, 'Finish unpublishing')).toBeUndefined();
+    expect(button(container, 'Unpublish')).toBeDefined();
   });
 
   it('says why giving it back failed, and finishes it without asking again', async () => {

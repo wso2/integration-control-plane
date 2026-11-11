@@ -331,7 +331,7 @@ describe('an unpublish that gives the workflow back in the background', () => {
   afterEach(() => vi.useRealTimers());
   const poll = () => act(async () => vi.advanceTimersByTimeAsync(3_000));
 
-  it('closes the confirmation on 202, shows Unpublishing…, and settles quietly once the workflow is back', async () => {
+  it('closes the confirmation on 202, shows Unpublishing…, and says so once when the workflow is back', async () => {
     publishability.mockResolvedValueOnce(published).mockResolvedValue(running);
     unpublish.mockResolvedValue({ environment: 'production', published: false, publishing: false, unpublishing: true, rejectedScopes: [] });
     const container = await action(DEVELOPER, true);
@@ -343,12 +343,28 @@ describe('an unpublish that gives the workflow back in the background', () => {
     expect(toggle(container)?.disabled).toBe(true);
     expect(container.querySelector('label')?.getAttribute('aria-label')).toContain("The workflow is redeployed to take the console's API key again");
 
+    expect(onNotify).not.toHaveBeenCalled();
     publishability.mockResolvedValue(publishable);
     await poll();
     await flush();
     expect(label(container)).toBe('Publish to User Portal');
     expect(toggle(container)?.disabled).toBe(false);
-    expect(onNotify).not.toHaveBeenCalled();
+    expect(onNotify).toHaveBeenCalledTimes(1);
+    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Unpublished from the User Portal in Production.', severity: 'success' }));
+
+    await poll();
+    await flush();
+    expect(onNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it('says an unpublish that needed no redeploy is done at once', async () => {
+    publishability.mockResolvedValue({ ...publishable, published: true });
+    unpublish.mockResolvedValue({ environment: 'production', published: false, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await act(async () => dialogButton(container, 'Unpublish')?.click());
+    await flush();
+    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Unpublished from the User Portal in Production.', severity: 'success' }));
   });
 
   it('reports a failed switch back once, and finishes it without asking again', async () => {
