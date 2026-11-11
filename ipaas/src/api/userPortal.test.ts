@@ -88,16 +88,17 @@ describe('toUserPortal', () => {
       expect(toUserPortal(done)).toEqual({ environment: 'prod', state: 'active', url: 'https://prod-up.example' });
     });
 
-    it('reads a readiness the console does not know as active', () => {
-      expect(toUserPortal({ ...done, readiness: 'DEGRADED' }).state).toBe('active');
+    // Read as active, it would link a portal that may not answer.
+    it('reads a readiness the console does not know as not ready, saying so', () => {
+      expect(toUserPortal({ ...done, readiness: 'DEGRADED' })).toEqual({ environment: 'prod', state: 'unhealthy', readinessMessage: "The User Portal reports a readiness the console doesn't know: DEGRADED." });
     });
 
     it('reads a portal whose pods are starting as starting, with no URL', () => {
       expect(toUserPortal({ ...done, readiness: 'STARTING', readinessMessage: 'Resource "deployment" (Deployment) is Progressing' })).toEqual({ environment: 'prod', state: 'starting' });
     });
 
-    // Right after an enable, the readiness can still be the suspended portal's.
-    it('reads an enabled portal still reported suspended as starting', () => {
+    // ipaas-service doesn't send this; were it to, the portal would be on its way up.
+    it('reads an enabled portal reported suspended as starting', () => {
       expect(toUserPortal({ ...done, readiness: 'SUSPENDED' })).toEqual({ environment: 'prod', state: 'starting' });
     });
 

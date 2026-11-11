@@ -21,6 +21,7 @@ import { AppWindow, ExternalLink, RotateCcw, Trash2 } from '@wso2/oxygen-ui-icon
 import type { JSX } from 'react';
 import type { Environment } from '../../types/environment';
 import type { UserPortal, UserPortalState } from '../../types/userPortal';
+import { portalBusy } from '../../utils/userPortal';
 import * as styles from './UserPortal.styles';
 
 const STATUS: Record<Exclude<UserPortalState, 'not-enabled'>, { label: string; color: 'success' | 'info' | 'warning' | 'error' | 'default' }> = {
@@ -57,7 +58,7 @@ interface UserPortalCardProps {
 export default function UserPortalCard({ environment, portal, manageRefusal, retrying, onRetry, deprovisionRefusal, onDeprovision }: UserPortalCardProps): JSX.Element {
   const { state } = portal;
   const status = STATUS[state];
-  const busy = state === 'setting-up' || state === 'starting' || state === 'removing';
+  const busy = portalBusy(state);
 
   return (
     <Card variant="outlined" sx={styles.cardSx}>
@@ -113,7 +114,8 @@ export default function UserPortalCard({ environment, portal, manageRefusal, ret
             </Tooltip>
           ) : (
             // A portal that isn't ready says why on hover: OpenChoreo's reason, which is too raw to be the headline.
-            <Tooltip title={state === 'unhealthy' ? (portal.readinessMessage ?? '') : ''}>
+            // Only such a portal has one.
+            <Tooltip title={portal.readinessMessage}>
               <Box component="span" sx={styles.cardActionAnchorSx}>
                 <Button fullWidth size="small" sx={styles.actionButtonSx} variant="contained" disabled startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}>
                   {WAITING[state] ?? 'Portal unavailable'}
@@ -121,11 +123,12 @@ export default function UserPortalCard({ environment, portal, manageRefusal, ret
               </Box>
             </Tooltip>
           )}
-          {/* A portal can be deprovisioned only while it isn't setting up, starting or being removed. */}
-          {!busy && (
+          {/* A portal can be deprovisioned once it is set up, until it is being removed, but not while a retry runs.
+              A starting one can, so one that never comes up isn't stuck. */}
+          {state !== 'setting-up' && state !== 'removing' && (
             <Tooltip title={deprovisionRefusal}>
               <Box component="span" sx={styles.cardSideActionAnchorSx}>
-                <Button size="small" sx={styles.dangerActionButtonSx} variant="outlined" color="error" onClick={onDeprovision} disabled={!!deprovisionRefusal} startIcon={<Trash2 size={16} />}>
+                <Button size="small" sx={styles.dangerActionButtonSx} variant="outlined" color="error" onClick={onDeprovision} disabled={!!deprovisionRefusal || retrying} startIcon={<Trash2 size={16} />}>
                   Deprovision
                 </Button>
               </Box>

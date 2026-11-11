@@ -26,14 +26,14 @@ import type { OrgScope } from '../nav';
 import { apiErrorMessage, isUserPortalUnavailable } from '../utils/apiErrors';
 import type { Environment } from '../types/environment';
 import type { UserPortal as Portal, UserPortalState } from '../types/userPortal';
-import ConfirmDeleteDialog from '../components/ConfirmDeleteDialog';
 import OrgSettingsTabs from '../components/Settings/OrgConfigureTabs';
+import DeprovisionUserPortalDialog from '../components/UserPortal/DeprovisionUserPortalDialog';
 import EnableUserPortalDialog from '../components/UserPortal/EnableUserPortalDialog';
 import UserPortalCard from '../components/UserPortal/UserPortalCard';
 import UserPortalSkeleton from '../components/UserPortal/UserPortalSkeleton';
 import { ComingSoonInline } from './ComingSoon';
 import * as styles from '../components/UserPortal/UserPortal.styles';
-import { hasSomeEnvironments } from '../utils/userPortal';
+import { hasSomeEnvironments, userPortalErrorText } from '../utils/userPortal';
 
 const MANAGE_REFUSAL = "Your role can't enable the User Portal.";
 const DEPROVISION_REFUSAL = "Your role can't deprovision the User Portal.";
@@ -52,8 +52,9 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
   const envs = environments.data ?? [];
   const portals = useUserPortals(envs.map((e) => e.id));
   const can = useCan();
-  const manageRefusal = can(Scopes.ENVIRONMENT_MANAGE) ? '' : MANAGE_REFUSAL;
-  const deprovisionRefusal = can(Scopes.ENVIRONMENT_MANAGE) ? '' : DEPROVISION_REFUSAL;
+  const canManage = can(Scopes.ENVIRONMENT_MANAGE);
+  const manageRefusal = canManage ? '' : MANAGE_REFUSAL;
+  const deprovisionRefusal = canManage ? '' : DEPROVISION_REFUSAL;
 
   const enable = useEnableUserPortal();
   // A card's Retry is an enable of its own, so opening the Enable dialog can't reset it.
@@ -103,11 +104,12 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
     setDeprovisionTarget(environment);
   };
 
-  const confirmDeprovision = (environment: string) =>
-    deprovision.mutate(environment, {
-      onSuccess: () => {
+  // A portal that a later environment's portal still needs is suspended, not removed: it reads as not enabled at once.
+  const confirmDeprovision = (environment: Environment) =>
+    deprovision.mutate(environment.id, {
+      onSuccess: (portal) => {
         setDeprovisionTarget(null);
-        notify('Deprovisioning the User Portal.', 'info');
+        notify(portal.state === 'removing' ? `Deprovisioning the User Portal in ${environment.name}.` : `Deprovisioned the User Portal in ${environment.name}.`, 'info');
       },
     });
 
@@ -216,21 +218,13 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
       {enableOpen && hasSomeEnvironments(available) && <EnableUserPortalDialog environments={available} isPending={enable.isPending} error={enable.isError ? errorText(enable.error) : null} onEnable={startEnable} onClose={() => setEnableOpen(false)} />}
 
       {deprovisionTarget && (
-        <ConfirmDeleteDialog
-          title={`Deprovision the User Portal in ${deprovisionTarget.name}`}
-          onConfirm={() => confirmDeprovision(deprovisionTarget.id)}
-          onClose={() => setDeprovisionTarget(null)}
+        <DeprovisionUserPortalDialog
+          environment={deprovisionTarget}
           isPending={deprovision.isPending}
-          confirmLabel="Deprovision"
-          pendingLabel="Deprovisioning…"
-          maxWidth="xs">
-          <Typography variant="body2">This unpublishes every integration published to the User Portal in {deprovisionTarget.name}, then removes the portal.</Typography>
-          {deprovision.isError && (
-            <Alert severity="error" sx={styles.dialogErrorSx}>
-              {errorText(deprovision.error)}
-            </Alert>
-          )}
-        </ConfirmDeleteDialog>
+          error={deprovision.isError ? userPortalErrorText(deprovision.error, deprovisionTarget.name) : null}
+          onDeprovision={() => confirmDeprovision(deprovisionTarget)}
+          onClose={() => setDeprovisionTarget(null)}
+        />
       )}
 
       <Snackbar open={noticeOpen} autoHideDuration={4000} onClose={() => setNoticeOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>

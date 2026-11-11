@@ -23,7 +23,7 @@ import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
 import { useEnableUserPortal, useUserPortalEnvironments, useUserPortalPublishability, useUserPortals } from '../../hooks/useUserPortal';
 import type { Environment } from '../../types/environment';
-import type { UserPortalPublishability } from '../../types/userPortal';
+import type { UserPortal, UserPortalPublishability, UserPortalState } from '../../types/userPortal';
 import { apiErrorMessage, isUserPortalUnavailable } from '../../utils/apiErrors';
 import { shownRefusals, unpublishingText, USER_PORTAL_NOT_ENABLED } from '../../utils/userPortal';
 import EnableUserPortalDialog from './EnableUserPortalDialog';
@@ -38,6 +38,8 @@ const ENABLE_REFUSAL = "Your role can't enable the User Portal.";
 const OUT_OF_REACH = new Set(['USER_PORTAL_NOT_PUBLISHABLE', 'USER_PORTAL_PIPELINE']);
 // An environment off the User Portal's pipeline, worded as ipaas-service's code for one it can't use.
 const NOT_A_PORTAL_ENVIRONMENT = { code: 'USER_PORTAL_INVALID_ENVIRONMENT', message: '' };
+// A portal whose provision is done: it takes publishes, whether or not its pods are ready.
+const PROVISIONED: ReadonlySet<UserPortalState> = new Set(['starting', 'active', 'unhealthy']);
 
 interface UserPortalPromptProps {
   componentId: string;
@@ -58,9 +60,9 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   const [portalQuery] = useUserPortals([environment.id]);
   // The environments a User Portal can run in. Where the read fails, Enable is still offered, and refused with the reason.
   const portalEnvironments = useUserPortalEnvironments();
-  const portalActive = portalQuery.data?.state === 'active';
+  const portalProvisioned = !!portalQuery.data && PROVISIONED.has(portalQuery.data.state);
   // ipaas-service can still answer from before the portal it waited for came up: read again until it catches up.
-  const publishability = useUserPortalPublishability(componentId, environment.id, { rereadWhile: (report) => portalActive && notEnabledIn(report) });
+  const publishability = useUserPortalPublishability(componentId, environment.id, { rereadWhile: (report) => portalProvisioned && notEnabledIn(report) });
   const can = useCan();
   const enable = useEnableUserPortal();
   const [enableOpen, setEnableOpen] = useState(false);
@@ -70,7 +72,7 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   const report = publishability.data;
   // The report is kept a while after it is read, so it can still say the portal isn't enabled once the portal it was
   // waiting for is up: read it again then, and every few seconds after while it still says so.
-  const staleReport = portalActive && !!report && notEnabledIn(report);
+  const staleReport = portalProvisioned && !!report && notEnabledIn(report);
   const { refetch: rereadReport } = publishability;
   useEffect(() => {
     if (staleReport) void rereadReport();
@@ -139,22 +141,10 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
       );
     }
     case 'setting-up':
-    case 'starting':
       return (
         <Button variant="contained" disabled startIcon={<CircularProgress size={16} color="inherit" />}>
-          {portal.state === 'starting' ? 'Starting User Portal…' : 'Setting up User Portal…'}
+          Setting up User Portal…
         </Button>
-      );
-    // Enabling it again doesn't make it ready, and some of these recover on their own, so only the reason is offered.
-    case 'unhealthy':
-      return (
-        <Tooltip title={portal.readinessMessage ?? ''}>
-          <span>
-            <Button variant="contained" disabled>
-              User Portal not ready
-            </Button>
-          </span>
-        </Tooltip>
       );
     case 'removing':
       return (
@@ -162,6 +152,10 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
           The User Portal in {environment.name} is being removed.
         </Typography>
       );
+    // A provisioned portal takes publishes whether or not its pods are ready, as the env card's switch does; only
+    // opening it waits for them.
+    case 'starting':
+    case 'unhealthy':
     case 'active':
       break;
   }
@@ -169,9 +163,7 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   if (report.published) {
     return (
       <Stack alignItems="center" gap={1}>
-        <Button variant="contained" component="a" href={portal.url} target="_blank" rel="noopener noreferrer" disabled={!portal.url} startIcon={<ExternalLink size={16} />}>
-          Open User Portal
-        </Button>
+        <OpenUserPortal portal={portal} />
         <RejectedScopes scopes={publish.rejectedScopes} />
       </Stack>
     );
@@ -210,3 +202,33 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
 }
 
 const notEnabledIn = (report: UserPortalPublishability): boolean => report.reasons.some((r) => r.code === USER_PORTAL_NOT_ENABLED);
+
+/**
+ * Opens the User Portal once its pods are ready. Until then it says why it can't be opened: still starting, or not
+ * ready, with OpenChoreo's reason on hover. Enabling it again doesn't make it ready, so nothing else is offered.
+ */
+function OpenUserPortal({ portal }: { portal: UserPortal }): JSX.Element {
+  if (portal.state === 'starting') {
+    return (
+      <Button variant="contained" disabled startIcon={<CircularProgress size={16} color="inherit" />}>
+        Starting User Portal…
+      </Button>
+    );
+  }
+  if (portal.state === 'unhealthy') {
+    return (
+      <Tooltip title={portal.readinessMessage}>
+        <span>
+          <Button variant="contained" disabled>
+            User Portal not ready
+          </Button>
+        </span>
+      </Tooltip>
+    );
+  }
+  return (
+    <Button variant="contained" component="a" href={portal.url} target="_blank" rel="noopener noreferrer" disabled={!portal.url} startIcon={<ExternalLink size={16} />}>
+      Open User Portal
+    </Button>
+  );
+}

@@ -62,18 +62,25 @@ function portalState(s: BffUserPortalStatus): { state: UserPortalState; error?: 
 }
 
 // A finished provision doesn't mean UP-DP answers yet: its pods may still be starting, so it opens
-// only once READY. With no readiness, or one the console doesn't know, it reads as active, as it
-// did before ipaas-service reported readiness.
+// only once READY. With no readiness, as from an ipaas-service older than it, it reads as active, as
+// it did before. One the console doesn't know reads as not ready, saying so, as an unknown provision
+// state reads as failed: read as active, it would link a portal that may not answer.
 function readyState(s: BffUserPortalStatus): { state: UserPortalState; readinessMessage?: string } {
-  switch (s.readiness?.toUpperCase()) {
-    // An enabled portal reads SUSPENDED only for a moment after the enable; the next read corrects it.
+  const readiness = s.readiness?.toUpperCase();
+  switch (readiness) {
+    case undefined:
+    case '':
+    case 'READY':
+      return { state: 'active' };
+    // ipaas-service sends SUSPENDED only for a portal that isn't enabled, which reads as not enabled
+    // above. An enabled one would be on its way up.
     case 'STARTING':
     case 'SUSPENDED':
       return { state: 'starting' };
     case 'UNHEALTHY':
       return { state: 'unhealthy', ...(s.readinessMessage ? { readinessMessage: s.readinessMessage } : {}) };
     default:
-      return { state: 'active' };
+      return { state: 'unhealthy', readinessMessage: `The User Portal reports a readiness the console doesn't know: ${readiness}.` };
   }
 }
 
