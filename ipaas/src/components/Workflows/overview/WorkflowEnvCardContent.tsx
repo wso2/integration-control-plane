@@ -81,7 +81,9 @@ function WorkflowDefinitions({ api, scope, search, envId }: { api: ReadyWorkflow
   const [picked, setPicked] = useState<string | null>(null);
   const [startOpen, setStartOpen] = useState(false);
   const { goToWorkflowRuns } = useWorkflowRoutes();
-  const definitions = useQuery(definitionsQuery(client, connection.scopeId));
+  // The picker shows each definition's worker count, which changes without a deploy, so the card reads the
+  // definitions again whenever it mounts, showing what the connection read alongside its probe meanwhile.
+  const definitions = useQuery({ ...definitionsQuery(client, connection.scopeId), staleTime: 0 });
 
   if (definitions.isPending) return <WorkflowEnvCardSkeleton />;
   if (definitions.isError) {
