@@ -281,8 +281,8 @@ export const fetchExecutionLogs = async (componentId: string, _deploymentTrackId
   return matched.map(toExecutionLogEntry);
 };
 
-// GET /components/{name}/runtime-arguments — the arguments the deployed build recorded
-// from the `runtimeArguments` of the integration's component.yaml. 424: no build of the
+// GET /components/{name}/runtime-arguments — the arguments the deployed build recorded:
+// the `runtimeArguments` of the integration's component.yaml, else a Ballerina main's. 424: no build of the
 // commit was found, the build recorded none, or it recorded a section that breaks a rule;
 // its message says which, and a build of the commit changes each.
 export const fetchRuntimeArguments = (componentId: string, deploymentTrackId: string, commitHash: string): Promise<RuntimeArgument[]> =>
