@@ -16,35 +16,12 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, Link, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
+import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
-import { cloudConsoleSubscriptionsUrl } from '../../../paths';
+import PlanLimitWarning from '../../common/PlanLimitAlert';
 import type { ScheduleFormApi } from './useScheduleForm';
-
-const UPGRADE = 'Upgrade';
-
-/** A plan limit the value goes over. Its "Upgrade …" sentence, if any, links "Upgrade" to the subscriptions page. */
-function PlanLimitWarning({ message, sx }: { message: string; sx?: object }): JSX.Element {
-  const at = message.lastIndexOf(`. ${UPGRADE} `);
-  if (at < 0)
-    return (
-      <Alert severity="warning" sx={sx}>
-        {message}
-      </Alert>
-    );
-  const upgradeAt = at + 2;
-  return (
-    <Alert severity="warning" sx={sx}>
-      {message.slice(0, upgradeAt)}
-      <Link href={cloudConsoleSubscriptionsUrl()} target="_blank" rel="noopener noreferrer" color="inherit" underline="always">
-        {UPGRADE}
-      </Link>
-      {message.slice(upgradeAt + UPGRADE.length)}
-    </Alert>
-  );
-}
 
 /**
  * Presentational cron editor bound to a {@link useScheduleForm} instance.

@@ -18,7 +18,22 @@
 
 import { describe, expect, it } from 'vitest';
 import type { DevopsConfigMap, DevopsConfigMount, DevopsSecret, ReleaseContainer } from '../types/devopsConfigs';
-import { buildConfigRows, mainContainer, mountKind, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName, keyInOtherGroupError } from './devopsConfigs';
+import {
+  buildConfigRows,
+  mainContainer,
+  mountKind,
+  parseDotEnv,
+  validateConfigKey,
+  validateDisplayName,
+  validateMountDirectory,
+  validateFileName,
+  mountedFilePath,
+  byteLength,
+  formatBytes,
+  configCounts,
+  validateNewEnvGroupName,
+  keyInOtherGroupError,
+} from './devopsConfigs';
 
 const makeContainer = (overrides: Partial<ReleaseContainer>): ReleaseContainer => ({
   ID: 'c1',
@@ -119,46 +134,94 @@ describe('validateConfigKey', () => {
   });
 });
 
-describe('validateMountPath', () => {
-  it('requires a non-empty path', () => {
-    expect(validateMountPath('')).toBe('Mount path is required.');
-    expect(validateMountPath('   ')).toBe('Mount path is required.');
+describe('validateMountDirectory', () => {
+  const invalid = 'Enter an absolute directory without a trailing slash, e.g. /app/configs.';
+
+  it('requires a non-empty directory', () => {
+    expect(validateMountDirectory('')).toBe('Mount directory is required.');
+    expect(validateMountDirectory('   ')).toBe('Mount directory is required.');
   });
 
-  it('rejects paths longer than 2048 characters', () => {
-    const longPath = `/${'a'.repeat(2048)}`;
-    expect(validateMountPath(longPath)).toBe('Path must be 2048 characters or fewer.');
+  it('rejects directories longer than 2048 characters', () => {
+    expect(validateMountDirectory(`/${'a'.repeat(2048)}`)).toBe('Directory must be 2048 characters or fewer.');
   });
 
-  it('rejects a relative path', () => {
-    expect(validateMountPath('app/config.json')).toBe('Enter an absolute path including the filename, e.g. /app/configs/config.json.');
+  it.each(['app/configs', '/app//configs', '/app/../configs', '/app/configs/', '/'])('rejects %s', (dir) => {
+    expect(validateMountDirectory(dir)).toBe(invalid);
   });
 
-  it('rejects a path with a double slash', () => {
-    expect(validateMountPath('/app//config.json')).toBe('Enter an absolute path including the filename, e.g. /app/configs/config.json.');
+  it.each(['/app/configs', '/conf', '/home/ballerina/.certs'])('accepts %s', (dir) => {
+    expect(validateMountDirectory(dir)).toBe('');
+  });
+});
+
+describe('validateFileName', () => {
+  const invalid = 'Use letters, numbers, dots, hyphens and underscores, e.g. config.json.';
+
+  it('requires a name', () => {
+    expect(validateFileName('')).toBe('File name is required.');
   });
 
-  it('rejects a path with a parent-directory segment', () => {
-    expect(validateMountPath('/app/../config.json')).toBe('Enter an absolute path including the filename, e.g. /app/configs/config.json.');
+  it('rejects names longer than 253 characters', () => {
+    expect(validateFileName('a'.repeat(254))).toBe('File name must be 253 characters or fewer.');
+    expect(validateFileName('a'.repeat(253))).toBe('');
   });
 
-  it('rejects a path with a trailing slash', () => {
-    expect(validateMountPath('/app/configs/')).toBe('Enter an absolute path including the filename, e.g. /app/configs/config.json.');
+  // The service and Kubernetes accept the same names: a ConfigMap key.
+  it.each(['File Size Exceed', 'a/b.txt', 'a\\b.txt', '.', '..', 'naïve.txt', 'a:b'])('rejects %s', (name) => {
+    expect(validateFileName(name)).toBe(invalid);
   });
 
-  it('accepts a valid absolute path', () => {
-    expect(validateMountPath('/app/configs/config.json')).toBe('');
+  it('rejects the Ballerina config file', () => {
+    expect(validateFileName('Config.toml')).toBe('"Config.toml" is reserved for Ballerina configuration.');
+  });
+
+  it.each(['config.json', 'ca-bundle_v2.pem', '.env'])('accepts %s', (name) => {
+    expect(validateFileName(name)).toBe('');
+  });
+});
+
+describe('mountedFilePath', () => {
+  it('joins the directory and the file name as the container sees them', () => {
+    expect(mountedFilePath('/app/configs', 'config.json')).toBe('/app/configs/config.json');
+    expect(mountedFilePath('/test.txt', 'test')).toBe('/test.txt/test');
+  });
+});
+
+describe('byteLength and formatBytes', () => {
+  it('counts UTF-8 bytes, as the service does', () => {
+    expect(byteLength('abc')).toBe(3);
+    expect(byteLength('é')).toBe(2);
+  });
+
+  it('formats sizes', () => {
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(4096)).toBe('4 KB');
+    expect(formatBytes(153600)).toBe('150 KB');
+    expect(formatBytes(1536 + 100)).toBe('1.6 KB');
+  });
+});
+
+describe('configCounts', () => {
+  it('counts env-var groups and non-secret files', () => {
+    const mounts = [
+      { ID: 'db', configmap_id: 'db', secret_id: null, container_id: 'dev', app_environment_id: 'r', mount_path: '', config_key: '', mount_type: 'ENVFile', mount_permissions: '0000' },
+      { ID: 'creds', configmap_id: null, secret_id: 'creds', container_id: 'dev', app_environment_id: 'r', mount_path: '', config_key: '', mount_type: 'ENVFile', mount_permissions: '0000' },
+      { ID: 'a.json', configmap_id: 'a.json', secret_id: null, container_id: 'dev', app_environment_id: 'r', mount_path: '/conf', config_key: 'data', mount_type: 'File', mount_permissions: '0644' },
+      { ID: 'b.key', configmap_id: null, secret_id: 'b.key', container_id: 'dev', app_environment_id: 'r', mount_path: '/conf', config_key: 'data', mount_type: 'File', mount_permissions: '0644' },
+    ];
+    expect(configCounts(buildConfigRows(mounts, [], []))).toEqual({ envGroupCount: 2, plainFileCount: 1 });
   });
 });
 
 describe('validateDisplayName', () => {
   it('requires a non-empty name', () => {
-    expect(validateDisplayName('')).toBe('Display name is required.');
-    expect(validateDisplayName('   ')).toBe('Display name is required.');
+    expect(validateDisplayName('')).toBe('Name is required.');
+    expect(validateDisplayName('   ')).toBe('Name is required.');
   });
 
   it('rejects names longer than 250 characters', () => {
-    expect(validateDisplayName('a'.repeat(251))).toBe('Display name must be 250 characters or fewer.');
+    expect(validateDisplayName('a'.repeat(251))).toBe('Name must be 250 characters or fewer.');
   });
 
   it('accepts a name at exactly 250 characters', () => {
@@ -182,7 +245,7 @@ describe('validateNewEnvGroupName', () => {
   });
 
   it('applies the display name rules first', () => {
-    expect(validateNewEnvGroupName('')).toBe('Display name is required.');
+    expect(validateNewEnvGroupName('')).toBe('Name is required.');
   });
 });
 

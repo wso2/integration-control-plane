@@ -21,7 +21,7 @@ import { Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import ConfigEditor, { type EditorContext } from '../../../Configs/ConfigEditor';
 import { useConfigMaps, useContainerConfigMounts, useDeleteConfig, useSecrets } from '../../../../hooks/useDevopsConfigs';
-import { buildConfigRows } from '../../../../utils/devopsConfigs';
+import { buildConfigRows, configCounts, mountedFilePath } from '../../../../utils/devopsConfigs';
 import type { ConfigKind, ConfigRow } from '../../../../types/devopsConfigs';
 
 interface ConfigStepProps {
@@ -44,7 +44,8 @@ export default function ConfigStep({ ctx, kind, emptyText, onNotify }: ConfigSte
   const { data: mounts = [], isLoading } = useContainerConfigMounts(ctx.projectId, ctx.componentId, ctx.releaseId, ctx.containerId, ctx.deploymentTrackId);
   const { data: configMaps = [] } = useConfigMaps(ctx.projectId, ctx.envId, ctx.deploymentTrackId);
   const { data: secrets = [] } = useSecrets(ctx.projectId, ctx.envId, ctx.deploymentTrackId);
-  const rows = useMemo(() => buildConfigRows(mounts, configMaps, secrets).filter((r) => r.kind === kind), [mounts, configMaps, secrets, kind]);
+  const allRows = useMemo(() => buildConfigRows(mounts, configMaps, secrets), [mounts, configMaps, secrets]);
+  const rows = useMemo(() => allRows.filter((r) => r.kind === kind), [allRows, kind]);
 
   const del = useDeleteConfig(ctx.projectId, ctx.deploymentTrackId);
   const [view, setView] = useState<View>({ mode: 'list' });
@@ -64,6 +65,7 @@ export default function ConfigStep({ ctx, kind, emptyText, onNotify }: ConfigSte
       <ConfigEditor
         ctx={ctx}
         existing={view.mode === 'edit' ? view.row : undefined}
+        {...configCounts(allRows)}
         onBack={() => setView({ mode: 'list' })}
         onSaved={(message) => {
           setView({ mode: 'list' });
@@ -96,7 +98,7 @@ export default function ConfigStep({ ctx, kind, emptyText, onNotify }: ConfigSte
             <ListingTable.Head>
               <ListingTable.Row>
                 <ListingTable.Cell>Name</ListingTable.Cell>
-                <ListingTable.Cell>{kind === 'fileMount' ? 'Mount path' : 'Keys'}</ListingTable.Cell>
+                <ListingTable.Cell>{kind === 'fileMount' ? 'Mounted at' : 'Keys'}</ListingTable.Cell>
                 <ListingTable.Cell align="right">Actions</ListingTable.Cell>
               </ListingTable.Row>
             </ListingTable.Head>
@@ -109,7 +111,7 @@ export default function ConfigStep({ ctx, kind, emptyText, onNotify }: ConfigSte
                       {r.isSecret && <Chip label="Secret" size="small" variant="outlined" color="warning" />}
                     </Stack>
                   </ListingTable.Cell>
-                  <ListingTable.Cell>{r.kind === 'fileMount' ? r.mount.mount_path || '—' : r.keys.join(', ') || '—'}</ListingTable.Cell>
+                  <ListingTable.Cell>{r.kind === 'fileMount' ? (r.mount.mount_path ? mountedFilePath(r.mount.mount_path, r.name) : '—') : r.keys.join(', ') || '—'}</ListingTable.Cell>
                   <ListingTable.Cell align="right">
                     <Tooltip title="Edit">
                       <IconButton size="small" aria-label={`Edit ${r.name}`} onClick={() => setView({ mode: 'edit', row: r })}>

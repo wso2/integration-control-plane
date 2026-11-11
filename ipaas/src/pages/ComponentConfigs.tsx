@@ -32,7 +32,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
-import { buildConfigRows, mainContainer } from '../utils/devopsConfigs';
+import { buildConfigRows, configCounts, mainContainer, mountedFilePath } from '../utils/devopsConfigs';
 import { runtimeFromDisplayType } from '../utils/identifyIntegration';
 import { isMiManagedGroup } from '../utils/miConfigs';
 import type { ConfigRow } from '../types/devopsConfigs';
@@ -156,7 +156,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
         ) : trackId === undefined ? null : !releaseId || !containerId ? (
           <Alert severity="info">Deploy this integration to the selected environment to manage its configs and secrets.</Alert>
         ) : view.kind === 'create' ? (
-          <ConfigEditor ctx={ctx} otherGroupKeys={otherGroupKeys()} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
+          <ConfigEditor ctx={ctx} otherGroupKeys={otherGroupKeys()} {...configCounts(rows)} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
         ) : view.kind === 'edit' ? (
           <ConfigEditor ctx={ctx} existing={view.row} otherGroupKeys={otherGroupKeys(view.row)} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
         ) : (
@@ -189,7 +189,9 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
                           </Stack>
                         </ListingTable.Cell>
                         <ListingTable.Cell>{r.kind === 'fileMount' ? 'File mount' : 'Environment variables'}</ListingTable.Cell>
-                        <ListingTable.Cell>{r.kind === 'fileMount' ? r.mount.mount_path || '—' : r.keys.join(', ') || '—'}</ListingTable.Cell>
+                        <ListingTable.Cell sx={r.kind === 'fileMount' ? { fontFamily: 'monospace', fontSize: '0.8125rem' } : undefined}>
+                          {r.kind === 'fileMount' ? (r.mount.mount_path ? mountedFilePath(r.mount.mount_path, r.name) : '—') : r.keys.join(', ') || '—'}
+                        </ListingTable.Cell>
                         <ListingTable.Cell align="right">
                           <Authorized permissions={Scopes.CONFIG_MANAGE}>
                             {managedByMi(r) ? (

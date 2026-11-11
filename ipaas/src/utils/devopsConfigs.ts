@@ -31,8 +31,12 @@ export function mainContainer(containers: ReleaseContainer[] | undefined): Relea
 // satisfies the backend and enforces valid env-var names (no leading digit, no
 // `-`/`.`, no spaces).
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-// Absolute mount path (Devant): no `//`, no `..`, no trailing slash.
-const MOUNT_PATH_RE = /^\/(?!\/)(?!.*\/\.\.)(?!.*\/$)[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
+// Absolute directory below the root: no `//`, no `..`, no trailing slash.
+const MOUNT_DIRECTORY_RE = /^\/(?!\/)(?!.*\/\.\.)(?!.*\/$)[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
+// The file name is the key of the ConfigMap or Secret holding the file; Kubernetes refuses
+// any other key, and the whole deployment's apply fails with it.
+const FILE_NAME_RE = /^[A-Za-z0-9._-]+$/;
+const RESERVED_FILE_NAME = 'Config.toml';
 
 // A Ballerina config save rebuilds these env vars and drops any other entry with
 // their names, so an env-var group can't use them (the BFF rejects them too).
@@ -56,16 +60,36 @@ export function keyInOtherGroupError(key: string, otherGroupKeys: ReadonlyMap<st
   return group === undefined ? '' : `"${key}" is already set by the "${group}" config.`;
 }
 
-export function validateMountPath(path: string): string {
-  if (!path.trim()) return 'Mount path is required.';
-  if (path.length > 2048) return 'Path must be 2048 characters or fewer.';
-  if (!MOUNT_PATH_RE.test(path)) return 'Enter an absolute path including the filename, e.g. /app/configs/config.json.';
+export function validateMountDirectory(path: string): string {
+  if (!path.trim()) return 'Mount directory is required.';
+  if (path.length > 2048) return 'Directory must be 2048 characters or fewer.';
+  if (!MOUNT_DIRECTORY_RE.test(path)) return 'Enter an absolute directory without a trailing slash, e.g. /app/configs.';
   return '';
 }
 
+export function validateFileName(name: string): string {
+  if (!name) return 'File name is required.';
+  if (name.length > 253) return 'File name must be 253 characters or fewer.';
+  if (!FILE_NAME_RE.test(name) || name === '.' || name === '..') return 'Use letters, numbers, dots, hyphens and underscores, e.g. config.json.';
+  if (name === RESERVED_FILE_NAME) return `"${RESERVED_FILE_NAME}" is reserved for Ballerina configuration.`;
+  return '';
+}
+
+/** Where a mounted file appears in the container. */
+export const mountedFilePath = (directory: string, fileName: string): string => `${directory.replace(/\/+$/, '')}/${fileName}`;
+
+/** Bytes of a string as UTF-8, which is how the service counts the limits. */
+export const byteLength = (text: string): number => new TextEncoder().encode(text).length;
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  return `${Number.isInteger(kb) ? kb : kb.toFixed(1)} KB`;
+}
+
 export function validateDisplayName(name: string): string {
-  if (!name.trim()) return 'Display name is required.';
-  if (name.length > 250) return 'Display name must be 250 characters or fewer.';
+  if (!name.trim()) return 'Name is required.';
+  if (name.length > 250) return 'Name must be 250 characters or fewer.';
   return '';
 }
 
@@ -101,6 +125,11 @@ export function parseDotEnv(text: string): Array<{ key: string; value: string }>
 /** Whether a mount injects env vars or a file, from its `mount_type`. */
 export function mountKind(mount: DevopsConfigMount): ConfigKind {
   return mount.mount_type === 'File' ? 'fileMount' : 'envVars';
+}
+
+/** What an environment holds that the plan's limits count: env-var groups, and files that are not secret. */
+export function configCounts(rows: ConfigRow[]): { envGroupCount: number; plainFileCount: number } {
+  return { envGroupCount: rows.filter((r) => r.kind === 'envVars').length, plainFileCount: rows.filter((r) => r.kind === 'fileMount' && !r.isSecret).length };
 }
 
 /** Join a component's config-mounts with the env's configmaps/secrets for display. */
