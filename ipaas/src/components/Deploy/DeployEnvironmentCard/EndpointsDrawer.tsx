@@ -38,9 +38,11 @@ interface EndpointsDrawerProps {
   versionId?: string;
   /** An MCP server, whose endpoints the AI gateway may front instead of the API Platform. */
   isMcpServer?: boolean;
+  /** A workflow integration, whose Management API the settings drawer warns about. */
+  isWorkflow?: boolean;
 }
 
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, projectId, componentId, environmentId, versionId, isMcpServer = false }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, projectId, componentId, environmentId, versionId, isMcpServer = false, isWorkflow = false }: EndpointsDrawerProps) {
   const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId: componentId ?? '', envId: environmentId, versionId: versionId ?? '' }, open && isMcpServer && !!componentId);
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
@@ -93,7 +95,7 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
         componentName={componentId ?? ''}
         envName={environmentId}
         deploymentTrackId={versionId}
-        endpoints={toEndpointOptions(endpoints)}
+        endpoints={toEndpointOptions(endpoints, isWorkflow)}
         activeEndpointName={selectedEndpoint?.id}
       />
     </>

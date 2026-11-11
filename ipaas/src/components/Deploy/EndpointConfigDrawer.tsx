@@ -16,9 +16,11 @@
  * under the License.
  */
 
+import { useMemo } from 'react';
 import { useEnvEndpoints } from '../../hooks/useDeployments';
 import ApiSecurityDrawer from '../Overview/integration-as-api/ApiSecurityDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
+import { managementApiLast } from '../../utils/workflowIntegration';
 
 interface EndpointConfigDrawerProps {
   open: boolean;
@@ -29,16 +31,19 @@ interface EndpointConfigDrawerProps {
   firstEnvReleaseId: string;
   /** Environment slug, required by the security drawer's BFF routes. */
   firstEnvId?: string;
+  /** A workflow integration, whose Management API the security drawer warns about. */
+  isWorkflow?: boolean;
 }
 
 /** Endpoint security settings, scoped to the first environment's endpoints. */
-export default function EndpointConfigDrawer({ open, onClose, componentId, versionId, firstEnvReleaseId, firstEnvId }: EndpointConfigDrawerProps) {
-  const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, firstEnvReleaseId);
+export default function EndpointConfigDrawer({ open, onClose, componentId, versionId, firstEnvReleaseId, firstEnvId, isWorkflow = false }: EndpointConfigDrawerProps) {
+  const { data: listedEndpoints = [] } = useEnvEndpoints(componentId, versionId, firstEnvReleaseId);
+  const endpoints = useMemo(() => managementApiLast(listedEndpoints), [listedEndpoints]);
 
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
   };
 
-  return <ApiSecurityDrawer open={open} onClose={handleClose} componentName={componentId} envName={firstEnvId ?? ''} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={endpoints[0]?.id} />;
+  return <ApiSecurityDrawer open={open} onClose={handleClose} componentName={componentId} envName={firstEnvId ?? ''} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints, isWorkflow)} activeEndpointName={endpoints[0]?.id} />;
 }

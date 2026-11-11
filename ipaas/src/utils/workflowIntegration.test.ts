@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isWorkflowIntegration, isWorkflowManagementEndpoint } from './workflowIntegration';
+import { isWorkflowIntegration, isWorkflowManagementEndpoint, managementApiLast } from './workflowIntegration';
 
 const management = { displayName: 'Workflow Management API' };
 const business = { displayName: 'Processorder' };
@@ -37,5 +37,18 @@ describe('isWorkflowManagementEndpoint', () => {
     expect(isWorkflowManagementEndpoint({ displayName: ' WORKFLOW MANAGEMENT API ' })).toBe(true);
     expect(isWorkflowManagementEndpoint(business)).toBe(false);
     expect(isWorkflowManagementEndpoint({ displayName: '' })).toBe(false);
+  });
+});
+
+describe('managementApiLast', () => {
+  it('moves the management API behind the others and keeps their order', () => {
+    const other = { displayName: 'Refunds' };
+    expect(managementApiLast([management, business, other])).toEqual([business, other, management]);
+  });
+
+  it('leaves the list it is given as it was', () => {
+    const endpoints = [management, business];
+    managementApiLast(endpoints);
+    expect(endpoints).toEqual([management, business]);
   });
 });

@@ -27,7 +27,7 @@ import type { Environment } from '../../../types/environment';
 import { apiErrorMessage, httpStatusOf, isPermissionError } from '../../../utils/apiErrors';
 import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
 import { hasJwtFormErrors, jwtFormErrors, jwtFormOf, toJwtSecurity, type JwtForm } from '../../../utils/jwtSecurity';
-import { isWorkflowManagementEndpoint, MANAGEMENT_API_SECURITY_WARNING } from '../../../utils/workflowIntegration';
+import { MANAGEMENT_API_SECURITY_WARNING } from '../../../utils/workflowIntegration';
 import OAuthSettingsSection from './OAuthSettingsSection';
 import { useEndpointDrawer } from './useEndpointDrawer';
 import { useManagementApiConfirm } from './useManagementApiConfirm';
@@ -133,10 +133,14 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
     }
   };
 
-  useUnsavedChanges(open && !!saved && JSON.stringify(draft) !== JSON.stringify(saved));
+  const dirty = !!saved && JSON.stringify(draft) !== JSON.stringify(saved);
+  useUnsavedChanges(open && dirty);
   const guardNavigation = useLeaveGuard();
-  const isManagementApi = !!selectedEndpoint && isWorkflowManagementEndpoint(selectedEndpoint);
-  const confirm = useManagementApiConfirm(isManagementApi, { title: 'Change the Workflow Management API’s security?', warning: MANAGEMENT_API_SECURITY_WARNING, confirmLabel: 'Apply' });
+  const isManagementApi = !!selectedEndpoint?.managementApi;
+  // ipaas-service never leaves a workflow's Management API open, so clearing its scheme could only be refused.
+  const openManagementApi = isManagementApi && mode === 'none';
+  // Asks only when the apply changes something.
+  const confirm = useManagementApiConfirm(isManagementApi && dirty, { title: 'Change the Workflow Management API’s security?', warning: MANAGEMENT_API_SECURITY_WARNING, confirmLabel: 'Apply' });
 
   const handleCancel = () =>
     guardNavigation(() => {
@@ -161,7 +165,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
             {error && <Alert severity="error">{error}</Alert>}
             {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
             {readOnlyNotice && !notice && !error && <Alert severity="info">{readOnlyNotice}</Alert>}
-            {isManagementApi && !readOnly && !notice && <Alert severity="warning">{MANAGEMENT_API_SECURITY_WARNING}</Alert>}
+            {isManagementApi && canUpdate && !readOnly && !notice && <Alert severity="warning">{MANAGEMENT_API_SECURITY_WARNING}</Alert>}
             {envLabel && !readOnly && !notice && (
               <Typography variant="body2" color="text.secondary">
                 Changes apply in <strong>{envLabel}</strong>. Promote to apply them to later environments.
@@ -263,7 +267,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
           Cancel
         </Button>
         {canUpdate && (
-          <Button variant="contained" onClick={() => confirm.request(() => void handleApply())} disabled={saving || readOnly || invalid || !selectedEndpoint || loadingSecurity || Boolean(securityError)} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
+          <Button variant="contained" onClick={() => confirm.request(() => void handleApply())} disabled={saving || readOnly || invalid || openManagementApi || !selectedEndpoint || loadingSecurity || Boolean(securityError)} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
             {saving ? 'Applying…' : 'Apply'}
           </Button>
         )}

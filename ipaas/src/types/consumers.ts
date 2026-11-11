@@ -39,6 +39,8 @@ export interface EndpointOption {
   /** Endpoint name — the BFF's `endpointName` path segment. */
   name: string;
   displayName: string;
+  /** A workflow's Management API, which the drawers warn about, ask before changing, and keep the CORS of. */
+  managementApi?: boolean;
   networkVisibilities?: string[] | null;
   visibilityStatus?: import('./component').EndpointVisibilityStatus | null;
 }

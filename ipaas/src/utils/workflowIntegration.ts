@@ -36,18 +36,24 @@ export function isWorkflowManagementEndpoint(endpoint: Pick<EnvEndpoint, 'displa
 }
 
 /**
- * A workflow's Management API is listed with its other endpoints, and its security, API settings and visibility can
- * be changed, for a team that shares it through the Developer Portal or calls it from its own applications. The
- * console's workflow pages and the User Portal call it as well, so each place that changes it says so first.
+ * Lists a workflow's own endpoints before its Management API, so whatever opens on the first endpoint opens on
+ * the workflow's own rather than the platform's.
  */
+export function managementApiLast<T extends Pick<EnvEndpoint, 'displayName'>>(endpoints: T[]): T[] {
+  return [...endpoints].sort((a, b) => Number(isWorkflowManagementEndpoint(a)) - Number(isWorkflowManagementEndpoint(b)));
+}
+
+// A workflow's Management API is listed with its other endpoints, and its security, API settings and visibility can
+// be changed, for a team that shares it through the Developer Portal or calls it from its own applications. The
+// console's workflow pages and the User Portal call it as well, so each place that changes it says so first.
 const MANAGEMENT_API_CALLERS =
   'This is the workflow’s Workflow Management API. The console’s workflow pages and human tasks call it with an API key, and the User Portal calls it with its users’ sign-ins while the workflow is published there.';
 
-/** Said before the Management API's security is changed. */
+/** Said before the Management API's security is changed. It names who calls the API and what each takes. */
 export const MANAGEMENT_API_SECURITY_WARNING = `${MANAGEMENT_API_CALLERS} Changing its security can stop them working: the console takes only API key security, and the User Portal only OAuth.`;
 
-/** Said before the Management API's CORS or rate limits are changed. */
+/** Said before the Management API's CORS or rate limits are changed. It names who calls the API. */
 export const MANAGEMENT_API_SETTINGS_WARNING = `${MANAGEMENT_API_CALLERS} A rate limit applies to their calls too, and both poll it. Its CORS allows every origin, for the User Portal, and every deploy sets that again, so it can’t be changed.`;
 
-/** Said before the Management API's network visibility is changed. */
+/** Said before the Management API's network visibility is changed. It names who calls the API. */
 export const MANAGEMENT_API_VISIBILITY_WARNING = `${MANAGEMENT_API_CALLERS} Changing its visibility can stop them reaching it: the User Portal calls it only on the public host.`;

@@ -95,11 +95,13 @@ interface ManageEndpointProps {
   versionId: string;
   releaseId: string;
   environmentId: string;
+  /** A workflow integration, whose Management API says what its visibility reaches, and asks first. */
+  isWorkflow?: boolean;
   onBack: () => void;
 }
 
-/** Edits an endpoint's network visibility. A workflow's Management API says what its visibility reaches, and asks first. */
-export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, environmentId, onBack }: ManageEndpointProps) {
+/** Edits an endpoint's network visibility. */
+export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, environmentId, isWorkflow = false, onBack }: ManageEndpointProps) {
   const [{ exposure: seededExposure, legacyBothHosts }] = useState(() => editorExposure(ep));
   const [exposure, setExposure] = useState<EndpointExposure>(seededExposure);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -107,8 +109,9 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
   const allowLeave = useUnsavedChanges(exposure !== seededExposure);
   const guardNavigation = useLeaveGuard();
   const canExpose = useCan()(Scopes.ENDPOINT_EXPOSE);
-  const isManagementApi = isWorkflowManagementEndpoint(ep);
-  const confirm = useManagementApiConfirm(isManagementApi, { title: 'Change the Workflow Management API’s visibility?', warning: MANAGEMENT_API_VISIBILITY_WARNING, confirmLabel: 'Update' });
+  const isManagementApi = isWorkflow && isWorkflowManagementEndpoint(ep);
+  // Asks only when the update changes something.
+  const confirm = useManagementApiConfirm(isManagementApi && exposure !== seededExposure, { title: 'Change the Workflow Management API’s visibility?', warning: MANAGEMENT_API_VISIBILITY_WARNING, confirmLabel: 'Update' });
 
   const handleSave = () => {
     setSaveError(null);

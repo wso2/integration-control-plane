@@ -24,15 +24,11 @@ import EnvCardBody from './EnvCardBody';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// A workflow program exports its management API beside its own endpoints.
-vi.mock('../../../hooks/useDeployments', () => ({
-  useEnvEndpoints: () => ({
-    data: [
-      { id: 'processorder', displayName: 'Processorder' },
-      { id: 'workflow-ma-cf1', displayName: 'Workflow Management API' },
-    ],
-  }),
-}));
+// A workflow program exports its management API beside its own endpoints, in whichever order the BFF lists them.
+const listed = vi.hoisted(() => ({ data: [] as { id: string; displayName: string }[] }));
+vi.mock('../../../hooks/useDeployments', () => ({ useEnvEndpoints: () => listed }));
+const PROCESS_ORDER = { id: 'processorder', displayName: 'Processorder' };
+const MANAGEMENT = { id: 'workflow-ma-cf1', displayName: 'Workflow Management API' };
 vi.mock('../_shared/EndpointUrlsPanel', () => ({
   default: ({ endpoints }: { endpoints: { displayName: string }[] }) => (
     <ul>
@@ -58,7 +54,8 @@ afterEach(async () => {
   container.remove();
 });
 
-async function listedEndpoints(displayType: string): Promise<string[]> {
+async function listedEndpoints(displayType: string, endpoints = [PROCESS_ORDER, MANAGEMENT]): Promise<string[]> {
+  listed.data = endpoints;
   const props = {
     component: { id: 'orderprocessor', displayType, componentSubType: null },
     env: { id: 'development', name: 'Development' },
@@ -74,11 +71,11 @@ async function listedEndpoints(displayType: string): Promise<string[]> {
 
 describe('webhook EnvCardBody endpoints', () => {
   // A team may share a workflow's Management API through the Developer Portal, or call it from its own applications.
-  it('lists a workflow integration’s management API with its own endpoints', async () => {
+  it('lists a management API with the integration’s own endpoints', async () => {
     expect(await listedEndpoints('ballerinaWorkflow')).toEqual(['Processorder', 'Workflow Management API']);
   });
 
-  it('lists every endpoint of an integration that is not a workflow', async () => {
-    expect(await listedEndpoints('ballerinaWebhook')).toEqual(['Processorder', 'Workflow Management API']);
+  it('lists the management API after the integration’s own endpoints, so the card opens on those', async () => {
+    expect(await listedEndpoints('ballerinaWorkflow', [MANAGEMENT, PROCESS_ORDER])).toEqual(['Processorder', 'Workflow Management API']);
   });
 });

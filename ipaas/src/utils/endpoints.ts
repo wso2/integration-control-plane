@@ -18,6 +18,7 @@
 
 import type { EndpointExposure, EnvEndpoint } from '../types/component';
 import type { EndpointOption } from '../types/consumers';
+import { isWorkflowManagementEndpoint } from './workflowIntegration';
 
 /**
  * Drop a redundant leading "Endpoint" word from a label, so "Endpoint Covid Status"
@@ -79,7 +80,9 @@ export function resolveEndpointInvokeUrl(endpoint: EnvEndpoint | undefined): str
 }
 
 /** Environment endpoints as the options the cloud API drawers select from. */
-export const toEndpointOptions = (endpoints: EnvEndpoint[]): EndpointOption[] => endpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id, networkVisibilities: ep.networkVisibilities, visibilityStatus: ep.visibilityStatus }));
+/** `isWorkflow` says the endpoints are a workflow integration's: only there is an endpoint titled like the Management API one. */
+export const toEndpointOptions = (endpoints: EnvEndpoint[], isWorkflow = false): EndpointOption[] =>
+  endpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id, managementApi: isWorkflow && isWorkflowManagementEndpoint(ep), networkVisibilities: ep.networkVisibilities, visibilityStatus: ep.visibilityStatus }));
 
 export type VisibilityKey = 'public' | 'organization' | 'project';
 

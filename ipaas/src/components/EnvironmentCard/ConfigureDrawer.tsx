@@ -32,6 +32,7 @@ import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
+import { isWorkflowIntegration } from '../../utils/workflowIntegration';
 import { EndpointCardList } from '../EndpointCardList';
 import { useAiGatewayUrls } from '../../hooks/useAiGatewayUrls';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
@@ -760,7 +761,7 @@ function GenericServiceConfigureDrawer({
   projectHandler: _projectHandler,
   commitHash,
   releaseId,
-  displayType: _displayType,
+  displayType,
   releaseMgtReleaseId: _releaseMgtReleaseId,
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
@@ -770,6 +771,7 @@ function GenericServiceConfigureDrawer({
   isMcpServer = false,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
+  const isWorkflow = isWorkflowIntegration({ displayType: displayType ?? '', componentSubType: null });
   // File/event integrations have no endpoints (devant: they open the
   // ConfigurationWizard, not the ConfigEndpointWizard). Their flow is the same
   // 2-step shape automation uses — Configurations + Certificate Mount, Apply on
@@ -1122,7 +1124,7 @@ function GenericServiceConfigureDrawer({
 
   const renderEndpoints = () => {
     if (managingEp) {
-      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} environmentId={envId} onBack={() => setManagingEp(null)} />;
+      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} environmentId={envId} isWorkflow={isWorkflow} onBack={() => setManagingEp(null)} />;
     }
     if (!endpoints.length) {
       return (
@@ -1199,7 +1201,7 @@ function GenericServiceConfigureDrawer({
         )}
       </DrawerPanel>
 
-      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId} envName={envId} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />
+      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId} envName={envId} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints, isWorkflow)} activeEndpointName={settingsEp?.id} />
     </>
   );
 }

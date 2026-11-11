@@ -443,6 +443,7 @@ export default function DeployEnvironmentCard({
           environmentId={env.id}
           versionId={versionId}
           isMcpServer={isMcpServer}
+          isWorkflow={isWorkflow}
         />
       )}
     </>

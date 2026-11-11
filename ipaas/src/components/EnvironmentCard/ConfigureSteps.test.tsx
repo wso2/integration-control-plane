@@ -37,11 +37,11 @@ afterEach(() => {
   updateEndpoint.mockReset();
 });
 
-async function render(scopes: string[], endpoint: EnvEndpoint = ep) {
+async function render(scopes: string[], endpoint: EnvEndpoint = ep, isWorkflow = false) {
   const r = await renderWithScopes(
     <MemoryRouter>
       <UnsavedChangesProvider>
-        <ManageEndpoint ep={endpoint} componentId="orders" projectId="default" versionId="v1" releaseId="orders-1" environmentId="production" onBack={() => {}} />
+        <ManageEndpoint ep={endpoint} componentId="orders" projectId="default" versionId="v1" releaseId="orders-1" environmentId="production" isWorkflow={isWorkflow} onBack={() => {}} />
       </UnsavedChangesProvider>
     </MemoryRouter>,
     scopes,
@@ -91,10 +91,12 @@ describe('ManageEndpoint network visibility', () => {
 describe("ManageEndpoint on a workflow's Management API", () => {
   const dialog = (container: HTMLElement) => container.ownerDocument.querySelector('[role="dialog"]');
   const dialogButton = (container: HTMLElement, name: string) => [...(dialog(container)?.querySelectorAll('button') ?? [])].find((b) => b.textContent === name);
+  const changeVisibility = (container: HTMLElement) => act(async () => checkbox(container, 'Organization').click());
 
   it('says what its visibility reaches, and asks before updating it', async () => {
-    const container = await render(DEVELOPER, management);
+    const container = await render(DEVELOPER, management, true);
     expect(container.textContent).toContain('the User Portal calls it only on the public host');
+    await changeVisibility(container);
     await act(async () => button(container, 'Update')?.click());
     expect(dialog(container)?.textContent).toContain('Change the Workflow Management API’s visibility?');
     expect(updateEndpoint).not.toHaveBeenCalled();
@@ -108,8 +110,24 @@ describe("ManageEndpoint on a workflow's Management API", () => {
     expect(updateEndpoint).toHaveBeenCalledWith(expect.objectContaining({ endpointId: 'workflow-ma-cf1' }), expect.anything());
   });
 
+  it('does not ask when the update changes nothing', async () => {
+    const container = await render(DEVELOPER, management, true);
+    await act(async () => button(container, 'Update')?.click());
+    expect(dialog(container)).toBeNull();
+    expect(updateEndpoint).toHaveBeenCalled();
+  });
+
+  it('treats an endpoint of that title outside a workflow as any other', async () => {
+    const container = await render(DEVELOPER, management);
+    expect(container.textContent).not.toContain('the User Portal calls it only on the public host');
+    await changeVisibility(container);
+    await act(async () => button(container, 'Update')?.click());
+    expect(dialog(container)).toBeNull();
+    expect(updateEndpoint).toHaveBeenCalled();
+  });
+
   it('updates any other endpoint without asking', async () => {
-    const container = await render(DEVELOPER);
+    const container = await render(DEVELOPER, ep, true);
     expect(container.textContent).not.toContain('Workflow Management API');
     await act(async () => button(container, 'Update')?.click());
     expect(dialog(container)).toBeNull();
@@ -117,6 +135,6 @@ describe("ManageEndpoint on a workflow's Management API", () => {
   });
 
   it('says nothing to a role that cannot change it', async () => {
-    expect((await render(VIEWER, management)).textContent).not.toContain('the User Portal calls it only on the public host');
+    expect((await render(VIEWER, management, true)).textContent).not.toContain('the User Portal calls it only on the public host');
   });
 });

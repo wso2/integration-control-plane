@@ -29,7 +29,7 @@ import { isPermissionError } from '../../../utils/apiErrors';
 import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
 import CorsSection from '../../Policies/CorsSection';
 import RateLimitingSection from '../../Policies/RateLimitingSection';
-import { isWorkflowManagementEndpoint, MANAGEMENT_API_SETTINGS_WARNING } from '../../../utils/workflowIntegration';
+import { MANAGEMENT_API_SETTINGS_WARNING } from '../../../utils/workflowIntegration';
 import { useEndpointDrawer } from './useEndpointDrawer';
 import { useManagementApiConfirm } from './useManagementApiConfirm';
 import * as styles from './apiConsumption.styles';
@@ -99,22 +99,29 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
   const readOnly = readOnlyNotice !== null;
   const canApply = !readOnly && !!endpointRef && !!cors && !!rateLimit && isRateLimitValid(rateLimit) && !loadError && !isLoading && !saving;
 
+  const isManagementApi = !!selectedEndpoint?.managementApi;
+
   const handleApply = async () => {
     if (!endpointRef || !cors || !rateLimit || !canApply) return;
     setError(null);
     try {
-      await setPolicies.mutateAsync(configToPolicy(cors, rateLimit));
+      const next = configToPolicy(cors, rateLimit);
+      // ipaas-service accepts only the CORS it already has on a workflow's Management API, and the editor's round trip can
+      // reshape it (empty lists get defaults), so the loaded CORS goes back as it came.
+      if (isManagementApi) next.cors = policies?.cors;
+      await setPolicies.mutateAsync(next);
       onClose();
     } catch (err) {
       if (!isPermissionError(err)) setError(friendlyApiError(err, 'Could not save the API settings.'));
     }
   };
 
-  const isManagementApi = !!selectedEndpoint && isWorkflowManagementEndpoint(selectedEndpoint);
-  const confirm = useManagementApiConfirm(isManagementApi, { title: 'Change the Workflow Management API’s settings?', warning: MANAGEMENT_API_SETTINGS_WARNING, confirmLabel: 'Apply' });
-
   const seeded = useMemo(() => (policies ? policyToConfig(policies) : null), [policies]);
-  useUnsavedChanges(open && !!seeded && !!cors && !!rateLimit && JSON.stringify({ cors, rateLimit }) !== JSON.stringify(seeded));
+  const dirty = !!seeded && !!cors && !!rateLimit && JSON.stringify({ cors, rateLimit }) !== JSON.stringify(seeded);
+  // Asks only when the apply changes something.
+  const confirm = useManagementApiConfirm(isManagementApi && dirty, { title: 'Change the Workflow Management API’s settings?', warning: MANAGEMENT_API_SETTINGS_WARNING, confirmLabel: 'Apply' });
+
+  useUnsavedChanges(open && dirty);
   const guardNavigation = useLeaveGuard();
 
   const handleCancel = () =>
@@ -140,7 +147,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
             {error && <Alert severity="error">{error}</Alert>}
             {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
             {readOnlyNotice && !notice && !error && <Alert severity="info">{readOnlyNotice}</Alert>}
-            {isManagementApi && !readOnly && !notice && <Alert severity="warning">{MANAGEMENT_API_SETTINGS_WARNING}</Alert>}
+            {isManagementApi && canUpdate && !readOnly && !notice && <Alert severity="warning">{MANAGEMENT_API_SETTINGS_WARNING}</Alert>}
 
             <Stack direction="row" alignItems="center" gap={2}>
               <Typography variant="body2" fontWeight={500}>
