@@ -34,7 +34,7 @@ interface StorageStepProps {
 }
 
 const MANAGED_HINT: Record<EngineManagedServer, string> = {
-  embedded: 'Engine managed stores are embedded and need no setup.',
+  embedded: 'The defaults are built in and need no setup.',
   postgres: 'Engine managed stores run on the engine’s own PostgreSQL server, created and deleted with it, and need no setup.',
 };
 

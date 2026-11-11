@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Box, Button, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, CircleAlert, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Check, CircleAlert, Pencil, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { POPULAR_CONNECTORS, QUICK_ADD_CONNECTORS } from '../../../constants/contextEngine';
 import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSourceVisibility, summarizeSource } from '../../../utils/contextEngine';
+import ConnectorPicker from '../ConnectorPicker';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
-import { emptySourcesCardSx, marksRowSx, quickAddButtonSx, quickAddRowSx, sourceListSx, sourceRowSx, sourceRowTextSx, sourcesToolbarSx, stepHeadingAloneSx } from '../styles';
+import { sourceListSx, sourceRowSx, sourceRowTextSx, statusChipSx, stepHeadingSx, stepHintSx } from '../styles';
 import type { ContextSourceConfig } from '../../../types/contextEngine';
 
 interface SourcesStepProps {
@@ -53,15 +53,19 @@ function SourceRow({ source, roleNames, onEdit, onRemove }: { source: ContextSou
         <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
           {name}
         </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block' }} noWrap>
-          {summarizeSource(source)}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
+          {summarizeSource(source, { labelled: true })}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
           Source visible to: {summarizeSourceVisibility(source, roleNames)}
         </Typography>
       </Box>
       <Chip size="small" variant="outlined" label={sourceTypeName(source.type)} />
-      {reason ? <Chip size="small" variant="outlined" color="warning" icon={<CircleAlert size={14} />} label={reason} /> : <Chip size="small" variant="outlined" color="success" icon={<Check size={14} />} label="Configured" />}
+      {reason ? (
+        <Chip size="small" variant="outlined" color="warning" icon={<CircleAlert size={14} />} label={reason} sx={statusChipSx} />
+      ) : (
+        <Chip size="small" variant="outlined" color="success" icon={<Check size={14} />} label="Configured" sx={statusChipSx} />
+      )}
       <Tooltip title="Edit">
         <IconButton size="small" aria-label={`Edit ${name}`} onClick={onEdit}>
           <Pencil size={16} />
@@ -77,81 +81,72 @@ function SourceRow({ source, roleNames, onEdit, onRemove }: { source: ContextSou
 }
 
 /**
- * Step 1 — the sources the context graph is built from. The step itself only
- * lists what has been added; browsing the catalog and filling a connector's
- * form happen in a drawer, so the page stays short however many connectors exist.
+ * Step 2 — the sources the context graph is built from. Added sources are listed
+ * first; the connector catalog sits on the page (live connectors, then upcoming
+ * ones), and picking a connector opens its form in a drawer.
  */
 export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRemove, roleNames = {} }: SourcesStepProps): JSX.Element {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, session: 0 });
   const openDrawer = (start?: SourceDrawerStart) => setDrawer((d) => ({ open: true, session: d.session + 1, start }));
   const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }));
+  // Confirms each change inline, like the console's other success alerts; it stays until dismissed or replaced by the next change.
+  const [notice, setNotice] = useState<string | null>(null);
+  const displayName = (s: ContextSourceConfig) => s.name.trim() || sourceTypeName(s.type);
   const submit = (config: ContextSourceConfig, index?: number) => {
     if (index === undefined) onAdd(config);
     else onUpdate(index, config);
     closeDrawer();
+    setNotice(index === undefined ? `Source '${displayName(config)}' added successfully.` : `Source '${displayName(config)}' updated successfully.`);
+  };
+  const remove = (index: number) => {
+    const removed = sources[index];
+    onRemove(index);
+    if (removed) setNotice(`Source '${displayName(removed)}' removed successfully.`);
   };
 
   const incomplete = sources.filter((s) => !isSourceValid(s)).length;
+  const addedCounts = sources.reduce<Record<string, number>>((acc, s) => ({ ...acc, [s.type]: (acc[s.type] ?? 0) + 1 }), {});
 
   return (
     <>
-      <Typography variant="subtitle2" sx={stepHeadingAloneSx}>
+      <Typography variant="subtitle2" sx={stepHeadingSx}>
         Choose Sources
       </Typography>
 
-      {sources.length === 0 ? (
-        <>
-          <Box sx={emptySourcesCardSx}>
-            <Box sx={marksRowSx}>
-              {POPULAR_CONNECTORS.map((c) => (
-                <SourceMark key={c.id} type={c.id} variant="tile" />
-              ))}
-            </Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>
-              No sources yet
-            </Typography>
-            <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => openDrawer()} sx={{ mt: 0.5 }}>
-              Add source
-            </Button>
-          </Box>
-          <Box sx={quickAddRowSx}>
-            <Typography variant="body2" color="text.secondary">
-              Quick add
-            </Typography>
-            {QUICK_ADD_CONNECTORS.map((c) => (
-              <Button key={c.id} size="small" variant="outlined" startIcon={<SourceMark type={c.id} size={16} />} endIcon={<Plus size={14} />} onClick={() => openDrawer({ connectorId: c.id })} aria-label={`Quick add ${c.name}`} sx={quickAddButtonSx}>
-                {c.name}
-              </Button>
-            ))}
-          </Box>
-        </>
-      ) : (
-        <>
-          <Box sx={sourcesToolbarSx}>
-            <Typography variant="body2" color="text.secondary">
-              {sources.length} source{sources.length === 1 ? '' : 's'}
-              {incomplete > 0 && (
-                <>
-                  {' · '}
-                  <Box component="span" sx={{ color: 'warning.dark' }}>
-                    {incomplete} need{incomplete === 1 ? 's' : ''} attention
-                  </Box>
-                </>
-              )}
-            </Typography>
-            <Button size="small" variant="outlined" startIcon={<Plus size={16} />} onClick={() => openDrawer()}>
-              Add source
-            </Button>
-          </Box>
-          <Box sx={sourceListSx}>
-            {sources.map((s, i) => (
-              <SourceRow key={`${s.type}-${i}`} source={s} roleNames={roleNames} onEdit={() => openDrawer({ config: s, index: i })} onRemove={() => onRemove(i)} />
-            ))}
-          </Box>
-        </>
+      <Typography variant="body2" sx={stepHintSx}>
+        Add the places this engine reads content from. You can add more later.
+      </Typography>
+
+      {notice && (
+        <Alert severity="success" onClose={() => setNotice(null)} sx={{ mb: 3 }}>
+          {notice}
+        </Alert>
       )}
 
-      <SourceDrawer key={drawer.session} orgHandle={orgHandle} open={drawer.open} start={drawer.start} existing={sources} onClose={closeDrawer} onSubmit={submit} />
+      {sources.length > 0 && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            {sources.length} source{sources.length === 1 ? '' : 's'} added
+            {incomplete > 0 && (
+              <>
+                {' · '}
+                <Box component="span" sx={{ color: 'warning.dark' }}>
+                  {incomplete} need{incomplete === 1 ? 's' : ''} attention
+                </Box>
+              </>
+            )}
+          </Typography>
+          <Box sx={sourceListSx}>
+            {sources.map((s, i) => (
+              <SourceRow key={`${s.type}-${i}`} source={s} roleNames={roleNames} onEdit={() => openDrawer({ config: s, index: i })} onRemove={() => remove(i)} />
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      <ConnectorPicker addedCounts={addedCounts} onPick={(connectorId) => openDrawer({ connectorId })} />
+
+      <SourceDrawer key={drawer.session} formOnly orgHandle={orgHandle} open={drawer.open} start={drawer.start} existing={sources} onClose={closeDrawer} onSubmit={submit} />
     </>
   );
 }

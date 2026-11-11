@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, ButtonBase, CircularProgress, Stack, Typography, Paper } from '@wso2/oxygen-ui';
 import { History } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { askedQuestionMeta } from '../../../utils/contextEngine';
@@ -41,7 +41,7 @@ interface RecentQuestionsProps {
  */
 export default function RecentQuestions({ questions, selectedId, openingId, onOpen, onClear }: RecentQuestionsProps): JSX.Element {
   return (
-    <Box sx={{ ...summaryCardSx, px: 1, py: 2 }}>
+    <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto', px: 1, py: 2, position: { lg: 'sticky' }, top: { lg: 16 } }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.5 }}>
         <History size={18} aria-hidden />
         <Typography variant="subtitle2" sx={{ fontWeight: 600, flex: 1 }}>
@@ -53,6 +53,11 @@ export default function RecentQuestions({ questions, selectedId, openingId, onOp
           </Button>
         )}
       </Stack>
+      {questions.length === 0 && (
+        <Typography variant="body2" sx={{ ...mutedSx, px: 1.5, mt: 1.25 }}>
+          Questions you ask appear here, so you can open them again.
+        </Typography>
+      )}
       {questions.length > 0 && (
         <Stack gap={0.25} sx={{ mt: 1.25 }} component="ul" style={{ listStyle: 'none', margin: '10px 0 0', padding: 0 }}>
           {questions.map((q) => (
@@ -91,6 +96,6 @@ export default function RecentQuestions({ questions, selectedId, openingId, onOp
       <Typography variant="caption" component="p" sx={{ ...mutedSx, mx: 1.5, mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider', lineHeight: 1.5 }}>
         Only you see this list. It is kept in this browser.
       </Typography>
-    </Box>
+    </Paper>
   );
 }

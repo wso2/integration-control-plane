@@ -16,14 +16,15 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { MessageSquare, Waypoints, X } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, ButtonBase, CircularProgress, IconButton, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft, ArrowRight, MessageSquare, Waypoints, X } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import { useContextEntity } from '../../../hooks/useContextEngine';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
 import { sentencesCiting, type EntityConflict } from '../../../utils/contextGraph';
+import { isOpaqueRecordId, restoreCase, tidyPassage } from '../../../utils/contextEngine';
 import { EvidencePlace } from '../detail/EvidenceCard';
 import { mutedSx } from '../styles';
 import { panelSx, panelLabelSx, selectRowSx, sentenceSx } from './graphStyles';
@@ -44,18 +45,22 @@ interface PassageRowProps {
 export function PassageRow({ evidence: ev, engineId, orgHandle, sourceName, answerNumber: n, inDerivation }: PassageRowProps): JSX.Element {
   const navigate = useAppNavigate();
   const href = contextEvidenceUrl(orgHandle, engineId, ev.id);
+  // A record id that is only a storage key (a Drive file id, say) means nothing to a reader: the source's name stands in for it.
+  const opaque = isOpaqueRecordId(ev.recordId);
+  const title = opaque ? (sourceName ?? ev.recordId) : ev.recordId;
   return (
     <Box component="li" sx={{ p: 1.25, borderRadius: 1, border: '1px solid', borderColor: n ? 'primary.light' : 'divider', bgcolor: n ? 'action.hover' : 'transparent' }}>
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1}>
-        <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0 }} noWrap title={ev.recordId}>
-          {ev.recordId}
+        <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0 }} noWrap title={title}>
+          {title}
         </Typography>
         <Button size="small" variant="text" href={href} onClick={(e) => (e.preventDefault(), navigate(href))} sx={{ minWidth: 0, px: 0.5, flexShrink: 0 }}>
           Open
         </Button>
       </Stack>
       <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }}>
-        {sourceName ?? ev.sourceId} · <EvidencePlace evidence={ev} showRecord={false} />
+        {opaque ? null : `${sourceName ?? ev.sourceId} · `}
+        <EvidencePlace evidence={ev} showRecord={false} />
       </Typography>
       {inDerivation ? (
         <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: n ? 'primary.main' : 'text.secondary' }}>
@@ -63,7 +68,7 @@ export function PassageRow({ evidence: ev, engineId, orgHandle, sourceName, answ
         </Typography>
       ) : (
         <Typography variant="body2" sx={{ mt: 0.5, fontSize: 13, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          “{ev.passage}”
+          “{tidyPassage(ev.passage)}”
         </Typography>
       )}
     </Box>
@@ -119,28 +124,31 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
   const shownKind = kind ?? view?.entity.kind;
   // This entity's own name, by name and, when both sides know one, by kind: the same name can be another entity of another kind.
   const mine = (other: string, otherKind?: string) => other.toLowerCase() === name.toLowerCase() && (!kind || !otherKind || otherKind === kind);
-  const related = [
-    ...new Map(
-      (view?.facts ?? [])
-        .flatMap((f): [string, string | undefined][] => [
-          [f.subject, f.subjectKind],
-          [f.object, f.objectKind],
-        ])
-        .filter(([other, otherKind]) => !mine(other, otherKind))
-        .map(([other, otherKind]) => [`${other.toLowerCase()}\u0000${otherKind ?? ''}`, { name: other, kind: otherKind }] as const),
-    ).values(),
-  ];
+  // Names as the passages write them: the engine keeps them in lower case.
+  const passages = mentioned.map((e) => e.passage);
+  const shownName = restoreCase(name, passages);
+  // Relationships grouped by verb and side, so a verb several entities share with this one reads once:
+  // "→ generates" lists what this entity points at, "← knows app" what points at it, as the canvas arrows do.
+  const groups = new Map<string, { relation: string; incoming: boolean; others: Map<string, { name: string; kind?: string; text?: string }> }>();
+  for (const fact of view?.facts ?? []) {
+    const incoming = !mine(fact.subject, fact.subjectKind) && mine(fact.object, fact.objectKind);
+    const [other, otherKind] = incoming ? [fact.subject, fact.subjectKind] : [fact.object, fact.objectKind];
+    const key = `${incoming ? 'in' : 'out'}\u0000${fact.relation}`;
+    const group = groups.get(key) ?? { relation: fact.relation, incoming, others: new Map() };
+    group.others.set(`${other.toLowerCase()}\u0000${otherKind ?? ''}`, { name: other, kind: otherKind, text: fact.text ?? undefined });
+    groups.set(key, group);
+  }
 
   return (
     <Box component="aside" aria-label={`Entity ${name}`} sx={panelSx(true)}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Stack direction="row" alignItems="baseline" flexWrap="wrap" columnGap={1} sx={{ minWidth: 0 }}>
-          <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: kindColor ?? 'primary.main', flexShrink: 0, alignSelf: 'center' }} />
+          <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: kindColor ?? 'text.secondary', flexShrink: 0, alignSelf: 'center' }} />
           <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>
-            {name}
+            {shownName}
           </Typography>
           <Typography variant="caption" sx={mutedSx}>
-            Entity{shownKind ? ` · ${shownKind}` : ''}
+            {shownKind ? shownKind.charAt(0).toUpperCase() + shownKind.slice(1) : 'Entity'}
           </Typography>
         </Stack>
         <IconButton size="small" aria-label="Release the selection" onClick={onClose}>
@@ -209,29 +217,38 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
             </Stack>
           </Box>
 
-          {view.facts.length > 0 && (
+          {groups.size > 0 && (
             <Box>
               <Typography sx={panelLabelSx}>Relationships</Typography>
-              <Stack component="ul" gap={0.5} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
-                {view.facts.map((fact) => {
-                  const subjectMine = mine(fact.subject, fact.subjectKind);
-                  const objectMine = mine(fact.object, fact.objectKind);
+              <Box component="dl" sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, auto) minmax(0, 1fr)', columnGap: 1.5, rowGap: 0.75, m: 0, mt: 0.75, fontSize: 13, lineHeight: 1.5 }}>
+                {[...groups.entries()].map(([key, group]) => {
+                  const others = [...group.others.values()];
+                  const listed = others.map((o) => restoreCase(o.name, passages)).join(', ');
                   return (
-                    <Box component="li" key={`${fact.subject}|${fact.subjectKind ?? ''}|${fact.relation}|${fact.object}|${fact.objectKind ?? ''}`} sx={{ fontSize: 13, lineHeight: 1.5 }}>
-                      <span>{subjectMine ? name : <EntityChip name={fact.subject} kind={fact.subjectKind} onSelect={onSelectEntity} />}</span>{' '}
-                      <Box component="span" sx={mutedSx}>
-                        {fact.relation}
-                      </Box>{' '}
-                      <span>{objectMine ? name : <EntityChip name={fact.object} kind={fact.objectKind} onSelect={onSelectEntity} />}</span>
-                      {fact.text && (
-                        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
-                          “{fact.text}”
-                        </Typography>
-                      )}
+                    <Box key={key} sx={{ display: 'contents' }}>
+                      <Box component="dt" sx={{ ...mutedSx, display: 'flex', alignItems: 'center', alignSelf: 'start', gap: 0.5 }} title={group.incoming ? `${listed} ${group.relation} ${shownName}` : `${shownName} ${group.relation} ${listed}`}>
+                        {group.incoming ? <ArrowLeft size={13} aria-label="Points at this:" /> : <ArrowRight size={13} aria-label="This points at:" />}
+                        {group.relation}
+                      </Box>
+                      <Box component="dd" sx={{ m: 0, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.25 }}>
+                        {/* One per line: a button cannot wrap like text, so a comma list breaks apart on long names. */}
+                        {others.map((o) => (
+                          <Link
+                            key={`${o.name}|${o.kind ?? ''}`}
+                            component="button"
+                            type="button"
+                            underline="hover"
+                            title={o.text ? `“${o.text}”` : undefined}
+                            onClick={() => onSelectEntity(o.name, o.kind)}
+                            sx={{ fontSize: 13, fontWeight: 500, textAlign: 'left' }}>
+                            {restoreCase(o.name, passages)}
+                          </Link>
+                        ))}
+                      </Box>
                     </Box>
                   );
                 })}
-              </Stack>
+              </Box>
             </Box>
           )}
 
@@ -282,17 +299,6 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
                     </Box>
                   );
                 })}
-              </Stack>
-            </Box>
-          )}
-
-          {related.length > 0 && (
-            <Box>
-              <Typography sx={panelLabelSx}>Related entities</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ mt: 0.75 }}>
-                {related.map((other) => (
-                  <EntityChip key={`${other.name}|${other.kind ?? ''}`} name={other.name} kind={other.kind} onSelect={onSelectEntity} />
-                ))}
               </Stack>
             </Box>
           )}

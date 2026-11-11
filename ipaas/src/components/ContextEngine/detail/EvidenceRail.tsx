@@ -16,11 +16,12 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, Chip, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { /* Check, */ ChevronDown, ChevronRight, ExternalLink, History /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, ButtonBase, Chip, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { /* Check, */ ChevronDown, ChevronRight, ExternalLink, History, X /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 // import { Link as RouterLink } from 'react-router';
-import { /* absoluteUrl, */ VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
+import { /* absoluteUrl, */ isOpaqueRecordId, passageExcerpt, queryTerms, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
+import PassageText from './PassageText';
 import { EvidencePlace } from './EvidenceCard';
 import { mutedSx, railCardSx, railNumberSx } from '../styles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
@@ -41,10 +42,13 @@ interface RailCardProps {
   onOpen: () => void;
   /** The Graph tab URL that shows the answer's derivation with this passage chosen. */
   graphHref?: string;
+  /** The question's words, shown in bold in the excerpt. */
+  terms: string[];
 }
 
-function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen /* , graphHref */ }: RailCardProps): JSX.Element {
+function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen /* , graphHref */, terms }: RailCardProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
+  const opaque = isOpaqueRecordId(evidence.recordId);
   useEffect(() => {
     if (pinned) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [pinned]);
@@ -54,38 +58,50 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
         <ButtonBase aria-label={`${pinned ? 'Release' : 'Pin'} passage ${n}`} aria-pressed={pinned} onClick={() => onPin(n)} sx={railNumberSx(active || pinned)}>
           {n}
         </ButtonBase>
+        {/* An opaque record id (a Drive file id) names nothing; the source name stands in until the engine has item names. */}
         <Typography variant="caption" sx={{ fontWeight: 600, minWidth: 0 }} noWrap title={evidence.recordId}>
-          {evidence.recordId}
+          {opaque ? (source?.name ?? evidence.sourceId) : evidence.recordId}
         </Typography>
         {!cited && <Chip size="small" variant="outlined" label="Not cited" sx={{ ml: 'auto', height: 20, color: 'text.secondary' }} />}
+        {pinned && (
+          <Tooltip title="Release (Esc)">
+            <IconButton size="small" aria-label="Close pinned passage" onClick={() => onPin(n)} sx={{ ml: cited ? 'auto' : 0, p: 0.25 }}>
+              <X size={14} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
       <Typography variant="caption" sx={{ ...mutedSx, display: 'block', pl: 3.5, mt: 0.25 }}>
-        {source?.name ?? evidence.sourceId} · <EvidencePlace evidence={evidence} showRecord={false} />
+        {opaque ? null : <>{source?.name ?? evidence.sourceId} · </>}
+        <EvidencePlace evidence={evidence} showRecord={false} />
+        {/* Pinned, the version joins the place line instead of taking a line of its own. */}
+        {pinned && (
+          <Tooltip title={VERSION_HINT}>
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, ml: 0.5 }}>
+              · <History size={12} aria-hidden /> {versionFromLabel(evidence.sourceVersion)}
+            </Box>
+          </Tooltip>
+        )}
       </Typography>
-      <Typography variant="body2" sx={{ pl: 3.5, mt: 1, lineHeight: 1.5, fontSize: 13, ...(pinned ? { maxHeight: 280, overflowY: 'auto', pr: 0.5 } : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>
-        “{evidence.passage}”
+      {/* Pinned shows more of the passage without a scroll area inside the page; Open has the whole of it. */}
+      <Typography variant="body2" sx={{ pl: 3.5, mt: 1, lineHeight: 1.5, fontSize: 13, display: '-webkit-box', WebkitLineClamp: pinned ? 8 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        “<PassageText text={passageExcerpt(evidence.passage, terms)} terms={terms} />”
       </Typography>
       {pinned && (
         <Box sx={{ pl: 3.5 }}>
-          <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
-            <History size={13} aria-hidden />
-            <Tooltip title={VERSION_HINT}>
-              <Typography variant="caption">{versionFromLabel(evidence.sourceVersion)}</Typography>
-            </Tooltip>
-          </Stack>
           <Stack direction="row" gap={1} sx={{ mt: 1.25 }}>
             <Button size="small" variant="outlined" startIcon={<ExternalLink size={14} />} onClick={onOpen}>
               Open
             </Button>
           </Stack>
-          <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1 }}>
-            Pinned. Press Esc to release.
-          </Typography>
         </Box>
       )}
     </Box>
   );
 }
+
+/** Passages shown before Show all. */
+const RAIL_PREVIEW = 3;
 
 interface EvidenceRailProps {
   /** The passages the model was given, in prompt order: `[n]` is `evidence[n - 1]`. */
@@ -101,6 +117,8 @@ interface EvidenceRailProps {
   onOpen: (evidence: ContextEvidence) => void;
   /** The Graph tab URL that shows the answer's derivation; with a passage, that passage opens chosen. */
   graphHrefFor?: (evidence?: ContextEvidence) => string;
+  /** The question asked, so its words can be found and shown in bold. */
+  question?: string;
 }
 
 /**
@@ -110,10 +128,15 @@ interface EvidenceRailProps {
  * engine checks all of them before showing the answer again. Beside graph
  * facts, with no answer, every passage is listed in the order it came back.
  */
-export default function EvidenceRail({ evidence, sources, cited, active, pinned, hrefFor, onHover, onPin, onOpen, graphHrefFor }: EvidenceRailProps): JSX.Element {
+export default function EvidenceRail({ evidence, sources, cited, active, pinned, hrefFor, onHover, onPin, onOpen, graphHrefFor, question = '' }: EvidenceRailProps): JSX.Element {
   const byId = new Map(sources.map((s) => [s.id, s]));
+  const terms = queryTerms(question);
   const uncited = cited ? evidence.map((_, i) => i + 1).filter((n) => !cited.has(n)) : [];
   const [showUncited, setShowUncited] = useState(false);
+  const listed = evidence.map((_, i) => i + 1).filter((n) => !cited || cited.has(n));
+  // A long list collapses so it does not run far past the facts or answer beside it; a pinned passage stays reachable.
+  const [showAllState, setShowAll] = useState(false);
+  const showAll = showAllState || (pinned !== null && listed.indexOf(pinned) >= RAIL_PREVIEW);
   // Pinning an uncited passage from the answer cannot happen, but hovering its card can; keep it reachable.
   const open = showUncited || (pinned !== null && uncited.includes(pinned));
 
@@ -134,6 +157,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
         onPin={onPin}
         onOpen={() => onOpen(ev)}
         graphHref={graphHrefFor?.(ev)}
+        terms={terms}
       />
     );
   };
@@ -142,10 +166,10 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
     <Stack gap={1.25} sx={{ position: { lg: 'sticky' }, top: { lg: 16 } }}>
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {cited ? 'Evidence' : 'Citations'}
+          Passages
         </Typography>
         <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-          {cited ? 'Cited in the answer' : 'In rank order'}
+          {cited ? 'Cited in the answer' : 'Best match first'}
           {/* See in graph, hidden for now.
           {graphHrefFor && (
             <>
@@ -158,10 +182,12 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
           */}
         </Typography>
       </Stack>
-      {evidence
-        .map((_, i) => i + 1)
-        .filter((n) => !cited || cited.has(n))
-        .map(renderCard)}
+      {listed.slice(0, showAll ? listed.length : RAIL_PREVIEW).map(renderCard)}
+      {listed.length > RAIL_PREVIEW && (
+        <Button size="small" variant="text" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} sx={{ alignSelf: 'flex-start' }}>
+          {showAll ? 'Show fewer' : `Show all ${listed.length} passages`}
+        </Button>
+      )}
       {uncited.length > 0 && (
         <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 0.5, mt: 0.5 }}>
           <Button size="small" variant="text" color="inherit" aria-expanded={open} startIcon={open ? <ChevronDown size={14} /> : <ChevronRight size={14} />} onClick={() => setShowUncited((v) => !v)} sx={{ color: 'text.secondary', fontWeight: 600, px: 0.5 }}>

@@ -23,7 +23,7 @@ import { blankSource, CONNECTOR_BY_ID } from '../../constants/contextEngine';
 import { isSourceValid, sourceNameError } from '../../utils/contextEngine';
 import ConnectorCatalog from './ConnectorCatalog';
 import ConnectorForm from './ConnectorForm';
-import { drawerBodySx, drawerFooterSx, drawerHeaderSx, sourceDrawerSx } from './styles';
+import { drawerHeaderSx, sourceDrawerBodySx, sourceDrawerFooterSx, sourceDrawerSx } from './styles';
 import type { ContextSourceConfig } from '../../types/contextEngine';
 
 /** Where the drawer opens: the catalog (nothing set), a connector's blank form (`connectorId`), or an existing source (`config` + `index`). */
@@ -46,6 +46,8 @@ interface SourceDrawerProps {
   queryRoles?: string[];
   /** The running engine the source is added to; absent in the wizard. */
   engineId?: string;
+  /** Open straight on a connector's form with no way back to the catalog, for pages that show the catalog themselves. */
+  formOnly?: boolean;
 }
 
 /**
@@ -54,7 +56,7 @@ interface SourceDrawerProps {
  * and a sticky footer, however large the catalog grows. Remount (change `key`)
  * to start a fresh session.
  */
-export default function SourceDrawer({ orgHandle, open, start, existing, onClose, onSubmit, queryRoles, engineId }: SourceDrawerProps): JSX.Element {
+export default function SourceDrawer({ orgHandle, open, start, existing, onClose, onSubmit, queryRoles, engineId, formOnly = false }: SourceDrawerProps): JSX.Element {
   const [connectorId, setConnectorId] = useState<string | null>(start?.config?.type ?? start?.connectorId ?? null);
   const [draft, setDraft] = useState<ContextSourceConfig | null>(start?.config ?? (start?.connectorId ? blankSource(start.connectorId) : null));
   const editing = start?.index !== undefined;
@@ -77,33 +79,29 @@ export default function SourceDrawer({ orgHandle, open, start, existing, onClose
     <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={sourceDrawerSx}>
       <Box sx={drawerHeaderSx}>
         <Stack direction="row" alignItems="center" gap={1}>
-          {connector && !editing && (
+          {connector && !editing && !formOnly && (
             <IconButton size="small" aria-label="Back to all sources" onClick={backToCatalog}>
               <ArrowLeft size={18} />
             </IconButton>
           )}
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            {title}
-          </Typography>
+          <Typography variant="h5">{title}</Typography>
         </Stack>
         <IconButton size="small" aria-label="Close" onClick={onClose}>
-          <X size={18} />
+          <X size={16} />
         </IconButton>
       </Box>
 
-      <Box sx={drawerBodySx}>
+      <Box sx={sourceDrawerBodySx}>
         {connector && draft ? (
-          <ConnectorForm orgHandle={orgHandle} connector={connector} draft={draft} otherNames={otherNames} onChange={setDraft} onChangeSource={editing ? undefined : backToCatalog} queryRoles={queryRoles} engineId={engineId} />
+          <ConnectorForm orgHandle={orgHandle} connector={connector} draft={draft} otherNames={otherNames} onChange={setDraft} onChangeSource={editing || formOnly ? undefined : backToCatalog} queryRoles={queryRoles} engineId={engineId} />
         ) : (
           <ConnectorCatalog addedIds={existing.map((s) => s.type)} onPick={pick} />
         )}
       </Box>
 
       {connector && draft && (
-        <Box sx={drawerFooterSx}>
-          <Button variant="outlined" onClick={onClose}>
-            Cancel
-          </Button>
+        <Box sx={sourceDrawerFooterSx}>
+          <Button onClick={onClose}>Cancel</Button>
           <Button variant="contained" disabled={!canSubmit} startIcon={editing ? undefined : <Plus size={16} />} onClick={() => onSubmit(draft, start?.index)}>
             {editing ? 'Save changes' : 'Add source'}
           </Button>
