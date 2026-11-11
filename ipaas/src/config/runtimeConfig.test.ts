@@ -45,24 +45,19 @@ describe('loadConfig: gateway sign-in (BFF)', () => {
   });
 });
 
-describe('loadConfig: organization switch endpoints', () => {
-  it('takes a comma-separated list, in order', async () => {
-    await load({ ORGANIZATION_SWITCH_URLS: ' /_auth/cloud/switch , /_auth/integration/switch ' });
-    expect(window.API_CONFIG.organizationSwitchUrls).toEqual(['/_auth/cloud/switch', '/_auth/integration/switch']);
+describe('loadConfig: organization switcher', () => {
+  it.each([
+    ['true', true],
+    [true, true],
+    ['false', false],
+    ['', false],
+  ] as const)('reads ORGANIZATION_SWITCHER %j as %s', async (value, expected) => {
+    await load({ ORGANIZATION_SWITCHER: value } as unknown as Record<string, string>);
+    expect(window.API_CONFIG.organizationSwitcher).toBe(expected);
   });
 
-  it('takes a JSON list', async () => {
-    await load({ ORGANIZATION_SWITCH_URLS: ['/_auth/cloud/switch', '/_auth/integration/switch'] } as unknown as Record<string, string>);
-    expect(window.API_CONFIG.organizationSwitchUrls).toEqual(['/_auth/cloud/switch', '/_auth/integration/switch']);
-  });
-
-  it('keeps only paths on the console origin', async () => {
-    await load({ ORGANIZATION_SWITCH_URLS: 'https://evil.example/switch,//evil.example/switch,/_auth/integration/switch' });
-    expect(window.API_CONFIG.organizationSwitchUrls).toEqual(['/_auth/integration/switch']);
-  });
-
-  it('is empty when unset, which leaves the switcher off', async () => {
+  it('is off when unset', async () => {
     await load({});
-    expect(window.API_CONFIG.organizationSwitchUrls).toEqual([]);
+    expect(window.API_CONFIG.organizationSwitcher).toBe(false);
   });
 });

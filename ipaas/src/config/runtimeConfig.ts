@@ -41,8 +41,7 @@ interface RuntimeConfig {
   AUTH_BFF_CONTEXT?: string;
   AUTH_BFF_SIGN_IN_URL?: string;
   AUTH_BFF_PROXY_CONTEXT?: string;
-  /** Comma-separated switch endpoints, in the order they are called, e.g. "/_auth/cloud/switch,/_auth/integration/switch". */
-  ORGANIZATION_SWITCH_URLS?: string | string[];
+  ORGANIZATION_SWITCHER?: string | boolean;
   CHOREO_BASE_API_URL?: string;
   SYS_API_PREFIX?: string;
   GITHUB_APP_CLIENT_ID?: string;
@@ -87,12 +86,10 @@ export interface ApiConfig {
   /** The gateway's API root that the per-product session proxies sit under (e.g. /_api). */
   authBffProxyContext?: string;
   /**
-   * The gateway endpoints that move the sessions into another organization, called in order: the cloud
-   * console's session first (billing and the product sessions come from it), then this console's.
-   * Non-empty with gateway sign-in (authBffContext), the header's organization card lists the user's
-   * organizations and switches to the one picked.
+   * Turns on the header's organization switcher. Takes effect only with gateway sign-in (authBffContext):
+   * the switch moves the cloud console's session and then this console's on the gateway.
    */
-  organizationSwitchUrls: string[];
+  organizationSwitcher: boolean;
   choreoBaseApiUrl: string;
   choreoOrgApiUrl: string;
   systemApisBaseUrl?: string;
@@ -211,14 +208,10 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
   trackingEnv: 'dev',
-  organizationSwitchUrls: [],
+  organizationSwitcher: false,
 };
 
 const localPath = (value: string | undefined): string | undefined => (value && /^\/(?![/\\])/.test(value) ? value : undefined);
-
-// A list (or comma-separated string) of paths on the console origin; anything else is dropped.
-const localPaths = (value: unknown): string[] =>
-  (Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : []).map((item) => (typeof item === 'string' ? localPath(item.trim()) : undefined)).filter((item): item is string => item !== undefined);
 
 /**
  * Load configuration from /config.json.
@@ -246,7 +239,7 @@ export async function loadConfig(): Promise<void> {
       authBffContext: localPath(config.AUTH_BFF_CONTEXT ? trim(config.AUTH_BFF_CONTEXT.trim()) : undefined),
       authBffSignInUrl: localPath(config.AUTH_BFF_SIGN_IN_URL?.trim()),
       authBffProxyContext: config.AUTH_BFF_PROXY_CONTEXT ? trim(config.AUTH_BFF_PROXY_CONTEXT.trim()) || undefined : undefined,
-      organizationSwitchUrls: localPaths(config.ORGANIZATION_SWITCH_URLS),
+      organizationSwitcher: config.ORGANIZATION_SWITCHER === 'true' || config.ORGANIZATION_SWITCHER === true,
       choreoBaseApiUrl: choreoBase,
       choreoOrgApiUrl: `${choreoBase}/orgs/1.0.0`,
       systemApisBaseUrl: systemApisBase || DEFAULT_CONFIG.systemApisBaseUrl,

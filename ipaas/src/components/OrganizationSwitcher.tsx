@@ -118,7 +118,7 @@ function OrganizationSelect({ ref, org, name, onHome, organizationUnits, error, 
 }
 
 /**
- * The header's organization card. With ORGANIZATION_SWITCH_URLS on the gateway, it lists the organizations
+ * The header's organization card. With ORGANIZATION_SWITCHER on the gateway, it lists the organizations
  * the user belongs to and switches the console to the one picked; otherwise, or with one organization,
  * it shows the organization alone.
  */

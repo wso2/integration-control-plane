@@ -23,7 +23,7 @@ const CLOUD = '/_auth/cloud/switch';
 const OWN = '/_auth/integration/switch';
 
 beforeEach(() => {
-  window.API_CONFIG = { authBffContext: '/_auth/integration', organizationSwitchUrls: [CLOUD, OWN] } as unknown as typeof window.API_CONFIG;
+  window.API_CONFIG = { authBffContext: '/_auth/integration', organizationSwitcher: true } as unknown as typeof window.API_CONFIG;
 });
 
 afterEach(() => {
@@ -47,12 +47,12 @@ function gateway(statuses: Record<string, number> = {}): string[] {
 }
 
 describe('canSwitchOrganization', () => {
-  it('is on with switch endpoints and gateway sign-in', () => {
+  it('is on with ORGANIZATION_SWITCHER and gateway sign-in', () => {
     expect(canSwitchOrganization()).toBe(true);
   });
 
-  it('is off without switch endpoints', () => {
-    window.API_CONFIG.organizationSwitchUrls = [];
+  it('is off without ORGANIZATION_SWITCHER', () => {
+    window.API_CONFIG.organizationSwitcher = false;
     expect(canSwitchOrganization()).toBe(false);
   });
 
@@ -68,6 +68,13 @@ describe('switchOrganization', () => {
     const calls = gateway();
     await switchOrganization('org-b', 'org-a');
     expect(calls).toEqual([`${CLOUD} org-b`, `${OWN} org-b`]);
+  });
+
+  it('derives this console’s switch from AUTH_BFF_CONTEXT', async () => {
+    window.API_CONFIG.authBffContext = '/gw/_auth/integration';
+    const calls = gateway();
+    await switchOrganization('org-b', 'org-a');
+    expect(calls).toEqual([`${CLOUD} org-b`, '/gw/_auth/integration/switch org-b']);
   });
 
   it('sends the CSRF header and the session cookies', async () => {

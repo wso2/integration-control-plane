@@ -44,7 +44,7 @@ const switchFailure = (error: unknown, name: string): string => {
 
 /**
  * The organizations the signed-in user belongs to (Thunder's `/users/me/ous`, siblings of the current
- * one), for a custom picker. A pick moves the sessions in ORGANIZATION_SWITCH_URLS to that organization
+ * one), for a custom picker. A pick moves the cloud console's session and this console's to that organization
  * (switchOrganization) and then reloads the console in it.
  */
 export function OrganizationList({ children }: { children: (state: OrganizationSwitchState) => ReactNode }): JSX.Element {

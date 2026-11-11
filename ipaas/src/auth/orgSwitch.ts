@@ -20,11 +20,25 @@ import { withBase } from '../utils/basePath';
 import { isBffAuth } from './thunderConfig';
 
 /**
- * Whether the header can switch organizations. Only the gateway can move a session in place, so it takes
- * gateway sign-in as well as the switch endpoints (ORGANIZATION_SWITCH_URLS).
+ * The cloud console's session switch. The gateway serves it at this fixed context in every environment
+ * (gateway-bff/platform/auth-cloud-restapi.yaml), as the API Platform console assumes too.
+ */
+const CLOUD_SWITCH_URL = '/_auth/cloud/switch';
+
+/**
+ * Whether the header can switch organizations: ORGANIZATION_SWITCHER, with gateway sign-in, since only the
+ * gateway can move a session in place.
  */
 export function canSwitchOrganization(): boolean {
-  return isBffAuth() && window.API_CONFIG.organizationSwitchUrls.length > 0;
+  return isBffAuth() && window.API_CONFIG.organizationSwitcher;
+}
+
+/**
+ * The sessions a switch moves, in order: the cloud console's first, since billing and every product session
+ * are minted from it, then this console's (`<AUTH_BFF_CONTEXT>/switch`).
+ */
+function organizationSwitchUrls(): string[] {
+  return [CLOUD_SWITCH_URL, `${window.API_CONFIG.authBffContext}/switch`];
 }
 
 /**
@@ -63,15 +77,14 @@ async function moveSession(url: string, ouId: string): Promise<void> {
 }
 
 /**
- * Moves every session in ORGANIZATION_SWITCH_URLS into `targetId`, in order: the cloud console's session
- * first, which billing and the product sessions are minted from, then this console's. When a later one
+ * Moves every session in organizationSwitchUrls() into `targetId`, in order. When a later one
  * fails, the sessions already moved are moved back to `currentId`, so they don't sit in different
  * organizations, and the failure is rethrown. If moving one back fails too, it rejects with `incomplete`:
  * switching to `targetId` again finishes the move, since each endpoint only sets its session's organization.
  */
 export async function switchOrganization(targetId: string, currentId: string): Promise<void> {
   const moved: string[] = [];
-  for (const url of window.API_CONFIG.organizationSwitchUrls) {
+  for (const url of organizationSwitchUrls()) {
     try {
       await moveSession(url, targetId);
     } catch (error) {
