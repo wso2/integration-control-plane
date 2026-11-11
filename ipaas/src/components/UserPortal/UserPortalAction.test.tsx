@@ -206,13 +206,16 @@ describe("the env card's User Portal action", () => {
     expect(portal).not.toHaveBeenCalled();
   });
 
-  it('offers no link while the portal has no address to open', async () => {
+  it('offers no link while the portal has no address to open, or is not ready', async () => {
     publishability.mockResolvedValue({ ...publishable, published: true });
-    portal.mockResolvedValue({ environment: 'production', state: 'setting-up' });
-    const container = await action(DEVELOPER);
-    await flush();
-    expect(container.textContent).toContain('Published to User Portal');
-    expect(container.querySelector('a')).toBeNull();
+    for (const state of ['setting-up', 'starting', 'unhealthy'] as const) {
+      portal.mockResolvedValue({ environment: 'production', state });
+      const container = await action(DEVELOPER);
+      await flush();
+      expect(container.textContent).toContain('Published to User Portal');
+      expect(container.querySelector('a')).toBeNull();
+      unmount();
+    }
   });
 
   it('confirms an unpublish, from switching it off, before unpublishing', async () => {

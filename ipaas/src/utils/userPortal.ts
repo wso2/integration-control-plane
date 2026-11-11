@@ -18,7 +18,7 @@
 
 import { DEFAULT_FORWARDED_TOKEN_HEADER } from '../constants/apiConsumption';
 import type { Environment } from '../types/environment';
-import type { UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
+import type { UserPortalPublishability, UserPortalRefusal, UserPortalState } from '../types/userPortal';
 import { apiErrorMessage, httpCodeOf } from './apiErrors';
 import { WORKFLOW_MANAGEMENT_API_TITLE } from './workflowIntegration';
 
@@ -26,6 +26,9 @@ import { WORKFLOW_MANAGEMENT_API_TITLE } from './workflowIntegration';
 export type SomeEnvironments = [Environment, ...Environment[]];
 
 export const hasSomeEnvironments = (environments: Environment[]): environments is SomeEnvironments => environments.length > 0;
+
+/** A portal on its way somewhere: setting up, starting or being removed. It is read again every few seconds. */
+export const portalBusy = (state: UserPortalState): boolean => state === 'setting-up' || state === 'starting' || state === 'removing';
 
 export const USER_PORTAL_NOT_ENABLED = 'USER_PORTAL_NOT_ENABLED';
 export const USER_PORTAL_NOT_DEPLOYED = 'USER_PORTAL_NOT_DEPLOYED';
