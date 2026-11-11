@@ -64,7 +64,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const gatewayExposureEnabled = gatewayExposure.state === 'enabled' || gatewayExposure.state === 'unknown';
 
   // The API gateway's state for this environment's release; polled while it is being updated.
-  const { data: gateway } = useProxyReconciliation(orgHandler, orgUuid, component.id, versionId, env.id, projectId, {
+  const { data: gateway } = useProxyReconciliation(orgHandler, orgUuid, component.id, versionId, env.id, projectId, releaseId, {
     enabled: hasDeployment,
     refetchInterval: (query) => (isProxyReconciliationActive(query.state.data) ? 3_000 : false),
   });

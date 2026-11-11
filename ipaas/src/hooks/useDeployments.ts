@@ -67,7 +67,8 @@ export function useComponentDeployment(
 
 /**
  * One environment's API gateway state, which only the Promote button and the Integration-as-API card use. It is
- * keyed under the environment's deployment, so whatever reads the deployment again reads it again too.
+ * keyed under the environment's deployment, so whatever invalidates the deployment reads it again too, and by the
+ * release the deployment runs, so a deployment poll that finds a new release reads the new release's state.
  */
 export function useProxyReconciliation(
   orgHandler: string,
@@ -76,10 +77,11 @@ export function useProxyReconciliation(
   versionId: string | undefined,
   environmentId: string,
   projectName: string,
+  releaseId: string | undefined,
   options?: { enabled?: boolean; refetchInterval?: number | false | ((query: Query<ProxyReconciliationStatus | null>) => number | false) },
 ) {
   return useQuery<ProxyReconciliationStatus | null, Error, ProxyReconciliationStatus | null>({
-    queryKey: ['componentDeployment', orgHandler, orgUuid, componentId, versionId, environmentId, 'proxyReconciliation'],
+    queryKey: ['componentDeployment', orgHandler, orgUuid, componentId, versionId, environmentId, 'proxyReconciliation', releaseId],
     queryFn: () => fetchProxyReconciliation(componentId, environmentId, projectName, versionId!),
     enabled: (options?.enabled ?? true) && !!orgHandler && !!orgUuid && !!componentId && !!versionId && !!environmentId && !!projectName,
     retry: false,

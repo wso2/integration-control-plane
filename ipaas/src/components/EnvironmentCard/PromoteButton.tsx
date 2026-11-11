@@ -73,8 +73,8 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   // same release can still differ in API settings or visibility, which only a promotion carries.
   const sameRelease = !sourceLoading && !targetLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
   // Only environments on the same release need the API gateway's state to tell, and it is slow to read, so only they read it.
-  const sourceGateway = useProxyReconciliation(orgHandler, orgUuid, componentId, versionId, sourceEnvId, projectId, { enabled: sameRelease });
-  const targetGateway = useProxyReconciliation(orgHandler, orgUuid, componentId, versionId, targetEnvId, projectId, { enabled: sameRelease });
+  const sourceGateway = useProxyReconciliation(orgHandler, orgUuid, componentId, versionId, sourceEnvId, projectId, sourceReleaseId, { enabled: sameRelease });
+  const targetGateway = useProxyReconciliation(orgHandler, orgUuid, componentId, versionId, targetEnvId, projectId, targetDeployment?.releaseId, { enabled: sameRelease });
   const gatewayLoading = sameRelease && (sourceGateway.isLoading || targetGateway.isLoading);
   const loading = sourceLoading || targetLoading || gatewayLoading;
   // A state that could not be read counts as no API change.

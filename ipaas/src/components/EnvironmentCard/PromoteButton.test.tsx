@@ -29,7 +29,7 @@ const mutate = vi.hoisted(() => vi.fn());
 const gateway = vi.hoisted(() => ({ states: {} as Record<string, unknown>, read: [] as string[] }));
 vi.mock('../../hooks/useDeployments', () => ({
   useComponentDeployment: (_o: string, _u: string, _c: string, _v: string, env: string) => ({ data: deployments[env], isLoading: false }),
-  useProxyReconciliation: (_o: string, _u: string, _c: string, _v: string, env: string, _p: string, { enabled }: { enabled: boolean }) => {
+  useProxyReconciliation: (_o: string, _u: string, _c: string, _v: string, env: string, _p: string, _r: string, { enabled }: { enabled: boolean }) => {
     if (!enabled) return { data: undefined, isLoading: false };
     gateway.read.push(env);
     const state = gateway.states[env];
