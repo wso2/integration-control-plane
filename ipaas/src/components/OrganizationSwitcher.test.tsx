@@ -33,6 +33,15 @@ vi.mock('../auth', () => ({
   OrganizationList: ({ children }: { children: (state: OrganizationSwitchState) => unknown }) => children(auth.list),
 }));
 
+// A dirty form's leave guard: whether the user chooses to leave, and what it was asked to run.
+const leaveGuard = vi.hoisted(() => ({ leave: true, asked: 0 }));
+vi.mock('../contexts/UnsavedChangesContext', () => ({
+  useLeaveGuard: () => (proceed: () => void) => {
+    leaveGuard.asked++;
+    if (leaveGuard.leave) proceed();
+  },
+}));
+
 const onSwitch = vi.fn();
 const onHome = vi.fn();
 let unmount = () => {};
@@ -65,6 +74,8 @@ beforeEach(() => {
   vi.resetAllMocks();
   auth.canSwitch = true;
   auth.sessionOrg = 'acme';
+  leaveGuard.leave = true;
+  leaveGuard.asked = 0;
   listing();
 });
 
@@ -81,6 +92,30 @@ describe('OrganizationSwitcher', () => {
 
     expect(onSwitch).toHaveBeenCalledWith(GLOBEX, ACME.id);
     expect(onHome).not.toHaveBeenCalled();
+  });
+
+  it('asks about unsaved changes before switching, and switches nothing when the user stays', async () => {
+    leaveGuard.leave = false;
+    const container = await render();
+    open(container);
+    pick('Globex');
+
+    expect(leaveGuard.asked).toBe(1);
+    expect(onSwitch).not.toHaveBeenCalled();
+  });
+
+  it('shows a retry’s failure even when it reads the same as the one dismissed', async () => {
+    listing({ error: "Couldn't switch to Globex. Try again." });
+    const container = await render();
+    expect(document.body.textContent).toContain("Couldn't switch to Globex. Try again.");
+
+    // Opening the menu dismisses the message; picking again starts a new attempt.
+    open(container);
+    expect(document.querySelector('[role="tooltip"]')?.textContent ?? '').not.toContain('Try again');
+    pick('Globex');
+
+    expect(onSwitch).toHaveBeenCalledWith(GLOBEX, ACME.id);
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toContain("Couldn't switch to Globex. Try again.");
   });
 
   it('opens the current organization’s overview when it is picked, without switching', async () => {

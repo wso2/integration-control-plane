@@ -19,6 +19,7 @@
 import { Box, ComplexSelect, Tooltip } from '@wso2/oxygen-ui';
 import { useState, type JSX, type KeyboardEvent, type Ref } from 'react';
 import { OrganizationList, canSwitchOrganization, useAuth, type OrganizationSwitchState } from '../auth';
+import { useLeaveGuard } from '../contexts/UnsavedChangesContext';
 
 interface OrganizationSwitcherProps {
   /** The card's element, which the header's project menu anchors to. */
@@ -80,6 +81,7 @@ function OrganizationCard({ ref, org, name, onHome }: OrganizationSwitcherProps)
 function OrganizationSelect({ ref, org, name, onHome, organizationUnits, error, switchingId, onSwitch }: OrganizationSwitcherProps & OrganizationSwitchState): JSX.Element {
   // The failure the user has already seen: opening the select again hides it.
   const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const guardNavigation = useLeaveGuard();
   const current = organizationUnits.find((unit) => unit.handle === org);
 
   // Until the list arrives, or with nowhere else to go, the organization stays a card.
@@ -101,7 +103,13 @@ function OrganizationSelect({ ref, org, name, onHome, organizationUnits, error, 
           onOpen={() => setDismissedError(error)}
           onChange={(event) => {
             const unit = organizationUnits.find((candidate) => candidate.id === event.target.value);
-            if (unit && unit.id !== current.id && switchingId === null) onSwitch(unit, current.id);
+            if (!unit || unit.id === current.id || switchingId !== null) return;
+            // Asks about unsaved changes before any session moves: the switch ends in a reload. A new
+            // attempt's failure then shows even when it reads the same as the one dismissed.
+            guardNavigation(() => {
+              setDismissedError(null);
+              return onSwitch(unit, current.id);
+            });
           }}
           SelectDisplayProps={selectDisplayProps}
           renderValue={() => <OrganizationText name={shown.id === current.id ? name : shown.name} />}

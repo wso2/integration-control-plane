@@ -27,8 +27,12 @@ export interface OrganizationSwitchState {
   error: string | null;
   /** The organization being switched to, or `null`. Stays set once the switch succeeds, while the page reloads. */
   switchingId: string | null;
-  /** Switches to `unit`; `currentId` is where the sessions go back to if a step fails. */
-  onSwitch: (unit: AccessibleOrganizationUnit, currentId: string) => void;
+  /**
+   * Switches to `unit`; `currentId` is where the sessions go back to if a step fails. The promise settles
+   * only when the switch fails: on success the console reloads, so it never does, which keeps a leave
+   * guard released (useLeaveGuard) until the page has gone.
+   */
+  onSwitch: (unit: AccessibleOrganizationUnit, currentId: string) => Promise<void>;
 }
 
 /** How many organizations the header asks for at once. */
@@ -51,14 +55,20 @@ export function OrganizationList({ children }: { children: (state: OrganizationS
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const onSwitch = (unit: AccessibleOrganizationUnit, currentId: string): void => {
-    if (switchingId !== null) return;
+  const onSwitch = (unit: AccessibleOrganizationUnit, currentId: string): Promise<void> => {
+    if (switchingId !== null) return Promise.resolve();
     setError(null);
     setSwitchingId(unit.id);
-    switchOrganization(unit.id, currentId).then(loadConsoleHome, (failure: unknown) => {
-      setError(switchFailure(failure, unit.name));
-      setSwitchingId(null);
-    });
+    return switchOrganization(unit.id, currentId).then(
+      () => {
+        loadConsoleHome();
+        return new Promise<void>(() => {});
+      },
+      (failure: unknown) => {
+        setError(switchFailure(failure, unit.name));
+        setSwitchingId(null);
+      },
+    );
   };
 
   // The SDK only lists here: onSelect takes the pick over, so the SDK's own single-endpoint switch never runs.

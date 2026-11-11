@@ -90,6 +90,29 @@ describe('OrganizationList', () => {
     expect(state.switchingId).toBe(GLOBEX.id);
   });
 
+  // The header runs the switch through useLeaveGuard, which keeps leaving allowed until this settles.
+  it('never settles a successful switch: the page is leaving', async () => {
+    orgSwitch.switchOrganization.mockResolvedValue(undefined);
+    await render();
+    const settled = vi.fn();
+
+    await act(async () => {
+      void state.onSwitch(GLOBEX, ACME.id).then(settled, settled);
+    });
+
+    expect(orgSwitch.loadConsoleHome).toHaveBeenCalled();
+    expect(settled).not.toHaveBeenCalled();
+  });
+
+  it('settles a failed switch, so a leave guard comes back', async () => {
+    orgSwitch.switchOrganization.mockRejectedValue(new OrganizationSwitchError('failed'));
+    await render();
+
+    await act(async () => {
+      await expect(state.onSwitch(GLOBEX, ACME.id)).resolves.toBeUndefined();
+    });
+  });
+
   it('ignores a second pick while a switch runs', async () => {
     orgSwitch.switchOrganization.mockReturnValue(new Promise(() => {}));
     await render();
