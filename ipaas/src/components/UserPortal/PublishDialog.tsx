@@ -20,8 +20,10 @@ import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, 
 import type { JSX } from 'react';
 import * as styles from './UserPortal.styles';
 
-interface PublishWorkflowDialogProps {
+interface PublishDialogProps {
   envName: string;
+  /** Whether the publish redeploys a workflow for the User Portal's sign-in (its publishability's `redeploys`). */
+  redeploys: boolean;
   onConfirm: () => void;
   onClose: () => void;
   isPending: boolean;
@@ -30,20 +32,27 @@ interface PublishWorkflowDialogProps {
 }
 
 /**
- * Confirms a publish that redeploys a workflow. From then on its Workflow Management API takes only User Portal
+ * Confirms a publish, as every unpublish is confirmed, with what it does. Any integration shows in the User Portal there.
+ * A publish that redeploys a workflow also says so: from then on its Workflow Management API takes only User Portal
  * sign-ins, on the gateway and in the workflow itself, so the console's runs and human tasks views stop working in
  * the environment and the User Portal is where the workflow is managed. Unpublishing gives the console its views back.
  */
-export default function PublishWorkflowDialog({ envName, onConfirm, onClose, isPending, error }: PublishWorkflowDialogProps): JSX.Element {
+export default function PublishDialog({ envName, redeploys, onConfirm, onClose, isPending, error }: PublishDialogProps): JSX.Element {
   return (
     <Dialog open onClose={isPending ? undefined : onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Publish to the User Portal in {envName}?</DialogTitle>
       <DialogContent>
-        <Alert severity="warning">The integration will be redeployed in {envName}, and the console&apos;s workflow management features will be turned off there.</Alert>
-        <Typography variant="body2" sx={styles.dialogBodySx}>
-          Its Workflow Management API will accept only User Portal sign-ins, so the console can no longer show or act on its runs and human tasks in {envName}. Use the User Portal for all workflow management. Unpublishing turns the console&apos;s workflow
-          management back on.
-        </Typography>
+        {redeploys ? (
+          <>
+            <Alert severity="warning">The integration will be redeployed in {envName}, and the console&apos;s workflow management features will be turned off there.</Alert>
+            <Typography variant="body2" sx={styles.dialogBodySx}>
+              Its Workflow Management API will accept only User Portal sign-ins, so the console can no longer show or act on its runs and human tasks in {envName}. Use the User Portal for all workflow management. Unpublishing turns the console&apos;s workflow
+              management back on.
+            </Typography>
+          </>
+        ) : (
+          <Typography variant="body2">The User Portal&apos;s users will see this integration there. The integration keeps running as it is.</Typography>
+        )}
         {error && (
           <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
             {error}

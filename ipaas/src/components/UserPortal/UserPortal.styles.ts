@@ -74,13 +74,12 @@ export const cardActionAnchorSx = { display: 'inline-flex', flex: 1 } as const;
 /** The same wrapper for a card's action beside it, which keeps its label on one line. */
 export const cardSideActionAnchorSx = { display: 'inline-flex', flexShrink: 0 } as const;
 
-// The env card's User Portal row.
+// The env card's User Portal footer. The action renders nothing where ipaas-service serves no User Portal; the footer
+// then takes no space, so the card doesn't end in an empty gap.
+export const footerSx = { mt: 2, '&:empty': { display: 'none' } } as const;
 
-export const rowSx = { mt: 2 } as const;
-
+// The publishing rules a refusal lists.
 export const rowNoteSx = { mt: 0.5 } as const;
-
-export const rowChipSx = { height: 18, fontSize: '0.65rem' } as const;
 
 export const reasonSx = { display: 'flex', gap: 0.75, alignItems: 'flex-start' } as const;
 
@@ -90,9 +89,7 @@ export const dialogErrorSx = { mt: 2 } as const;
 
 export const dialogBodySx = { mt: 2 } as const;
 
-// The row for an environment with no User Portal, and its About dialog.
-
-export const infoButtonSx = { p: 0.25, color: 'text.secondary' } as const;
+// The About dialog for an environment with no User Portal.
 
 export const aboutNoteSx = { mt: 1.5 } as const;
 

@@ -23,10 +23,7 @@ import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import UserPortalAction from '../../UserPortal/UserPortalAction';
 import UserPortalActionSkeleton from '../../UserPortal/UserPortalActionSkeleton';
-
-// The action renders nothing where ipaas-service serves no User Portal; the footer then takes no
-// space, so the card doesn't end in an empty gap.
-const footerSx = { mt: 2, '&:empty': { display: 'none' } } as const;
+import { footerSx } from '../../UserPortal/UserPortal.styles';
 
 /**
  * The env card's User Portal action, in the card's footer: Publish, Unpublish, or

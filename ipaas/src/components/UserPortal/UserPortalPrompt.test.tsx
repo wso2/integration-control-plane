@@ -32,13 +32,18 @@ vi.mock('../../api/userPortal', () => ({
   enableUserPortal: vi.fn(),
   fetchUserPortalPublishability: vi.fn(),
   publishToUserPortal: vi.fn(),
+  unpublishFromUserPortal: vi.fn(),
 }));
+
+// Whether the environment is where the project's API security is edited, which the unpublish confirmation says.
+vi.mock('../../hooks/useEntryEnvironment', () => ({ useEntryEnvironment: () => ({ isEntry: true, loading: false, entryEnvironmentName: 'Development' }) }));
 
 const portalEnvironments = vi.mocked(api.fetchUserPortalEnvironments);
 const portal = vi.mocked(api.fetchUserPortal);
 const enable = vi.mocked(api.enableUserPortal);
 const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const publish = vi.mocked(api.publishToUserPortal);
+const unpublish = vi.mocked(api.unpublishFromUserPortal);
 
 const ACTIVE: UserPortal = { environment: 'production', state: 'active', url: 'https://portal.example/acme' };
 const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
@@ -61,7 +66,7 @@ beforeEach(() => {
 async function prompt(scopes: string[]) {
   const r = await renderWithScopes(
     <MemoryRouter>
-      <UserPortalPrompt componentId="orders" environment={{ id: 'production', name: 'Production', critical: true }} />
+      <UserPortalPrompt orgHandler="acme" projectId="shop" componentId="orders" environment={{ id: 'production', name: 'Production', critical: true }} />
     </MemoryRouter>,
     scopes,
   );
@@ -71,6 +76,10 @@ async function prompt(scopes: string[]) {
 }
 
 const dialogText = (container: HTMLElement) => container.ownerDocument.querySelector('[role="dialog"]')?.textContent ?? '';
+// The env cards' publish switch, its label, and what its tooltip says.
+const toggle = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input[type="checkbox"]') ?? undefined;
+const switchLabel = (container: HTMLElement) => container.querySelector('label')?.textContent ?? '';
+const tooltip = (container: HTMLElement) => container.querySelector('label')?.getAttribute('aria-label') ?? '';
 
 describe('the way to a workflow in the User Portal', () => {
   it('offers to enable the User Portal where it is not enabled, in that environment', async () => {
@@ -97,14 +106,18 @@ describe('the way to a workflow in the User Portal', () => {
     expect(container.textContent).toContain("The User Portal can't use Production.");
   });
 
-  it('shows the scopes the portal could not hold once a publish from here goes through', async () => {
+  it('reports a publish from the switch in a notice, with the scopes the portal could not hold', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValueOnce({ ...PUBLISHABLE, redeploys: false }).mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
     publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await prompt(DEVELOPER);
-    await act(async () => button(container, 'Publish to User Portal')?.click());
+    await act(async () => toggle(container)?.click());
+    expect(publish).not.toHaveBeenCalled();
+    await act(async () => button(container, 'Publish')?.click());
     await flush();
-    expect(container.textContent).toContain('bad scope');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Published to the User Portal in Production.');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('bad scope');
+    expect(toggle(container)?.checked).toBe(true);
   });
 
   it("leaves the last environment's failed publish behind when another is shown", async () => {
@@ -115,7 +128,7 @@ describe('the way to a workflow in the User Portal', () => {
     function Switching() {
       const [env, setEnv] = useState('production');
       show = setEnv;
-      return <UserPortalPrompt componentId="orders" environment={{ id: env, name: env === 'production' ? 'Production' : 'Development', critical: false }} />;
+      return <UserPortalPrompt orgHandler="acme" projectId="shop" componentId="orders" environment={{ id: env, name: env === 'production' ? 'Production' : 'Development', critical: false }} />;
     }
     const r = await renderWithScopes(
       <MemoryRouter>
@@ -125,14 +138,16 @@ describe('the way to a workflow in the User Portal', () => {
     );
     unmount = r.unmount;
     await flush();
-    await act(async () => button(r.container, 'Publish to User Portal')?.click());
+    await act(async () => toggle(r.container)?.click());
+    await act(async () => button(r.container, 'Publish')?.click());
     await flush();
-    expect(r.container.textContent).toContain('Deploy it to Production first.');
+    expect(dialogText(r.container)).toContain('Deploy it to Production first.');
 
     await act(async () => show('development'));
     await flush();
-    expect(r.container.textContent).not.toContain('Deploy it to Production first.');
-    expect(button(r.container, 'Publish to User Portal')?.disabled).toBe(false);
+    expect(dialogText(r.container)).toBe('');
+    expect(tooltip(r.container)).toBe('Publish to the User Portal in Development');
+    expect(toggle(r.container)?.disabled).toBe(false);
   });
 
   it("tells a role that can't enable the User Portal why", async () => {
@@ -144,13 +159,14 @@ describe('the way to a workflow in the User Portal', () => {
     expect(reasonFor(b)).toBe("Your role can't enable the User Portal.");
   });
 
-  it('offers to publish where the User Portal runs, warning first of the redeploy', async () => {
+  it('offers the switch where the User Portal runs, warning first of the redeploy', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue(PUBLISHABLE);
     publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
+    expect(switchLabel(container)).toBe('Publish to User Portal');
 
-    await act(async () => button(container, 'Publish to User Portal')?.click());
+    await act(async () => toggle(container)?.click());
     await flush();
     expect(publish).not.toHaveBeenCalled();
     expect(dialogText(container)).toContain('will be redeployed in Production');
@@ -159,7 +175,7 @@ describe('the way to a workflow in the User Portal', () => {
     expect(publish).toHaveBeenCalledWith('orders', 'production');
   });
 
-  it('lists what keeps it from being published', async () => {
+  it('lists what keeps it from being published once the switch is flipped, without publishing', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue({
       ...PUBLISHABLE,
@@ -167,17 +183,35 @@ describe('the way to a workflow in the User Portal', () => {
       reasons: [{ code: 'USER_PORTAL_NOT_DEPLOYED', message: 'the integration is not deployed in this environment; deploy it first' }],
     });
     const container = await prompt(DEVELOPER);
-    expect(button(container, 'Publish to User Portal')?.disabled).toBe(true);
-    expect(container.textContent).toContain('Deploy it to Production first.');
+    expect(container.textContent).not.toContain('Deploy it to Production first.');
+    await act(async () => toggle(container)?.click());
+    expect(dialogText(container)).toContain('Deploy it to Production first.');
+    expect(publish).not.toHaveBeenCalled();
   });
 
   it('opens the User Portal a workflow is published to', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
     const container = await prompt(DEVELOPER);
-    const link = [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Open User Portal');
-    expect(link?.getAttribute('href')).toBe('https://portal.example/acme');
-    expect(link?.getAttribute('target')).toBe('_blank');
+    const links = [...container.querySelectorAll('a')].filter((a) => a.textContent?.trim() === 'Open User Portal');
+    expect(links).toHaveLength(1);
+    expect(links[0]?.getAttribute('href')).toBe('https://portal.example/acme');
+    expect(links[0]?.getAttribute('target')).toBe('_blank');
+    expect(toggle(container)?.checked).toBe(true);
+    expect(switchLabel(container)).toContain('Published to User Portal');
+  });
+
+  it('confirms an unpublish, from switching it off, before unpublishing', async () => {
+    portal.mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
+    unpublish.mockResolvedValue({ environment: 'production', published: false, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await prompt(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    expect(dialogText(container)).toContain('The workflow is redeployed in Production');
+    expect(unpublish).not.toHaveBeenCalled();
+    await act(async () => button(container, 'Unpublish')?.click());
+    await flush();
+    expect(unpublish).toHaveBeenCalledWith('orders', 'production');
   });
 
   it('reads the report again once the portal it waited for is up', async () => {
@@ -186,7 +220,7 @@ describe('the way to a workflow in the User Portal', () => {
     const container = await prompt(DEVELOPER);
     await flush();
     expect(publishability).toHaveBeenCalledTimes(2);
-    expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+    expect(toggle(container)?.disabled).toBe(false);
   });
 
   it('keeps reading it every few seconds while it still says the portal is not enabled', async () => {
@@ -196,11 +230,14 @@ describe('the way to a workflow in the User Portal', () => {
       publishability.mockResolvedValueOnce(NOT_ENABLED).mockResolvedValueOnce(NOT_ENABLED).mockResolvedValue(PUBLISHABLE);
       const container = await prompt(DEVELOPER);
       await flush();
-      expect(button(container, 'Publish to User Portal')?.disabled).toBe(true);
+      // The stale report would say the portal is off: the switch's placeholder holds its place instead.
+      expect(container.querySelector('[aria-label="Loading the User Portal"]')).not.toBeNull();
+      expect(button(container, 'User Portal off')).toBeUndefined();
       await act(async () => void (await vi.advanceTimersByTimeAsync(3_000)));
       await flush();
       expect(publishability).toHaveBeenCalledTimes(3);
-      expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+      expect(container.querySelector('[aria-label="Loading the User Portal"]')).toBeNull();
+      expect(toggle(container)?.disabled).toBe(false);
     } finally {
       vi.useRealTimers();
     }
@@ -249,33 +286,37 @@ describe('a publish that finishes in the background, from the prompt', () => {
     publishability.mockResolvedValueOnce(PUBLISHABLE).mockResolvedValue({ ...PUBLISHABLE, publishing: true });
     publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, unpublishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
-    await act(async () => button(container, 'Publish to User Portal')?.click());
+    await act(async () => toggle(container)?.click());
     await flush();
     const confirm = [...container.ownerDocument.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((b) => b.textContent === 'Publish');
     await act(async () => confirm?.click());
     await flush();
     expect(dialogText(container)).toBe('');
-    expect(button(container, 'Publishing…')?.disabled).toBe(true);
-    expect(container.textContent).toContain('this takes a minute or two');
+    expect(switchLabel(container)).toContain('Publishing…');
+    expect(toggle(container)?.disabled).toBe(true);
+    expect(tooltip(container)).toContain('this takes a minute or two');
 
     publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     await poll();
     await flush();
     expect(container.textContent).toContain('Open User Portal');
-    expect(container.textContent).toContain('bad scope');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Published to the User Portal in Production.');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('bad scope');
   });
 
   it('follows a publish running at load, and words the failure it ends with', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue({ ...PUBLISHABLE, publishing: true });
     const container = await prompt(DEVELOPER);
-    expect(button(container, 'Publishing…')?.disabled).toBe(true);
+    expect(switchLabel(container)).toContain('Publishing…');
+    expect(toggle(container)?.disabled).toBe(true);
 
     publishability.mockResolvedValue({ ...PUBLISHABLE, publishError: { code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'interrupted' } });
     await poll();
     await flush();
-    expect(container.textContent).toContain("Publishing didn't finish. Publish again.");
-    expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Could not publish to the User Portal in Production.');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Publishing didn't finish. Publish again.");
+    expect(toggle(container)?.disabled).toBe(false);
   });
 });
 
@@ -292,7 +333,7 @@ describe("a User Portal that isn't ready yet", () => {
     for (const state of ['starting', 'unhealthy'] as const) {
       portal.mockResolvedValue({ environment: 'production', state });
       const container = await prompt(DEVELOPER);
-      expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+      expect(toggle(container)?.disabled).toBe(false);
       unmount();
     }
   });

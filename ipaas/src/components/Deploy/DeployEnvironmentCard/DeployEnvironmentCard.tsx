@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Card, CardActions, CardContent, Divider, Tooltip } from '@wso2/oxygen-ui';
+import { Box, Card, CardActions, CardContent, Divider, Tooltip } from '@wso2/oxygen-ui';
 import { ArrowRight } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -41,12 +41,18 @@ import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 import DeploymentHistoryDrawer from './DeploymentHistoryDrawer';
 import EndpointsDrawer from './EndpointsDrawer';
 import WorkflowRuntimeRow from './WorkflowRuntimeRow';
-import UserPortalRow from '../../UserPortal/UserPortalRow';
+import UserPortalAction from '../../UserPortal/UserPortalAction';
+import { footerSx as userPortalFooterSx } from '../../UserPortal/UserPortal.styles';
+import EnvCardNotice from '../../Overview/_shared/EnvCardNotice';
+import { useEnvCardNotification } from '../../Overview/_shared/useEnvCardNotification';
 import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
 import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
+
+// Below the header's divider, which already spaces it from the header.
+const noticeSx = { mb: 2 } as const;
 
 export default function DeployEnvironmentCard({
   orgHandler,
@@ -80,6 +86,8 @@ export default function DeployEnvironmentCard({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [endpointsOpen, setEndpointsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // The User Portal action's notices, shown and timed as on the Overview card.
+  const { notification, onNotify, dismiss } = useEnvCardNotification();
 
   // Tracks which action button is showing an in-flight label (persists through post-mutation refetch)
   const [actionInFlight, setActionInFlight] = useState<'stop' | 'redeploy' | null>(null);
@@ -344,6 +352,8 @@ export default function DeployEnvironmentCard({
 
           <Divider sx={{ mb: 2 }} />
 
+          <EnvCardNotice notification={notification} onClose={dismiss} sx={noticeSx} />
+
           <DeployEnvironmentCardBody
             status={status}
             flags={flags}
@@ -368,7 +378,12 @@ export default function DeployEnvironmentCard({
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
           <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
-          {publishesToUserPortal && <UserPortalRow orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={env.id} envName={env.name} isWorkflow={isWorkflow} />}
+          {/* The Overview card's User Portal action, so publishing works the same on both cards. */}
+          {publishesToUserPortal && (
+            <Box sx={userPortalFooterSx}>
+              <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={env.id} envName={env.name} onNotify={onNotify} isWorkflow={isWorkflow} />
+            </Box>
+          )}
         </CardContent>
 
         {showPromote && (

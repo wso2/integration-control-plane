@@ -112,12 +112,17 @@ describe("the env card's User Portal action", () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  // As the deploy page and the workflow pages do (usePublishFlow): only a publish that redeploys a workflow asks first.
-  it('publishes what redeploys nothing at once, then reports scopes the portal could not take on the card', async () => {
+  // As every place in the console does (usePublishFlow): every publish asks first, as an unpublish does.
+  it('confirms a publish that redeploys nothing, saying what it does, then reports scopes the portal could not take on the card', async () => {
     publishability.mockResolvedValue(publishable);
     publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await action(DEVELOPER);
     await act(async () => toggle(container)?.click());
+    expect(publish).not.toHaveBeenCalled();
+    expect(dialog(container)?.textContent).toContain('Publish to the User Portal in Production?');
+    expect(dialog(container)?.textContent).toContain("The User Portal's users will see this integration there.");
+    expect(dialog(container)?.textContent).not.toContain('redeployed');
+    await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
     expect(dialog(container)).toBeNull();
     expect(publish).toHaveBeenCalledWith('orders', 'production');
@@ -136,14 +141,19 @@ describe("the env card's User Portal action", () => {
     expect(publish).toHaveBeenCalledWith('orders', 'production');
   });
 
-  it('says why a publish was refused on the switch, worded from its code', async () => {
+  it('keeps the confirm dialog open on a refused publish, worded from its code, and leaves the switch as it was', async () => {
     publishability.mockResolvedValue(publishable);
     publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"the integration is not deployed in this environment; deploy it first"}'));
     const container = await action(DEVELOPER);
     await act(async () => toggle(container)?.click());
+    await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
-    expect(container.querySelector('label')?.getAttribute('aria-label')).toBe('Deploy it to Production first. The User Portal lists only what runs there.');
+    expect(dialog(container)?.textContent).toContain('Deploy it to Production first. The User Portal lists only what runs there.');
     expect(onNotify).not.toHaveBeenCalled();
+    await act(async () => dialogButton(container, 'Cancel')?.click());
+    await flush();
+    expect(container.querySelector('label')?.getAttribute('aria-label')).toBe('Publish to the User Portal in Production');
+    expect(toggle(container)?.checked).toBe(false);
   });
 
   it('keeps the confirm dialog open on a refused publish of a workflow, worded from its code', async () => {

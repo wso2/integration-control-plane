@@ -50,7 +50,7 @@ interface UserPortalActionProps {
 /**
  * The env card's User Portal action, in the card's footer. Its verb follows the state:
  * "User Portal off" explains the portal and how to turn it on; "Publish" publishes as every place in the console does
- * (`usePublishFlow`: a publish that redeploys a workflow is confirmed first, any other goes straight ahead), or lists
+ * (`usePublishFlow`: confirmed first, warning of a workflow's redeploy where it has one), or lists
  * what to fix when ipaas-service's rules refuse; "Unpublish" confirms, then unpublishes (`useUnpublishFlow`). The work
  * after the response, for an AI agent or a workflow, is followed by the switch until it ends, and reported on the card.
  */

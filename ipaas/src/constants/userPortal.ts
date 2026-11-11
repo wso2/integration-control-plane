@@ -20,7 +20,7 @@ import type { IntegrationType } from '../types/integration';
 
 /**
  * The integration types the User Portal shows. ipaas-service refuses to publish any other kind.
- * The Deploy page's environment cards show the User Portal row, and the Overview's env cards the
- * User Portal action, for exactly these.
+ * The Deploy page's and the Overview's environment cards show the User Portal action for exactly
+ * these.
  */
 export const USER_PORTAL_TYPES: ReadonlySet<IntegrationType> = new Set<IntegrationType>(['ai-agent', 'automation', 'workflow']);
