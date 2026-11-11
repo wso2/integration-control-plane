@@ -70,8 +70,11 @@ export const createEndpointApiKey = (ref: EndpointRef, input: CreateApiKeyInput)
 
 export const revokeEndpointApiKey = (ref: EndpointRef, keyName: string): Promise<void> => bff.delete<void>(endpointUrl(ref, `/api-keys/${seg(keyName)}`));
 
-/** One-click 1h credential. Also forces `api-key-auth` on (no-op when already on). */
-export const createEndpointTestKey = (ref: EndpointRef): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(endpointUrl(ref, '/test-key'));
+/**
+ * One-click 1h credential, for an endpoint on API-key auth only: for another mode ipaas-service refuses it
+ * (`API_KEY_AUTH_REQUIRED`) rather than switch the endpoint, which only `setEndpointApiKeyAuth` does.
+ */
+export const createEndpointTestKey = (ref: EndpointRef): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(`${endpointPath(ref)}/test-key${q({ deploymentTrackId: ref.deploymentTrackId, keepSecurity: true })}`);
 
 // ---------------------------------------------------------------------------
 // Endpoint security — enforcement policies

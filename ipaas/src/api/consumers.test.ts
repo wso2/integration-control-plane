@@ -81,7 +81,7 @@ describe('endpoint API calls', () => {
         `${BASE}/api-keys?deploymentTrackId=next-bbbbbb`,
         `${BASE}/api-keys?deploymentTrackId=next-bbbbbb`,
         `${BASE}/api-keys/key-1?deploymentTrackId=next-bbbbbb`,
-        `${BASE}/test-key?deploymentTrackId=next-bbbbbb`,
+        `${BASE}/test-key?deploymentTrackId=next-bbbbbb&keepSecurity=true`,
         `${BASE}/security/api-key?deploymentTrackId=next-bbbbbb`,
         `${BASE}/security/jwt?deploymentTrackId=next-bbbbbb`,
         `${BASE}/security?deploymentTrackId=next-bbbbbb`,

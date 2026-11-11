@@ -22,8 +22,7 @@ import { useState, type JSX, type ReactNode } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router';
 import { useUserPortalServed } from '../../../hooks/useUserPortal';
 import { hasComponent, useScope, type ComponentScope } from '../../../nav';
-import { retryWorkflowRead } from '../api/http';
-import { workflowKeys } from '../api/queryKeys';
+import { definitionsQuery } from '../api/definitionsQuery';
 import type { WorkflowStatusFilter } from '../api/types';
 import { useWorkflowApi, type ReadyWorkflowApi } from '../api/useWorkflowApi';
 import type { WorkflowTarget } from '../connection/useWorkflowConnection';
@@ -82,11 +81,7 @@ function WorkflowDefinitions({ api, scope, search, envId }: { api: ReadyWorkflow
   const [picked, setPicked] = useState<string | null>(null);
   const [startOpen, setStartOpen] = useState(false);
   const { goToWorkflowRuns } = useWorkflowRoutes();
-  const definitions = useQuery({
-    queryKey: workflowKeys.definitions(connection.scopeId),
-    queryFn: () => client.definitions.list(),
-    retry: retryWorkflowRead,
-  });
+  const definitions = useQuery(definitionsQuery(client, connection.scopeId));
 
   if (definitions.isPending) return <WorkflowEnvCardSkeleton />;
   if (definitions.isError) {

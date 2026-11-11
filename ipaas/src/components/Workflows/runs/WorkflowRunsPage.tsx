@@ -23,6 +23,7 @@ import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import EmptyListing from '../../EmptyListing';
 import { formatDateTime } from '../../../utils/time';
+import { definitionsQuery } from '../api/definitionsQuery';
 import { retryWorkflowRead } from '../api/http';
 import { workflowKeys } from '../api/queryKeys';
 import { DEFAULT_SETTLE_MS, isSettling } from '../api/settleRegistry';
@@ -146,12 +147,7 @@ export default function WorkflowRunsPage({ component, environment, api }: Workfl
   }, [waitKey]);
   const runLinkWaited = waitKey !== null && waitedFor === waitKey;
 
-  const { data: definitions = [], isPending: definitionsPending } = useQuery({
-    queryKey: workflowKeys.definitions(scopeId),
-    queryFn: () => client.definitions.list(),
-    staleTime: 5 * 60 * 1000,
-    retry: retryWorkflowRead,
-  });
+  const { data: definitions = [], isPending: definitionsPending } = useQuery(definitionsQuery(client, scopeId));
   const workflowNameOptions = definitions.map((d) => d.workflowType);
   // A link may name a definition this deployment no longer lists; it stays selectable as the filter.
   if (workflowNameFilter && !workflowNameOptions.includes(workflowNameFilter)) {

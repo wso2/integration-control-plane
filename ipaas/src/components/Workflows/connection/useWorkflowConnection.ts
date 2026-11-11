@@ -29,6 +29,7 @@ import { isUserPortalUnavailable } from '../../../utils/apiErrors';
 import { userPortalErrorText } from '../../../utils/userPortal';
 import { createWorkflowClient, type WorkflowClient } from '../api/client';
 import { isWorkflowError, retryWorkflowRead } from '../api/http';
+import { definitionsQuery } from '../api/definitionsQuery';
 import { isScopedWorkflowKey, workflowKeys } from '../api/queryKeys';
 import type { WorkflowRuntimeInfo } from '../api/types';
 import { resolveWorkflowBaseUrl, resolveWorkflowEndpoint } from './resolveWorkflowBaseUrl';
@@ -164,8 +165,10 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   // Release-scoped discovery already returns the gateway's public URL; the security read may too. A
   // published workflow takes no test key, and nor does one being given back or not given back, so none
   // is minted until it is known to be none of them. Its security is read meanwhile, which changes nothing.
+  // Nothing on the views shows until the gateway answers, so the key is minted alongside the security
+  // read rather than after it.
   const portalHeld = publishedHere || unpublishingHere || notGivenBackHere;
-  const access = useEndpointTestAccess(ref, { enabled: !!ref, mint: publicationsKnown && !portalHeld, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
+  const access = useEndpointTestAccess(ref, { enabled: !!ref, mint: publicationsKnown && !portalHeld, gatewayUrlFallback: endpoint?.publicUrl ?? '', mintEarly: true });
   const { authHeader, apiKey, mintKey, renewKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 
@@ -186,6 +189,9 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     staleTime: 5 * 60_000,
     retry: retryWorkflowRead,
   });
+  // Every view on the connection lists the definitions, which don't depend on what the probe answers,
+  // so they are read alongside it rather than once the connection is ready.
+  useQuery({ ...definitionsQuery(client!, scopeId), enabled: !!client && !!scopeId && access.isAuthorized && publicationsKnown && !portalHeld });
 
   // When the held key was minted, to tell a stale key's refusal from any other. The key is shared,
   // so it can be older than this connection.

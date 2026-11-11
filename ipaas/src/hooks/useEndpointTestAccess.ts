@@ -140,6 +140,8 @@ interface HeldKey {
   mintedAt: number;
   /** When to mint again (epoch ms): a minute before it expires. */
   renewAt: number;
+  /** The request header it goes in, when the mint named one. */
+  header?: string;
 }
 
 const heldKeyQueryKey = (refKey: string) => ['endpoint-test-key', refKey] as const;
@@ -164,7 +166,7 @@ async function mintHeldKey(mint: (target: EndpointRef) => Promise<ApiKeyResult>,
   const result = await mint(target);
   // An answer without a key is a failed mint: held as one, a view that mounts tries again.
   if (!result?.apiKey) throw new Error('The test-key route answered without a key.');
-  return { key: result.apiKey, mintedAt, renewAt: keyRenewalTime(result.expiresAt, mintedAt) };
+  return { key: result.apiKey, mintedAt, renewAt: keyRenewalTime(result.expiresAt, mintedAt), header: result.header };
 }
 
 /**
@@ -197,9 +199,15 @@ interface TestAccessOptions {
   gatewayUrlFallback?: string;
   /** An AI agent's test key comes from Agent Manager, which also checks `amp:agent:api-key-manage`. */
   agent?: boolean;
+  /**
+   * Mint without waiting for the security read, for a caller that needs the key before anything else. ipaas-service
+   * mints only for an endpoint already on API-key auth, and refuses otherwise without changing it, so the outcome is
+   * the one waiting would give. The mint names the key's header, so the key is usable before the security read answers.
+   */
+  mintEarly?: boolean;
 }
 
-export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
+export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false, mintEarly = false }: TestAccessOptions = {}): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError, isLoading: isSecurityLoading } = useEndpointSecurity(ref, enabled);
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
@@ -227,7 +235,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     queryKey: heldKeyQueryKey(refKey),
     queryFn: () => mintHeldKey(createKeyFor, endpoint!),
     // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
-    enabled: enabled && isCompleteRef(endpoint) && mintable && mode === 'api-key',
+    enabled: enabled && isCompleteRef(endpoint) && mintable && (mode === 'api-key' || (mintEarly && !security && !securityError)),
     // Fresh until it is due for renewal, so a view that mounts later uses the held key.
     staleTime: (query) => Math.max((query.state.data?.renewAt ?? 0) - Date.now(), 0),
     gcTime: HELD_KEY_GC_MS,
@@ -327,7 +335,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     aiGateway,
     mcpUrl,
     mode,
-    authHeader: security?.apiKey?.header || DEFAULT_API_KEY_HEADER,
+    authHeader: security?.apiKey?.header || held.data?.header || DEFAULT_API_KEY_HEADER,
     apiKey,
     keyMintedAt: apiKey ? (held.data?.mintedAt ?? 0) : 0,
     // An open (mode `none`) endpoint needs no credential; anything else does.

@@ -18,6 +18,7 @@
 
 import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BffError } from '../api/_client';
 import { createEndpointTestKey, getEndpointSecurity, setEndpointApiKeyAuth } from '../api/consumers';
 import { keyRenewalTime, useEndpointTestAccess, type EndpointTestAccess } from './useEndpointTestAccess';
 import { flush, renderWithScopes } from '../test/renderWithScopes';
@@ -111,6 +112,48 @@ describe('useEndpointTestAccess', () => {
     expect(r.container.textContent).toBe('');
     await act(async () => select(a));
     expect(r.container.textContent).toBe('key-for-http-development-main');
+  });
+});
+
+describe('a key minted before the security is read', () => {
+  function Early({ early }: { early: boolean }) {
+    currentAccess = useEndpointTestAccess(a, { mintEarly: early });
+    return null;
+  }
+  const unanswered = () => new Promise<never>(() => {});
+
+  it('is minted while the security read is under way, and goes in the header the mint names', async () => {
+    vi.mocked(getEndpointSecurity).mockImplementation(unanswered);
+    vi.mocked(createEndpointTestKey).mockResolvedValue({ keyId: 'k', apiKey: 'early-key', header: 'X-Orders-Key' });
+    const r = await renderWithScopes(<Early early />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+
+    expect(currentAccess?.apiKey).toBe('early-key');
+    expect(currentAccess?.isAuthorized).toBe(true);
+    expect(currentAccess?.authHeader).toBe('X-Orders-Key');
+  });
+
+  it('is not minted that early unless asked for', async () => {
+    vi.mocked(getEndpointSecurity).mockImplementation(unanswered);
+    const r = await renderWithScopes(<Early early={false} />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+
+    expect(createEndpointTestKey).not.toHaveBeenCalled();
+  });
+
+  it('offers the switch once the security read answers, when the endpoint is not on API-key auth', async () => {
+    vi.mocked(createEndpointTestKey).mockRejectedValue(new BffError(409, JSON.stringify({ code: 'API_KEY_AUTH_REQUIRED', message: 'the endpoint does not use API-key auth' })));
+    const r = await renderWithScopes(<Early early />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+
+    expect(createEndpointTestKey).toHaveBeenCalledTimes(1);
+    expect(currentAccess?.apiKey).toBeNull();
+    expect(currentAccess?.needsApiKeyAuth).toBe(true);
+    expect(currentAccess?.keyError).toBeNull();
+    expect(currentAccess?.canSwitch).toBe(true);
   });
 });
 
