@@ -118,6 +118,24 @@ describe('engineRequest', () => {
     expect(post).toHaveBeenCalledTimes(2);
   });
 
+  it('sends the login token the BFF returned when the browser holds none, and renews before it expires', async () => {
+    vi.useFakeTimers();
+    getAccessToken.mockResolvedValue(null);
+    post
+      .mockResolvedValueOnce({ ...access('k1'), userToken: 'session-token', userTokenExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() })
+      .mockResolvedValueOnce({ ...access('k1'), userToken: 'refreshed-token' });
+    authenticatedFetch.mockImplementation(async () => response(200));
+
+    await engineRequest(ENGINE, 'GET', '/v1/engine');
+    expect(post).toHaveBeenCalledWith('/context-engines/docs/console-access', { withUserToken: true });
+    expect(keyOf(authenticatedFetch.mock.calls[0]).Authorization).toBe('Bearer session-token');
+
+    vi.advanceTimersByTime(9 * 60 * 1000);
+    await engineRequest(ENGINE, 'GET', '/v1/engine');
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(keyOf(authenticatedFetch.mock.calls[1]).Authorization).toBe('Bearer refreshed-token');
+  });
+
   it('surfaces a BFF refusal as an HttpError with its status', async () => {
     post.mockRejectedValueOnce(new BffError(409, JSON.stringify({ message: 'the context engine is not running yet' })));
 
@@ -166,6 +184,15 @@ describe('engineUpload', () => {
 
     await expect(engineUpload(ENGINE, '/v1/sources/s1/ingestions', new FormData(), { 'Idempotency-Key': 'i' })).resolves.toEqual({ jobId: 'j1', statusUrl: '/v1/jobs/j1' });
     expect(sent[0]).toEqual({ url: `${URL_BASE}/v1/sources/s1/ingestions`, headers: { 'Idempotency-Key': 'i', 'X-API-Key': 'k1', Authorization: 'Bearer platform-token' } });
+  });
+
+  it('sends the login token the BFF returned when the browser holds none', async () => {
+    getAccessToken.mockResolvedValue(null);
+    post.mockResolvedValueOnce({ ...access('k1'), userToken: 'session-token' });
+    statuses = [[202, '{}']];
+
+    await engineUpload(ENGINE, '/v1/sources/s1/ingestions', new FormData(), {});
+    expect(sent[0].headers.Authorization).toBe('Bearer session-token');
   });
 
   it('retries once with a new key when the gateway refuses', async () => {

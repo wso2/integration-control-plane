@@ -19,8 +19,9 @@
 /**
  * Calls to one engine's console API, through the org gateway. The BFF hands out the gateway URL
  * and a short-lived key (`POST …/console-access`); every call carries that key as `X-API-Key` and
- * the platform login token as `Authorization`, which the gateway passes to the engine. A key is
- * fetched again shortly before it expires, and once more when the gateway refuses it.
+ * the platform login token as `Authorization`, which the gateway passes to the engine. A console
+ * signed in through the gateway holds no token, so the BFF returns the session's with the key. A key
+ * is fetched again shortly before it or that token expires, and once more when the gateway refuses it.
  */
 
 import { authenticatedFetch, getAccessToken } from '../auth';
@@ -33,12 +34,15 @@ interface ConsoleAccess {
   url: string;
   apiKey: string;
   expiresAt: number;
+  userToken?: string;
 }
 
 interface RawConsoleAccess {
   consoleApiUrl: string;
   apiKey: string;
   expiresAt: string;
+  userToken?: string;
+  userTokenExpiresAt?: string;
 }
 
 /** A BFF failure as the engine pages expect one: an `HttpError` carrying the status and the BFF's sentence. */
@@ -57,9 +61,15 @@ const isFresh = (access: ConsoleAccess): boolean => access.expiresAt - CONSOLE_A
 
 async function requestAccess(engineId: string, staleApiKey?: string): Promise<ConsoleAccess> {
   try {
-    const raw = await bff.post<RawConsoleAccess>(`${enginePath(engineId)}/console-access`, staleApiKey ? { staleApiKey } : {});
-    const expiresAt = Date.parse(raw.expiresAt);
-    return { url: raw.consoleApiUrl.replace(/\/+$/, ''), apiKey: raw.apiKey, expiresAt: Number.isNaN(expiresAt) ? Date.now() + 2 * CONSOLE_ACCESS_REFRESH_MARGIN_MS : expiresAt };
+    const withUserToken = !(await getAccessToken());
+    const raw = await bff.post<RawConsoleAccess>(`${enginePath(engineId)}/console-access`, { ...(staleApiKey ? { staleApiKey } : {}), ...(withUserToken ? { withUserToken } : {}) });
+    const expiries = [raw.expiresAt, raw.userTokenExpiresAt].map((at) => Date.parse(at ?? '')).filter((at) => !Number.isNaN(at));
+    return {
+      url: raw.consoleApiUrl.replace(/\/+$/, ''),
+      apiKey: raw.apiKey,
+      expiresAt: expiries.length ? Math.min(...expiries) : Date.now() + 2 * CONSOLE_ACCESS_REFRESH_MARGIN_MS,
+      userToken: raw.userToken || undefined,
+    };
   } catch (err) {
     throw asHttpError(err);
   }
@@ -101,12 +111,17 @@ export function forgetConsoleAccess(engineId: string): void {
   accessByEngine.delete(engineId);
 }
 
+async function bearer(access: ConsoleAccess): Promise<Record<string, string>> {
+  const token = (await getAccessToken()) ?? access.userToken;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 const toError = (status: number, text: string, statusText = ''): HttpError => new HttpError(status, `HTTP ${status}: ${text || statusText}`);
 
 /** A JSON call to the engine's console API. Errors are `HttpError`s carrying the engine's status and body. */
 export async function engineRequest<T>(engineId: string, method: string, path: string, body?: unknown): Promise<T> {
   const send = async (access: ConsoleAccess): Promise<{ res: Response; text: string }> => {
-    const headers: Record<string, string> = { 'X-API-Key': access.apiKey, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) };
+    const headers: Record<string, string> = { 'X-API-Key': access.apiKey, ...(await bearer(access)), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) };
     const res = await authenticatedFetch(`${access.url}${path}`, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
     return { res, text: await res.text().catch(() => '') };
   };
@@ -152,8 +167,7 @@ function postMultipart(url: string, form: FormData, headers: Record<string, stri
  */
 export async function engineUpload<T>(engineId: string, path: string, form: FormData, headers: Record<string, string>, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<T> {
   const send = async (access: ConsoleAccess): Promise<XhrResult> => {
-    const token = await getAccessToken();
-    return postMultipart(`${access.url}${path}`, form, { ...headers, 'X-API-Key': access.apiKey, ...(token ? { Authorization: `Bearer ${token}` } : {}) }, onProgress, signal);
+    return postMultipart(`${access.url}${path}`, form, { ...headers, 'X-API-Key': access.apiKey, ...(await bearer(access)) }, onProgress, signal);
   };
   const access = await consoleAccess(engineId);
   let result = await send(access);
