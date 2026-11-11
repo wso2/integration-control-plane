@@ -47,7 +47,17 @@ import {
   updateContextModels,
   updateContextSource,
 } from '../api/contextEngine';
-import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
+import {
+  CONTEXT_ENGINE_ASKED_KEY_PREFIX,
+  CONTEXT_ENGINE_CONNECT_KEY_PREFIX,
+  CONTEXT_ENGINE_DRAFT_KEY_PREFIX,
+  CONTEXT_OWNER_ACTIONS,
+  DELETION_POLL_MS,
+  ENGINE_STATUS_POLL_MS,
+  PROGRESS_POLL_ACTIVE_MS,
+  PROGRESS_POLL_IDLE_MS,
+  SUMMARY_CONCURRENCY,
+} from '../constants/contextEngine';
 import { contextEngineKey } from '../utils/contextEngineKey';
 import { everyoneRoles, fromDraft, isEngineProgressActive, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
@@ -471,14 +481,29 @@ export function useContextEngineDraft(orgHandle: string) {
 }
 
 /** Whether this user has asked the engine anything yet — drives the "Ask it something" checklist step. */
-export function useAskedFlag(engineId: string) {
-  const key = `${CONTEXT_ENGINE_ASKED_KEY_PREFIX}${engineId}`;
-  const [asked, setAsked] = useState(() => readStorage(local, key) === 'true');
-  const markAsked = useCallback(() => {
+/**
+ * A per-engine flag kept in this browser. Keyed by the engine's id and its creation time: the console runs one
+ * engine instance with a fixed id, so without the time a flag set on a deleted engine would carry over to the next.
+ */
+function useEngineFlag(prefix: string, engineId: string, createdAt = '') {
+  const key = `${prefix}${engineId}${createdAt ? `:${createdAt}` : ''}`;
+  const [value, setValue] = useState(() => readStorage(local, key) === 'true');
+  const mark = useCallback(() => {
     writeStorage(local, key, 'true');
-    setAsked(true);
+    setValue(true);
   }, [key]);
+  return [value, mark] as const;
+}
+
+export function useAskedFlag(engineId: string, createdAt?: string) {
+  const [asked, markAsked] = useEngineFlag(CONTEXT_ENGINE_ASKED_KEY_PREFIX, engineId, createdAt);
   return { asked, markAsked };
+}
+
+/** Whether the user has opened this engine's API or MCP tab, for the Connect an agent step. */
+export function useConnectViewedFlag(engineId: string, createdAt?: string) {
+  const [connectViewed, markConnectViewed] = useEngineFlag(CONTEXT_ENGINE_CONNECT_KEY_PREFIX, engineId, createdAt);
+  return { connectViewed, markConnectViewed };
 }
 
 // ── Integrations and API keys ──

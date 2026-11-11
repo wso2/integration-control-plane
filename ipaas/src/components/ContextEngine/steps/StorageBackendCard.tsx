@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { CircleAlert, Database, ExternalLink, Plus, RefreshCw, Waypoints } from '@wso2/oxygen-ui-icons-react';
+import { ChartScatter, CircleAlert, Database, ExternalLink, Network, Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { useServerDatabases } from '../../../hooks/usePlatformServices';
 import { STORAGE_DEFAULT_DATABASE, type StorageBackendInfo } from '../../../constants/contextEngine';
@@ -48,7 +48,8 @@ interface StorageBackendCardProps {
   createUrl?: string;
 }
 
-const KIND_ICON: Record<StorageBackendInfo['kind'], ReactNode> = { vector: <Waypoints size={20} />, relational: <Database size={20} />, graph: <Waypoints size={20} /> };
+// Waypoints stays with Context Engines in the menu; each store gets its own picture.
+const KIND_ICON: Record<StorageBackendInfo['kind'], ReactNode> = { vector: <ChartScatter size={20} />, relational: <Database size={20} />, graph: <Network size={20} /> };
 
 const serverSubtitle = (s: DatabaseServer): string =>
   [s.type === 'postgres' ? 'PostgreSQL' : s.type, s.is_vector_enabled ? 'pgvector' : null, `${s.cloud_provider.toUpperCase()} ${s.cloud_region.toUpperCase()}`, s.status === 'ACTIVE' ? 'Active' : s.status.toLowerCase()].filter(Boolean).join(' · ');
@@ -110,18 +111,12 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
   const uriError = external && external.uri && !isGraphUri(external.uri) ? 'Enter a bolt://, neo4j:// or http(s):// URI' : '';
 
   const infraBody = (): ReactNode => {
-    if (!infrastructureAvailable)
-      return (
-        <Alert severity="info" variant="outlined">
-          Managed databases are not enabled for this deployment.
-        </Alert>
-      );
+    if (!infrastructureAvailable) return <Alert severity="info">Managed databases are not enabled for this deployment.</Alert>;
     if (serversLoading) return <CircularProgress size={20} />;
     if (serversError) {
       return (
         <Alert
           severity="error"
-          variant="outlined"
           action={
             <Button color="inherit" size="small" onClick={onRefresh}>
               Retry
@@ -257,6 +252,26 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
             }
           />
         </Box>
+        {!info.infraSegment && (
+          // Infrastructure has no graph databases yet: shown in its usual place, disabled, so all three cards share one shape.
+          <Box sx={storageOptionSx(false)}>
+            <FormControlLabel
+              value="infrastructure"
+              disabled
+              control={<Radio size="small" />}
+              label={
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    From Infrastructure · Graph databases
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Coming soon.
+                  </Typography>
+                </Box>
+              }
+            />
+          </Box>
+        )}
         <Box sx={storageOptionSx(value.mode !== 'managed')}>
           <FormControlLabel
             value={alternativeMode}

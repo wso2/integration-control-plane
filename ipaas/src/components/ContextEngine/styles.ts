@@ -39,28 +39,32 @@ export const stepHintSx = { color: 'text.secondary', mb: 2.5 } as const;
 export const fieldStackSx = { gap: 2.5, maxWidth: 560 } as const;
 
 /** Clickable subheading that collapses a group of connector fields. */
-export const fieldGroupToggleSx = {
-  alignSelf: 'flex-start',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 0.5,
-  fontWeight: 600,
-  fontSize: 12,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-  color: 'text.secondary',
-  '&:hover': { color: 'text.primary' },
-} as const;
+export const fieldGroupSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } as const;
 
-/** The chevron on a group header; points down when the group is open. */
-export const fieldGroupChevronSx = (open: boolean) =>
+/** Group header, styled like the integration Configure drawer's section accordions. */
+export const fieldGroupToggleSx = (open: boolean) =>
   ({
-    transition: 'transform 0.15s ease',
-    transform: open ? 'rotate(90deg)' : 'none',
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    px: 2,
+    py: 1.25,
+    bgcolor: 'action.hover',
+    borderBottom: open ? 1 : 0,
+    borderColor: 'divider',
+    textAlign: 'left',
+    '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
   }) as const;
 
-/** Fields inside a collapsible group, spaced like the main field stack and set off from the header. */
-export const fieldGroupBodySx = { gap: 2.5, pt: 2.5 } as const;
+/**
+ * Fields inside an open group. Each field keeps a helper line under it (so an error does not shift the form),
+ * which already spaces the fields, so the gap between them is small and the bottom padding is light.
+ */
+export const fieldGroupBodySx = { gap: 1, px: 2, pt: 2, pb: 1 } as const;
+
+/** The connector form's top-level stack: the source name, then the field groups. */
+export const connectorFieldStackSx = { gap: 1.5, maxWidth: 560 } as const;
 
 /** Source / provider tile grid spacing. */
 export const tileGridSx = { mb: 3 } as const;
@@ -133,10 +137,16 @@ export const sourceTileMarkSx = {
 
 // ── Source drawer ───────────────────────────────────────────────────────────
 
+/** Add-source drawer, matching the integration Configure drawer: 560 wide, below the app header. */
 export const sourceDrawerSx = {
   '& .MuiDrawer-paper': {
-    width: 720,
+    width: 560,
     maxWidth: '100%',
+    position: 'fixed',
+    top: 64,
+    height: 'calc(100% - 64px)',
+    borderLeft: '1px solid',
+    borderColor: 'divider',
     display: 'flex',
     flexDirection: 'column',
     ...wrapSx,
@@ -155,7 +165,7 @@ export const drawerHeaderSx = {
   flexShrink: 0,
 } as const;
 
-export const drawerBodySx = {
+const drawerBodySxBase = {
   flex: 1,
   minHeight: 0,
   overflowY: 'auto',
@@ -165,6 +175,8 @@ export const drawerBodySx = {
   flexDirection: 'column',
   gap: 2,
 } as const;
+
+export const drawerBodySx = drawerBodySxBase;
 
 export const drawerFooterSx = {
   display: 'flex',
@@ -177,6 +189,10 @@ export const drawerFooterSx = {
   flexShrink: 0,
   bgcolor: 'background.paper',
 } as const;
+
+/** Body and footer spacing of the integration Configure drawer, for the add-source drawer. */
+export const sourceDrawerBodySx = { ...drawerBodySxBase, px: 2, py: 2 } as const;
+export const sourceDrawerFooterSx = { display: 'flex', justifyContent: 'flex-end', gap: 1, px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 } as const;
 
 export const catalogChipsSx = { display: 'flex', gap: 1, flexWrap: 'wrap' } as const;
 
@@ -239,10 +255,8 @@ export const sourceMarkSx = {
 
 // ── Review + Overview cards ─────────────────────────────────────────────────
 
+/** Padding and height for a summary card. Used on an outlined Paper, which brings the border, radius and background. */
 export const summaryCardSx = {
-  border: '1px solid',
-  borderColor: 'divider',
-  borderRadius: 1,
   p: 2.5,
   height: '100%',
 } as const;
@@ -509,10 +523,6 @@ export const checklistSx = {
   alignItems: 'flex-start',
   p: 2.5,
   mb: 2,
-  border: '1px solid',
-  borderColor: 'divider',
-  borderRadius: 1,
-  bgcolor: 'background.paper',
 } as const;
 
 export const checklistStepSx = { flex: 1, display: 'flex', gap: 1.5, alignItems: 'flex-start', minWidth: 0 } as const;
@@ -717,3 +727,49 @@ export const storageLinksSx = { display: 'flex', gap: 2, alignItems: 'center' } 
 /** Under a file whose status check could not reach the engine: the caption and a "Check again" button side by side. */
 export const checkAgainRowSx = { mt: 0.75 } as const;
 export const warningCaptionSx = { color: 'warning.dark' } as const;
+
+/** Choose Sources catalog grid, sized like the prebuilt-integration app grid (six across at the step's width). */
+export const connectorGridSx = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+  gap: 2,
+  '& img': { width: 'auto', maxWidth: '100%' },
+} as const;
+
+export const connectorSectionHeaderSx = { display: 'block', mb: 1.5 } as const;
+
+export const connectorLogoSx = { height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' } as const;
+
+/** One connector card in the Choose Sources grid; mirrors the prebuilt-integration ApplicationCard. */
+export const connectorCardSx = ({ added, interactive }: { added: boolean; interactive: boolean }) =>
+  ({
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 1.5,
+    p: 2.5,
+    minHeight: 132,
+    width: '100%',
+    font: 'inherit',
+    color: 'text.primary',
+    textAlign: 'center',
+    border: '2px solid',
+    borderColor: added ? 'primary.main' : 'divider',
+    borderRadius: 1,
+    bgcolor: 'background.paper',
+    cursor: interactive ? 'pointer' : 'default',
+    transition: 'border-color 0.15s',
+    ...(interactive && { '&:hover': { borderColor: 'primary.main' } }),
+    '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+  }) as const;
+
+/** Status chips on a source row: a little more room before the icon, which sits against the outline at the default small-chip inset. */
+export const statusChipSx = { '& .MuiChip-icon': { ml: 0.75 } } as const;
+
+/** Labelled values on a review card: three across, so Models and Storage each read as one row. */
+export const reviewDetailGridSx = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 3 } as const;
+
+/** Exposure rows: a text button whose label lines up with the row's left edge, like the other rows' labels. */
+/** Exposure rows open their tab: a plain Oxygen text button, padding kept so it reads as a button, not a link. */
+export const exposureButtonSx = { textTransform: 'none' } as const;

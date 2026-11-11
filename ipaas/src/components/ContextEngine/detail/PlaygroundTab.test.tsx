@@ -54,6 +54,7 @@ vi.mock('@wso2/oxygen-ui', () => {
     Button: plain('button'),
     CircularProgress: plain('span'),
     IconButton: plain('button'),
+    Skeleton: plain('span'),
     Stack: plain('div'),
     TextField: plain('textarea'),
     ToggleButton: plain('button'),
@@ -64,7 +65,7 @@ vi.mock('@wso2/oxygen-ui', () => {
 });
 vi.mock('@wso2/oxygen-ui-icons-react', () => {
   const icon = () => null;
-  return { Braces: icon, Copy: icon, Eraser: icon, EyeOff: icon, History: icon, RotateCcw: icon, Send: icon, Unlink: icon };
+  return { Braces: icon, Copy: icon, Eraser: icon, EyeOff: icon, History: icon, Info: icon, RotateCcw: icon, Send: icon, Unlink: icon };
 });
 
 const queryContext = vi.hoisted(() => ({ mutateAsync: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }));

@@ -18,8 +18,8 @@
 
 import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, MenuItem, PageContent, PageTitle, Select, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Play, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type JSX, type MouseEvent } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useMemo, useState, type JSX, type MouseEvent } from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngines, useContextEngineSummary, useDeleteContextEngine, useSeenOnScreen } from '../hooks/useContextEngine';
 import { useAllEnvironments } from '../hooks/useEnvironments';
@@ -127,7 +127,8 @@ function EngineRow({ engine, onOpen, onPlayground, onDelete }: { engine: Context
       sx={{ cursor: 'pointer' }}
       onClick={onOpen}
       onKeyDown={(ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') {
+        // Only keys pressed on the row itself open it; Enter on a row action button belongs to that button.
+        if (ev.target === ev.currentTarget && (ev.key === 'Enter' || ev.key === ' ')) {
           ev.preventDefault();
           onOpen();
         }
@@ -169,7 +170,15 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const remove = useDeleteContextEngine();
   const [search, setSearch] = useState('');
   const [toDelete, setToDelete] = useState<ContextEngine | null>(null);
-  const [alert, setAlert] = useState<{ type: 'info' | 'error'; message: string } | null>(null);
+  const [alert, setAlert] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+  const location = useLocation();
+  // A delete started on the engine page lands here with the engine's name, like a deleted project does.
+  useEffect(() => {
+    const state = location.state as { engineDeleted?: boolean; engineName?: string } | null;
+    if (!state?.engineDeleted) return;
+    setAlert({ type: 'info', message: `Context engine '${state.engineName ?? ''}' is being deleted. It leaves this list once it is gone.` });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location, navigate]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const goCreate = () => navigate(newContextEngineUrl(scope.org, environment));
@@ -196,7 +205,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     remove.mutate(engine.id, {
       onSuccess: () => {
         setToDelete(null);
-        setAlert({ type: 'info', message: `“${engine.name}” is being deleted. It leaves this list once it is gone.` });
+        setAlert({ type: 'info', message: `Context engine '${engine.name}' is being deleted. It leaves this list once it is gone.` });
       },
       onError: (e) => setDeleteError(deletionError(e, engine.name)),
     });

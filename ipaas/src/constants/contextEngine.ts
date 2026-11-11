@@ -169,7 +169,16 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [F('integrationToken', 'Integration Token', 'secret'), O('rootPageId', 'Root Page ID', 'text', { helper: 'Leave empty to read every page the integration can see.' })],
     summaryKeys: ['rootPageId'],
   },
-  { id: 'gitbook', name: 'GitBook', description: 'Published docs from a space.', category: 'documentation', logo: `${CONNECTOR_LOGO_BASE}gitbook.svg`, icon: 'book', fields: [F('spaceId', 'Space ID', 'text'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['spaceId'] },
+  {
+    id: 'gitbook',
+    name: 'GitBook',
+    description: 'Published docs from a space.',
+    category: 'documentation',
+    logo: `${CONNECTOR_LOGO_BASE}gitbook.svg`,
+    icon: 'book',
+    fields: [F('spaceId', 'Space ID', 'text'), F('apiToken', 'API Token', 'secret')],
+    summaryKeys: ['spaceId'],
+  },
   {
     id: 'readme',
     name: 'ReadMe',
@@ -190,7 +199,16 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [F('projectVersionId', 'Project Version ID', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['projectVersionId'],
   },
-  { id: 'helpjuice', name: 'Helpjuice', description: 'Knowledge base articles.', category: 'documentation', logo: `${CONNECTOR_LOGO_BASE}helpjuice.svg`, icon: 'book', fields: [F('accountUrl', 'Account URL', 'url'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['accountUrl'] },
+  {
+    id: 'helpjuice',
+    name: 'Helpjuice',
+    description: 'Knowledge base articles.',
+    category: 'documentation',
+    logo: `${CONNECTOR_LOGO_BASE}helpjuice.svg`,
+    icon: 'book',
+    fields: [F('accountUrl', 'Account URL', 'url'), F('apiKey', 'API Key', 'secret')],
+    summaryKeys: ['accountUrl'],
+  },
 
   // Cloud storage
   {
@@ -203,10 +221,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     icon: 'folder',
     // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
     // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
-    fields: [
-      ...G('Connection', ...GOOGLE_AUTH),
-      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'Subfolders are included.' })),
-    ],
+    fields: [...G('Connection', ...GOOGLE_AUTH), ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'Subfolders are included.' }))],
     summaryKeys: ['folderId'],
   },
   {
@@ -231,7 +246,16 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [F('siteUrl', 'Site URL', 'url', { placeholder: 'https://contoso.sharepoint.com/sites/docs' }), ...MS_GRAPH_APP],
     summaryKeys: ['siteUrl'],
   },
-  { id: 'onedrive', name: 'OneDrive', description: "Files in a user's or shared drive.", category: 'cloud-storage', logo: `${CONNECTOR_LOGO_BASE}onedrive.svg`, icon: 'cloud', fields: [F('driveId', 'Drive ID', 'text'), ...MS_GRAPH_APP], summaryKeys: ['driveId'] },
+  {
+    id: 'onedrive',
+    name: 'OneDrive',
+    description: "Files in a user's or shared drive.",
+    category: 'cloud-storage',
+    logo: `${CONNECTOR_LOGO_BASE}onedrive.svg`,
+    icon: 'cloud',
+    fields: [F('driveId', 'Drive ID', 'text'), ...MS_GRAPH_APP],
+    summaryKeys: ['driveId'],
+  },
   {
     id: 'dropbox',
     name: 'Dropbox',
@@ -242,7 +266,16 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [F('folderPath', 'Folder Path', 'text', { placeholder: '/Team/Docs' }), F('accessToken', 'Access Token', 'secret')],
     summaryKeys: ['folderPath'],
   },
-  { id: 'box', name: 'Box', description: 'Files in a folder tree.', category: 'cloud-storage', logo: `${CONNECTOR_LOGO_BASE}box.svg`, icon: 'box', fields: [F('folderId', 'Folder ID', 'text'), F('developerToken', 'Developer Token', 'secret')], summaryKeys: ['folderId'] },
+  {
+    id: 'box',
+    name: 'Box',
+    description: 'Files in a folder tree.',
+    category: 'cloud-storage',
+    logo: `${CONNECTOR_LOGO_BASE}box.svg`,
+    icon: 'box',
+    fields: [F('folderId', 'Folder ID', 'text'), F('developerToken', 'Developer Token', 'secret')],
+    summaryKeys: ['folderId'],
+  },
   {
     id: 'azure-blob',
     name: 'Azure Blob Storage',
@@ -271,7 +304,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Docs, markdown and code in a repository branch.',
     category: 'code',
     popular: true,
-    logo: `${CONNECTOR_LOGO_BASE}github.svg`, logoDark: `${CONNECTOR_LOGO_BASE}github-dark.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}github.svg`,
+    logoDark: `${CONNECTOR_LOGO_BASE}github-dark.svg`,
     icon: 'github',
     fields: [
       F('repositoryUrl', 'Repository URL', 'url', { placeholder: 'https://github.com/org/repo' }),
@@ -327,9 +361,36 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [F('baseUrl', 'Base URL', 'url', { placeholder: 'https://your-org.atlassian.net' }), F('projectKey', 'Project Key', 'text'), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['baseUrl', 'projectKey'],
   },
-  { id: 'linear', name: 'Linear', description: 'Issues and project documents.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}linear.svg`, icon: 'kanban', fields: [F('teamKey', 'Team Key', 'text'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['teamKey'] },
-  { id: 'asana', name: 'Asana', description: 'Tasks and project descriptions.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}asana.svg`, icon: 'kanban', fields: [F('projectId', 'Project ID', 'text'), F('accessToken', 'Access Token', 'secret')], summaryKeys: ['projectId'] },
-  { id: 'trello', name: 'Trello', description: 'Cards in a board.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}trello.svg`, icon: 'kanban', fields: [F('boardId', 'Board ID', 'text'), F('apiKey', 'API Key', 'secret'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['boardId'] },
+  {
+    id: 'linear',
+    name: 'Linear',
+    description: 'Issues and project documents.',
+    category: 'code',
+    logo: `${CONNECTOR_LOGO_BASE}linear.svg`,
+    icon: 'kanban',
+    fields: [F('teamKey', 'Team Key', 'text'), F('apiKey', 'API Key', 'secret')],
+    summaryKeys: ['teamKey'],
+  },
+  {
+    id: 'asana',
+    name: 'Asana',
+    description: 'Tasks and project descriptions.',
+    category: 'code',
+    logo: `${CONNECTOR_LOGO_BASE}asana.svg`,
+    icon: 'kanban',
+    fields: [F('projectId', 'Project ID', 'text'), F('accessToken', 'Access Token', 'secret')],
+    summaryKeys: ['projectId'],
+  },
+  {
+    id: 'trello',
+    name: 'Trello',
+    description: 'Cards in a board.',
+    category: 'code',
+    logo: `${CONNECTOR_LOGO_BASE}trello.svg`,
+    icon: 'kanban',
+    fields: [F('boardId', 'Board ID', 'text'), F('apiKey', 'API Key', 'secret'), F('apiToken', 'API Token', 'secret')],
+    summaryKeys: ['boardId'],
+  },
 
   // Collaboration
   {
@@ -405,7 +466,16 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [F('accountId', 'Account ID', 'text'), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret')],
     summaryKeys: ['accountId'],
   },
-  { id: 'google-chat', name: 'Google Chat', description: 'Conversations in a space.', category: 'collaboration', logo: `${CONNECTOR_LOGO_BASE}google-chat.svg`, icon: 'chat', fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')], summaryKeys: ['spaceId'] },
+  {
+    id: 'google-chat',
+    name: 'Google Chat',
+    description: 'Conversations in a space.',
+    category: 'collaboration',
+    logo: `${CONNECTOR_LOGO_BASE}google-chat.svg`,
+    icon: 'chat',
+    fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')],
+    summaryKeys: ['spaceId'],
+  },
 
   // Databases
   {
@@ -427,8 +497,31 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['host', 'database'],
     isStructuredData: true,
   },
-  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
-  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  {
+    id: 'mysql',
+    name: 'MySQL',
+    description: 'Rows of a table, kept in sync.',
+    category: 'databases',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}mysql.svg`,
+    logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`,
+    icon: 'database',
+    fields: DATABASE_FIELDS('3306'),
+    summaryKeys: ['host', 'database'],
+    isStructuredData: true,
+  },
+  {
+    id: 'mssql',
+    name: 'Microsoft SQL Server',
+    description: 'Rows of a table, kept in sync.',
+    category: 'databases',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}mssql.svg`,
+    icon: 'database',
+    fields: DATABASE_FIELDS('1433', 'dbo'),
+    summaryKeys: ['host', 'database'],
+    isStructuredData: true,
+  },
   {
     id: 'mongodb',
     name: 'MongoDB',
@@ -477,7 +570,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Zendesk',
     description: 'Tickets and help-center articles.',
     category: 'saas',
-    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`, logoDark: `${CONNECTOR_LOGO_BASE}zendesk-dark.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`,
+    logoDark: `${CONNECTOR_LOGO_BASE}zendesk-dark.svg`,
     icon: 'headset',
     fields: [F('subdomain', 'Subdomain', 'text', { placeholder: 'your-org' }), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['subdomain'],
@@ -713,11 +807,11 @@ export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
 /** Chip text for a source's place in the pipeline. */
 export const SOURCE_PROGRESS_LABEL: Record<SourceProgressStatus, string> = {
   waiting: 'Waiting for data',
-  reading: 'Reading',
-  processing: 'Processing',
+  reading: 'Syncing',
+  processing: 'Syncing',
   indexing: 'Indexing',
-  processed: 'Processed',
-  attention: 'Processed with errors',
+  processed: 'Indexed',
+  attention: 'Needs attention',
   empty: 'Nothing stored',
 };
 
@@ -750,6 +844,8 @@ export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
 export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
 /** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
 export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
+/** Set once the user has opened the API or MCP tab of an engine: the closest signal the console has that they connected an agent. */
+export const CONTEXT_ENGINE_CONNECT_KEY_PREFIX = 'contextEngine:connectViewed:';
 
 /** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
 export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';
@@ -876,7 +972,7 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
   {
     kind: 'vector',
     title: 'Vector database',
-    purpose: 'Embeddings and similarity search over your sources.',
+    purpose: 'Embeddings used to find relevant passages.',
     managedName: 'LanceDB',
     serverName: 'PostgreSQL + pgvector',
     infraSegment: 'vector-databases',
@@ -887,7 +983,7 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
   {
     kind: 'relational',
     title: 'Relational database',
-    purpose: 'Source records, provenance ledger, grants and evidence.',
+    purpose: 'Records of your sources and the evidence behind answers.',
     managedName: 'SQLite',
     serverName: 'PostgreSQL',
     infraSegment: 'databases',
@@ -898,7 +994,7 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
   {
     kind: 'graph',
     title: 'Graph database',
-    purpose: 'Entities and relationships the engine extracts.',
+    purpose: 'Entities and relationships found in your sources.',
     managedName: 'Kuzu',
     serverName: 'PostgreSQL',
     infraSegment: null,

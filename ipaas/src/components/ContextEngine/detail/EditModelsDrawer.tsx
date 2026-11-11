@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, IconButton, MenuItem, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
 import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
@@ -178,14 +178,14 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
 
       <Box sx={drawerBodySx}>
         {failure && (
-          <Alert severity="error" variant="outlined">
+          <Alert severity="error">
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {failure.title}
             </Typography>
             {failure.body}
           </Alert>
         )}
-        <Box sx={{ ...summaryCardSx, height: 'auto' }}>
+        <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto' }}>
           <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
               Embedding model
@@ -223,9 +223,9 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
               </Typography>
             )}
           </Box>
-        </Box>
+        </Paper>
 
-        <Box sx={{ ...summaryCardSx, height: 'auto' }}>
+        <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
             Ingestion language model
           </Typography>
@@ -237,7 +237,7 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
               </Typography>
             )}
           </Box>
-        </Box>
+        </Paper>
       </Box>
 
       <Box sx={{ ...drawerFooterSx, justifyContent: 'space-between' }}>

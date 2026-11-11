@@ -28,7 +28,8 @@
  * Reads that hit a missing route degrade to an empty section so the detail page still renders.
  */
 
-import { CONTEXT_ENGINE_ID, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../constants/contextEngine';
+import { clearQuestions } from '../hooks/contextQuestions';
+import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX, CONTEXT_ENGINE_ID, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../constants/contextEngine';
 import {
   audienceMappingFromRules,
   contextEngineKey,
@@ -398,9 +399,9 @@ const toExposure = (raw: RawEngineConfig | null): ContextEngineExposure => ({ ap
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
-  lancedb: { label: 'LanceDB', detail: 'Engine managed · embedded' },
-  sqlite: { label: 'SQLite', detail: 'Engine managed · embedded' },
-  kuzu: { label: 'Kuzu', detail: 'Engine managed · embedded' },
+  lancedb: { label: 'LanceDB', detail: 'Engine managed · built in' },
+  sqlite: { label: 'SQLite', detail: 'Engine managed · built in' },
+  kuzu: { label: 'Kuzu', detail: 'Engine managed · built in' },
   // The console offers PostgreSQL only as the engine's own server, which the BFF creates with it.
   pgvector: { label: 'PostgreSQL + pgvector', detail: 'Engine managed · own server' },
   postgres: { label: 'PostgreSQL', detail: 'Engine managed · own server' },
@@ -614,6 +615,21 @@ export async function setUpContextEngine(engineId: string, input: ContextEngineS
 export async function deleteContextEngine(engineId: string): Promise<void> {
   await viaBff(() => bff.delete(enginePath(engineId)));
   forgetConsoleAccess(engineId);
+  forgetEngineBrowserState(engineId);
+}
+
+/** Drop what this browser kept about a deleted engine: its recent questions and its getting-started flags. */
+function forgetEngineBrowserState(engineId: string): void {
+  clearQuestions(engineId);
+  try {
+    const prefixes = [CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX].map((p) => `${p}${engineId}`);
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (k && prefixes.some((p) => k === p || k.startsWith(`${p}:`))) localStorage.removeItem(k);
+    }
+  } catch {
+    // Storage unavailable: the flags are also scoped by creation time, so they never carry over.
+  }
 }
 
 /** The BFF cannot change an engine's models yet. */

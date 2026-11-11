@@ -118,7 +118,7 @@ export default function FileVisibilityField({ id, label, hint, orgHandle, value,
         ))}
 
       {warnings.map((w) => (
-        <Alert key={w} severity="warning" variant="outlined" sx={{ mt: 1.5 }}>
+        <Alert key={w} severity="warning" sx={{ mt: 1.5 }}>
           {w}
         </Alert>
       ))}
