@@ -49,7 +49,7 @@ import {
   updateContextSource,
 } from '../api/contextEngine';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
-import { everyoneRoles, fromDraft, isEngineProgressActive, isRestartPending, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
+import { everyoneRoles, fromDraft, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, toDraft, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
@@ -145,9 +145,10 @@ export const ENGINE_RESTARTING_REASON = 'Restarting with the new models';
 
 /** One engine; checked again while it starts, restarts or is being deleted. A restart shows the engine as starting until a pod that started after it runs. */
 export function useContextEngine(engineId: string, { pollOnError = false }: { pollOnError?: boolean } = {}) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: [ROOT_KEY, 'detail', engineId],
-    queryFn: () => getContextEngine(engineId),
+    queryFn: async () => withLastKnownFacets(await getContextEngine(engineId), qc.getQueryData<ContextEngineDetail>([ROOT_KEY, 'detail', engineId])),
     enabled: isContextEngineEnabled() && !!engineId,
     retry: false,
     select: (engine) => (engine.state === 'ready' && isRestartPending(engine.startedAt, engine.restartedAt) ? { ...engine, state: 'starting' as const, statusReason: ENGINE_RESTARTING_REASON } : engine),
@@ -177,8 +178,8 @@ export function useUpdateContextModels(engineId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Omit<UpdateContextModelsInput, 'engineId'>) => updateContextModels({ ...input, engineId }),
-    onSuccess: ({ restartedAt }) => {
-      qc.setQueryData<ContextEngineDetail>([ROOT_KEY, 'detail', engineId], (engine) => engine && { ...engine, restartedAt });
+    onSuccess: ({ restartedAt }, input) => {
+      qc.setQueryData<ContextEngineDetail>([ROOT_KEY, 'detail', engineId], (engine) => engine && { ...engine, restartedAt, models: modelsAfterUpdate(engine.models, input) });
       return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
     },
   });

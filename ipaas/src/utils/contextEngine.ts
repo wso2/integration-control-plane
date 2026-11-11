@@ -1340,6 +1340,28 @@ export function isRestartPending(startedAt: string | undefined, restartedAt: str
   return !startedAt || Date.parse(startedAt) < Math.floor(asked / 1000) * 1000;
 }
 
+/** The models a saved update moves the engine to. */
+export function modelsAfterUpdate(models: ContextEngineModels, update: Omit<UpdateContextModelsInput, 'engineId'>): ContextEngineModels {
+  const llm = update.ingestion ? { provider: update.ingestion.provider, model: update.ingestion.model } : models.llm;
+  let answer = answersFromIngestion(models) ? null : models.answer;
+  if (update.answer) answer = 'sameAsIngestion' in update.answer ? null : { provider: update.answer.provider, model: update.answer.model };
+  return { ...models, llm, answer };
+}
+
+/** An engine read while it restarts, with what its last read got from the engine itself. */
+export function withLastKnownFacets(engine: ContextEngineDetail, last: ContextEngineDetail | undefined): ContextEngineDetail {
+  if (!last || engine.state !== 'ready' || !isRestartPending(engine.startedAt, engine.restartedAt)) return engine;
+  return {
+    ...engine,
+    description: engine.description || last.description,
+    sources: last.sources,
+    models: last.models,
+    queryRoles: last.queryRoles,
+    exposure: { ...engine.exposure, answers: last.exposure.answers },
+    storage: last.storage,
+  };
+}
+
 /** The absolute form of an in-app path, for links people paste elsewhere. */
 export function absoluteUrl(path: string, origin: string = window.location.origin): string {
   return new URL(path, origin).toString();

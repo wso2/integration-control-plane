@@ -42,6 +42,7 @@ import {
   evidenceVersionLabel,
   versionFromLabel,
   isRestartPending,
+  withLastKnownFacets,
   modelsDraftErrors,
   modelsDraftOf,
   modelsUpdate,
@@ -1431,6 +1432,13 @@ describe('changing models on a running engine', () => {
     expect(isRestartPending(undefined, asked, now)).toBe(true);
     expect(isRestartPending('2026-11-06T09:12:40Z', asked, now)).toBe(false);
     expect(isRestartPending('2026-11-06T08:00:00Z', asked, Date.parse(asked) + 10 * 60_000)).toBe(false);
+  });
+
+  it('keeps the last known models and sources while a restart is pending', () => {
+    const last = engineDetail({ models: { embedding: null, llm: { provider: 'openai', model: 'gpt-5-mini' } } });
+    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false } });
+    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true } });
+    expect(withLastKnownFacets({ ...restarting, restartedAt: undefined }, last)).toEqual({ ...restarting, restartedAt: undefined });
   });
 });
 
