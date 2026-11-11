@@ -177,9 +177,9 @@ export function useUpdateContextModels(engineId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Omit<UpdateContextModelsInput, 'engineId'>) => updateContextModels({ ...input, engineId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
-      return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+    onSuccess: ({ restartedAt }) => {
+      qc.setQueryData<ContextEngineDetail>([ROOT_KEY, 'detail', engineId], (engine) => engine && { ...engine, restartedAt });
+      return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
     },
   });
 }

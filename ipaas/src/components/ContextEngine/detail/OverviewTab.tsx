@@ -96,16 +96,11 @@ function ModelRow({ label, model, locked, action }: { label: string; model: stri
 
 const modelText = (kind: 'embedding' | 'llm', m: ContextModelSummary | null | undefined, fallback: string): string => (m ? `${modelProviderName(kind, m.provider)} · ${m.model}` : fallback);
 
-/** Opens the models drawer; disabled, with the reason as its tooltip, when the caller can't change models. */
-function ModelAction({ label, blocked, onClick }: { label: string; blocked?: string; onClick: () => void }): JSX.Element {
+function ModelAction({ label, onClick }: { label: string; onClick: () => void }): JSX.Element {
   return (
-    <Tooltip title={blocked ?? ''}>
-      <span>
-        <Link component="button" type="button" variant="body2" disabled={!!blocked} onClick={onClick}>
-          {label}
-        </Link>
-      </span>
-    </Tooltip>
+    <Link component="button" type="button" variant="body2" onClick={onClick}>
+      {label}
+    </Link>
   );
 }
 
@@ -151,15 +146,8 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
   const permissions = useContextPermissions(readOnly ? '' : engine.id);
-  const modelsBlocked = permissions.isPending
-    ? 'Checking your permissions…'
-    : permissions.isError
-      ? "Couldn't check your permissions."
-      : permissions.data?.includes('engine.manage')
-        ? undefined
-        : 'You need the manage permission on this engine to change its models.';
   const llmModels = engine.models.llm ? { ...engine.models, llm: engine.models.llm } : null;
-  const canOpenModels = !readOnly && !!llmModels;
+  const canOpenModels = canManage && !!llmModels;
   const accessDisabledReason = readOnly ? 'The engine is being deleted.' : undefined;
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
@@ -169,7 +157,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
     setModelsSession((n) => n + 1);
     setModelsOpen(true);
   };
-  const changeModels = canOpenModels ? <ModelAction label="Change" blocked={modelsBlocked} onClick={() => openModels()} /> : undefined;
+  const changeModels = canOpenModels ? <ModelAction label="Change" onClick={() => openModels()} /> : undefined;
   const { everyone } = useUploadAudience(orgHandle, engine.queryRoles, readOnly ? null : engine.id);
   const existingConfigs = engine.sources.map((s) => sourceAsConfig(s, rememberedSourceRules(s.id)));
 
@@ -288,7 +276,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
                   label="Embedding model"
                   model={modelText('embedding', engine.models.embedding, 'Engine default')}
                   locked="The embedding model can't change."
-                  action={canOpenModels && engine.models.embedding ? <ModelAction label="Replace key" blocked={modelsBlocked} onClick={() => openModels(true)} /> : undefined}
+                  action={canOpenModels && engine.models.embedding ? <ModelAction label="Replace key" onClick={() => openModels(true)} /> : undefined}
                 />
                 <ModelRow label="Ingestion language model" model={modelText('llm', engine.models.llm, 'Engine default')} action={changeModels} />
                 <ModelRow
@@ -296,14 +284,6 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
                   model={!engine.exposure.answers ? 'Answers are off' : answersFromIngestion(engine.models) ? 'Same as the ingestion model' : modelText('llm', engine.models.answer, 'Same as the ingestion model')}
                   action={engine.exposure.answers ? changeModels : undefined}
                 />
-                {canOpenModels && permissions.isError && (
-                  <Typography variant="caption" color="error">
-                    Couldn&apos;t check your permissions.{' '}
-                    <Link component="button" type="button" variant="caption" onClick={() => void permissions.refetch()}>
-                      Retry
-                    </Link>
-                  </Typography>
-                )}
               </>
             ) : (
               <Stack direction="row" gap={1} sx={mutedSx}>

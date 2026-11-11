@@ -33,6 +33,7 @@ import {
   deliveryIdentity,
   engineMessage,
   integrationTypeFor,
+  isRestartPending,
   ownerGrantId,
   roleGrantId,
   rolesFromGrants,
@@ -343,7 +344,7 @@ const toEvidence = (raw: RawEvidence): ContextEvidence => ({
 
 const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary | null => (raw ? { provider: raw.provider, model: raw.model } : null);
 
-/** The environment's models; changing them restarts the engine. */
+/** The engine's models; changing them restarts the engine. */
 const toModels = (raw: RawEngineConfig | null): ContextEngineModels => ({
   embedding: toModel(raw?.models?.embedding),
   llm: toModel(raw?.models?.llm),
@@ -538,7 +539,7 @@ export async function getContextEngineSummary(engineId: string): Promise<Context
 /** The engine with its sources, models, query roles and exposure. Until it runs, only what the BFF knows. */
 export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
   const engine = toEngine(await viaBff(() => bff.get<BffEngine>(enginePath(engineId))));
-  if (engine.state !== 'ready') {
+  if (engine.state !== 'ready' || isRestartPending(engine.startedAt, engine.restartedAt)) {
     return { ...engine, sources: [], models: toModels(null), queryRoles: [], exposure: toExposure(null, engine.access), storage: null };
   }
   const { engine: config, sources, grants } = await fetchEngineFacets(engineId);
@@ -617,9 +618,10 @@ export async function deleteContextEngine(engineId: string): Promise<void> {
   forgetConsoleAccess(engineId);
 }
 
-/** PUT /context-engines/{engine}/environments/{environment}/models: saves, then restarts the engine. */
-export async function updateContextModels({ engineId, ...input }: UpdateContextModelsInput): Promise<void> {
-  await viaBff(() => bff.put(`${enginePath(engineId)}/models`, input));
+/** PUT /context-engines/{engine}/models: saves the models and starts the engine's restart, which ends after the call returns. */
+export async function updateContextModels({ engineId, ...input }: UpdateContextModelsInput): Promise<{ restartedAt: string }> {
+  const raw = await viaBff(() => bff.put<{ restartedAt: string }>(`${enginePath(engineId)}/models`, input));
+  return { restartedAt: raw.restartedAt };
 }
 
 // ── Integrations and API keys (BFF) ─────────────────────────────────────────
