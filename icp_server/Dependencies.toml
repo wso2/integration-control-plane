@@ -61,6 +61,9 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.object"}
 ]
+modules = [
+	{org = "ballerina", packageName = "data.jsondata", moduleName = "data.jsondata"}
+]
 
 [[package]]
 org = "ballerina"
@@ -655,6 +658,7 @@ version = "2.0.0-SNAPSHOT"
 dependencies = [
 	{org = "ballerina", name = "cache"},
 	{org = "ballerina", name = "crypto"},
+	{org = "ballerina", name = "data.jsondata"},
 	{org = "ballerina", name = "file"},
 	{org = "ballerina", name = "graphql"},
 	{org = "ballerina", name = "http"},

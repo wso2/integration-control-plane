@@ -457,6 +457,21 @@ function hasDesiredFederatedMembership(types:FederatedGroupMembershipInput[] mem
     return false;
 }
 
+// Test: Token response with provider-specific extra fields (e.g. Keycloak) is accepted
+@test:Config {
+    groups: ["oidc", "token-response"]
+}
+function testTokenResponseWithProviderExtraFields() returns error? {
+    // The mock provider adds Keycloak's refresh_expires_in, not-before-policy and session_state
+    types:OIDCTokenResponse|http:Unauthorized|http:InternalServerError tokenResponse =
+        auth:exchangeCodeForTokens(VALID_AUTH_CODE, getSSOConfig());
+    if tokenResponse !is types:OIDCTokenResponse {
+        test:assertFail("Token response with provider-specific extra fields should be accepted");
+    }
+    test:assertEquals(tokenResponse.access_token, "mock-access-token-" + VALID_AUTH_CODE);
+    test:assertEquals(tokenResponse.expires_in, 3600);
+}
+
 // Test: Verify display name fallback logic
 @test:Config {
     groups: ["oidc", "claims", "fallback"],
