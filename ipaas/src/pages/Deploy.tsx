@@ -84,10 +84,6 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
     );
   }
 
-  if (component.isPrebuilt) {
-    return <ComingSoon title="Deploy not available for prebuilt integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
-  }
-
   const displayLabel = getDisplayLabel(component.displayType ?? '', component.componentSubType ?? null);
   // Type identified once, via the canonical resolver — NOT re-derived in
   // `getComponentTypeFlags` (which keys only on displayType). File and event
