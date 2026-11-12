@@ -70,7 +70,7 @@ function UploadRow({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = isUploadActive(entry);
-  const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
+  const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' || entry.status === 'needed' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
     setSaving(true);

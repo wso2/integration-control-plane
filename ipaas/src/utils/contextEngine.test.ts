@@ -696,7 +696,7 @@ const progress = (o: ProgressOverrides = {}): SourceProgress => ({
   reading: { state: 'idle', ...o.reading },
   processing: { total: 0, queued: 0, running: 0, succeeded: 0, failed: 0, percent: null, ...o.processing },
   records: { active: 0, quarantined: 0, deleted: 0, ...o.records },
-  indexing: { state: 'not_collected', expected: null, indexed: null, indexing: null, failed: null, missing: null, percent: null, ...o.indexing },
+  indexing: { state: 'not_collected', expected: null, indexed: null, indexing: null, failed: null, missing: null, percent: null, awaitingContent: null, ...o.indexing },
 });
 
 describe('source progress', () => {
@@ -708,6 +708,10 @@ describe('source progress', () => {
     expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 4, succeeded: 4, percent: 100 }, records: { active: 4 } }))).toBe('processed');
     expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 4, succeeded: 3, failed: 1, percent: 100 }, records: { active: 3 } }))).toBe('attention');
     expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 2, succeeded: 2, percent: 100 }, records: { active: 1, quarantined: 1 } }))).toBe('attention');
+    // A record the engine must get again is not failed, but the source is not done either.
+    expect(
+      sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 4, succeeded: 4, percent: 100 }, records: { active: 4 }, indexing: { state: 'ok', expected: 4, indexed: 3, indexing: 0, awaitingContent: 1, percent: 75 } })),
+    ).toBe('attention');
   });
 
   it('treats a finished sync with nothing new as processed, not waiting', () => {
@@ -748,6 +752,7 @@ describe('source progress', () => {
     expect(sourceIndexingText(progress())).toBeNull();
     expect(sourceIndexingText(progress({ indexing: { state: 'unavailable' } }))).toMatch(/unavailable/);
     expect(sourceIndexingText(progress({ indexing: { state: 'ok', expected: 8, indexed: 6, indexing: 1, missing: 1, percent: 75 } }))).toBe('75% indexed (6 of 8) · 1 missing');
+    expect(sourceIndexingText(progress({ indexing: { state: 'ok', expected: 8, indexed: 7, indexing: 0, awaitingContent: 1, percent: 87.5 } }))).toBe('87% indexed (7 of 8) · 1 needed again');
   });
 
   it('rolls progress up across sources, counting ones the caller cannot inspect as hidden', () => {
@@ -878,11 +883,16 @@ describe('file uploads', () => {
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
     expect(uploadStatusFromRecord(record({ indexState: 'not_indexed' })).status).toBe('stored');
+    expect(uploadStatusFromRecord(record({ indexState: 'content_needed' }))).toEqual({
+      status: 'needed',
+      detail: 'The engine no longer has this file and needs it again. Upload it once more with Replace to make it searchable.',
+    });
     expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
       status: 'held',
       detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
+    expect(summarizeUploads([{ status: 'searchable' }, { status: 'needed' }])).toBe('2 files · 1 searchable · 1 needed again');
     expect(summarizeUploads([])).toBe('No files yet');
   });
 

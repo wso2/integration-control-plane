@@ -574,14 +574,14 @@ export function formatProgressPercent(percent: number): string {
 /**
  * Where a source is in the pipeline. A connector that is still reading wins over
  * queued work, queued work wins over indexing, and a source that finished with
- * failed or quarantined items needs attention.
+ * failed or quarantined items, or with records the engine must get again, needs attention.
  */
 export function sourceProgressStatus(p: SourceProgress): SourceProgressStatus {
   if (p.reading.state === 'reading') return 'reading';
   if (p.processing.queued + p.processing.running > 0) return 'processing';
   if (p.indexing.state === 'ok' && (p.indexing.indexing ?? 0) > 0) return 'indexing';
   if (p.reading.state === 'idle' && p.processing.total === 0 && p.records.active === 0) return 'waiting';
-  if (p.processing.failed > 0 || p.records.quarantined > 0 || (p.indexing.state === 'ok' && (p.indexing.failed ?? 0) > 0)) return 'attention';
+  if (p.processing.failed > 0 || p.records.quarantined > 0 || (p.indexing.state === 'ok' && ((p.indexing.failed ?? 0) > 0 || (p.indexing.awaitingContent ?? 0) > 0))) return 'attention';
   return 'processed';
 }
 
@@ -635,6 +635,7 @@ export function sourceIndexingText(p: SourceProgress): string | null {
   const parts = [`${ix.percent !== null ? formatProgressPercent(ix.percent) : '0%'} indexed (${(ix.indexed ?? 0).toLocaleString('en-US')} of ${ix.expected.toLocaleString('en-US')})`];
   if (ix.failed) parts.push(`${ix.failed.toLocaleString('en-US')} failed`);
   if (ix.missing) parts.push(`${ix.missing.toLocaleString('en-US')} missing`);
+  if (ix.awaitingContent) parts.push(`${ix.awaitingContent.toLocaleString('en-US')} needed again`);
   return parts.join(' · ');
 }
 
@@ -895,6 +896,10 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
         : { status: 'failed', detail: `Indexing failed${record.indexError ? `: ${record.indexError}` : ''}.` };
     case 'not_indexed':
       return { status: 'stored', detail: 'The engine is running without its knowledge backend, so nothing is searchable yet.' };
+    case 'content_needed':
+      // The engine keeps no copy of a file once it is indexed. If its knowledge backend loses the
+      // file, only a new upload can bring it back; nothing is polled for, because nothing will change on its own.
+      return { status: 'needed', detail: 'The engine no longer has this file and needs it again. Upload it once more with Replace to make it searchable.' };
     default:
       return { status: 'indexing' };
   }
@@ -915,6 +920,7 @@ export function summarizeUploads(entries: Pick<UploadEntry, 'status'>[]): string
   if (count('stored')) parts.push(`${count('stored')} stored only`);
   if (count('unreadable')) parts.push(`${count('unreadable')} not readable`);
   if (count('held')) parts.push(`${count('held')} held back`);
+  if (count('needed')) parts.push(`${count('needed')} needed again`);
   if (count('failed')) parts.push(`${count('failed')} failed`);
   return parts.join(' · ');
 }

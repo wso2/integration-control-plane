@@ -267,8 +267,12 @@ export interface SourceProgress {
   /** Deliveries since the latest sync run started. `percent` is finished (succeeded + failed) over total; null when nothing was delivered. */
   processing: { since?: string; total: number; queued: number; running: number; succeeded: number; failed: number; percent: number | null };
   records: { active: number; quarantined: number; deleted: number };
-  /** Active record versions the knowledge backend has indexed, from the last background collection. */
-  indexing: { state: SourceIndexingState; expected: number | null; indexed: number | null; indexing: number | null; failed: number | null; missing: number | null; percent: number | null; collectedAt?: string };
+  /**
+   * Active record versions the knowledge backend has indexed, from the last background collection.
+   * `awaitingContent` counts records the engine no longer has the content of and must get again;
+   * they are in `expected` but not in `failed`. Null on an engine that does not report it.
+   */
+  indexing: { state: SourceIndexingState; expected: number | null; indexed: number | null; indexing: number | null; failed: number | null; missing: number | null; percent: number | null; awaitingContent: number | null; collectedAt?: string };
 }
 
 export interface ContextEngineProgress {
@@ -321,8 +325,8 @@ export interface StagedFileCheck {
   replaces: boolean;
 }
 
-/** The engine's per-record index state. */
-export type ContextIndexState = 'pending' | 'indexed' | 'failed' | 'reconcile_required' | 'not_indexed';
+/** The engine's per-record index state. `content_needed` means the engine no longer has the record's content and waits to get it again. */
+export type ContextIndexState = 'pending' | 'indexed' | 'failed' | 'reconcile_required' | 'not_indexed' | 'content_needed';
 
 /** `GET /v1/sources/{id}/records/{recordId}`. */
 export interface ContextRecordStatus {
@@ -339,9 +343,10 @@ export interface ContextRecordStatus {
 /**
  * Where an uploaded file is, in plain words: the transfer, the engine's job,
  * then the record's index state. `stored` is a file the engine keeps but cannot
- * search because its knowledge backend is off; `unreadable` is a kept file whose type has no reader yet.
+ * search because its knowledge backend is off; `unreadable` is a kept file whose type has no reader yet;
+ * `needed` is a file the engine no longer has and must get again, so the person has to upload it once more.
  */
-export type UploadFileStatus = 'uploading' | 'queued' | 'indexing' | 'searchable' | 'stored' | 'unreadable' | 'held' | 'failed';
+export type UploadFileStatus = 'uploading' | 'queued' | 'indexing' | 'searchable' | 'stored' | 'unreadable' | 'held' | 'needed' | 'failed';
 
 /** One file the UI uploaded to a source; remembered per browser until the engine lists records. */
 export interface UploadedFile {
