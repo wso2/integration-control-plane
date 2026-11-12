@@ -58,10 +58,10 @@ import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
-const STEP_LABELS = ['Define Engine', 'Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Review & Create'];
+const STEP_LABELS = ['Define engine', 'Choose sources', /* 'Grant access', */ 'Configure models', 'Configure storage', 'Review & create'];
 const LAST_STEP = STEP_LABELS.length - 1;
-const MODELS_STEP = STEP_LABELS.indexOf('Configure Models');
-const STORAGE_STEP = STEP_LABELS.indexOf('Configure Storage');
+const MODELS_STEP = STEP_LABELS.indexOf('Configure models');
+const STORAGE_STEP = STEP_LABELS.indexOf('Configure storage');
 
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
 export interface CreateContextEngineLocationState {
@@ -192,6 +192,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   // A restored draft can be thrown away where it comes back, rather than by asking on the way out:
   // every exit keeps the draft, so Back and Cancel leave straight away like any other link.
   const discardDraft = () => {
+    // Staged files live outside the draft, so they are released with it.
+    form.sources.forEach((s) => (s.staged ?? []).forEach((m) => dropStagedFile(m.id)));
     draft.clear();
     dispatch({ type: 'reset' });
     setActiveStep(0);
@@ -220,7 +222,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent sx={wrapSx}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (settingUp ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} disabled={create.isPending} onClick={() => (settingUp ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
       <PageTitle>

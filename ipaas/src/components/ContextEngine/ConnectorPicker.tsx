@@ -110,7 +110,7 @@ export default function ConnectorPicker({ addedCounts, onPick }: ConnectorPicker
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <SearchField value={query} onChange={setQuery} placeholder="Search connectors" fullWidth />
+      <SearchField value={query} onChange={setQuery} placeholder="Search connectors" width="standard" />
 
       <Box sx={catalogChipsSx} role="group" aria-label="Filter by category">
         <Chip label="All" clickable variant={category === 'all' ? 'filled' : 'outlined'} color={category === 'all' ? 'primary' : 'default'} onClick={() => setCategory('all')} />

@@ -50,8 +50,8 @@ const TABS: { value: ContextEngineTabKey; label: string }[] = [
   { value: 'api', label: 'API' },
   { value: 'mcp', label: 'MCP' },
   // MOCK: proposed layouts for the API and MCP tabs, for the team to compare with the real ones.
-  { value: 'api-mock', label: 'API Mock' },
-  { value: 'mcp-mock', label: 'MCP Mock' },
+  { value: 'api-mock', label: 'API mock' },
+  { value: 'mcp-mock', label: 'MCP mock' },
   // { value: 'access', label: 'Access' },
 ];
 

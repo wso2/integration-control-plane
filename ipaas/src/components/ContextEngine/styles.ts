@@ -736,7 +736,8 @@ export const connectorGridSx = {
   '& img': { width: 'auto', maxWidth: '100%' },
 } as const;
 
-export const connectorSectionHeaderSx = { display: 'block', mb: 1.5 } as const;
+/** Keeps the headings in the case they are written in, over catalogSectionSx's uppercase. */
+export const connectorSectionHeaderSx = { display: 'block', mb: 1.5, textTransform: 'none', letterSpacing: 'normal' } as const;
 
 export const connectorLogoSx = { height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' } as const;
 

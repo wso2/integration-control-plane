@@ -61,6 +61,7 @@ import {
 import { contextEngineKey } from '../utils/contextEngineKey';
 import { everyoneRoles, fromDraft, isEngineProgressActive, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
+import { clearQuestions } from './contextQuestions';
 import type { ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
@@ -288,6 +289,7 @@ export function useDeleteContextEngine() {
   return useMutation({
     mutationFn: (engineId: string) => deleteContextEngine(engineId),
     onSuccess: (_result, engineId) => {
+      forgetEngineBrowserState(engineId);
       qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
       qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
     },
@@ -487,12 +489,31 @@ export function useContextEngineDraft(orgHandle: string) {
  */
 function useEngineFlag(prefix: string, engineId: string, createdAt = '') {
   const key = `${prefix}${engineId}${createdAt ? `:${createdAt}` : ''}`;
-  const [value, setValue] = useState(() => readStorage(local, key) === 'true');
+  // Held with its key, so a new key (another engine, or one created again) reads its own flag, not the last one's.
+  const [held, setHeld] = useState(() => ({ key, value: readStorage(local, key) === 'true' }));
+  const value = held.key === key ? held.value : readStorage(local, key) === 'true';
   const mark = useCallback(() => {
     writeStorage(local, key, 'true');
-    setValue(true);
+    setHeld({ key, value: true });
   }, [key]);
   return [value, mark] as const;
+}
+
+/**
+ * Drop what this browser kept about a deleted engine: its recent questions and its getting-started flags.
+ * The flags are keyed by the engine's id and creation time, so every key under the id is removed.
+ */
+function forgetEngineBrowserState(engineId: string): void {
+  clearQuestions(engineId);
+  try {
+    const prefixes = [CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX].map((p) => `${p}${engineId}`);
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (k && prefixes.some((p) => k === p || k.startsWith(`${p}:`))) localStorage.removeItem(k);
+    }
+  } catch {
+    // Storage unavailable: nothing was kept to clear.
+  }
 }
 
 export function useAskedFlag(engineId: string, createdAt?: string) {

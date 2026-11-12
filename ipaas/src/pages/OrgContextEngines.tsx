@@ -177,7 +177,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     const state = location.state as { engineDeleted?: boolean; engineName?: string } | null;
     if (!state?.engineDeleted) return;
     setAlert({ type: 'info', message: `Context engine '${state.engineName ?? ''}' is being deleted. It leaves this list once it is gone.` });
-    navigate(location.pathname, { replace: true, state: null });
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
   }, [location, navigate]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 

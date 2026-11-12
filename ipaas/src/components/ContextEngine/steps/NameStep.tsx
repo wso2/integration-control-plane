@@ -42,7 +42,7 @@ export default function NameStep({ name, description, onNameChange, onDescriptio
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
-        Define Engine
+        Define engine
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
         Give the engine a name your team will recognise.

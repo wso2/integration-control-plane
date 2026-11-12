@@ -164,6 +164,17 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
   const [route, setRoute] = useState<'context' | 'answer'>(routes[0]);
   const urlOf = (r: 'context' | 'answer') => (r === 'answer' ? answerEndpointUrl(base) : contextEndpointUrl(base));
 
+  if (!engine.publicApiUrl) {
+    return (
+      <Box sx={{ maxWidth: 900 }}>
+        <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
+        <Alert severity="info" variant="outlined">
+          The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ maxWidth: 900 }}>
       <Alert severity="warning" sx={{ mb: 3 }}>
@@ -208,7 +219,7 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
         </Tabs>
       )}
       <Typography variant="body2" sx={{ ...mutedSx, mb: 1.5 }}>
-        Replace <code>$TOKEN</code> with a token from Access tokens.
+        Replace <code>$API_KEY</code> with one of this engine&apos;s API keys. The mock tokens above don&apos;t work with the engine.
       </Typography>
       <CodeViewer title="Request" language="text" code={buildQueryCurl(base, question, route)} showCopyButton wrapLongLines />
       <Box sx={{ mt: 2 }}>

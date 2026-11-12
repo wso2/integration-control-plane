@@ -1237,7 +1237,7 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
           // Once done, the step only needs the result; the explanation is for while it is still running.
           description:
             done.index && progress
-              ? `${plural(progress.processed, 'source')} indexed.`
+              ? `${plural(progress.processed, 'source')} processed.`
               : uploadOnly
                 ? progress
                   ? `${progressHeadline(progress)}.`

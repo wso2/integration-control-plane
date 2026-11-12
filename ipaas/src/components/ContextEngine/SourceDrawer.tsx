@@ -101,7 +101,9 @@ export default function SourceDrawer({ orgHandle, open, start, existing, onClose
 
       {connector && draft && (
         <Box sx={sourceDrawerFooterSx}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="outlined" color="inherit" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="contained" disabled={!canSubmit} startIcon={editing ? undefined : <Plus size={16} />} onClick={() => onSubmit(draft, start?.index)}>
             {editing ? 'Save changes' : 'Add source'}
           </Button>

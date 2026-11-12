@@ -110,7 +110,7 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
-        Choose Sources
+        Choose sources
       </Typography>
 
       <Typography variant="body2" sx={stepHintSx}>

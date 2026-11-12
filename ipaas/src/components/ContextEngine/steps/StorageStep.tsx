@@ -55,7 +55,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
-        Configure Storage
+        Configure storage
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
         Where the engine keeps its data.{managedServer.data ? ` ${MANAGED_HINT[managedServer.data]}` : ''}

@@ -53,7 +53,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, 
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingAloneSx}>
-        Configure Models
+        Configure models
       </Typography>
 
       <Box sx={modelColumnsSx}>
