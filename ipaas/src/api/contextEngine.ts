@@ -17,9 +17,8 @@
  */
 
 /**
- * Context Engines. The BFF lists, creates and deletes engines (`/context-engines`); each engine
- * lives in one environment and is named within it, so the console keys it by both (see
- * `contextEngineKey`). Everything inside an engine — sources, uploads, queries, grants, the graph —
+ * Context Engines. The BFF lists, creates and deletes engines (`/context-engines`), keyed by name.
+ * Everything inside an engine — sources, uploads, queries, grants, the graph —
  * is the engine's own REST API (`/v1`), called through the org gateway with a console key from the
  * BFF and the user's platform token (`_contextEngineAccess.ts`). Sources that run as integrations
  * are added through the BFF, which deploys them next to the engine. Models come from the engine's
@@ -31,7 +30,6 @@
 import { CONTEXT_ENGINE_ID, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../constants/contextEngine';
 import {
   audienceMappingFromRules,
-  contextEngineKey,
   deliveryIdentity,
   engineMessage,
   integrationTypeFor,
@@ -44,7 +42,7 @@ import {
   toSourceRegistration,
 } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
-import { bff, items, q, seg, type ListResponse } from './_client';
+import { bff, items, seg, type ListResponse } from './_client';
 import { asHttpError, enginePath, engineRequest, engineUpload, forgetConsoleAccess } from './_contextEngineAccess';
 import type {
   ContextApiKey,
@@ -234,7 +232,6 @@ interface BffEngine {
   name: string;
   displayName?: string;
   description?: string;
-  environment: string;
   status: string;
   statusReason?: string;
   createdAt?: string;
@@ -311,9 +308,8 @@ interface RawEngineProgress {
 const ENGINE_STATES: Record<string, ContextEngineState> = { provisioning: 'provisioning', starting: 'starting', running: 'ready', failed: 'failed', deleting: 'deleting' };
 
 const toEngine = (raw: BffEngine): ContextEngine => ({
-  id: contextEngineKey(raw.environment, raw.name),
+  id: raw.name,
   handle: raw.name,
-  environment: raw.environment,
   name: raw.displayName || raw.name,
   description: raw.description ?? '',
   state: ENGINE_STATES[raw.status] ?? 'unknown',
@@ -511,9 +507,9 @@ async function fetchProgressQuietly(engineId: string): Promise<RawEngineProgress
   }
 }
 
-/** The engines in one environment, from the BFF alone; their summaries are read per engine. */
-export async function listContextEngines(environment: string): Promise<ContextEngine[]> {
-  const raw = await viaBff(() => bff.get<ListResponse<BffEngine>>(`/context-engines${q({ environment })}`));
+/** The engines, from the BFF alone; their summaries are read per engine. */
+export async function listContextEngines(): Promise<ContextEngine[]> {
+  const raw = await viaBff(() => bff.get<ListResponse<BffEngine>>('/context-engines'));
   return items(raw).map(toEngine);
 }
 

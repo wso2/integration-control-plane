@@ -16,11 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
-import { useLocation, useParams, useSearchParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useCan } from '../hooks/useCan';
+import { Scopes } from '../constants/permissions';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
 import { engineMessage } from '../utils/contextEngine';
@@ -85,6 +87,14 @@ function EngineNotRunning({ state, reason }: { state: ContextEngineState; reason
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
 const tabsSx = { borderBottom: '1px solid', borderColor: 'divider', mb: 3 } as const;
 
+function NoConsoleAccess(): JSX.Element {
+  return (
+    <Alert severity="info" variant="outlined">
+      Your role can&apos;t query this engine or browse its graph.
+    </Alert>
+  );
+}
+
 export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
   const { tab = 'overview' } = useParams();
@@ -96,14 +106,14 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   const remove = useDeleteContextEngine();
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleting = engine?.state === 'deleting';
   // Once an engine seen deleting answers 404, it was deleted rather than never there.
   const seenDeleting = useRef(false);
   if (deleting) seenDeleting.current = true;
-  const [params] = useSearchParams();
-  const base = contextEnginesUrl(scope.org, engine?.environment ?? (params.get('env') || undefined));
+  const base = contextEnginesUrl(scope.org);
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
@@ -175,7 +185,6 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
               {engine.name}
             </Typography>
             <EngineStateChip state={engine.state} reason={engine.statusReason} />
-            <Chip size="small" variant="outlined" label={engine.environment} />
           </Stack>
           {engine.description && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -218,9 +227,11 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting ? undefined : () => setConfirmDelete(true)} />}
-      {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
-      {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
+      {shownTab === 'overview' && (
+        <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting || !canManage ? undefined : () => setConfirmDelete(true)} />
+      )}
+      {shownTab === 'playground' && (canManage ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
+      {shownTab === 'graph' && (canManage ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'api' && <ApiTab engine={engine} />}
       {shownTab === 'mcp' && <McpTab key={engine.id} engine={engine} />}
       {/* {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />} */}

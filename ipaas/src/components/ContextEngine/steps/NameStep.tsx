@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_HINT, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
@@ -28,14 +28,10 @@ interface NameStepProps {
   description: string;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
-  /** Environments the engine can be created in, and the one chosen. */
-  environments: { id: string; name: string }[];
-  environment: string;
-  onEnvironmentChange: (value: string) => void;
 }
 
 /** The engine's name and description, which people and connected agents see when choosing an engine. */
-export default function NameStep({ name, description, onNameChange, onDescriptionChange, environments, environment, onEnvironmentChange }: NameStepProps): JSX.Element {
+export default function NameStep({ name, description, onNameChange, onDescriptionChange }: NameStepProps): JSX.Element {
   const nameError = engineNameError(name);
   const descriptionError = engineDescriptionError(description);
 
@@ -73,13 +69,6 @@ export default function NameStep({ name, description, onNameChange, onDescriptio
           helperText={descriptionError || `${CONTEXT_ENGINE_DESCRIPTION_HINT} ${description.length}/${CONTEXT_ENGINE_DESCRIPTION_MAX}`}
           onChange={(e) => onDescriptionChange(e.target.value)}
         />
-        <TextField select label="Environment" required fullWidth size="small" value={environment} onChange={(e) => onEnvironmentChange(e.target.value)} helperText="The engine runs in this environment; its name must be unique there." sx={REQUIRED_FIELD_SX}>
-          {environments.map((env) => (
-            <MenuItem key={env.id} value={env.id}>
-              {env.name}
-            </MenuItem>
-          ))}
-        </TextField>
       </Stack>
     </>
   );

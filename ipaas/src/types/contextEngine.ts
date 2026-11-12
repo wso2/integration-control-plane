@@ -49,11 +49,10 @@ export interface ContextEngineSummary {
 
 /** A context engine as shown in the listing. */
 export interface ContextEngine {
-  /** The engine's key in this console, built from its environment and handle (see `contextEngineKey`). */
+  /** The engine's key in this console: its name at the BFF. */
   id: string;
-  /** The engine's name at the BFF: unique within its environment. */
+  /** The engine's name at the BFF: unique within the organization. */
   handle: string;
-  environment: string;
   /** Display name. */
   name: string;
   description: string;
@@ -544,8 +543,6 @@ export interface ContextEngineDraft {
 export interface CreateContextEngineInput {
   name: string;
   description: string;
-  /** The environment the engine is created in. */
-  environment: string;
   sources: ContextSourceConfig[];
   roles: string[];
   embedding: EmbeddingConfig;

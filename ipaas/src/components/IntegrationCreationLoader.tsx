@@ -37,22 +37,36 @@ interface IntegrationCreationLoaderProps {
    */
   progress?: number;
   stepLabel?: string;
+  steps?: CreationStep[];
+  successText?: string;
 }
 
-export default function IntegrationCreationLoader({ label, subLabel, isPending, isSuccess, error, errorSeverity = 'error', onBack, progress, stepLabel }: IntegrationCreationLoaderProps): JSX.Element {
-  const [timedStep, setCreationStep] = useState<CreationStep>(CREATION_STEPS[0]);
+export default function IntegrationCreationLoader({
+  label,
+  subLabel,
+  isPending,
+  isSuccess,
+  error,
+  errorSeverity = 'error',
+  onBack,
+  progress,
+  stepLabel,
+  steps = CREATION_STEPS,
+  successText = 'Integration created!',
+}: IntegrationCreationLoaderProps): JSX.Element {
+  const [timedStep, setCreationStep] = useState<CreationStep>(steps[0]);
   const creationStep: CreationStep = progress !== undefined && !isSuccess ? { progress, text: stepLabel || timedStep.text } : timedStep;
 
   useEffect(() => {
     if (!isPending) return;
-    setCreationStep(CREATION_STEPS[0]);
-    const timers = CREATION_STEPS.slice(1).map((step, i) => setTimeout(() => setCreationStep(step), (i + 1) * CREATION_STEP_INTERVAL));
+    setCreationStep(steps[0]);
+    const timers = steps.slice(1).map((step, i) => setTimeout(() => setCreationStep(step), (i + 1) * CREATION_STEP_INTERVAL));
     return () => timers.forEach(clearTimeout);
-  }, [isPending]);
+  }, [isPending, steps]);
 
   useEffect(() => {
-    if (isSuccess) setCreationStep({ progress: 100, text: 'Integration created!' });
-  }, [isSuccess]);
+    if (isSuccess) setCreationStep({ progress: 100, text: successText });
+  }, [isSuccess, successText]);
 
   if (error) {
     return (

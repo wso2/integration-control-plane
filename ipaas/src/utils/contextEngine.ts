@@ -342,12 +342,12 @@ export function isModelProviderUnavailable(provider: string): boolean {
 }
 
 /** The wizard form as a create request. Throws when a required section is missing — call after {@link isFormComplete}. */
-export function toCreateInput(form: ContextEngineForm, environment: string): CreateContextEngineInput {
+export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput {
   const llm = effectiveLlm(form);
   if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
   if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer language model configuration is incomplete.');
   const answers = { enabled: form.answersEnabled, model: form.answersEnabled ? form.answerLlm : null };
-  return { name: form.name.trim(), description: form.description.trim(), environment, sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
+  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
 }
 
 /** Whether the wizard holds anything worth keeping. */
@@ -1472,15 +1472,6 @@ export function askedQuestionMeta(q: Pick<AskedQuestion, 'askedAt' | 'outcome' |
 
 // ── Engine identity ─────────────────────────────────────────────────────────
 
-export { contextEngineKey, parseContextEngineKey } from './contextEngineKey';
-
-/** The environment a page shows: the one picked on it, else the one in its link, else the first; '' while none exist. */
-export function selectEnvironment(environmentIds: string[], picked: string | null, linked: string | null): string {
-  if (picked && environmentIds.includes(picked)) return picked;
-  if (linked && environmentIds.includes(linked)) return linked;
-  return environmentIds[0] ?? '';
-}
-
 /** The BFF's engine name derived from a display name: lowercase letters, digits and hyphens. */
 export function engineHandleFrom(displayName: string): string {
   const slug = displayName
@@ -1519,7 +1510,6 @@ export interface BffCreateEngineRequest {
   name: string;
   displayName: string;
   description?: string;
-  environment: string;
   models: { llm: BffEngineModel; embedding: BffEngineModel; answer?: BffEngineModel; answersEnabled: boolean };
 }
 
@@ -1531,7 +1521,6 @@ export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEn
     name: engineHandleFrom(input.name),
     displayName: input.name.trim(),
     ...(input.description.trim() ? { description: input.description.trim() } : {}),
-    environment: input.environment,
     models: { llm: model(input.llm), embedding: model(input.embedding), ...(answer ? { answer } : {}), answersEnabled: input.answers.enabled },
   };
 }

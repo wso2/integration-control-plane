@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams, useSearchParams } from 'react-router';
+import { useParams } from 'react-router';
 import {
   addContextSource,
   createContextApiKey,
@@ -48,7 +48,6 @@ import {
   updateContextSource,
 } from '../api/contextEngine';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
-import { contextEngineKey } from '../utils/contextEngineKey';
 import { everyoneRoles, fromDraft, isEngineProgressActive, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import type { ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
@@ -63,23 +62,21 @@ export function isContextEngineEnabled(): boolean {
   return !!window.API_CONFIG?.enableContextEngineFeature;
 }
 
-/** The engine a page is for: its name from the path and its environment from `?env=`; empty when either is missing. */
+/** The engine a page is for, from the path; empty when missing. */
 export function useRouteEngineId(): string {
-  const { engineId: handle = '' } = useParams();
-  const [params] = useSearchParams();
-  const environment = params.get('env') ?? '';
-  return handle && environment ? contextEngineKey(environment, handle) : '';
+  const { engineId = '' } = useParams();
+  return engineId;
 }
 
 /** States an engine leaves on its own, so a page showing one checks again. */
 const TRANSIENT_STATES: ReadonlySet<ContextEngineState> = new Set(['provisioning', 'starting', 'deleting', 'unknown']);
 
-/** The engines in one environment; checked again while any is starting, syncing or being deleted, so the listing's progress keeps moving. */
-export function useContextEngines(environment: string) {
+/** The engines; checked again while any is starting, syncing or being deleted, so the listing's progress keeps moving. */
+export function useContextEngines(enabled = true) {
   return useQuery({
-    queryKey: [ROOT_KEY, 'list', environment],
-    queryFn: () => listContextEngines(environment),
-    enabled: isContextEngineEnabled() && !!environment,
+    queryKey: [ROOT_KEY, 'list'],
+    queryFn: listContextEngines,
+    enabled: isContextEngineEnabled() && enabled,
     retry: false,
     refetchInterval: (query) => (query.state.data?.some((e) => TRANSIENT_STATES.has(e.state)) ? DELETION_POLL_MS : listPollInterval(query.state.data)),
   });

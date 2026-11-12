@@ -55,6 +55,7 @@ import NotFound from '../components/NotFound';
 import {
   Activity,
   BookOpen,
+  Mic,
   Boxes,
   ChartColumn,
   ChevronDown,
@@ -747,7 +748,7 @@ export default function AppLayout(): JSX.Element {
                       </Sidebar.Item>
                     </Sidebar.Item>
 
-                    {isContextEngineEnabled() && (
+                    {isContextEngineEnabled() && canReadIntegrations && (
                       <Sidebar.Item id="org-context-engines">
                         <Sidebar.ItemIcon>
                           <Waypoints size={20} />
@@ -769,6 +770,14 @@ export default function AppLayout(): JSX.Element {
                             <BookOpen size={20} />
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      )}
+                      {canReadIntegrations && (
+                        <Sidebar.Item id="org-voice-agents">
+                          <Sidebar.ItemIcon>
+                            <Mic size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Voice agents</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       )}
                     </Sidebar.Item>
@@ -800,6 +809,7 @@ export default function AppLayout(): JSX.Element {
                     const integrationType = identifyIntegration(currentComponent?.displayType ?? '', currentComponent?.componentSubType ?? null).type;
                     const runtimeLogsType = ['file-integration', 'event-integration'].includes(integrationType);
                     const aiAgentType = integrationType === 'ai-agent';
+                    const voiceAgentType = integrationType === 'voice-agent';
                     // A workflow integration's runs and the human tasks they wait on.
                     const workflowType = integrationType === 'workflow';
                     // MCP (server + proxy): a single Test tab → the MCP playground
@@ -836,6 +846,13 @@ export default function AppLayout(): JSX.Element {
 
                         {aiAgentType ? (
                           <Sidebar.Item id="agent-chat">
+                            <Sidebar.ItemIcon>
+                              <FlaskConical size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        ) : voiceAgentType ? (
+                          <Sidebar.Item id="voice-agent">
                             <Sidebar.ItemIcon>
                               <FlaskConical size={20} />
                             </Sidebar.ItemIcon>

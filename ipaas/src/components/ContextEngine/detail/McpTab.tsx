@@ -20,6 +20,8 @@ import { Alert, Box, Button, ListingTable, Tab, Tabs, TextField, Typography } fr
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useCreateContextApiKey } from '../../../hooks/useContextEngine';
+import { useCan } from '../../../hooks/useCan';
+import { Scopes } from '../../../constants/permissions';
 import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
 import { buildMcpClientConfigs, mcpEndpointUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
@@ -45,6 +47,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   const [testing, setTesting] = useState(false);
   // The playground calls the public endpoint like any client would, with a short-lived key minted for it.
   const testKey = useCreateContextApiKey(engine.id);
+  const canMintKey = useCan()(Scopes.CONFIG_MANAGE);
   const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + TEST_KEY_LIFETIME_MS).toISOString() });
   const selected = configs.find((c) => c.id === client) ?? configs[0];
 
@@ -81,15 +84,17 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
         </Tabs>
         <CodeViewer title={selected.path} language="json" code={selected.json} showCopyButton />
 
-        <Box sx={{ my: 3 }}>
-          <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} onClick={() => setTesting((t) => !t)}>
-            {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
-          </Button>
-        </Box>
+        {canMintKey && (
+          <Box sx={{ my: 3 }}>
+            <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} onClick={() => setTesting((t) => !t)}>
+              {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
+            </Button>
+          </Box>
+        )}
       </Box>
 
       {/* The playground takes the page's full width; the text around it keeps a readable measure. */}
-      {testing && (
+      {testing && canMintKey && (
         <Box sx={playgroundFrameSx}>
           {testKey.isError && (
             <Alert
@@ -100,8 +105,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
                   Try again
                 </Button>
               }
-              sx={{ mb: 2 }}
-            >
+              sx={{ mb: 2 }}>
               Couldn&apos;t create a test key.
             </Alert>
           )}

@@ -118,6 +118,30 @@ export function componentsNewAiBuilderUrl(orgHandler: string, projectHandler: st
   return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/ai-builder`;
 }
 
+export function voiceAgentsUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/voice-agents`;
+}
+
+export function newVoiceAgentUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/voice-agents/new`;
+}
+
+export function createVoiceAgentUrl(orgHandler: string, projectHandler: string): string {
+  return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/voice-agent`;
+}
+
+export function componentTestUrl(orgHandler: string, projectHandler: string, componentHandler: string): string {
+  return `${componentUrl(orgHandler, projectHandler, componentHandler)}/test`;
+}
+
+export function voiceAgentTestUrl(orgHandler: string, projectHandler: string, voiceAgentHandler: string): string {
+  return `${componentTestUrl(orgHandler, projectHandler, voiceAgentHandler)}/voice-agent`;
+}
+
+export function enableVoiceAgentUrl(orgHandler: string, projectHandler: string, agentHandler: string): string {
+  return `/organizations/${orgHandler}/projects/${projectHandler}/components/${agentHandler}/voice-agent/new`;
+}
+
 export function prebuiltIntegrationsUrl(orgHandler: string, projectHandler: string): string {
   return `/organizations/${orgHandler}/projects/${projectHandler}/prebuilt-integrations`;
 }
@@ -317,32 +341,28 @@ export const analyticsViewerTokenUrl = (base: string): string => `${base}/analyt
 // ---------------------------------------------------------------------------
 
 import type { ContextEngineTabKey } from './types/contextEngine';
-import { parseContextEngineKey } from './utils/contextEngineKey';
 
 const withQuery = (path: string, params: Record<string, string | undefined>): string => {
   const query = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1])).toString();
   return query ? `${path}?${query}` : path;
 };
 
-/** The engines list, showing `environment` when given. */
-export function contextEnginesUrl(orgHandler: string, environment?: string): string {
-  return withQuery(`/organizations/${orgHandler}/context-engines`, { env: environment });
+export function contextEnginesUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/context-engines`;
 }
 
-export function newContextEngineUrl(orgHandler: string, environment?: string): string {
-  return withQuery(`/organizations/${orgHandler}/context-engines/new`, { env: environment });
+export function newContextEngineUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/context-engines/new`;
 }
 
-/** An engine's page: its name in the path, its environment as `?env=`, and any extra query values. */
+/** An engine's page: its name in the path, and any extra query values. */
 export function contextEngineUrl(orgHandler: string, engineId: string, tab: ContextEngineTabKey = 'overview', params: Record<string, string | undefined> = {}): string {
-  const { environment, handle } = parseContextEngineKey(engineId);
-  return withQuery(`/organizations/${orgHandler}/context-engines/${encodeURIComponent(handle)}/${tab}`, { env: environment, ...params });
+  return withQuery(`/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/${tab}`, params);
 }
 
 /** One cited passage: the page a citation link opens. */
 export function contextEvidenceUrl(orgHandler: string, engineId: string, evidenceId: string): string {
-  const { environment, handle } = parseContextEngineKey(engineId);
-  return withQuery(`/organizations/${orgHandler}/context-engines/${encodeURIComponent(handle)}/evidence/${encodeURIComponent(evidenceId)}`, { env: environment });
+  return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/evidence/${encodeURIComponent(evidenceId)}`;
 }
 
 // ---------------------------------------------------------------------------

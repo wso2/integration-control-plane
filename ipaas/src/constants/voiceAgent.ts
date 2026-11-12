@@ -16,16 +16,4 @@
  * under the License.
  */
 
-/**
- * An engine's key in this console. The BFF names an engine by its name within an environment,
- * and neither may hold a slash, so the pair fits one string for ids, query keys and storage keys.
- */
-export function contextEngineKey(environment: string, handle: string): string {
-  return `${environment}/${handle}`;
-}
-
-export function parseContextEngineKey(key: string): { environment: string; handle: string } {
-  const at = key.indexOf('/');
-  if (at <= 0 || at === key.length - 1) throw new Error(`Not a context engine key: "${key}"`);
-  return { environment: key.slice(0, at), handle: key.slice(at + 1) };
-}
+export const VOICE_AGENT_COMPONENT_TYPE = 'voiceAgent';

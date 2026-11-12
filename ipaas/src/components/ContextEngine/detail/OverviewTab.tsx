@@ -21,6 +21,8 @@ import { EyeOff, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-reac
 import { useState, type JSX, type ReactNode } from 'react';
 import { CONTEXT_ENGINE_MODEL_UPDATES, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
+import { useCan } from '../../../hooks/useCan';
+import { Scopes } from '../../../constants/permissions';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { checkStagedFile, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
@@ -107,6 +109,8 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
     setFilesSource(source);
     setFilesOpen(true);
   };
+  const can = useCan();
+  const canManage = !readOnly && can(Scopes.CONFIG_MANAGE);
   const { asked } = useAskedFlag(engine.id);
   const progress = useContextEngineProgress(readOnly ? '' : engine.id);
   // Adding a source reuses the wizard's drawer; the session key remounts it fresh each time.
@@ -197,16 +201,16 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             engineId={engine.id}
             running={!readOnly}
             sources={engine.sources}
-            onManageFiles={readOnly ? undefined : openFiles}
+            onManageFiles={canManage ? openFiles : undefined}
             onAddSource={
-              readOnly
+              !canManage
                 ? undefined
                 : () => {
                     setAddSession((n) => n + 1);
                     setAddOpen(true);
                   }
             }
-            onEditSource={readOnly ? undefined : setEditSource}
+            onEditSource={canManage ? setEditSource : undefined}
           />
         </Grid>
 
@@ -329,7 +333,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
       </Grid>
 
       {modelsSession > 0 && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={engine.models} open={modelsOpen} onClose={() => setModelsOpen(false)} />}
-      {filesSource && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
+      {filesSource && canManage && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
       <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} queryRoles={engine.queryRoles} engineId={engine.id} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
       {editSource && (
         <EditSourceDrawer

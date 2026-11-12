@@ -17,8 +17,7 @@
  */
 
 /**
- * The BFF side of Context Engines: engines map from the BFF's shape and are keyed by environment
- * and name, and a new engine's setup sends upload sources to the engine and connector sources to
+ * The BFF side of Context Engines: engines map from the BFF's shape and are keyed by name, and a new engine's setup sends upload sources to the engine and connector sources to
  * the BFF as integrations.
  */
 
@@ -36,8 +35,8 @@ import { BffError } from './_client';
 import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setUpContextEngine, toEngineManagedServer } from './contextEngine';
 import type { ContextSourceConfig, CreateContextEngineInput } from '../types/contextEngine';
 
-const ENGINE = 'development/docs';
-const bffEngine = { name: 'docs', displayName: 'Docs', description: 'Product docs', environment: 'development', status: 'running', createdAt: '2026-10-29T00:00:00Z', consoleApiUrl: 'https://gw/c', publicApiUrl: 'https://gw/p/' };
+const ENGINE = 'docs';
+const bffEngine = { name: 'docs', displayName: 'Docs', description: 'Product docs', status: 'running', createdAt: '2026-10-29T00:00:00Z', consoleApiUrl: 'https://gw/c', publicApiUrl: 'https://gw/p/' };
 
 beforeEach(() => {
   Object.values(bff).forEach((f) => f.mockReset());
@@ -58,14 +57,14 @@ describe('engine managed storage', () => {
 });
 
 describe('engines', () => {
-  it('lists one environment and keys each engine by environment and name', async () => {
-    bff.get.mockResolvedValueOnce({ items: [bffEngine, { name: 'hr', environment: 'development', status: 'unknown', statusReason: 'could not read' }] });
+  it('lists the engines and keys each by name', async () => {
+    bff.get.mockResolvedValueOnce({ items: [bffEngine, { name: 'hr', status: 'unknown', statusReason: 'could not read' }] });
 
-    const engines = await listContextEngines('development');
+    const engines = await listContextEngines();
 
-    expect(bff.get).toHaveBeenCalledWith('/context-engines?environment=development');
+    expect(bff.get).toHaveBeenCalledWith('/context-engines');
     expect(engines[0]).toMatchObject({ id: ENGINE, handle: 'docs', name: 'Docs', state: 'ready', publicApiUrl: 'https://gw/p' });
-    expect(engines[1]).toMatchObject({ id: 'development/hr', name: 'hr', state: 'unknown', statusReason: 'could not read', description: '' });
+    expect(engines[1]).toMatchObject({ id: 'hr', name: 'hr', state: 'unknown', statusReason: 'could not read', description: '' });
     expect(engineRequest).not.toHaveBeenCalled();
   });
 
@@ -74,7 +73,7 @@ describe('engines', () => {
 
     const engine = await getContextEngine(ENGINE);
 
-    expect(bff.get).toHaveBeenCalledWith('/context-engines/docs/environments/development');
+    expect(bff.get).toHaveBeenCalledWith('/context-engines/docs');
     expect(engine).toMatchObject({ state: 'starting', sources: [], queryRoles: [] });
     expect(engineRequest).not.toHaveBeenCalled();
   });
@@ -84,7 +83,6 @@ describe('engines', () => {
     const input: CreateContextEngineInput = {
       name: 'Docs',
       description: 'Product docs',
-      environment: 'development',
       sources: [],
       roles: [],
       embedding: { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'e', azureBaseUrl: '', azureApiVersion: '' },
@@ -98,7 +96,6 @@ describe('engines', () => {
       name: 'docs',
       displayName: 'Docs',
       description: 'Product docs',
-      environment: 'development',
       models: {
         llm: { provider: 'openai', model: 'gpt-4.1', apiKey: 'l' },
         embedding: { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'e' },
@@ -130,7 +127,7 @@ describe('setting up a new engine', () => {
 
     expect(result).toEqual({ sources: { Handbook: 'src-upload', 'Team DB': 'src-db' }, warnings: [] });
     expect(engineRequest).toHaveBeenCalledWith(ENGINE, 'PUT', '/v1/resources/engine/grants/owner-user-1', expect.objectContaining({ principalId: 'user-1' }));
-    expect(bff.post).toHaveBeenCalledWith('/context-engines/docs/environments/development/integrations', {
+    expect(bff.post).toHaveBeenCalledWith('/context-engines/docs/integrations', {
       name: 'team-db',
       type: 'mysql',
       settings: { tableName: 'articles' },

@@ -19,18 +19,11 @@
 import { describe, expect, it } from 'vitest';
 import { defaultStorage } from '../constants/contextEngine';
 import { contextEngineUrl, contextEnginesUrl, contextEvidenceUrl, newContextEngineUrl } from '../paths';
-import { connectorFor, contextEngineKey, engineHandleFrom, integrationTypeFor, isGatewayKeyRefusal, modelsStepBlocker, parseContextEngineKey, selectEnvironment, storageStepBlocker, toIntegrationRequest } from './contextEngine';
+import { connectorFor, engineHandleFrom, integrationTypeFor, isGatewayKeyRefusal, modelsStepBlocker, storageStepBlocker, toIntegrationRequest } from './contextEngine';
 import type { LlmConfig } from '../types/contextEngine';
 import type { EmbeddingConfig } from '../types/ragIngestion';
 
 describe('engine identity', () => {
-  it('keys an engine by environment and name, and reads the key back', () => {
-    expect(contextEngineKey('development', 'docs')).toBe('development/docs');
-    expect(parseContextEngineKey('development/docs')).toEqual({ environment: 'development', handle: 'docs' });
-    expect(() => parseContextEngineKey('docs')).toThrow();
-    expect(() => parseContextEngineKey('development/')).toThrow();
-  });
-
   it('derives the BFF name from a display name', () => {
     expect(engineHandleFrom('Support Knowledge!')).toBe('support-knowledge');
     expect(engineHandleFrom('  Café  docs ')).toBe('cafe-docs');
@@ -40,25 +33,12 @@ describe('engine identity', () => {
     expect(long).toMatch(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/);
   });
 
-  it('puts the name in the path and the environment in ?env=', () => {
-    expect(contextEngineUrl('acme', 'development/docs')).toBe('/organizations/acme/context-engines/docs/overview?env=development');
-    expect(contextEngineUrl('acme', 'development/docs', 'playground', { q: 'a b&c' })).toBe('/organizations/acme/context-engines/docs/playground?env=development&q=a+b%26c');
-    expect(contextEvidenceUrl('acme', 'prod/docs', 'evi_1')).toBe('/organizations/acme/context-engines/docs/evidence/evi_1?env=prod');
+  it('puts the name in the path', () => {
+    expect(contextEngineUrl('acme', 'docs')).toBe('/organizations/acme/context-engines/docs/overview');
+    expect(contextEngineUrl('acme', 'docs', 'playground', { q: 'a b&c' })).toBe('/organizations/acme/context-engines/docs/playground?q=a+b%26c');
+    expect(contextEvidenceUrl('acme', 'docs', 'evi_1')).toBe('/organizations/acme/context-engines/docs/evidence/evi_1');
     expect(contextEnginesUrl('acme')).toBe('/organizations/acme/context-engines');
-    expect(contextEnginesUrl('acme', 'prod')).toBe('/organizations/acme/context-engines?env=prod');
-    expect(newContextEngineUrl('acme', 'prod')).toBe('/organizations/acme/context-engines/new?env=prod');
-  });
-});
-
-describe('environment selection', () => {
-  const envs = ['development', 'production'];
-
-  it('shows the picked environment, else the linked one, else the first', () => {
-    expect(selectEnvironment(envs, null, null)).toBe('development');
-    expect(selectEnvironment(envs, null, 'production')).toBe('production');
-    expect(selectEnvironment(envs, 'development', 'production')).toBe('development');
-    expect(selectEnvironment(envs, null, 'staging')).toBe('development');
-    expect(selectEnvironment([], null, 'production')).toBe('');
+    expect(newContextEngineUrl('acme')).toBe('/organizations/acme/context-engines/new');
   });
 });
 

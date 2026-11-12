@@ -55,6 +55,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
   'ballerinaFileIntegration',
   'miFileIntegration',
   'byoiService',
+  'voiceAgent',
 ]);
 
 /**
@@ -163,6 +164,8 @@ export function getDisplayLabel(displayType: string, componentSubType: string | 
     case 'miJob':
     case 'buildpackJob':
       return 'Manual Task';
+    case 'voiceAgent':
+      return 'Voice Agent';
   }
   // Foreign-runtime components arrive as lower(buildpackType)+Cap(componentType), e.g. 'otherAiAgent'.
   if (displayType?.startsWith(OTHER_BUILDPACK)) return 'Other';
