@@ -29,12 +29,7 @@ export const GitRefType = {
 } as const;
 export type GitRefType = (typeof GitRefType)[keyof typeof GitRefType];
 
-/**
- * Whether the Deploy page offers "Auto deploy on build" for Ballerina and MI integrations.
- * Off while ipaas-service deploys their builds itself (it refuses turning auto-deploy
- * on for them); turn it back on together with ipaas-service's openChoreoAutoDeploy.
- * isAutoDeployOffered decides the switch for every integration.
- */
+/** Mirrors ipaas-service's openChoreoAutoDeploy: on lifts the MI hold in isAutoDeployOffered. */
 export const AUTO_DEPLOY_AVAILABLE = false;
 
 export const BUILD_STAGES = [

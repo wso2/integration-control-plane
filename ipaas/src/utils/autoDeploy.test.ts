@@ -24,7 +24,7 @@ const offered = (buildpackType: string, displayType: string, componentSubType: s
 
 describe('isAutoDeployOffered', () => {
   it('is not offered for the integrations ipaas-service deploys itself', () => {
-    expect(offered(BI_BUILDPACK, 'ballerinaService')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'ballerinaWorkflow')).toBe(false);
     expect(offered('MI', 'miApiService')).toBe(false);
     expect(offered('MI', 'miWebhook')).toBe(false);
     expect(offered('MI', 'miCronjob')).toBe(false);
@@ -32,6 +32,25 @@ describe('isAutoDeployOffered', () => {
     expect(offered('MI', 'miApiService', 'miFileIntegration')).toBe(false);
     // An MI display type decides it when the buildpack is not reported.
     expect(offered('', 'miCronjob')).toBe(false);
+  });
+
+  it('is offered for Ballerina integrations', () => {
+    expect(offered(BI_BUILDPACK, 'ballerinaService')).toBe(true);
+    expect(offered(BI_BUILDPACK, 'scheduledTask')).toBe(true);
+    expect(offered(BI_BUILDPACK, 'ballerinaEventHandler')).toBe(true);
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'webhook')).toBe(true);
+  });
+
+  it('is not offered for integrations the platform provisions without a build', () => {
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'tailscale')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'knowledge-base')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'rag-service')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'scheduledTask', 'rag-ingestion')).toBe(false);
+  });
+
+  it('is offered while auto-deploy is on, so a held integration can turn it off', () => {
+    expect(isAutoDeployOffered({ buildpackType: BI_BUILDPACK, displayType: 'ballerinaWorkflow', componentSubType: null }, true)).toBe(true);
+    expect(isAutoDeployOffered({ buildpackType: 'MI', displayType: 'miApiService', componentSubType: null }, true)).toBe(true);
   });
 
   it('is offered for agents and for integrations of another runtime', () => {

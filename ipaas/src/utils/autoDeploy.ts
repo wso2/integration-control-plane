@@ -19,22 +19,23 @@
 import { AUTO_DEPLOY_AVAILABLE } from '../constants/build';
 import type { Component } from '../types/component';
 import { identifyIntegration } from './identifyIntegration';
-import { hasIntegrationTraces } from './integrationTraces';
 
 /** The buildpackType ipaas-service reports for an MI integration. */
 const MI_BUILDPACK_TYPE = 'MI';
 
-/**
- * Whether the Deploy page offers "Auto deploy on build" for the integration. While
- * AUTO_DEPLOY_AVAILABLE is off, ipaas-service keeps auto-deploy off, and refuses turning it on,
- * for the integrations whose deploys it makes itself, so the switch is not offered for them:
- *
- * - Ballerina integrations: a deploy sets up their tracing.
- * - MI integrations: a deploy queues the publishing of an MI API's endpoints on the API gateway,
- *   which a build OpenChoreo deploys on its own never gets, and every MI type deploys the same way.
- */
-export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displayType' | 'componentSubType'>): boolean {
+/** Integrations the platform provisions without a build, so auto-deploy on build has nothing to act on. */
+const UNBUILT_TYPES = new Set(['tailscale-vpn', 'rag-ingestion', 'mcp-proxy']);
+const UNBUILT_SUBTYPES = new Set(['knowledge-base', 'rag-service', 'rag-retrieval-service']);
+
+/** Mirrors ipaas-service's auto-deploy hold, so the Deploy page offers the switch only where it can be turned on. */
+export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displayType' | 'componentSubType'>, enabled = false): boolean {
+  const { type, runtime } = identifyIntegration(c.displayType ?? '', c.componentSubType ?? null);
+  if (UNBUILT_TYPES.has(type) || UNBUILT_SUBTYPES.has(c.componentSubType ?? '')) return false;
+  // Turning it off is always allowed, so a held integration that already has it on can still turn it off.
+  if (enabled) return true;
+  // A workflow's deploy also connects it to the workflow runtime, which only ipaas-service does.
+  if (type === 'workflow') return false;
   if (AUTO_DEPLOY_AVAILABLE) return true;
-  const isMI = c.buildpackType === MI_BUILDPACK_TYPE || identifyIntegration(c.displayType ?? '', c.componentSubType ?? null).runtime === 'mi';
-  return !isMI && !hasIntegrationTraces(c);
+  // MI deploys one way, through ipaas-service.
+  return c.buildpackType !== MI_BUILDPACK_TYPE && runtime !== 'mi';
 }

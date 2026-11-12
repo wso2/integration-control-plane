@@ -29,7 +29,6 @@ import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/use
 import { useLinkedForm } from './useLinkedForm';
 import { savedValue } from '../../utils/savedConfig';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
-import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCardList } from '../EndpointCardList';
@@ -520,14 +519,14 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           onSaved?.();
         };
         // A release is what carries the configuration and the links to the running integration,
-        // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
-        // OpenChoreo releases a changed Workload itself then.
+        // so applying deploys: auto-deploy releases a changed Workload only into the first
+        // environment, and only while it is on.
         //
         // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
         // hands back to it rather than releasing first: a deploy made here is one its Cancel
         // cannot undo, and it would release the current Workload rather than that image.
         const afterSave = () => {
-          if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
+          if (continueWithoutChanges) {
             done();
             return;
           }
@@ -999,14 +998,14 @@ function GenericServiceConfigureDrawer({
         onSaved?.();
       };
       // A release is what carries the configuration and the links to the running integration,
-      // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
-      // OpenChoreo releases a changed Workload itself then.
+      // so applying deploys: auto-deploy releases a changed Workload only into the first
+      // environment, and only while it is on.
       //
       // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
       // hands back to it rather than releasing first: a deploy made here is one its Cancel
       // cannot undo, and it would release the current Workload rather than that image.
       const afterSave = () => {
-        if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
+        if (continueWithoutChanges) {
           done();
           return;
         }
