@@ -88,7 +88,7 @@ export const panelSx = (lit: boolean) =>
     borderRadius: 1.5,
     bgcolor: 'background.paper',
     // One pixel less padding when the border is one pixel wider, so the content does not move.
-    p: lit ? '15px' : 2,
+    p: lit ? (t: { spacing: (n: number) => string }) => `calc(${t.spacing(2)} - 1px)` : 2,
     display: 'flex',
     flexDirection: 'column',
     gap: 1.5,

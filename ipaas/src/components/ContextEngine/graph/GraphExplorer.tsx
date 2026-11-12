@@ -159,7 +159,14 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, /* onExpl
     const entity = (kind ? named.find((e) => e.kind === kind) : undefined) ?? named[0];
     if (!entity) return;
     const index = model.index.get(entity.id);
-    if (index !== undefined) select(index);
+    if (index !== undefined) {
+      select(index);
+      return;
+    }
+    // Hidden by the type filter: clear it, and select the entity by its key once the graph draws it again.
+    setTypes(new Set());
+    setSelectedKey(entity.id);
+    onSelectKey(entity.id);
   };
 
   if (graph.isLoading) {
@@ -261,8 +268,9 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, /* onExpl
                 </li>
               );
             }}
+            // Clearing the box releases the selection, so its label does not come back on blur.
             onChange={(_e, i) => {
-              if (i !== null && i !== undefined) select(i);
+              if (i !== undefined) select(i);
             }}
             renderInput={(params) => (
               <TextField {...params} placeholder="Find a document or entity…" inputProps={{ ...params.inputProps, 'aria-label': 'Find in graph' }} InputProps={{ ...params.InputProps, startAdornment: <Search size={16} aria-hidden /> }} />
@@ -371,7 +379,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, /* onExpl
               </Typography>
             </Box>
           )}
-          <Box sx={{ ...legendSx, position: 'absolute', left: 12, bottom: 12, right: 64, width: 'fit-content', pointerEvents: 'none' }}>
+          <Box sx={{ ...legendSx, position: 'absolute', left: (t) => t.spacing(1.5), bottom: (t) => t.spacing(1.5), right: (t) => t.spacing(8), width: 'fit-content', pointerEvents: 'none' }}>
             {data.conflicts.length > 0 && (
               <Stack direction="row" alignItems="center" gap={0.75}>
                 <Box aria-hidden sx={{ width: 14, height: 3, borderRadius: 1, bgcolor: colors.conflict, flexShrink: 0 }} />

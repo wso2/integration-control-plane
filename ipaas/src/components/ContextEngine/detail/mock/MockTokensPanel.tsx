@@ -112,6 +112,13 @@ function MockTokenDrawer({ engineId, target, tokens, onClose }: { engineId: stri
   const token = id ? tokens.find((t) => t.id === id) : undefined;
   const taken = tokens.some((t) => t.name.toLowerCase() === name.trim().toLowerCase());
 
+  // The plaintext is shown once: leaving the drawer by unmounting it (a tab switch, say) forgets it too.
+  const shownSecret = token?.secret ? token.id : null;
+  useEffect(() => {
+    if (!shownSecret) return undefined;
+    return () => forgetMockSecret(engineId, shownSecret);
+  }, [engineId, shownSecret]);
+
   useEffect(() => {
     if (!open) return;
     setName('');
@@ -125,7 +132,8 @@ function MockTokenDrawer({ engineId, target, tokens, onClose }: { engineId: stri
     if (token?.secret) forgetMockSecret(engineId, token.id);
     onClose();
   };
-  const header = token?.secret ? `Bearer ${token.secret}` : '';
+  // The same header the engine's API and MCP server take, as the request builder and client configs send it.
+  const header = token?.secret ?? '';
 
   return (
     <Drawer anchor="right" open={open} onClose={close} variant="temporary" sx={styles.rightDrawer}>
@@ -143,17 +151,10 @@ function MockTokenDrawer({ engineId, target, tokens, onClose }: { engineId: stri
           <Alert severity="warning" sx={styles.dialogAlert}>
             Mock: this token is not real. The engine does not accept it.
           </Alert>
-          <Typography sx={styles.fieldLabel}>
-            <span>
-              Token name
-              {!token && (
-                <Box component="span" sx={styles.requiredMark} aria-hidden="true">
-                  *
-                </Box>
-              )}
-            </span>
-          </Typography>
           <TextField
+            label="Token name"
+            labelPlacement="top"
+            required={!token}
             value={token ? token.name : name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. support-bot"
@@ -176,18 +177,18 @@ function MockTokenDrawer({ engineId, target, tokens, onClose }: { engineId: stri
               <Typography sx={styles.fieldLabel}>Header</Typography>
               <Box sx={styles.credField}>
                 <Typography component="span" sx={styles.credValue}>
-                  Authorization
+                  X-API-Key
                 </Typography>
-                <CopyButton value="Authorization" label="Copy header name" />
+                <CopyButton value="X-API-Key" label="Copy header name" />
               </Box>
               <Typography sx={styles.nextFieldLabel}>Value</Typography>
               {token.secret ? (
                 <Box sx={styles.credField}>
                   <Typography component="span" sx={styles.credValue}>
-                    {reveal ? header : `Bearer ${TOKEN_MASK}`}
+                    {reveal ? header : TOKEN_MASK}
                   </Typography>
                   <Tooltip title={reveal ? 'Hide' : 'Reveal'}>
-                    <IconButton size="small" onClick={() => setReveal((v) => !v)} sx={styles.credIconButton}>
+                    <IconButton size="small" aria-label={reveal ? 'Hide token' : 'Reveal token'} onClick={() => setReveal((v) => !v)} sx={styles.credIconButton}>
                       {reveal ? <EyeOff size={15} /> : <Eye size={15} />}
                     </IconButton>
                   </Tooltip>
@@ -200,8 +201,32 @@ function MockTokenDrawer({ engineId, target, tokens, onClose }: { engineId: stri
           )}
         </Box>
 
+        {confirm && token && (
+          // Confirmed in the drawer itself: a dialog over a drawer would stack two modal layers.
+          <Box sx={{ px: 3, pt: 2 }}>
+            <Alert severity="warning">{confirm === 'regenerate' ? REGENERATE_KEY_WARNING : REVOKE_KEY_WARNING}</Alert>
+          </Box>
+        )}
         <Box sx={token ? styles.drawerFooterSplit : styles.drawerFooter}>
-          {token ? (
+          {confirm && token ? (
+            <>
+              <Button variant="outlined" color="inherit" onClick={() => setConfirm(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                onClick={() => {
+                  if (confirm === 'regenerate') {
+                    regenerateMockToken(engineId, token.id);
+                    setReveal(false);
+                  } else revokeMockToken(engineId, token.id);
+                  setConfirm(null);
+                }}>
+                {confirm === 'regenerate' ? 'Regenerate token' : 'Revoke token'}
+              </Button>
+            </>
+          ) : token ? (
             <>
               <Button variant="outlined" color="error" onClick={() => setConfirm('revoke')} disabled={token.status === 'revoked'}>
                 Revoke
@@ -228,25 +253,6 @@ function MockTokenDrawer({ engineId, target, tokens, onClose }: { engineId: stri
         </Box>
       </Box>
 
-      {confirm && token && (
-        <ConfirmDeleteDialog
-          title={confirm === 'regenerate' ? 'Regenerate this token?' : 'Revoke this token?'}
-          onConfirm={() => {
-            if (confirm === 'regenerate') {
-              regenerateMockToken(engineId, token.id);
-              setReveal(false);
-            } else revokeMockToken(engineId, token.id);
-            setConfirm(null);
-          }}
-          onClose={() => setConfirm(null)}
-          isPending={false}
-          confirmLabel={confirm === 'regenerate' ? 'Regenerate' : 'Revoke'}
-          maxWidth="xs">
-          <Typography variant="body2" color="text.secondary">
-            {confirm === 'regenerate' ? REGENERATE_KEY_WARNING : REVOKE_KEY_WARNING}
-          </Typography>
-        </ConfirmDeleteDialog>
-      )}
     </Drawer>
   );
 }

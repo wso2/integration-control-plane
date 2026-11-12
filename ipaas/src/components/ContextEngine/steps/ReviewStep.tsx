@@ -25,7 +25,7 @@ import { answerChoice, modelProviderName, roleList, sharingMismatches, sourceTyp
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import SectionCard from '../SectionCard';
-import { mutedSx, reviewDetailGridSx, stepHeadingSx, stepHintSx, summaryDescriptionSx, summaryRowSx } from '../styles';
+import { mutedSx, reviewDetailGridSx, wrapSx, stepHeadingSx, stepHintSx, summaryDescriptionSx, summaryRowSx } from '../styles';
 import type { ContextEngineForm } from '../../../types/contextEngine';
 
 /** Wizard step indexes the summary cards can jump back to (Name, Sources, Models, Storage; 'Grant Access' is hidden). */
@@ -51,11 +51,11 @@ function Detail({ label, value, secondary }: { label: string; value: string; sec
       <Typography variant="caption" sx={mutedSx}>
         {label}
       </Typography>
-      <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+      <Typography variant="body2" sx={{ fontWeight: 500, ...wrapSx }}>
         {value}
       </Typography>
       {secondary && (
-        <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }} noWrap>
+        <Typography variant="caption" sx={{ ...mutedSx, ...wrapSx, display: 'block' }}>
           {secondary}
         </Typography>
       )}
@@ -95,7 +95,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
         <Box>
           <Typography variant="subtitle2" sx={stepHeadingSx}>
-            Review &amp; Create
+            Review &amp; create
           </Typography>
           <Typography variant="body2" sx={stepHintSx}>
             Check the setup.

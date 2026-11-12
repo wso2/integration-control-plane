@@ -74,8 +74,3 @@ export const drawerFooterSplit = {
   borderTop: '1px solid',
   borderColor: 'divider',
 } as const;
-
-export const requiredMark = {
-  color: 'error.main',
-  ml: 0.25,
-} as const;

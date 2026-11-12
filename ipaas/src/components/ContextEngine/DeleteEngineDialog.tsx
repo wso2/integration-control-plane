@@ -93,6 +93,8 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
           autoFocus
           inputRef={inputRef}
           fullWidth
+          label="Context engine name"
+          labelPlacement="top"
           placeholder="Enter context engine name to confirm"
           value={typed}
           onChange={(e) => setTyped(e.target.value)}

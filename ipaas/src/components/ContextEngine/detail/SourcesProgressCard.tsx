@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, LinearProgress, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, LinearProgress, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Pencil, Plus, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useSourceUploads } from '../../../hooks/contextUploads';
 import type { JSX } from 'react';
@@ -156,12 +156,7 @@ export default function SourcesProgressCard({ id, engineId, running, sources, on
       title={`Sources (${sources.length})`}
       action={
         <Stack direction="row" alignItems="center" gap={1.5}>
-          {progressQuery.isLoading && sources.length > 0 && (
-            <Box sx={progressHeadlineSx}>
-              <CircularProgress size={12} color="inherit" aria-hidden />
-              <Typography variant="caption">Loading progress…</Typography>
-            </Box>
-          )}
+          {progressQuery.isLoading && sources.length > 0 && <Skeleton variant="text" width={110} aria-label="Loading progress" />}
           {summary && (summary.active > 0 || attention > 0) && (
             <Box sx={progressHeadlineSx} aria-live="polite">
               {summary.active > 0 && <CircularProgress size={12} color="inherit" aria-hidden />}

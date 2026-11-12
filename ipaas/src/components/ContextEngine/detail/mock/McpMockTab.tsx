@@ -72,6 +72,17 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
   const selected = configs.find((c) => c.id === client) ?? configs[0];
   const tools = CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers);
 
+  if (!engine.publicApiUrl) {
+    return (
+      <Box sx={{ maxWidth: 900 }}>
+        <SurfaceHeader title="MCP server" description="Agents connect here and call the tools below." />
+        <Alert severity="info" variant="outlined">
+          The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Box sx={readableSx}>
@@ -98,7 +109,7 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
           Connect from your client
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Replace <code>&lt;token&gt;</code> with a token from Access tokens.
+          Replace <code>&lt;api key&gt;</code> with one of this engine&apos;s API keys. The mock tokens above don&apos;t work with the engine.
         </Typography>
         <Tabs value={client} onChange={(_, v) => setClient(v as McpClientId)} sx={clientTabsSx} aria-label="MCP client">
           {configs.map((c) => (

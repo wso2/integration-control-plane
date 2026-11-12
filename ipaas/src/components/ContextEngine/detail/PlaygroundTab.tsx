@@ -152,7 +152,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         // The engine stored the question either way, so it joins the recent list even when the conversation moved on.
         rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
         markAsked();
-        if (finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } })) setQuestion('');
+        // The box was emptied when the question was sent; whatever was typed since stays.
+        finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } });
       },
       (error: unknown) => {
         if (finishQuestion(engine.id, token, { error })) setQuestion((current) => current || q);

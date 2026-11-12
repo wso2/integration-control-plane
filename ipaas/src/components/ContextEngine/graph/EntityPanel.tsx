@@ -129,13 +129,17 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
   const shownName = restoreCase(name, passages);
   // Relationships grouped by verb and side, so a verb several entities share with this one reads once:
   // "→ generates" lists what this entity points at, "← knows app" what points at it, as the canvas arrows do.
-  const groups = new Map<string, { relation: string; incoming: boolean; others: Map<string, { name: string; kind?: string; text?: string }> }>();
+  // An entity's sentences are all kept: two facts naming the same entity can say different things about it.
+  const groups = new Map<string, { relation: string; incoming: boolean; others: Map<string, { name: string; kind?: string; texts: string[] }> }>();
   for (const fact of view?.facts ?? []) {
     const incoming = !mine(fact.subject, fact.subjectKind) && mine(fact.object, fact.objectKind);
     const [other, otherKind] = incoming ? [fact.subject, fact.subjectKind] : [fact.object, fact.objectKind];
     const key = `${incoming ? 'in' : 'out'}\u0000${fact.relation}`;
     const group = groups.get(key) ?? { relation: fact.relation, incoming, others: new Map() };
-    group.others.set(`${other.toLowerCase()}\u0000${otherKind ?? ''}`, { name: other, kind: otherKind, text: fact.text ?? undefined });
+    const otherKey = `${other.toLowerCase()}\u0000${otherKind ?? ''}`;
+    const entry = group.others.get(otherKey) ?? { name: other, kind: otherKind, texts: [] };
+    if (fact.text && !entry.texts.includes(fact.text)) entry.texts.push(fact.text);
+    group.others.set(otherKey, entry);
     groups.set(key, group);
   }
 
@@ -233,16 +237,17 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
                       <Box component="dd" sx={{ m: 0, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.25 }}>
                         {/* One per line: a button cannot wrap like text, so a comma list breaks apart on long names. */}
                         {others.map((o) => (
-                          <Link
-                            key={`${o.name}|${o.kind ?? ''}`}
-                            component="button"
-                            type="button"
-                            underline="hover"
-                            title={o.text ? `“${o.text}”` : undefined}
-                            onClick={() => onSelectEntity(o.name, o.kind)}
-                            sx={{ fontSize: 13, fontWeight: 500, textAlign: 'left' }}>
-                            {restoreCase(o.name, passages)}
-                          </Link>
+                          <Box key={`${o.name}|${o.kind ?? ''}`} sx={{ minWidth: 0 }}>
+                            <Link component="button" type="button" underline="hover" onClick={() => onSelectEntity(o.name, o.kind)} sx={{ fontSize: 13, fontWeight: 500, textAlign: 'left' }}>
+                              {restoreCase(o.name, passages)}
+                            </Link>
+                            {/* The sentence each fact came from, shown rather than on hover: it can carry qualifiers the name leaves out. */}
+                            {o.texts.map((text) => (
+                              <Typography key={text} variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                                “{text}”
+                              </Typography>
+                            ))}
+                          </Box>
                         ))}
                       </Box>
                     </Box>
