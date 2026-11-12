@@ -62,6 +62,43 @@ export const fieldGroupChevronSx = (open: boolean) =>
 /** Fields inside a collapsible group, spaced like the main field stack and set off from the header. */
 export const fieldGroupBodySx = { gap: 2.5, pt: 2.5 } as const;
 
+/** Explanation at the top of a connector field group. */
+export const fieldGroupIntroSx = { color: 'text.secondary', lineHeight: 1.5 } as const;
+
+/** One database table a source syncs, as a card. */
+export const tableCardSx = {
+  p: 2,
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: '14px',
+  bgcolor: 'background.default',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+  minWidth: 0,
+} as const;
+
+export const tableCardHeaderSx = { display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 } as const;
+
+/** The small icon tile in a table card's header. */
+export const tableCardIconSx = {
+  width: 28,
+  height: 28,
+  borderRadius: 1,
+  bgcolor: 'action.hover',
+  color: 'text.secondary',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+} as const;
+
+/** Table and Primary Key side by side; stacked on a narrow screen. */
+export const tableCardPairSx = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 } as const;
+
+/** The full-width dashed "Add table" button under the table cards. */
+export const addTableButtonSx = { borderStyle: 'dashed', '&:hover': { borderStyle: 'dashed' } } as const;
+
 /** Source / provider tile grid spacing. */
 export const tileGridSx = { mb: 3 } as const;
 

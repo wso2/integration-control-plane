@@ -123,6 +123,12 @@ import {
   sourceNameError,
   sourcesStepBlocker,
   splitUrls,
+  parseTables,
+  serializeTables,
+  tableErrors,
+  objectErrors,
+  parseObjects,
+  serializeObjects,
   summarizeSource,
   toConfigurationPayload,
   toBffCreateRequest,
@@ -274,7 +280,7 @@ describe('source validation', () => {
     expect(isFieldVisible(token, { authType: 'bearer' })).toBe(true);
     expect(isFieldVisible(clientId, { authType: 'bearer' })).toBe(false);
 
-    const base = { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name' };
+    const base = { baseUrl: 'https://acme.my.salesforce.com', objects: serializeObjects([{ name: 'Account', fields: 'Name' }]) };
     // Client credentials is complete with the app key and secret; its hidden refresh token is not demanded.
     expect(isSourceValid(withValues('salesforce', { ...base, clientId: 'c', clientSecret: 's' }))).toBe(true);
     // Refresh-token flow additionally requires the refresh token.
@@ -330,7 +336,7 @@ describe('source validation', () => {
     expect(rmlOf('upload')).toBeUndefined();
 
     // Optional: a source is valid without it, and its contents travel as a setting when provided.
-    const base = { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name', clientId: 'c', clientSecret: 's' };
+    const base = { baseUrl: 'https://acme.my.salesforce.com', objects: serializeObjects([{ name: 'Account', fields: 'Name' }]), clientId: 'c', clientSecret: 's' };
     expect(isSourceValid(withValues('salesforce', base))).toBe(true);
     const mapped = withValues('salesforce', { ...base, rmlMapping: '@prefix ex: <http://ex> .' });
     const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] })).sources[0].settings;
@@ -343,7 +349,8 @@ describe('source validation', () => {
     for (const id of ['mysql', 'postgresql', 'mssql']) expect(isConnectorEnabled(id)).toBe(true);
     // Core settings of the database integrations are present on each.
     for (const id of ['mysql', 'postgresql', 'mssql']) {
-      expect(keys(id)).toEqual(expect.arrayContaining(['host', 'port', 'database', 'username', 'password', 'tableName', 'primaryKey', 'columns', 'updatedAtColumn', 'pollInterval']));
+      expect(keys(id)).toEqual(expect.arrayContaining(['host', 'port', 'database', 'username', 'password', 'tables', 'pollInterval']));
+      expect(keys(id)).not.toContain('tableName');
     }
     // MySQL has no schema layer; PostgreSQL and SQL Server do.
     expect(keys('mysql')).not.toContain('schema');
@@ -355,9 +362,73 @@ describe('source validation', () => {
     expect(blankSource('mysql').values.port).toBe('3306');
     expect(blankSource('mssql').values.port).toBe('1433');
     // Numeric fields refuse text.
-    const db = { host: 'h', database: 'd', username: 'u', password: 'p', tableName: 't', primaryKey: 'id' };
+    const db = { host: 'h', database: 'd', username: 'u', password: 'p', tables: serializeTables([{ tableName: 't', primaryKey: 'id', columns: '', updatedAtColumn: '' }]) };
     expect(invalidSourceFields(withValues('postgresql', { ...db, port: '54x' })).map((f) => f.key)).toEqual(['port']);
     expect(invalidSourceFields(withValues('postgresql', { ...db, port: '5432', pollInterval: 'soon' })).map((f) => f.key)).toEqual(['pollInterval']);
+  });
+
+  it('takes one or more tables on a database source', () => {
+    const conn = { host: 'h', database: 'd', username: 'u', password: 'p' };
+    const table = (tableName: string, primaryKey = 'id', columns = '', updatedAtColumn = '') => ({ tableName, primaryKey, columns, updatedAtColumn });
+    const db = (...tables: ReturnType<typeof table>[]) => withValues('mysql', { ...conn, tables: serializeTables(tables) });
+    const tablesDef = SOURCE_CONNECTORS.find((c) => c.id === 'mysql')!.fields.find((f) => f.key === 'tables')!;
+    expect(tablesDef).toMatchObject({ kind: 'tables', required: true, group: 'Data to sync' });
+
+    // A blank value is one blank table, and the source is not ready until it is filled in.
+    expect(parseTables('')).toEqual([table('', '')]);
+    expect(parseTables('not json')).toEqual([table('', '')]);
+    expect(isSourceValid(withValues('mysql', conn))).toBe(false);
+    expect(sourceIncompleteReason(withValues('mysql', conn))).toBe('Tables missing');
+    expect(sourceFieldError(tablesDef, serializeTables([]))).toBe('Add at least one table.');
+
+    expect(isSourceValid(db(table('EMPLOYEE', 'ID')))).toBe(true);
+    expect(isSourceValid(db(table('EMPLOYEE', 'ID', 'ID, NAME', 'UPDATED_AT'), table('DEPT', 'DEPT_ID')))).toBe(true);
+    // Every table needs a name and a primary key.
+    expect(sourceFieldError(tablesDef, serializeTables([table('EMPLOYEE', 'ID'), table('DEPT', '')]))).toBe('Table 2: Primary Key is required.');
+    expect(sourceIncompleteReason(db(table('EMPLOYEE', 'ID'), table('', 'ID')))).toBe('Tables invalid');
+    // Table names are unique within the source, ignoring case.
+    expect(sourceFieldError(tablesDef, serializeTables([table('employee'), table(' EMPLOYEE ')]))).toBe('Table 2: Another table has this name.');
+
+    // Per-input messages, so the form can mark the input at fault.
+    expect(tableErrors([table('EMP', 'ID', 'ID,,NAME'), table('emp', '')])).toEqual([
+      { tableName: '', primaryKey: '', columns: '', updatedAtColumn: '' },
+      { tableName: 'Another table has this name.', primaryKey: 'Primary Key is required.', columns: '', updatedAtColumn: '' },
+    ]);
+
+    // The summary counts the tables rather than showing the raw value.
+    expect(summarizeSource(db(table('EMPLOYEE', 'ID'), table('DEPT', 'ID')))).toBe('h · d · 2 tables');
+    expect(summarizeSource(withValues('mysql', conn))).toBe('h · d');
+  });
+
+  it('moves a restored draft from before multiple tables into the tables field', () => {
+    const legacy = { type: 'mysql', name: 'DB', values: { host: 'h', tableName: 'EMP', primaryKey: 'ID', columns: 'ID, NAME', updatedAtColumn: '' }, audience: [RULE] };
+    const restored = fromDraft(JSON.stringify({ v: 1, savedAt: '2026-01-01T00:00:00Z', form: { ...completeForm(), sources: [legacy] } }));
+    const values = restored!.form.sources[0].values;
+    expect(values.tableName).toBeUndefined();
+    expect(parseTables(values.tables)).toEqual([{ tableName: 'EMP', primaryKey: 'ID', columns: 'ID, NAME', updatedAtColumn: '' }]);
+  });
+
+  it('takes one or more objects on a Salesforce source', () => {
+    const conn = { baseUrl: 'https://acme.my.salesforce.com', clientId: 'c', clientSecret: 's' };
+    const sf = (...objects: { name: string; fields: string }[]) => withValues('salesforce', { ...conn, objects: serializeObjects(objects) });
+    const objectsDef = SOURCE_CONNECTORS.find((c) => c.id === 'salesforce')!.fields.find((f) => f.key === 'objects')!;
+    expect(objectsDef).toMatchObject({ kind: 'objects', required: true, group: 'Data to sync' });
+
+    expect(parseObjects('')).toEqual([{ name: '', fields: '' }]);
+    expect(sourceIncompleteReason(withValues('salesforce', conn))).toBe('Objects missing');
+    expect(isSourceValid(sf({ name: 'Account', fields: 'Name' }, { name: 'Contact', fields: 'FirstName, LastName' }))).toBe(true);
+    // Every object needs fields, and names are unique ignoring case.
+    expect(sourceFieldError(objectsDef, serializeObjects([{ name: 'Account', fields: 'Name' }, { name: 'Contact', fields: ' , ' }]))).toBe('Object 2: Fields is required.');
+    expect(objectErrors([{ name: 'Account', fields: 'Name' }, { name: ' account ', fields: 'Name' }])[1].name).toBe('Another object has this name.');
+    expect(summarizeSource(sf({ name: 'Account', fields: 'Name' }, { name: 'Contact', fields: 'Email' }))).toBe('https://acme.my.salesforce.com · 2 objects');
+  });
+
+  it('moves a restored Salesforce draft from before multiple objects into the objects field', () => {
+    const legacy = { type: 'salesforce', name: 'SF', values: { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry' }, audience: [RULE] };
+    const restored = fromDraft(JSON.stringify({ v: 1, savedAt: '2026-01-01T00:00:00Z', form: { ...completeForm(), sources: [legacy] } }));
+    const values = restored!.form.sources[0].values;
+    expect(values.sobject).toBeUndefined();
+    expect(parseObjects(values.objects)).toEqual([{ name: 'Account', fields: 'Name, Industry' }]);
   });
 
   it('needs at least one complete, unique visibility rule', () => {
@@ -541,17 +612,28 @@ describe('wire payloads', () => {
   });
 
   it('sends only the settings and credentials the chosen auth flow uses', () => {
-    const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale' });
+    const objects = serializeObjects([{ name: 'Account', fields: 'Name, Industry' }]);
+    const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', objects, clientId: 'c', clientSecret: 's', refreshToken: 'stale' });
     const form = { ...completeForm(), sources: [sf] };
     const source = toConfigurationPayload(toCreateInput(form)).sources[0];
     // Client credentials is the default flow: the Connected App key is a setting, the hidden refresh token is dropped.
-    expect(source.settings).toMatchObject({ authType: 'client_credentials', baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', apiVersion: '59.0' });
+    expect(source.settings).toMatchObject({ authType: 'client_credentials', baseUrl: 'https://acme.my.salesforce.com', clientId: 'c', apiVersion: '59.0' });
+    expect(JSON.parse(source.settings.objects)).toEqual([{ name: 'Account', fields: ['Name', 'Industry'] }]);
     expect(source.credentials).toEqual({ clientSecret: 's' });
     expect(source.credentials.refreshToken).toBeUndefined();
   });
 
   it('shapes an integration request as the integration settings type it', () => {
-    const pg = withValues('postgresql', { host: 'db', port: '5432', database: 'cetest', schema: 'kb', username: 'u', password: ' p ', tableName: 'articles', primaryKey: 'id', columns: 'title, body,, category', pollInterval: '60' });
+    const pg = withValues('postgresql', {
+      host: 'db',
+      port: '5432',
+      database: 'cetest',
+      schema: 'kb',
+      username: 'u',
+      password: ' p ',
+      tables: serializeTables([{ tableName: ' articles ', primaryKey: 'id ', columns: 'title, body,, category', updatedAtColumn: '' }]),
+      pollInterval: '60',
+    });
     expect(toIntegrationRequest(pg, 'postgresql').settings).toEqual({
       host: 'db',
       port: 5432,
@@ -559,19 +641,55 @@ describe('wire payloads', () => {
       schema: 'kb',
       username: 'u',
       password: ' p ',
-      tableName: 'articles',
-      primaryKey: 'id',
-      columns: ['title', 'body', 'category'],
+      tables: [{ name: 'articles', primaryKey: 'id', columns: ['title', 'body', 'category'] }],
       pollInterval: 60,
     });
 
-    const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale', rmlMapping: '@prefix ex: <http://ex> .' });
-    // The auth flow nests under auth; the hidden refresh token and the mapping file are left out.
+    // Several tables, each as its own entry: columns and the updated-at column only when given.
+    const mysql = withValues('mysql', {
+      host: 'db',
+      database: 'hr',
+      username: 'u',
+      password: 'p',
+      tables: serializeTables([
+        { tableName: 'EMPLOYEE', primaryKey: 'ID', columns: 'ID, NAME', updatedAtColumn: ' UPDATED_AT ' },
+        { tableName: 'DEPT', primaryKey: 'DEPT_ID', columns: ' , ', updatedAtColumn: '' },
+      ]),
+    });
+    expect(toIntegrationRequest(mysql, 'mysql').settings).toEqual({
+      host: 'db',
+      port: 3306,
+      databaseName: 'hr',
+      username: 'u',
+      password: 'p',
+      tables: [
+        { name: 'EMPLOYEE', primaryKey: 'ID', columns: ['ID', 'NAME'], updatedAtColumn: 'UPDATED_AT' },
+        { name: 'DEPT', primaryKey: 'DEPT_ID' },
+      ],
+    });
+    // The configuration payload carries the same tables as one JSON setting.
+    const configured = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mysql] })).sources[0].settings;
+    expect(JSON.parse(configured.tables)).toEqual(toIntegrationRequest(mysql, 'mysql').settings.tables);
+
+    const sf = withValues('salesforce', {
+      baseUrl: 'https://acme.my.salesforce.com',
+      objects: serializeObjects([
+        { name: ' Account ', fields: 'Name, Industry' },
+        { name: 'Contact', fields: 'FirstName,, Email ' },
+      ]),
+      clientId: 'c',
+      clientSecret: 's',
+      refreshToken: 'stale',
+      rmlMapping: '@prefix ex: <http://ex> .',
+    });
+    // The auth flow nests under auth; each object is its own entry; the hidden refresh token and the mapping file are left out.
     expect(toIntegrationRequest(sf, 'salesforce').settings).toEqual({
       baseUrl: 'https://acme.my.salesforce.com',
       auth: { type: 'client_credentials', clientId: 'c', clientSecret: 's' },
-      sobject: 'Account',
-      fields: ['Name', 'Industry'],
+      objects: [
+        { name: 'Account', fields: ['Name', 'Industry'] },
+        { name: 'Contact', fields: ['FirstName', 'Email'] },
+      ],
       apiVersion: '59.0',
     });
 

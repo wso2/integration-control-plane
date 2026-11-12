@@ -114,7 +114,7 @@ const SQL_TABLES = (port: string) => [
 
 /**
  * Grouped form fields for a SQL database connector, mirroring the database integrations'
- * settings: the table, the columns to ingest and the poll for rows that Change Data Capture
+ * settings: the tables, the columns to ingest and the poll for rows that Change Data Capture
  * missed. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
  * MySQL has no schema layer and omits it.
  */
@@ -128,13 +128,8 @@ const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[]
     F('username', 'Username', 'text'),
     F('password', 'Password', 'secret', { verbatim: true }),
   ),
-  ...G(
-    'Data to sync',
-    F('tableName', 'Table', 'text'),
-    F('primaryKey', 'Primary Key', 'text'),
-    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated. Leave empty for all columns.', valueType: 'list' }),
-    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Last-updated time. Recommended.' }),
-  ),
+  // Every table the integration reads, edited as one card per table; the value is a JSON array of SourceTable.
+  ...G('Data to sync', F('tables', 'Tables', 'tables')),
   ...G(
     { label: 'Sync options', collapsed: true },
     O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for new rows the change listener missed.', valueType: 'number' }),
@@ -411,7 +406,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'postgresql',
     name: 'PostgreSQL',
-    description: 'Rows of a table, kept in sync.',
+    description: 'Rows of tables, kept in sync.',
     category: 'databases',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}postgresql.svg`,
@@ -424,11 +419,11 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
         O('publicationName', 'Publication', 'text', { helper: 'Leave empty for the default.' }),
       ),
     ],
-    summaryKeys: ['host', 'database'],
+    summaryKeys: ['host', 'database', 'tables'],
     isStructuredData: true,
   },
-  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
-  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of tables, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database', 'tables'], isStructuredData: true },
+  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of tables, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database', 'tables'], isStructuredData: true },
   {
     id: 'mongodb',
     name: 'MongoDB',
@@ -485,7 +480,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'salesforce',
     name: 'Salesforce',
-    description: 'Records of a Salesforce object, kept in sync.',
+    description: 'Records of Salesforce objects, kept in sync.',
     category: 'saas',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}salesforce.svg`,
@@ -508,14 +503,15 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
         F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.refreshToken' }),
         F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.', setting: 'auth.token' }),
       ),
-      ...G('Data to sync', F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'Must have Change Data Capture enabled.' }), F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated.', valueType: 'list' })),
+      // Every object the integration reads, edited as one card per object; the value is a JSON array of SourceObject.
+      ...G('Data to sync', F('objects', 'Objects', 'objects')),
       ...G(
         { label: 'Sync options', collapsed: true },
         O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' }),
         O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for records the change listener missed.', valueType: 'number' }),
       ),
     ],
-    summaryKeys: ['baseUrl', 'sobject'],
+    summaryKeys: ['baseUrl', 'objects'],
     isStructuredData: true,
   },
   { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}hubspot.svg`, icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },

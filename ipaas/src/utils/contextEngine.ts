@@ -85,6 +85,8 @@ import type {
   SourceCategory,
   SourceConnector,
   SourceFieldDef,
+  SourceObject,
+  SourceTable,
   SourceProgress,
   UploadedFile,
   SourceProgressStatus,
@@ -145,8 +147,148 @@ export function visibleFields(connector: SourceConnector, values: Record<string,
   return fields.filter((f) => isFieldVisible(f, values));
 }
 
+// ── Database tables ─────────────────────────────────────────────────────────
+
+/** A table with nothing typed in. */
+export const BLANK_TABLE: SourceTable = { tableName: '', primaryKey: '', columns: '', updatedAtColumn: '' };
+
+/** The tables in a `tables` field's value: a JSON array, coerced to strings. A blank or unreadable value is one blank table. */
+export function parseTables(value: string | undefined): SourceTable[] {
+  if (!value || !value.trim()) return [{ ...BLANK_TABLE }];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [{ ...BLANK_TABLE }];
+    const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+    return parsed.map((t) => {
+      const r = (t ?? {}) as Partial<Record<keyof SourceTable, unknown>>;
+      return { tableName: str(r.tableName), primaryKey: str(r.primaryKey), columns: str(r.columns), updatedAtColumn: str(r.updatedAtColumn) };
+    });
+  } catch {
+    return [{ ...BLANK_TABLE }];
+  }
+}
+
+/** A `tables` field's value for these tables. */
+export const serializeTables = (tables: SourceTable[]): string => JSON.stringify(tables);
+
+/** Whether nothing is typed in any table, so the field reads as empty. */
+const tablesBlank = (tables: SourceTable[]): boolean => tables.every((t) => Object.values(t).every((v) => !nonEmpty(v)));
+
+/** A comma-separated column list, trimmed, blanks dropped. */
+const splitColumns = (columns: string): string[] =>
+  columns
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+/** Validation messages for each input of each table, '' where it is acceptable. Required inputs that are empty get a message too; the form shows messages only once something is typed. */
+export function tableErrors(tables: SourceTable[]): Record<keyof SourceTable, string>[] {
+  const seen = new Set<string>();
+  return tables.map((t) => {
+    const name = t.tableName.trim();
+    let tableName = name ? '' : 'Table is required.';
+    if (name) {
+      if (seen.has(name.toLowerCase())) tableName = 'Another table has this name.';
+      seen.add(name.toLowerCase());
+    }
+    return { tableName, primaryKey: t.primaryKey.trim() ? '' : 'Primary Key is required.', columns: '', updatedAtColumn: '' };
+  });
+}
+
+/** Why a `tables` value is unusable, naming the first bad table, or '' when every table is fine. */
+function tablesError(value: string | undefined): string {
+  const tables = parseTables(value);
+  if (tables.length === 0) return 'Add at least one table.';
+  const errors = tableErrors(tables);
+  const i = errors.findIndex((e) => Object.values(e).some(Boolean));
+  if (i < 0) return '';
+  const message = Object.values(errors[i]).find(Boolean)!;
+  return tables.length === 1 ? message : `Table ${i + 1}: ${message}`;
+}
+
+/** The integration's `tables` setting: names trimmed, column lists left out when empty, the updated-at column left out when blank. */
+function tablesSetting(tables: SourceTable[]): Record<string, unknown>[] {
+  return tables.map((t) => {
+    const columns = splitColumns(t.columns);
+    const updatedAt = t.updatedAtColumn.trim();
+    return {
+      name: t.tableName.trim(),
+      primaryKey: t.primaryKey.trim(),
+      ...(columns.length ? { columns } : {}),
+      ...(updatedAt ? { updatedAtColumn: updatedAt } : {}),
+    };
+  });
+}
+
+// ── Salesforce objects ──────────────────────────────────────────────────────
+
+/** An object with nothing typed in. */
+export const BLANK_OBJECT: SourceObject = { name: '', fields: '' };
+
+/** The objects in an `objects` field's value: a JSON array, coerced to strings. A blank or unreadable value is one blank object. */
+export function parseObjects(value: string | undefined): SourceObject[] {
+  if (!value || !value.trim()) return [{ ...BLANK_OBJECT }];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [{ ...BLANK_OBJECT }];
+    const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+    return parsed.map((o) => {
+      const r = (o ?? {}) as Partial<Record<keyof SourceObject, unknown>>;
+      return { name: str(r.name), fields: str(r.fields) };
+    });
+  } catch {
+    return [{ ...BLANK_OBJECT }];
+  }
+}
+
+/** An `objects` field's value for these objects. */
+export const serializeObjects = (objects: SourceObject[]): string => JSON.stringify(objects);
+
+/** Whether nothing is typed in any object, so the field reads as empty. */
+const objectsBlank = (objects: SourceObject[]): boolean => objects.every((o) => !nonEmpty(o.name) && !nonEmpty(o.fields));
+
+/** Validation messages for each input of each object, '' where it is acceptable. */
+export function objectErrors(objects: SourceObject[]): Record<keyof SourceObject, string>[] {
+  const seen = new Set<string>();
+  return objects.map((o) => {
+    const name = o.name.trim();
+    let nameError = name ? '' : 'Object is required.';
+    if (name) {
+      if (seen.has(name.toLowerCase())) nameError = 'Another object has this name.';
+      seen.add(name.toLowerCase());
+    }
+    return { name: nameError, fields: splitColumns(o.fields).length ? '' : 'Fields is required.' };
+  });
+}
+
+/** Why an `objects` value is unusable, naming the first bad object, or '' when every object is fine. */
+function objectsError(value: string | undefined): string {
+  const objects = parseObjects(value);
+  if (objects.length === 0) return 'Add at least one object.';
+  const errors = objectErrors(objects);
+  const i = errors.findIndex((e) => Object.values(e).some(Boolean));
+  if (i < 0) return '';
+  const message = Object.values(errors[i]).find(Boolean)!;
+  return objects.length === 1 ? message : `Object ${i + 1}: ${message}`;
+}
+
+/** The integration's `objects` setting: names trimmed, fields as a list. */
+const objectsSetting = (objects: SourceObject[]): Record<string, unknown>[] => objects.map((o) => ({ name: o.name.trim(), fields: splitColumns(o.fields) }));
+
+/** Whether a field holds nothing the user typed; a `tables` or `objects` value with only blank entries counts as empty. */
+function isFieldBlank(def: SourceFieldDef, value: string | undefined): boolean {
+  if (def.kind === 'tables') return tablesBlank(parseTables(value));
+  if (def.kind === 'objects') return objectsBlank(parseObjects(value));
+  return !nonEmpty(value ?? '');
+}
+
+/** A `tables` or `objects` field's value as the integration's setting. */
+const listSetting = (def: SourceFieldDef, value: string): Record<string, unknown>[] => (def.kind === 'tables' ? tablesSetting(parseTables(value)) : objectsSetting(parseObjects(value)));
+
 /** Validation message for one connector field; empty when the value is acceptable. */
 export function sourceFieldError(def: SourceFieldDef, value: string | undefined): string {
+  if (def.kind === 'tables') return tablesError(value);
+  if (def.kind === 'objects') return objectsError(value);
   const v = (value ?? '').trim();
   if (!v) return def.required ? `${def.label} is required.` : '';
   if (def.kind === 'url' && !isHttpUrl(v)) return 'Enter a full http(s) URL.';
@@ -214,7 +356,7 @@ export function sourceIncompleteReason(source: ContextSourceConfig): string {
   if (!connectorFor(source.type)) return 'Unknown connector';
   if (!nonEmpty(source.name)) return 'Name missing';
   const first = invalidSourceFields(source)[0];
-  if (first) return (source.values[first.key] ?? '').trim() ? `${first.label} invalid` : `${first.label} missing`;
+  if (first) return isFieldBlank(first, source.values[first.key]) ? `${first.label} missing` : `${first.label} invalid`;
   if (visibilityError(effectiveVisibility(source.stagedVisibility))) return 'Choose who can see this content';
   return stagedBlocker(source);
 }
@@ -397,7 +539,23 @@ function sanitizeSourceConfig(raw: unknown): ContextSourceConfig {
         .map((f) => ({ id: str((f as Partial<StagedFileMeta>)?.id), name: str((f as Partial<StagedFileMeta>)?.name), size: Number((f as Partial<StagedFileMeta>)?.size) || 0, contentType: str((f as Partial<StagedFileMeta>)?.contentType) }))
         .filter((f) => f.id && f.name)
     : [];
-  return { type: str(r.type), name: str(r.name), values, audience, stagedVisibility: sanitizeVisibility(r.stagedVisibility), ...(staged.length ? { staged } : {}) };
+  return { type: str(r.type), name: str(r.name), values: migrateObjectValues(str(r.type), migrateTableValues(str(r.type), values)), audience, stagedVisibility: sanitizeVisibility(r.stagedVisibility), ...(staged.length ? { staged } : {}) };
+}
+
+/** A database source saved when it read one table, as separate fields, moved into its `tables` field. */
+function migrateTableValues(type: string, values: Record<string, string>): Record<string, string> {
+  const field = connectorFor(type)?.fields.find((f) => f.kind === 'tables');
+  if (!field || values[field.key] !== undefined || values.tableName === undefined) return values;
+  const { tableName = '', primaryKey = '', columns = '', updatedAtColumn = '', ...rest } = values;
+  return { ...rest, [field.key]: serializeTables([{ tableName, primaryKey, columns, updatedAtColumn }]) };
+}
+
+/** A Salesforce source saved when it read one object, as `sobject` and `fields`, moved into its `objects` field. */
+function migrateObjectValues(type: string, values: Record<string, string>): Record<string, string> {
+  const field = connectorFor(type)?.fields.find((f) => f.kind === 'objects');
+  if (!field || values[field.key] !== undefined || values.sobject === undefined) return values;
+  const { sobject = '', fields = '', ...rest } = values;
+  return { ...rest, [field.key]: serializeObjects([{ name: sobject, fields }]) };
 }
 
 /** A stored visibility choice, coerced; anything unreadable, including a draft's old label, becomes everyone who can query. */
@@ -480,6 +638,14 @@ export function summarizeSource(source: ContextSourceConfig): string {
       const def = connector.fields.find((f) => f.key === key);
       const value = (source.values[key] ?? '').trim();
       if (!value) return '';
+      if (def?.kind === 'tables') {
+        const tables = parseTables(value);
+        return tablesBlank(tables) ? '' : plural(tables.length, 'table');
+      }
+      if (def?.kind === 'objects') {
+        const objects = parseObjects(value);
+        return objectsBlank(objects) ? '' : plural(objects.length, 'object');
+      }
       if (def?.kind === 'urls') {
         const n = splitUrls(value).length;
         return `${n} URL${n === 1 ? '' : 's'}`;
@@ -1550,11 +1716,11 @@ function integrationSettings(source: ContextSourceConfig): Record<string, unknow
   for (const f of visibleFields(connector, source.values)) {
     const value = source.values[f.key] ?? '';
     const raw = f.verbatim ? value : value.trim();
-    if (raw.trim() === '' || f.kind === 'file') continue;
+    if (isFieldBlank(f, raw) || f.kind === 'file') continue;
     const path = (f.setting ?? f.key).split('.');
     let table = settings;
     for (const key of path.slice(0, -1)) table = (table[key] ??= {}) as Record<string, unknown>;
-    table[path[path.length - 1]] = settingValue(f, raw);
+    table[path[path.length - 1]] = f.kind === 'tables' || f.kind === 'objects' ? listSetting(f, raw) : settingValue(f, raw);
   }
   return settings;
 }
@@ -1599,8 +1765,15 @@ function sourceSettings(source: ContextSourceConfig): Record<string, string> {
   return Object.fromEntries(
     visibleFields(connector, source.values)
       .filter((f) => f.kind !== 'secret')
-      .map((f) => [f.key, f.kind === 'urls' ? splitUrls(source.values[f.key] ?? '').join('\n') : (source.values[f.key] ?? '').trim()]),
+      .map((f) => [f.key, fieldSetting(f, source.values[f.key] ?? '')]),
   );
+}
+
+/** A non-secret field's value as the configuration payload carries it; tables travel as the same JSON array the integration reads. */
+function fieldSetting(def: SourceFieldDef, value: string): string {
+  if (def.kind === 'urls') return splitUrls(value).join('\n');
+  if (def.kind === 'tables' || def.kind === 'objects') return isFieldBlank(def, value) ? '' : JSON.stringify(listSetting(def, value));
+  return value.trim();
 }
 
 /** Secret field values, sent separately so the engine can store them as credentials. Only the secrets the chosen mode uses are sent. */
