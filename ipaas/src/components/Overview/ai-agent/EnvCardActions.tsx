@@ -28,7 +28,7 @@ import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 import { useLinkedVoiceAgents } from '../../../hooks/useVoiceAgents';
 import { voiceAgentTestUrl } from '../../../paths';
-import { isVoiceEndpoint } from '../../../utils/voiceAgent';
+import { agentChatEndpoint, isVoiceEndpoint } from '../../../utils/voiceAgent';
 import { useSelectedAgentEndpoint } from './selectedEndpoint';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
@@ -77,7 +77,8 @@ export default function EnvCardActions({
 
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
   const [selectedId] = useSelectedAgentEndpoint(component.id, env.id);
-  const selectedEndpoint = endpoints.find((e) => e.id === selectedId) ?? endpoints[0];
+  // The card body's endpoint: the one the user picked, else the one the agent chats on.
+  const selectedEndpoint = endpoints.find((e) => e.id === selectedId) ?? agentChatEndpoint(endpoints) ?? endpoints[0];
   const voiceSelected = isVoiceEndpoint(selectedEndpoint);
   const voiceAgent = useLinkedVoiceAgents(orgHandler, projectId, componentHandler).voiceAgents.at(0);
 
