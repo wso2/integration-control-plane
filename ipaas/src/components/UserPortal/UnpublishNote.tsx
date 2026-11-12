@@ -44,12 +44,9 @@ export default function UnpublishNote({ isWorkflow, projectId, environment, envN
       <Typography variant="body2">The User Portal&apos;s users no longer see this integration there.{isWorkflow ? '' : ' The integration keeps running.'}</Typography>
       {isWorkflow && (
         <Typography variant="body2" sx={styles.dialogBodySx}>
-          The workflow is redeployed in {envName} so its Workflow Management API takes the console&apos;s API key again.{' '}
+          {`The workflow is redeployed in ${envName} so its Workflow Management API takes the console's API key again.`}{' '}
           {keepsPortalSignIn ? (
-            <>
-              {envName} takes its API security from {entry.entryEnvironmentName} by promotion, though, so the gateway keeps taking only User Portal sign-ins here, and the console&apos;s workflow views stay off. To turn them on again, put the API back on API
-              key in {entry.entryEnvironmentName}, as unpublishing the workflow there does, then promote it here.
-            </>
+            `${envName} takes its API security from ${entry.entryEnvironmentName} by promotion, though, so the gateway keeps taking only User Portal sign-ins here, and the console's workflow views stay off. To turn them on again, put the API back on API key in ${entry.entryEnvironmentName}, as unpublishing the workflow there does, then promote it here.`
           ) : (
             <>The console&apos;s workflow views work there again.</>
           )}

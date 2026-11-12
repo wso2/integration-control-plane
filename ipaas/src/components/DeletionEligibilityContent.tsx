@@ -71,7 +71,7 @@ export default function DeletionEligibilityContent({ entityLabel, isLoading, isE
   return (
     <Alert severity="warning" icon={<AlertTriangle size={20} />}>
       <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-        This {entityLabel} is in use and can&apos;t be deleted.
+        {`This ${entityLabel} is in use and can't be deleted.`}
       </Typography>
       {blockedDetails}
     </Alert>
