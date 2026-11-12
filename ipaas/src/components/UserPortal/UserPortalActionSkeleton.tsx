@@ -20,20 +20,13 @@ import { Skeleton, Stack, Switch, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import * as styles from './UserPortal.styles';
 
-/**
- * Stands in for the env card's User Portal switch while it loads, for every integration type that has one. Each part is
- * sized by what it stands in for, the switch's label and the switch itself, laid out as the switch lays them out, so the
- * footer doesn't change size when the switch arrives.
- */
 export default function UserPortalActionSkeleton(): JSX.Element {
   return (
-    <Stack direction="row" alignItems="center" sx={styles.toggleSx} role="status" aria-busy="true" aria-label="Loading the User Portal">
-      <Skeleton variant="text">
+    <Skeleton variant="rounded" sx={styles.actionSkeletonSx} role="status" aria-busy="true" aria-label="Loading the User Portal">
+      <Stack direction="row" alignItems="center" sx={styles.toggleSx}>
         <Typography variant="body2">Publish to User Portal</Typography>
-      </Skeleton>
-      <Skeleton variant="rounded">
         <Switch size="small" />
-      </Skeleton>
-    </Stack>
+      </Stack>
+    </Skeleton>
   );
 }

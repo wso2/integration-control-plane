@@ -103,6 +103,7 @@ export const publishedDotSx = { width: 8, height: 8, borderRadius: '50%', bgcolo
 
 // The publish switch, after its label, with the pair flush with the card's left edge.
 export const toggleSx = { m: 0, gap: 1 } as const;
+export const actionSkeletonSx = { borderRadius: 5 } as const;
 
 // The footer's Open User Portal link: its icon sits centred on the text.
 export const footerLinkSx = { display: 'inline-flex', alignItems: 'center', gap: 0.5 } as const;
