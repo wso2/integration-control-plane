@@ -108,7 +108,7 @@ function UploadRow({
   const now = useNow(ELAPSED_TICK_MS, entry.status === 'queued');
   // The status shown is the last one read: the engine was out of reach.
   const retrying = entry.check !== undefined;
-  const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
+  const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' || entry.status === 'needed' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
     setSaving(true);

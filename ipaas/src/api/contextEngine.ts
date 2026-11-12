@@ -286,7 +286,7 @@ interface RawSourceProgress {
     bytes?: { delivered?: number | null; finished?: number | null } | null;
   };
   records: { active: number; quarantined: number; deleted: number };
-  indexing: { state: string; expected?: number | null; indexed?: number | null; indexing?: number | null; failed?: number | null; missing?: number | null; percent?: number | null; collectedAt?: string | null; failures?: Record<string, number> | null };
+  indexing: { state: string; expected?: number | null; indexed?: number | null; indexing?: number | null; failed?: number | null; missing?: number | null; percent?: number | null; awaitingContent?: number | null; collectedAt?: string | null; failures?: Record<string, number> | null };
 }
 
 interface RawRecordStatus {
@@ -384,6 +384,7 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
     failed: raw.indexing?.failed ?? null,
     missing: raw.indexing?.missing ?? null,
     percent: raw.indexing?.percent ?? null,
+    awaitingContent: raw.indexing?.awaitingContent ?? null,
     collectedAt: orUndefined(raw.indexing?.collectedAt),
     failures: raw.indexing?.failures ?? {},
   },
