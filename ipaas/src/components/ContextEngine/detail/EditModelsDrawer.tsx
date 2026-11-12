@@ -130,7 +130,7 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
             <Typography variant="body2">The embedding model can&apos;t change.</Typography>
           </Stack>
           <Box ref={focusEmbeddingKey ? focusKeyField : undefined}>
-            <SecretField label="API Key" value={draft.embeddingKey} onChange={(embeddingKey) => set({ embeddingKey })} helperText={KEEP_KEY_TEXT} error={keyShared ? errors.llm : undefined} />
+            <SecretField label="API key" value={draft.embeddingKey} onChange={(embeddingKey) => set({ embeddingKey })} helperText={KEEP_KEY_TEXT} error={keyShared ? errors.llm : undefined} />
           </Box>
         </Box>
 
