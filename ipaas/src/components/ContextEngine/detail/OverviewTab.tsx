@@ -98,7 +98,7 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
 }
 
 /** One public surface: its access switch, a link to its tab, and what an off switch means. */
-function ExposureRow({ engine, surface, label, link, canManage, disabledReason, onOpen }: { engine: ContextEngineDetail; surface: keyof ContextEngineAccess; label: string; link: string; canManage: boolean; disabledReason?: string; onOpen: () => void }): JSX.Element {
+function ExposureRow({ engine, surface, label, link, disabledReason, onOpen }: { engine: ContextEngineDetail; surface: keyof ContextEngineAccess; label: string; link: string; disabledReason?: string; onOpen: () => void }): JSX.Element {
   return (
     <Box sx={summaryRowSx}>
       <Box>
@@ -114,10 +114,8 @@ function ExposureRow({ engine, surface, label, link, canManage, disabledReason, 
           </Typography>
         )}
       </Box>
-      {engine.access && canManage ? (
+      {engine.access ? (
         <AccessSwitch engineId={engine.id} access={engine.access} surface={surface} disabledReason={disabledReason} />
-      ) : engine.access ? (
-        <Chip size="small" variant="outlined" color={engine.access[surface] ? 'success' : 'default'} label={engine.access[surface] ? 'On' : 'Off'} />
       ) : (
         <Typography variant="caption" sx={mutedSx}>
           Not available yet
@@ -324,8 +322,8 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
 
         <Grid size={{ xs: 12, md: 4 }}>
           <Card title="Exposure">
-            <ExposureRow engine={engine} surface="api" label="REST API" link="View API →" canManage={can(Scopes.CONFIG_MANAGE)} disabledReason={accessDisabledReason} onOpen={() => onGoTab('api')} />
-            <ExposureRow engine={engine} surface="mcp" label="MCP server" link="View MCP →" canManage={can(Scopes.CONFIG_MANAGE)} disabledReason={accessDisabledReason} onOpen={() => onGoTab('mcp')} />
+            <ExposureRow engine={engine} surface="api" label="REST API" link="View API →" disabledReason={accessDisabledReason} onOpen={() => onGoTab('api')} />
+            <ExposureRow engine={engine} surface="mcp" label="MCP server" link="View MCP →" disabledReason={accessDisabledReason} onOpen={() => onGoTab('mcp')} />
             <Box sx={summaryRowSx}>
               <Stack direction="row" alignItems="baseline" gap={1.5}>
                 <Typography variant="body2">Test playground</Typography>

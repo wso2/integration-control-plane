@@ -63,10 +63,11 @@ describe('AccessSwitch', () => {
     expect(mutate).toHaveBeenCalledWith({ mcp: false });
   });
 
-  it('is hidden without the manage scope', () => {
+  it('shows On or Off instead of the switch without the manage scope', () => {
     canManage = false;
-    act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: true }} surface="mcp" />));
+    act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: false }} surface="mcp" />));
     expect(toggle()).toBeNull();
+    expect(host.textContent).toBe('Off');
   });
 
   it('shows the pending value while applying', () => {

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
@@ -36,8 +36,8 @@ const SURFACES: Record<keyof ContextEngineAccess, { name: string; clients: strin
   mcp: { name: 'MCP', clients: 'Connected agents' },
 };
 
-/** Lets callers through to one public surface, or turns them away with a 403, at the engine's gateway. Turning it off asks first; hidden from roles that can't manage configuration. */
-export default function AccessSwitch({ engineId, access, surface, disabledReason }: AccessSwitchProps): JSX.Element | null {
+/** Lets callers through to one public surface, or turns them away with a 403, at the engine's gateway. Turning it off asks first; roles that can't manage configuration see On or Off. */
+export default function AccessSwitch({ engineId, access, surface, disabledReason }: AccessSwitchProps): JSX.Element {
   const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const set = useSetContextEngineAccess(engineId);
   const [confirming, setConfirming] = useState(false);
@@ -46,7 +46,7 @@ export default function AccessSwitch({ engineId, access, surface, disabledReason
   const apply = (on: boolean) => set.mutate({ [surface]: on });
   const onChange = (on: boolean) => (on ? apply(true) : setConfirming(true));
 
-  if (!canManage) return null;
+  if (!canManage) return <Chip size="small" variant="outlined" color={access[surface] ? 'success' : 'default'} label={access[surface] ? 'On' : 'Off'} />;
 
   return (
     <Stack alignItems="flex-end">
