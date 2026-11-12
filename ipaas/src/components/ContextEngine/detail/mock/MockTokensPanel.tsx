@@ -16,14 +16,17 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Chip, Drawer, IconButton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Eye, EyeOff, KeyRound, Plus, Trash2, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Avatar, Box, Button, Chip, DrawerPanel, IconButton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Eye, EyeOff, KeyRound, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import { REGENERATE_KEY_WARNING, REVOKE_KEY_WARNING, TOKEN_MASK, TOKEN_NOT_RETRIEVABLE_NOTICE, TOKEN_ONE_TIME_WARNING } from '../../../../constants/apiConsumption';
 import ConfirmDeleteDialog from '../../../ConfirmDeleteDialog';
 import CopyButton from '../../../Overview/integration-as-api/CopyButton';
-import * as styles from './mockTokensPanel.styles';
+import * as styles from '../../../Overview/integration-as-api/apiConsumption.styles';
 import { createMockToken, deleteMockToken, forgetMockSecret, regenerateMockToken, revokeMockToken, useMockTokens, type MockToken } from './mockTokens';
+
+/** Secondary actions on the left and the primary on the right, as the Consumers drawer's footer. */
+const splitFooterSx = { justifyContent: 'space-between' } as const;
 
 /** `'new'` opens the create form; a token opens it in manage mode. */
 type Target = MockToken | 'new' | null;
@@ -136,123 +139,115 @@ function MockTokenDrawer({ engineId, target, tokens, onClose }: { engineId: stri
   const header = token?.secret ?? '';
 
   return (
-    <Drawer anchor="right" open={open} onClose={close} variant="temporary" sx={styles.rightDrawer}>
-      <Box sx={styles.drawerFrame}>
-        <Box sx={styles.drawerHeader}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            {token ? token.name : 'New access token'}
-          </Typography>
-          <IconButton size="small" onClick={close} aria-label="Close">
-            <X size={16} />
-          </IconButton>
-        </Box>
+    <DrawerPanel open={open} onClose={close}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>{token ? token.name : 'New access token'}</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-        <Box sx={styles.drawerBody}>
-          <Alert severity="warning" sx={styles.dialogAlert}>
-            Mock: this token is not real. The engine does not accept it.
-          </Alert>
-          <TextField
-            label="Token name"
-            labelPlacement="top"
-            required={!token}
-            value={token ? token.name : name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. support-bot"
-            size="small"
-            fullWidth
-            autoFocus={!token}
-            disabled={!!token}
-            error={!token && taken}
-            helperText={!token && taken ? 'A token with this name already exists.' : 'Name it after the app or agent that will use it.'}
-            sx={token ? styles.lockedField : undefined}
-          />
+      <DrawerPanel.Body>
+        <Alert severity="warning" sx={styles.dialogAlert}>
+          Mock: this token is not real. The engine does not accept it.
+        </Alert>
+        <TextField
+          label="Token name"
+          labelPlacement="top"
+          required={!token}
+          value={token ? token.name : name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. support-bot"
+          size="small"
+          fullWidth
+          autoFocus={!token}
+          disabled={!!token}
+          error={!token && taken}
+          helperText={!token && taken ? 'A token with this name already exists.' : 'Name it after the app or agent that will use it.'}
+          sx={token ? styles.lockedField : undefined}
+        />
 
-          {token && (
-            <Box sx={styles.credentialsSection}>
-              {token.secret && (
-                <Alert severity="warning" sx={styles.dialogAlert}>
-                  {TOKEN_ONE_TIME_WARNING}
-                </Alert>
-              )}
-              <Typography sx={styles.fieldLabel}>Header</Typography>
+        {token && (
+          <Box sx={styles.credentialsSection}>
+            {token.secret && (
+              <Alert severity="warning" sx={styles.dialogAlert}>
+                {TOKEN_ONE_TIME_WARNING}
+              </Alert>
+            )}
+            <Typography sx={styles.fieldLabel}>Header</Typography>
+            <Box sx={styles.credField}>
+              <Typography component="span" sx={styles.credValue}>
+                X-API-Key
+              </Typography>
+              <CopyButton value="X-API-Key" label="Copy header name" />
+            </Box>
+            <Typography sx={styles.nextFieldLabel}>Value</Typography>
+            {token.secret ? (
               <Box sx={styles.credField}>
                 <Typography component="span" sx={styles.credValue}>
-                  X-API-Key
+                  {reveal ? header : TOKEN_MASK}
                 </Typography>
-                <CopyButton value="X-API-Key" label="Copy header name" />
+                <Tooltip title={reveal ? 'Hide' : 'Reveal'}>
+                  <IconButton size="small" aria-label={reveal ? 'Hide token' : 'Reveal token'} onClick={() => setReveal((v) => !v)} sx={styles.credIconButton}>
+                    {reveal ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </IconButton>
+                </Tooltip>
+                <CopyButton value={header} label="Copy header value" />
               </Box>
-              <Typography sx={styles.nextFieldLabel}>Value</Typography>
-              {token.secret ? (
-                <Box sx={styles.credField}>
-                  <Typography component="span" sx={styles.credValue}>
-                    {reveal ? header : TOKEN_MASK}
-                  </Typography>
-                  <Tooltip title={reveal ? 'Hide' : 'Reveal'}>
-                    <IconButton size="small" aria-label={reveal ? 'Hide token' : 'Reveal token'} onClick={() => setReveal((v) => !v)} sx={styles.credIconButton}>
-                      {reveal ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </IconButton>
-                  </Tooltip>
-                  <CopyButton value={header} label="Copy header value" />
-                </Box>
-              ) : (
-                <Alert severity="info">{token.status === 'revoked' ? 'This token is revoked. Regenerate it to use it again.' : TOKEN_NOT_RETRIEVABLE_NOTICE}</Alert>
-              )}
-            </Box>
-          )}
-        </Box>
-
-        {confirm && token && (
-          // Confirmed in the drawer itself: a dialog over a drawer would stack two modal layers.
-          <Box sx={{ px: 3, pt: 2 }}>
-            <Alert severity="warning">{confirm === 'regenerate' ? REGENERATE_KEY_WARNING : REVOKE_KEY_WARNING}</Alert>
+            ) : (
+              <Alert severity="info">{token.status === 'revoked' ? 'This token is revoked. Regenerate it to use it again.' : TOKEN_NOT_RETRIEVABLE_NOTICE}</Alert>
+            )}
           </Box>
         )}
-        <Box sx={token ? styles.drawerFooterSplit : styles.drawerFooter}>
-          {confirm && token ? (
-            <>
-              <Button variant="outlined" color="inherit" onClick={() => setConfirm(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={() => {
-                  if (confirm === 'regenerate') {
-                    regenerateMockToken(engineId, token.id);
-                    setReveal(false);
-                  } else revokeMockToken(engineId, token.id);
-                  setConfirm(null);
-                }}>
-                {confirm === 'regenerate' ? 'Regenerate token' : 'Revoke token'}
-              </Button>
-            </>
-          ) : token ? (
-            <>
-              <Button variant="outlined" color="error" onClick={() => setConfirm('revoke')} disabled={token.status === 'revoked'}>
-                Revoke
-              </Button>
-              <Stack direction="row" gap={1}>
-                <Button variant="outlined" onClick={() => setConfirm('regenerate')}>
-                  Regenerate
-                </Button>
-                <Button variant="contained" onClick={close}>
-                  Done
-                </Button>
-              </Stack>
-            </>
-          ) : (
-            <>
-              <Button variant="outlined" onClick={close}>
-                Cancel
-              </Button>
-              <Button variant="contained" disabled={!name.trim() || taken} onClick={() => setCreatedId(createMockToken(engineId, name).id)}>
-                Create token
-              </Button>
-            </>
-          )}
-        </Box>
-      </Box>
 
-    </Drawer>
+        {/* Confirmed in the drawer itself: a dialog over a drawer would stack two modal layers. */}
+        {confirm && token && <Alert severity="warning">{confirm === 'regenerate' ? REGENERATE_KEY_WARNING : REVOKE_KEY_WARNING}</Alert>}
+      </DrawerPanel.Body>
+
+      <DrawerPanel.Footer sx={token && !confirm ? splitFooterSx : undefined}>
+        {confirm && token ? (
+          <>
+            <Button variant="outlined" color="inherit" onClick={() => setConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => {
+                if (confirm === 'regenerate') {
+                  regenerateMockToken(engineId, token.id);
+                  setReveal(false);
+                } else revokeMockToken(engineId, token.id);
+                setConfirm(null);
+              }}>
+              {confirm === 'regenerate' ? 'Regenerate token' : 'Revoke token'}
+            </Button>
+          </>
+        ) : token ? (
+          <>
+            <Button variant="outlined" color="error" onClick={() => setConfirm('revoke')} disabled={token.status === 'revoked'}>
+              Revoke
+            </Button>
+            <Stack direction="row" gap={1}>
+              <Button variant="outlined" onClick={() => setConfirm('regenerate')}>
+                Regenerate
+              </Button>
+              <Button variant="contained" onClick={close}>
+                Done
+              </Button>
+            </Stack>
+          </>
+        ) : (
+          <>
+            <Button variant="outlined" color="inherit" onClick={close}>
+              Cancel
+            </Button>
+            <Button variant="contained" disabled={!name.trim() || taken} onClick={() => setCreatedId(createMockToken(engineId, name).id)}>
+              Create token
+            </Button>
+          </>
+        )}
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }
