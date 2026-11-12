@@ -1280,7 +1280,7 @@ export const DELETION_FAILURE_TEXT = 'Deletion did not finish. Your data is kept
 const sameModel = (a: ContextModelSummary | null | undefined, b: ContextModelSummary): boolean => !!a && a.provider === b.provider && a.model === b.model;
 
 /** Whether answers come from the ingestion model, as far as the engine reports its models. */
-export const answersFromIngestion = (models: ContextEngineModels): boolean => !models.answer || (!!models.llm && sameModel(models.answer, models.llm));
+export const answersFromIngestion = (models: ContextEngineModels): boolean => !models.answer || (!models.answerOwnKey && !!models.llm && sameModel(models.answer, models.llm));
 
 const draftLlm = (m: ContextModelSummary): LlmConfig => ({ ...blankLlm(m.provider as LlmProvider), model: m.model });
 
@@ -1307,8 +1307,9 @@ export function modelsDraftErrors(models: ContextEngineModels, draft: ModelsDraf
   let answer = '';
   if (answersEnabled && draft.answerChoice === 'different') {
     const current = answersFromIngestion(models) ? models.llm : models.answer;
+    const borrowedKeyMoved = providerMoved && !models.answerOwnKey;
     if (!draft.answer || !nonEmpty(draft.answer.model)) answer = 'Choose a model.';
-    else if ((providerMoved || draft.answer.provider !== current?.provider) && draft.answer.provider !== draft.llm.provider && !nonEmpty(draft.answer.apiKey)) answer = NEW_PROVIDER_KEY_TEXT;
+    else if ((borrowedKeyMoved || draft.answer.provider !== current?.provider) && draft.answer.provider !== draft.llm.provider && !nonEmpty(draft.answer.apiKey)) answer = NEW_PROVIDER_KEY_TEXT;
   }
   return { llm, answer };
 }
@@ -1344,8 +1345,16 @@ export function isRestartPending(startedAt: string | undefined, restartedAt: str
 export function modelsAfterUpdate(models: ContextEngineModels, update: Omit<UpdateContextModelsInput, 'engineId'>): ContextEngineModels {
   const llm = update.ingestion ? { provider: update.ingestion.provider, model: update.ingestion.model } : models.llm;
   let answer = answersFromIngestion(models) ? null : models.answer;
-  if (update.answer) answer = 'sameAsIngestion' in update.answer ? null : { provider: update.answer.provider, model: update.answer.model };
-  return { ...models, llm, answer };
+  let answerOwnKey = models.answerOwnKey;
+  if (update.answer && 'sameAsIngestion' in update.answer) {
+    answer = null;
+    if (answerOwnKey !== undefined) answerOwnKey = false;
+  } else if (update.answer) {
+    const next = { provider: update.answer.provider, model: update.answer.model };
+    if (answerOwnKey !== undefined) answerOwnKey = nonEmpty(update.answer.apiKey ?? '') || (answerOwnKey && next.provider === answer?.provider);
+    answer = next;
+  }
+  return { ...models, llm, answer, ...(answerOwnKey !== undefined ? { answerOwnKey } : {}) };
 }
 
 /** An engine read while it restarts, with what its last read got from the engine itself. */

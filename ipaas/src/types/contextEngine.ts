@@ -93,6 +93,8 @@ export interface ContextEngineModels {
   llm: ContextModelSummary | null;
   /** The model that writes answers; null when the engine offers none. */
   answer?: ContextModelSummary | null;
+  /** The answer model has an API key of its own; unknown when the BFF does not say. */
+  answerOwnKey?: boolean;
   /** The engine holds indexed content, so the embedding model cannot change until it can re-index. */
   embeddingLocked?: boolean;
 }

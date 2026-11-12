@@ -1414,6 +1414,9 @@ describe('changing models on a running engine', () => {
     const anthropic = { ...draft.llm, provider: 'anthropic' as const, model: 'claude-haiku-5-5' };
     expect(modelsUpdate(models, { ...draft, answerChoice: 'different', answer: anthropic }, true)).toEqual({ answer: { provider: 'anthropic', model: 'claude-haiku-5-5' } });
     expect(modelsUpdate({ ...models, answer: { provider: 'anthropic', model: 'claude-haiku-5-5' } }, draft, true)).toEqual({ answer: { sameAsIngestion: true } });
+    const ownKey = { ...models, answerOwnKey: true };
+    expect(modelsDraftOf(ownKey)).toMatchObject({ answerChoice: 'different', answer: { provider: 'openai', model: 'gpt-6-luna', apiKey: '' } });
+    expect(modelsUpdate(ownKey, modelsDraftOf(ownKey), true)).toBeNull();
   });
 
   it('asks for a key when a provider changes, unless the answer model can borrow the ingestion key', () => {
@@ -1422,6 +1425,9 @@ describe('changing models on a running engine', () => {
     expect(modelsDraftErrors(models, { ...draft, answerChoice: 'different', answer: anthropic }, true).answer).toBe('A new provider needs its own key.');
     expect(modelsDraftErrors(models, { ...draft, llm: { ...anthropic, apiKey: 'sk-a' }, answerChoice: 'different', answer: anthropic }, true)).toEqual({ llm: '', answer: '' });
     expect(modelsDraftErrors(models, { ...draft, embeddingKey: 'sk-e', shareKey: true, llm: anthropic }, true).llm).toBe('A new provider needs its own key.');
+    const ownAnswerKey = { ...models, answer: { provider: 'openai', model: 'gpt-6.1-terra' }, answerOwnKey: true };
+    expect(modelsDraftErrors(ownAnswerKey, { ...modelsDraftOf(ownAnswerKey), llm: { ...anthropic, apiKey: 'sk-a' } }, true)).toEqual({ llm: '', answer: '' });
+    expect(modelsDraftErrors({ ...ownAnswerKey, answerOwnKey: false }, { ...modelsDraftOf(ownAnswerKey), llm: { ...anthropic, apiKey: 'sk-a' } }, true).answer).toBe('A new provider needs its own key.');
     expect(modelsUpdate(models, { ...draft, embeddingKey: 'sk-e', shareKey: true, llm: { ...anthropic, apiKey: 'sk-a' } }, true)?.ingestion).toEqual({ provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: 'sk-a' });
   });
 

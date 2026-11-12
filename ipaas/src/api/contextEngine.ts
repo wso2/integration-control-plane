@@ -241,6 +241,7 @@ interface BffEngine {
   mcpEnabled?: boolean;
   startedAt?: string;
   restartedAt?: string;
+  answerOwnKey?: boolean;
 }
 
 interface BffIntegration {
@@ -538,7 +539,8 @@ export async function getContextEngineSummary(engineId: string): Promise<Context
 
 /** The engine with its sources, models, query roles and exposure. Until it runs, only what the BFF knows. */
 export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
-  const engine = toEngine(await viaBff(() => bff.get<BffEngine>(enginePath(engineId))));
+  const raw = await viaBff(() => bff.get<BffEngine>(enginePath(engineId)));
+  const engine = toEngine(raw);
   if (engine.state !== 'ready' || isRestartPending(engine.startedAt, engine.restartedAt)) {
     return { ...engine, sources: [], models: toModels(null), queryRoles: [], exposure: toExposure(null, engine.access), storage: null };
   }
@@ -547,7 +549,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     ...engine,
     description: engine.description || config?.description || '',
     sources: sources.map(toSource),
-    models: toModels(config),
+    models: { ...toModels(config), ...(typeof raw.answerOwnKey === 'boolean' ? { answerOwnKey: raw.answerOwnKey } : {}) },
     queryRoles: rolesFromGrants(grants.map(toGrant)),
     exposure: toExposure(config, engine.access),
     storage: toStorage(config),
