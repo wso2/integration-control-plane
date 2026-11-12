@@ -25,6 +25,8 @@ const offered = (buildpackType: string, displayType: string, componentSubType: s
 describe('isAutoDeployOffered', () => {
   it('is not offered for the integrations ipaas-service deploys itself', () => {
     expect(offered(BI_BUILDPACK, 'ballerinaWorkflow')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'ballerinaService')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'MCP')).toBe(false);
     expect(offered('MI', 'miApiService')).toBe(false);
     expect(offered('MI', 'miWebhook')).toBe(false);
     expect(offered('MI', 'miCronjob')).toBe(false);
@@ -35,7 +37,6 @@ describe('isAutoDeployOffered', () => {
   });
 
   it('is offered for Ballerina integrations', () => {
-    expect(offered(BI_BUILDPACK, 'ballerinaService')).toBe(true);
     expect(offered(BI_BUILDPACK, 'scheduledTask')).toBe(true);
     expect(offered(BI_BUILDPACK, 'ballerinaEventHandler')).toBe(true);
     expect(offered(BI_BUILDPACK, 'ballerinaService', 'webhook')).toBe(true);

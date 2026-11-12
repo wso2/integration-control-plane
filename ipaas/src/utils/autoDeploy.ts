@@ -35,6 +35,8 @@ export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displa
   if (enabled) return true;
   // A workflow's deploy also connects it to the workflow runtime, which only ipaas-service does.
   if (type === 'workflow') return false;
+  // ipaas-service's deploy publishes their gateway API or MCP server, which an auto-deploy skips.
+  if (type === 'integration-as-api' || type === 'mcp-server') return false;
   if (AUTO_DEPLOY_AVAILABLE) return true;
   // MI deploys one way, through ipaas-service.
   return c.buildpackType !== MI_BUILDPACK_TYPE && runtime !== 'mi';
