@@ -135,4 +135,24 @@ describe('ai-agent EnvCardBody endpoint', () => {
     expect(text).not.toContain('This WebSocket endpoint serves voice conversations');
     expect(security.endpointName).toBe('math-tutor-endpoint');
   });
+
+  it('lists a voice endpoint’s own wss:// route as Public, without asking for a gateway URL', async () => {
+    const wssRoute = 'wss://gw.example/math-tutor-voice';
+    listed.endpoints = [
+      {
+        ...voiceEndpoint,
+        exposure: 'public',
+        networkVisibilities: ['Project', 'Public'],
+        visibilityStatus: { public: { status: 'ENABLED', url: wssRoute }, organization: { status: 'DISABLED' } },
+        publicUrl: wssRoute,
+        projectUrl,
+      },
+    ];
+    security.data = { publicUrl: gatewayUrl };
+    const text = await render();
+    expect(text).toContain(wssRoute);
+    expect(text).not.toContain(gatewayUrl);
+    expect(text).toContain('This WebSocket endpoint serves voice conversations');
+    expect(security.endpointName).toBeUndefined();
+  });
 });

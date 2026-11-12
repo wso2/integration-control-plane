@@ -40,11 +40,13 @@ export default function EnvCardBody({ component, env, orgHandler, projectId, ver
   const voiceAgent = useLinkedVoiceAgents(orgHandler, projectId, component.handler).voiceAgents.at(0);
 
   // The agent's URL on Agent Manager's AI gateway, where every agent is deployed. It is the only URL the card
-  // lists: the endpoint's own routes (its OpenChoreo external route and its in-cluster project URL) carry
-  // neither the agent's API key nor its gateway policy. '' while the gateway has none, which shows as "—".
-  const securityRef = selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id, deploymentTrackId: versionId } : null;
-  const { data: apiSecurity, isError: isSecurityError, error: securityError, isFetching: isSecurityFetching, refetch: refetchSecurity } = useEndpointSecurity(securityRef, !!selectedEndpoint);
-  const agentGatewayUrl = apiSecurity?.publicUrl ?? '';
+  // lists for the agent's own endpoint: that endpoint's routes (its OpenChoreo external route and its in-cluster
+  // project URL) carry neither the agent's API key nor its gateway policy. '' while the gateway has none, which
+  // shows as "—". A voice endpoint is not on the gateway: the card lists the wss:// route the listing gives it.
+  const voiceSelected = isVoiceEndpoint(selectedEndpoint);
+  const securityRef = selectedEndpoint && !voiceSelected ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id, deploymentTrackId: versionId } : null;
+  const { data: apiSecurity, isError: isSecurityError, error: securityError, isFetching: isSecurityFetching, refetch: refetchSecurity } = useEndpointSecurity(securityRef, !!securityRef);
+  const agentGatewayUrl = voiceSelected ? undefined : (apiSecurity?.publicUrl ?? '');
 
   if (!hasDeployment) {
     return (
@@ -80,7 +82,7 @@ export default function EnvCardBody({ component, env, orgHandler, projectId, ver
           {friendlyApiError(securityError, 'Could not read the agent’s AI gateway URL.')}
         </Alert>
       )}
-      {isVoiceEndpoint(selectedEndpoint) ? (
+      {voiceSelected ? (
         <Alert severity="info" sx={{ mt: 2 }}>
           {voiceAgent ? (
             <>
