@@ -41,12 +41,28 @@ import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
-import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validateRequiredFields } from '../utils/runtimeArguments';
-import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
+import { isByoiComponent } from '../constants/integrations';
+import {
+  AFTER_REPEATED_ERROR,
+  FREE_FORM_ARGUMENTS,
+  POSITIONAL_GAP_ERROR,
+  buildExecutionArgumentsFromForm,
+  formDataEqual,
+  hasAnyFormData,
+  isCommitSha,
+  parseArgumentsToFormData,
+  parseRuntimeArgumentsToFormFields,
+  validatePositionalOrder,
+  validateRequiredFields,
+} from '../utils/runtimeArguments';
+import { apiErrorMessage, httpStatusOf, isNotFoundError } from '../utils/apiErrors';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { isTerminalStatus } from '../utils/executionStatus';
-import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, TaskExecution } from '../types/executions';
+import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, RuntimeArgument, TaskExecution } from '../types/executions';
 import type { ComponentScope } from '../nav';
+
+const argsNoticeSx = { mb: 3 } as const;
+const NO_ARGUMENTS: RuntimeArgument[] = [];
 
 /**
  * Automation "Test" page — mirrors Devant's "Test your automation" console layout:
@@ -74,7 +90,19 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   const commitHash = deployment?.build?.commit?.sha ?? '';
   const buildDate = deployment?.build?.commit?.author?.date;
 
-  const { data: runtimeArguments = [], isLoading: argsLoading, isError: argsError, error: argsErr } = useRuntimeArguments(comp?.id ?? '', trackId, commitHash, !!releaseId && !!commitHash);
+  // An image deployment (BYOI) has no build to record arguments, and reports its image
+  // tag as the commit, so its runs take arguments entered by hand and nothing is fetched.
+  const imageDeployment = !!comp && isByoiComponent(comp.displayType);
+  const argsCommit = !imageDeployment && isCommitSha(commitHash) ? commitHash : '';
+  const { data: declaredArguments = NO_ARGUMENTS, isLoading: argsLoading, isFetching: argsFetching, isError: argsError, error: argsErr, refetch: refetchArgs } = useRuntimeArguments(comp?.id ?? '', trackId, argsCommit, !!releaseId && !!argsCommit);
+  // A 424 is a build that recorded no arguments the form can use; a build of the commit
+  // records them. Until then the run takes arguments entered by hand, in order.
+  const argsNotRecorded = argsError && httpStatusOf(argsErr) === 424;
+  // A 404 is an integration or deployment track this page no longer finds: trigger-only.
+  const argsUnavailable = argsError && isNotFoundError(argsErr);
+  const hardArgsError = argsError && !argsUnavailable && !argsNotRecorded;
+  const freeForm = imageDeployment || argsNotRecorded;
+  const runtimeArguments = freeForm ? FREE_FORM_ARGUMENTS : declaredArguments;
   const formFields = useMemo(() => parseRuntimeArgumentsToFormFields(runtimeArguments), [runtimeArguments]);
 
   // form + run state (lifted so the args preview and stepper stay in sync)
@@ -135,14 +163,20 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   }, [trackId, envId]);
 
   const handleFieldChange = (fieldId: string, value: DynamicFormFieldValue) => {
-    setFormData((prev) => ({ ...prev, [fieldId]: value }));
-    if (showErrors && validationErrors[fieldId]) {
-      setValidationErrors((prev) => {
-        const next = { ...prev };
-        delete next[fieldId];
-        return next;
-      });
-    }
+    const nextData = { ...formData, [fieldId]: value };
+    setFormData(nextData);
+    if (!showErrors) return;
+    // A gap in the positional arguments can be closed from either side, so order errors
+    // are rechecked against the new values, not only cleared on the edited field.
+    const orderErrors = validatePositionalOrder(runtimeArguments, nextData);
+    setValidationErrors((prev) => {
+      const next = { ...prev };
+      delete next[fieldId];
+      for (const [id, message] of Object.entries(next)) {
+        if ((message === POSITIONAL_GAP_ERROR || message === AFTER_REPEATED_ERROR) && !orderErrors[id]) delete next[id];
+      }
+      return next;
+    });
   };
 
   // Load responses into the form as the committed baseline, dropping any in-progress run view.
@@ -204,16 +238,20 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   };
 
   // Fetch the selected execution's saved arguments, then parse them into the form.
-  const { data: appliedArgs = [], isLoading: applyLoading } = useExecutionArguments(applyRunId, comp?.id ?? '', releaseId, !!applyRunId);
+  const { data: appliedArgs = [], isLoading: applyLoading, isError: applyFailed, error: applyErr } = useExecutionArguments(applyRunId, comp?.id ?? '', releaseId, !!applyRunId);
   useEffect(() => {
     if (!applyRunId || applyLoading) return;
-    applyFormData(parseArgumentsToFormData(appliedArgs, runtimeArguments));
+    // A failed or empty load keeps the form as it is: applying it would clear the form.
+    if (applyFailed) setRunError(apiErrorMessage(applyErr, "Couldn't load that execution's arguments."));
+    else if (appliedArgs.length === 0) setRunError('No arguments were saved for that execution.');
+    // The free-form field takes the saved values in the order the run took them.
+    else applyFormData(freeForm ? { [FREE_FORM_ARGUMENTS[0].name]: appliedArgs.map((a) => a.argumentValue) } : parseArgumentsToFormData(appliedArgs, runtimeArguments));
     setApplyRunId('');
-  }, [applyRunId, applyLoading, appliedArgs, runtimeArguments]);
+  }, [applyRunId, applyLoading, applyFailed, applyErr, appliedArgs, runtimeArguments, freeForm]);
 
   const handleRun = async () => {
     setRunError(null);
-    const errors = validateRequiredFields(formFields, formData);
+    const errors = { ...validatePositionalOrder(runtimeArguments, formData), ...validateRequiredFields(formFields, formData) };
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       setShowErrors(true);
@@ -244,10 +282,6 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     );
   };
 
-  // A 404 means "no schema" and a not-implemented stub means the product has no
-  // runtime-arguments API at all. Neither is a failure — both mean trigger-only.
-  const argsUnavailable = argsError && (isNotFoundError(argsErr) || isUnsupportedError(argsErr));
-  const hardArgsError = argsError && !argsUnavailable;
   const hasFormData = hasAnyFormData(formData);
   const hasArgs = runtimeArguments.length > 0;
   // Critical (e.g. Production) environments phrase the action as Run rather than Test.
@@ -340,7 +374,6 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   // Runtime arguments present → the "Test your automation" form view (two panels).
   const renderFormView = (resolvedTrackId: string): JSX.Element => (
     <Box>
-      {pageTitle}
       <FormExecutionSummary
         commitSha={commitHash}
         buildDate={buildDate}
@@ -350,6 +383,16 @@ export default function AutomationTest({ org, project, component }: ComponentSco
         onRefresh={() => queryClient.invalidateQueries({ queryKey: ['taskExecutions'] })}
         refreshDisabled={trigger.isPending}
       />
+      {imageDeployment && (
+        <Alert severity="info" sx={argsNoticeSx}>
+          Image deployments don&apos;t declare runtime arguments. Enter the arguments in the order the run takes them.
+        </Alert>
+      )}
+      {argsNotRecorded && (
+        <Alert severity="info" sx={argsNoticeSx}>
+          {apiErrorMessage(argsErr, "This build didn't record its runtime arguments. Rebuild the integration to record them.")} Until then, enter the arguments in the order the run takes them.
+        </Alert>
+      )}
 
       <Box sx={{ display: 'flex', gap: 4, mt: 5, alignItems: 'stretch' }}>
         {/* Left panel scrolls with the page when the form is long. */}
@@ -412,7 +455,18 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     // A loaded integration always resolves a track; the check narrows the type for what follows.
     if (trackId === undefined) return renderNotice(<CircularProgress />);
     if (!deployment || !releaseId) return renderNotice(<NotDeployedAlert status={deployment?.deploymentStatusV2} />);
-    if (hardArgsError) return renderNotice(<Alert severity="error">Could not load this automation&apos;s runtime arguments. Retry in a moment; if it persists, the automation can still be triggered from its environment card.</Alert>);
+    if (hardArgsError)
+      return renderNotice(
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refetchArgs()} disabled={argsFetching} startIcon={argsFetching ? <CircularProgress size={14} color="inherit" /> : undefined}>
+              {argsFetching ? 'Retrying' : 'Retry'}
+            </Button>
+          }>
+          {apiErrorMessage(argsErr, "Couldn't load this automation's runtime arguments.")}
+        </Alert>,
+      );
     // Deployed but not usable yet — say so instead of offering a Run button with
     // no workload behind it.
     if (deployment.deploymentStatusV2 !== 'ACTIVE') return renderNotice(<NotDeployedAlert status={deployment.deploymentStatusV2} />);

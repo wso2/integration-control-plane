@@ -67,7 +67,7 @@ describe('isNotFoundError', () => {
 
 describe('isUnsupportedError', () => {
   it('matches the not-implemented stubs thrown by the cloud and icp API layers', () => {
-    expect(isUnsupportedError(new Error('[cloud] executions.fetchRuntimeArguments: not implemented'))).toBe(true);
+    expect(isUnsupportedError(new Error('[cloud] insights.fetchAutomationInsights: not implemented'))).toBe(true);
     expect(isUnsupportedError(new Error('[icp] governance.fetchPolicies: not implemented'))).toBe(true);
   });
 
