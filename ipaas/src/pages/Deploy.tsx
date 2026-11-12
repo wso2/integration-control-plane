@@ -137,7 +137,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
               firstEnvId={environments[0]?.id ?? ''}
               firstEnvTemplateId={environments[0]?.templateId ?? environments[0]?.id ?? ''}
               autoDeployEnabled={autoDeployEnabled}
-              autoDeployAvailable={isAutoDeployOffered(component)}
+              autoDeployAvailable={isAutoDeployOffered(component, autoDeployEnabled)}
               componentName={component.name}
               projectHandler={project?.handler ?? ''}
               displayType={component.displayType}

@@ -41,6 +41,18 @@ describe('isAutoDeployOffered', () => {
     expect(offered(BI_BUILDPACK, 'ballerinaService', 'webhook')).toBe(true);
   });
 
+  it('is not offered for integrations the platform provisions without a build', () => {
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'tailscale')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'knowledge-base')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'ballerinaService', 'rag-service')).toBe(false);
+    expect(offered(BI_BUILDPACK, 'scheduledTask', 'rag-ingestion')).toBe(false);
+  });
+
+  it('is offered while auto-deploy is on, so a held integration can turn it off', () => {
+    expect(isAutoDeployOffered({ buildpackType: BI_BUILDPACK, displayType: 'ballerinaWorkflow', componentSubType: null }, true)).toBe(true);
+    expect(isAutoDeployOffered({ buildpackType: 'MI', displayType: 'miApiService', componentSubType: null }, true)).toBe(true);
+  });
+
   it('is offered for agents and for integrations of another runtime', () => {
     expect(offered(BI_BUILDPACK, 'ballerinaService', 'aiAgent')).toBe(true);
     expect(offered('other', 'byocEventHandler')).toBe(true);
