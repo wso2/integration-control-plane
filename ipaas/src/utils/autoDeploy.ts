@@ -28,9 +28,9 @@ const UNBUILT_TYPES = new Set(['tailscale-vpn', 'rag-ingestion', 'mcp-proxy']);
 const UNBUILT_SUBTYPES = new Set(['knowledge-base', 'rag-service', 'rag-retrieval-service']);
 
 /** Mirrors ipaas-service's auto-deploy hold, so the Deploy page offers the switch only where it can be turned on. */
-export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displayType' | 'componentSubType'>, enabled = false): boolean {
+export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displayType' | 'componentSubType' | 'isPrebuilt'>, enabled = false): boolean {
   const { type, runtime } = identifyIntegration(c.displayType ?? '', c.componentSubType ?? null);
-  if (UNBUILT_TYPES.has(type) || UNBUILT_SUBTYPES.has(c.componentSubType ?? '')) return false;
+  if (c.isPrebuilt || UNBUILT_TYPES.has(type) || UNBUILT_SUBTYPES.has(c.componentSubType ?? '')) return false;
   // Turning it off is always allowed, so a held integration that already has it on can still turn it off.
   if (enabled) return true;
   // A workflow's deploy also connects it to the workflow runtime, which only ipaas-service does.
