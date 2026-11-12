@@ -18,7 +18,7 @@
 
 import { OrganizationUnitSwitcher, type AccessibleOrganizationUnit } from '@thunderid/react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { OrganizationSwitchError, loadConsoleHome, switchOrganization } from './orgSwitch';
+import { OrganizationSwitchError, loadConsolePage, switchOrganization } from './orgSwitch';
 
 /** What the organization list hands its child: the organizations and how to switch to one. */
 export interface OrganizationSwitchState {
@@ -28,11 +28,12 @@ export interface OrganizationSwitchState {
   /** The organization being switched to, or `null`. Stays set once the switch succeeds, while the page reloads. */
   switchingId: string | null;
   /**
-   * Switches to `unit`; `currentId` is where the sessions go back to if a step fails. The promise settles
+   * Switches to `unit`, then loads `landingPath` (an app path in `unit`); `currentId` is where the sessions
+   * go back to if a step fails. The promise settles
    * only when the switch fails: on success the console reloads, so it never does, which keeps a leave
    * guard released (useLeaveGuard) until the page has gone.
    */
-  onSwitch: (unit: AccessibleOrganizationUnit, currentId: string) => Promise<void>;
+  onSwitch: (unit: AccessibleOrganizationUnit, currentId: string, landingPath: string) => Promise<void>;
 }
 
 /** How many organizations the header asks for at once. */
@@ -55,13 +56,13 @@ export function OrganizationList({ children }: { children: (state: OrganizationS
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const onSwitch = (unit: AccessibleOrganizationUnit, currentId: string): Promise<void> => {
+  const onSwitch = (unit: AccessibleOrganizationUnit, currentId: string, landingPath: string): Promise<void> => {
     if (switchingId !== null) return Promise.resolve();
     setError(null);
     setSwitchingId(unit.id);
     return switchOrganization(unit.id, currentId).then(
       () => {
-        loadConsoleHome();
+        loadConsolePage(landingPath);
         return new Promise<void>(() => {});
       },
       (failure: unknown) => {

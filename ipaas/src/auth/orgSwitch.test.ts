@@ -17,7 +17,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { OrganizationSwitchError, canSwitchOrganization, loadConsoleHome, switchOrganization } from './orgSwitch';
+import { OrganizationSwitchError, canSwitchOrganization, loadConsoleHome, loadConsolePage, switchOrganization } from './orgSwitch';
 
 const CLOUD = '/_auth/cloud/switch';
 const OWN = '/_auth/integration/switch';
@@ -111,6 +111,14 @@ describe('switchOrganization', () => {
       vi.fn(async () => Promise.reject(new TypeError('offline'))),
     );
     await expect(switchOrganization('org-b', 'org-a')).rejects.toMatchObject({ reason: 'failed' });
+  });
+});
+
+describe('loadConsolePage', () => {
+  it('loads the page in a full page load', () => {
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    loadConsolePage('/organizations/globex/logs');
+    expect(assign).toHaveBeenCalledWith('/organizations/globex/logs');
   });
 });
 

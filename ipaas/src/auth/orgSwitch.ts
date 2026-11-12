@@ -101,10 +101,14 @@ export async function switchOrganization(targetId: string, currentId: string): P
 }
 
 /**
- * Loads the console root in a full page load, which lands on the session's organization the way a
- * sign-in does (PublicLayout). After a switch the page still holds the previous organization's URL,
- * cached queries and project; a fresh load drops them all.
+ * Loads `path` (an app path) in a full page load. After a switch the page still holds the previous
+ * organization's cached queries and project; a fresh load drops them all.
  */
+export function loadConsolePage(path: string): void {
+  window.location.assign(withBase(path));
+}
+
+/** Loads the console root, which lands on the session's organization the way a sign-in does (PublicLayout). */
 export function loadConsoleHome(): void {
-  window.location.assign(withBase('/'));
+  loadConsolePage('/');
 }
