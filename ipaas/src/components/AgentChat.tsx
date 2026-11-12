@@ -23,6 +23,7 @@ import { useApiDefinition, useEnvEndpoints } from '../hooks/useDeployments';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import ApiKeyAuthOffer from './ApiKeyAuthOffer';
 import { generateUUID } from '../utils/string';
+import { isVoiceEndpoint } from '../utils/voiceAgent';
 import type { AgentConnectionStatus, ChatMessage } from '../types/agentChat';
 import type { EndpointRef } from '../types/consumers';
 
@@ -57,9 +58,14 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
 
   // Candidate chat endpoint: the first one listed with a public URL, else the first one. Every agent is
   // deployed to the AI gateway, and the chat URL comes from the endpoint's security below, so an endpoint
-  // the release listing reports without a public URL is still the agent's way in. (The `/chat` operation
-  // is confirmed below only as a hint; the endpoint is still used when its operations aren't discoverable.)
-  const candidate = useMemo(() => endpoints.find((e) => e.publicUrl) ?? endpoints[0] ?? null, [endpoints]);
+  // the release listing reports without a public URL is still the agent's way in. A voice agent's WebSocket
+  // endpoint is never it: the AI gateway does not carry it, and it takes no chat requests. (The `/chat`
+  // operation is confirmed below only as a hint; the endpoint is still used when its operations aren't
+  // discoverable.)
+  const candidate = useMemo(() => {
+    const chat = endpoints.filter((e) => !isVoiceEndpoint(e));
+    return chat.find((e) => e.publicUrl) ?? chat[0] ?? null;
+  }, [endpoints]);
 
   // The enforcing gateway URL, active auth mode and a short-lived test key, from the
   // same BFF routes the swagger console and the API security drawer use.
