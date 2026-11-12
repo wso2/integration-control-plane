@@ -20,19 +20,18 @@ import { Alert, AlertTitle, type SxProps, type Theme } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import type { EnvCardNotification } from '../../types/integration';
 
-const defaultSx = { mt: 2 } as const;
-
 interface EnvCardNoticeProps {
   notification: EnvCardNotification | null;
   onClose: () => void;
+  variant?: 'standard' | 'filled';
   sx?: SxProps<Theme>;
 }
 
 /** An environment card's notice from `useEnvCardNotification`: its text, or a heading over its detail when it has one. */
-export default function EnvCardNotice({ notification, onClose, sx = defaultSx }: EnvCardNoticeProps): JSX.Element | null {
+export default function EnvCardNotice({ notification, onClose, variant = 'standard', sx }: EnvCardNoticeProps): JSX.Element | null {
   if (!notification) return null;
   return (
-    <Alert severity={notification.severity} onClose={onClose} sx={sx}>
+    <Alert severity={notification.severity} variant={variant} onClose={onClose} sx={sx}>
       {notification.detail ? (
         <>
           <AlertTitle>{notification.text}</AlertTitle>

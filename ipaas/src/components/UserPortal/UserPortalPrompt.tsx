@@ -47,8 +47,8 @@ interface UserPortalPromptProps {
   componentId: string;
   environment: Environment;
   /**
-   * Reports a publish or unpublish, as the env cards do. The page shows it above its content, which the prompt is part
-   * of and a publish replaces.
+   * Reports a publish or unpublish, as the env cards do. The page shows it, and reports how a background one ends
+   * itself, because a publish replaces the content the prompt is part of.
    */
   onNotify: (notification: EnvCardNotification) => void;
 }
@@ -173,7 +173,11 @@ function EnvironmentPrompt({ orgHandler, projectId, componentId, environment, on
     <Stack alignItems="center" gap={1}>
       {report.published && <OpenUserPortal portal={portal} />}
       {/* A stale report would turn the switch into "Share with your users" until it is read again, so its placeholder waits. */}
-      {staleReport ? <UserPortalActionSkeleton /> : <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={environment.id} envName={environment.name} onNotify={onNotify} isWorkflow showPortalLink={false} />}
+      {staleReport ? (
+        <UserPortalActionSkeleton />
+      ) : (
+        <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={environment.id} envName={environment.name} onNotify={onNotify} isWorkflow showPortalLink={false} reportsBackgroundOutcome={false} />
+      )}
     </Stack>
   );
 }

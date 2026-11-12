@@ -99,3 +99,30 @@ describe("the User Portal reads, when a workflow's switch ends", () => {
     expect(securityRereads(invalidate)).toBe(2);
   });
 });
+
+// A background publish labels the integration published only as it ends, and the publications aren't polled meanwhile:
+// a workflow's card shows it as published, with its Open User Portal button, from them.
+describe('the User Portal reads, when a background publish ends', () => {
+  it('read the publications again', async () => {
+    publishability.mockResolvedValue(report({ publishing: true }));
+    publications.mockResolvedValue(listed([]));
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <Reads />
+        </QueryClientProvider>,
+      ),
+    );
+    await settle();
+    expect(publications).toHaveBeenCalledTimes(1);
+
+    publishability.mockResolvedValue(report({ published: true }));
+    publications.mockResolvedValue({ environments: ['production'], unpublishing: [], notGivenBack: [] });
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['userPortal', 'publishability'] });
+    });
+    await settle();
+    expect(publications).toHaveBeenCalledTimes(2);
+    expect(client.getQueryData<UserPortalPublications>(['userPortal', 'publications', 'orders'])?.environments).toEqual(['production']);
+  });
+});

@@ -24,8 +24,9 @@ import { useCan } from '../../hooks/useCan';
 import { useBackgroundPublishOutcome, useUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import type { EnvCardNotification } from '../../types/integration';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { DEPLOY_REFUSAL, refusalText, rejectedScopesText, shownRefusals, userPortalIsOff } from '../../utils/userPortal';
+import { DEPLOY_REFUSAL, shownRefusals, userPortalIsOff } from '../../utils/userPortal';
 import AboutUserPortalDialog from './AboutUserPortalDialog';
+import { publicationNotices } from './publicationNotices';
 import PublishRefusals from './PublishRefusals';
 import RejectedScopes from './RejectedScopes';
 import { usePublishFlow } from './usePublishFlow';
@@ -46,38 +47,29 @@ interface UserPortalActionProps {
   isWorkflow?: boolean;
   /** Whether a published integration's Open User Portal link is here; false where the card links the portal elsewhere. */
   showPortalLink?: boolean;
+  /**
+   * Whether the switch reports how a background publish or unpublish ends.
+   */
+  reportsBackgroundOutcome?: boolean;
 }
 
 /**
  * The env card's User Portal action, in the card's footer.
  */
-export default function UserPortalAction({ orgHandler, projectId, componentId, environment, envName, onNotify, isWorkflow = false, showPortalLink = true }: UserPortalActionProps): JSX.Element | null {
+export default function UserPortalAction({ orgHandler, projectId, componentId, environment, envName, onNotify, isWorkflow = false, showPortalLink = true, reportsBackgroundOutcome = true }: UserPortalActionProps): JSX.Element | null {
   const { data, isLoading, error, refetch } = useUserPortalPublishability(componentId, environment);
   // The portal's address, for the link a published integration offers. Read only once published, and only where the link is.
   const { data: portal } = useUserPortal(environment, !!data?.published && showPortalLink);
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [open, setOpen] = useState<'about' | 'refusals' | null>(null);
 
-  const notifyPublished = (rejectedScopes: string[]) =>
-    onNotify({
-      text: `Published to the User Portal in ${envName}.`,
-      severity: 'success',
-      // Scopes the endpoints require that the portal's users' tokens can't carry.
-      detail: rejectedScopes.length > 0 ? rejectedScopesText(rejectedScopes) : undefined,
-    });
-  // Reported as a publish is: at once, or when the work after the response ends (useBackgroundPublishOutcome).
-  const notifyUnpublished = () => onNotify({ text: `Unpublished from the User Portal in ${envName}.`, severity: 'success' });
+  const notices = publicationNotices(envName, onNotify);
   // Each clears what the other left on the card as it starts.
-  const publish = usePublishFlow({ componentId, environment, envName, isWorkflow, onStart: () => unpublish.reset(), onPublished: notifyPublished });
-  const unpublish = useUnpublishFlow({ componentId, projectId, environment, envName, isWorkflow, onStart: () => publish.reset(), onUnpublished: notifyUnpublished });
+  const publish = usePublishFlow({ componentId, environment, envName, isWorkflow, onStart: () => unpublish.reset(), onPublished: notices.published });
+  const unpublish = useUnpublishFlow({ componentId, projectId, environment, envName, isWorkflow, onStart: () => publish.reset(), onUnpublished: notices.unpublished });
   // A publish or unpublish that finishes in the background is reported when the publishability says it ended, so it is
   // also reported after a page reload.
-  useBackgroundPublishOutcome(componentId, environment, {
-    onPublished: notifyPublished,
-    onFailed: (failure) => onNotify({ text: `Could not publish to the User Portal in ${envName}.`, severity: 'error', detail: refusalText(failure, envName) }),
-    onUnpublished: notifyUnpublished,
-    onUnpublishFailed: (failure) => onNotify({ text: `Could not finish unpublishing from the User Portal in ${envName}.`, severity: 'error', detail: refusalText(failure, envName) }),
-  });
+  useBackgroundPublishOutcome(componentId, environment, reportsBackgroundOutcome ? notices.background : null);
 
   // The card's own dialogs open on a clean slate, so an earlier failure never shows after them.
   const openDialog = (dialog: 'about' | 'refusals') => {
@@ -139,8 +131,8 @@ export default function UserPortalAction({ orgHandler, projectId, componentId, e
       );
     }
     // One switch for both: on is published. Flipping it starts the shared flow (or, when the rules refuse, lists what
-    // to fix), and the switch follows the result. A publish or unpublish stays pending until the publishability is
-    // read again (useWritePublication awaits it), so the switch is never clickable on a stale state after one.
+    // to fix), and the switch follows the result. A write's answer is put in the publishability as soon as it returns
+    // (useWritePublication), so the switch shows it at once, and is never clickable on the state from before it.
     const { published } = data;
     const publishing = publish.isPending;
     const unpublishing = data.unpublishing;

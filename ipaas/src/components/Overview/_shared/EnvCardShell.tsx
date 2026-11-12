@@ -45,6 +45,9 @@ interface EnvCardShellProps {
   module: IntegrationModule;
 }
 
+// The card's notice, under its header.
+const noticeSx = { mt: 2 } as const;
+
 // Per-env query keys invalidated by the generic Refresh — the union across
 // every migrated type's data. Invalidating a key a given type doesn't use is
 // harmless; adding a new type may mean adding its key here. `wf` holds every
@@ -163,7 +166,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
           />
         )}
 
-        <EnvCardNotice notification={notification} onClose={dismiss} />
+        <EnvCardNotice notification={notification} onClose={dismiss} sx={noticeSx} />
 
         {EnvCardBody && <EnvCardBody {...slotProps} pendingTriggerTime={pendingTriggerTime} pendingTriggerArgs={pendingTriggerArgs} onTriggerResolved={onTriggerResolved} />}
 

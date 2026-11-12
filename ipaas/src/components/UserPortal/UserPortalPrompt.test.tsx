@@ -284,9 +284,12 @@ describe('a publish that finishes in the background, from the prompt', () => {
   afterEach(() => vi.useRealTimers());
   const poll = () => act(async () => vi.advanceTimersByTimeAsync(3_000));
 
-  it('shows Publishing… after the 202 and offers to open the portal once published', async () => {
+  it('shows Publishing… after the 202 and offers to open the portal once published, leaving the report to the page', async () => {
     portal.mockResolvedValue(ACTIVE);
-    publishability.mockResolvedValueOnce(PUBLISHABLE).mockResolvedValue({ ...PUBLISHABLE, publishing: true });
+    publishability
+      .mockResolvedValueOnce(PUBLISHABLE)
+      .mockResolvedValueOnce(PUBLISHABLE)
+      .mockResolvedValue({ ...PUBLISHABLE, publishing: true });
     publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, unpublishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
     await act(async () => toggle(container)?.click());
@@ -303,11 +306,11 @@ describe('a publish that finishes in the background, from the prompt', () => {
     await poll();
     await flush();
     expect(container.textContent).toContain('Open User Portal');
-    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Published to the User Portal in Production.', severity: 'success', detail: expect.stringContaining('bad scope') }));
     expect(container.textContent).toContain('bad scope');
+    expect(onNotify).not.toHaveBeenCalled();
   });
 
-  it('follows a publish running at load, and words the failure it ends with', async () => {
+  it('follows a publish running at load, and shows the failure it ends with on the switch, leaving the report to the page', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue({ ...PUBLISHABLE, publishing: true });
     const container = await prompt(DEVELOPER);
@@ -317,8 +320,9 @@ describe('a publish that finishes in the background, from the prompt', () => {
     publishability.mockResolvedValue({ ...PUBLISHABLE, publishError: { code: 'USER_PORTAL_PUBLISH_INTERRUPTED', message: 'interrupted' } });
     await poll();
     await flush();
-    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Could not publish to the User Portal in Production.', severity: 'error', detail: "Publishing didn't finish. Publish again." }));
+    expect(tooltip(container)).toBe("Publishing didn't finish. Publish again.");
     expect(toggle(container)?.disabled).toBe(false);
+    expect(onNotify).not.toHaveBeenCalled();
   });
 });
 

@@ -273,9 +273,14 @@ describe("the env card's User Portal action", () => {
   it('warns of a redeploy the publishability comes to report while the confirmation is open', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
-      publishability.mockResolvedValueOnce(publishable).mockResolvedValue({ ...publishable, redeploys: true });
+      // The first read, the one the confirmation makes as it opens, then the one the tab's focus brings.
+      publishability
+        .mockResolvedValueOnce(publishable)
+        .mockResolvedValueOnce(publishable)
+        .mockResolvedValue({ ...publishable, redeploys: true });
       const container = await action(DEVELOPER, true);
       await act(async () => toggle(container)?.click());
+      await flush();
       expect(dialog(container)?.textContent).toContain("The User Portal's users will see this integration there.");
 
       // Past the read's stale time, the tab comes back into focus and the publishability is read again.
@@ -285,10 +290,99 @@ describe("the env card's User Portal action", () => {
         focusManager.setFocused(true);
       });
       await flush();
-      expect(publishability).toHaveBeenCalledTimes(2);
+      expect(publishability).toHaveBeenCalledTimes(3);
       expect(dialog(container)?.textContent).toContain('will be redeployed in Production');
     } finally {
       focusManager.setFocused(undefined);
+      vi.useRealTimers();
+    }
+  });
+
+  // The rules last read can be out of date: a redeploy or a security change since can break one.
+  it('reads the rules again as the confirmation opens without holding Publish, and holds it back once they refuse', async () => {
+    let answer: (report: UserPortalPublishability) => void = () => {};
+    publishability.mockResolvedValueOnce(publishable).mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await flush();
+    // The re-read runs every publishing rule, so Publish doesn't wait for it.
+    expect(dialogButton(container, 'Publish')?.disabled).toBe(false);
+
+    await act(async () => answer({ ...publishable, publishable: false, reasons: [{ code: 'USER_PORTAL_NOT_DEPLOYED', message: 'the integration is not deployed in this environment' }] }));
+    await flush();
+    expect(dialog(container)?.textContent).toContain('Deploy it to Production first.');
+    expect(dialogButton(container, 'Publish')?.disabled).toBe(true);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  // A write's answer goes into the publishability as it returns, so neither the dialog nor the switch waits for the
+  // re-read after it, which runs every publishing rule; that re-read never lands here.
+  it('shows a publish done within its request at once, and reports it, before the re-read after it lands', async () => {
+    publishability
+      .mockResolvedValueOnce(publishable)
+      .mockResolvedValueOnce(publishable)
+      .mockReturnValue(new Promise(() => {}));
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await flush();
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    expect(dialog(container)).toBeNull();
+    expect(toggle(container)?.checked).toBe(true);
+    expect(container.querySelector('label')?.textContent).toContain('Published to User Portal');
+    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Published to the User Portal in Production.', severity: 'success' }));
+  });
+
+  it('shows an unpublish done within its request at once, before the re-read after it lands', async () => {
+    publishability.mockResolvedValueOnce({ ...publishable, published: true }).mockReturnValue(new Promise(() => {}));
+    unpublish.mockResolvedValue({ environment: 'production', published: false, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await act(async () => dialogButton(container, 'Unpublish')?.click());
+    await flush();
+    expect(dialog(container)).toBeNull();
+    expect(toggle(container)?.checked).toBe(false);
+    expect(container.querySelector('label')?.textContent).toBe('Publish to User Portal');
+  });
+
+  // The read the confirmation started as it opened is still out when the publish answers: landing late, it would put
+  // back the state from before the publish.
+  it("keeps a publish's answer over a read that started before it", async () => {
+    let late: (report: UserPortalPublishability) => void = () => {};
+    publishability
+      .mockResolvedValueOnce(publishable)
+      .mockReturnValueOnce(new Promise((resolve) => (late = resolve)))
+      .mockReturnValue(new Promise(() => {}));
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await flush();
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    await act(async () => late(publishable));
+    await flush();
+    expect(toggle(container)?.checked).toBe(true);
+  });
+
+  it('leaves how a background publish ends to the page where the page reports it', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      publishability.mockResolvedValue({ ...publishable, publishing: true });
+      const r = await renderWithScopes(
+        <MemoryRouter>
+          <UserPortalAction orgHandler="acme" projectId="shop" componentId="orders" environment="production" envName="Production" onNotify={onNotify} isWorkflow reportsBackgroundOutcome={false} />
+        </MemoryRouter>,
+        DEVELOPER,
+      );
+      unmount = r.unmount;
+      await flush();
+      publishability.mockResolvedValue({ ...publishable, published: true });
+      await act(async () => void (await vi.advanceTimersByTimeAsync(3_000)));
+      await flush();
+      expect(r.container.querySelector('label')?.textContent).toContain('Published to User Portal');
+      expect(onNotify).not.toHaveBeenCalled();
+    } finally {
       vi.useRealTimers();
     }
   });

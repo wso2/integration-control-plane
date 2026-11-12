@@ -22,6 +22,7 @@ import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentScope } from '../../../nav';
+import type { UserPortalPublishability } from '../../../types/userPortal';
 import type { WorkflowApi } from '../api/useWorkflowApi';
 import type { WorkflowClient } from '../api/client';
 import WorkflowPageShell from './WorkflowPageShell';
@@ -66,15 +67,24 @@ vi.mock('../../../hooks/useDeployments', () => ({
     return { data: { releaseId: 'release-1', deploymentStatusV2: 'ACTIVE' }, isLoading: false };
   },
 }));
-// The prompt reports a publish through the page, as the real one does.
-vi.mock('../../UserPortal/UserPortalPrompt', () => ({
-  default: ({ environment, onNotify }: { environment: { id: string }; onNotify: (notification: { text: string; severity: 'success' }) => void }) => (
-    <span>
-      {`User Portal prompt for ${environment.id}`}
-      <button onClick={() => onNotify({ text: `Published to the User Portal in ${environment.id}.`, severity: 'success' })}>Publish</button>
-    </span>
-  ),
-}));
+const portalApi = vi.hoisted(() => ({ fetchUserPortalPublishability: vi.fn() }));
+vi.mock('../../../api/userPortal', () => portalApi);
+// The prompt reads the publishability, which the page follows a publish from, and reports a publish through the page,
+// as the real one does.
+vi.mock('../../UserPortal/UserPortalPrompt', async () => {
+  const { useUserPortalPublishability } = await import('../../../hooks/useUserPortal');
+  return {
+    default: function Prompt({ componentId, environment, onNotify }: { componentId: string; environment: { id: string }; onNotify: (notification: { text: string; severity: 'success' }) => void }) {
+      useUserPortalPublishability(componentId, environment.id);
+      return (
+        <span>
+          {`User Portal prompt for ${environment.id}`}
+          <button onClick={() => onNotify({ text: `Published to the User Portal in ${environment.id}.`, severity: 'success' })}>Publish</button>
+        </span>
+      );
+    },
+  };
+});
 vi.mock('../api/useWorkflowApi', () => ({
   useWorkflowApi: (target: unknown) => {
     state.targets.push(target);
@@ -87,13 +97,20 @@ vi.mock('../../common/EnvironmentSelect', () => ({ default: ({ value }: { value:
 
 const SCOPE: ComponentScope = { level: 'components', org: 'acme', project: 'default', component: 'orders' };
 
+const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
+
 let root: Root;
 let container: HTMLDivElement;
+// One per test, so a page rendered again keeps what it read.
+let client: QueryClient;
+
+/** Lets pending reads settle and re-render. */
+const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 
 async function renderShell(url = '/', placeholder?: WorkflowPageShellProps['placeholder']) {
   await act(async () =>
     root.render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[url]}>
           <WorkflowPageShell scope={SCOPE} title="Workflows" purpose="runWorkflows" placeholder={placeholder}>
             {({ api, environment }) => <p>{`slot for ${environment.id} on ${api.connection.runtime.taskQueue}`}</p>}
@@ -111,6 +128,9 @@ beforeEach(() => {
   state.componentError = null;
   state.refetchComponent.mockClear();
   state.deploymentReads = [];
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  portalApi.fetchUserPortalPublishability.mockReset();
+  portalApi.fetchUserPortalPublishability.mockResolvedValue(PUBLISHABLE);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -161,7 +181,7 @@ describe('WorkflowPageShell', () => {
   });
 
   // Once published, the management API takes only User Portal sign-ins, so the content the prompt is part of is replaced.
-  it("keeps the User Portal prompt's notice above the content once a publish replaces it", async () => {
+  it("keeps the User Portal prompt's notice once a publish replaces the content", async () => {
     state.api = pending({ status: 'unavailable', reason: 'secured-by-promotion', notice: { severity: 'info', text: 'Security comes by promotion.' }, action: null });
     await renderShell('/?env=production');
     const publish = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Publish');
@@ -172,6 +192,34 @@ describe('WorkflowPageShell', () => {
     expect(text).toContain('Published here.');
     expect(text).not.toContain('User Portal prompt');
     expect(text).toContain('Published to the User Portal in production.');
+  });
+
+  // The prompt goes once the workflow is published (the connection moves on), and a run's drawer it sits in can close.
+  it('reports how a background publish from the prompt ends, after the prompt has gone', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      portalApi.fetchUserPortalPublishability.mockResolvedValue({ ...PUBLISHABLE, publishing: true });
+      state.api = pending({ status: 'unavailable', reason: 'secured-by-promotion', notice: { severity: 'info', text: 'Security comes by promotion.' }, action: null });
+      await renderShell('/?env=production');
+      await settle();
+
+      state.api = pending({ status: 'unavailable', reason: 'published-to-user-portal', notice: { severity: 'info', text: 'Published here.' }, action: null });
+      expect(await renderShell('/?env=production')).not.toContain('User Portal prompt');
+
+      portalApi.fetchUserPortalPublishability.mockResolvedValue({ ...PUBLISHABLE, published: true });
+      await act(async () => void (await vi.advanceTimersByTimeAsync(3_000)));
+      await settle();
+      expect(container.textContent).toContain('Published to the User Portal in Production.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads no publishability where no User Portal prompt showed', async () => {
+    state.api = { client: {} as WorkflowClient, connection: { status: 'ready', scopeId: 's', runtime: { taskQueue: 'orders-queue' } } } as unknown as WorkflowApi;
+    await renderShell();
+    await settle();
+    expect(portalApi.fetchUserPortalPublishability).not.toHaveBeenCalled();
   });
 
   it('shows a placeholder for the environment shown, reading no deployment and making no connection', async () => {
