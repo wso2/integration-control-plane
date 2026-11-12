@@ -26,7 +26,7 @@ import type { EnvCardBodyProps } from '../../../types/integration';
 import { friendlyApiError } from '../../../utils/apiSecurity';
 import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
-import { isVoiceEndpoint } from '../../../utils/voiceAgent';
+import { agentChatEndpoint, isVoiceEndpoint } from '../../../utils/voiceAgent';
 import { useSelectedAgentEndpoint } from './selectedEndpoint';
 
 //AI Agent env-card body
@@ -34,11 +34,9 @@ export default function EnvCardBody({ component, env, orgHandler, projectId, ver
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
   const [selectedId, setSelectedId] = useSelectedAgentEndpoint(component.id, env.id);
-  const selectedEpIdx = Math.max(
-    0,
-    endpoints.findIndex((e) => e.id === selectedId),
-  );
-  const selectedEndpoint = endpoints[selectedEpIdx];
+  // Until the user picks one, the card opens on the endpoint the agent chats on, not on whichever sorts first.
+  const selectedEndpoint = endpoints.find((e) => e.id === selectedId) ?? agentChatEndpoint(endpoints) ?? endpoints[0];
+  const selectedEpIdx = Math.max(0, endpoints.indexOf(selectedEndpoint));
   const voiceAgent = useLinkedVoiceAgents(orgHandler, projectId, component.handler).voiceAgents.at(0);
 
   // The agent's URL on Agent Manager's AI gateway, where every agent is deployed. It is the only URL the card
