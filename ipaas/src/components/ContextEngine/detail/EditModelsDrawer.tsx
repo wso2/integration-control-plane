@@ -105,15 +105,6 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
       </Box>
 
       <Box sx={drawerBodySx}>
-        {failure && (
-          <Alert severity="error" variant="outlined">
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {failure.title}
-            </Typography>
-            {failure.body}
-          </Alert>
-        )}
-
         <Box sx={modelColumnSx}>
           <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
@@ -179,7 +170,15 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
         )}
       </Box>
 
-      <Box sx={footerSx}>
+      <Box component="footer" sx={footerSx}>
+        {failure && (
+          <Alert severity="error" variant="outlined">
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {failure.title}
+            </Typography>
+            {failure.body}
+          </Alert>
+        )}
         <Alert severity="warning">Saving restarts the engine. Queries fail for about a minute.</Alert>
         <Stack direction="row" gap={1.5} justifyContent="flex-end">
           <Button variant="outlined" onClick={close} disabled={save.isPending}>
