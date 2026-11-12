@@ -18,8 +18,8 @@
 
 import { Alert, Box, Button, Chip, CircularProgress, DrawerPanel, IconButton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useState, type JSX } from 'react';
-import { API_KEY_NAME_TAKEN, DEFAULT_API_KEY_HEADER, TOKEN_MASK, TOKEN_ONE_TIME_WARNING } from '../../../constants/apiConsumption';
+import { useState, type JSX } from 'react';
+import { API_KEY_NAME_REVOKED, API_KEY_NAME_TAKEN, DEFAULT_API_KEY_HEADER, TOKEN_MASK, TOKEN_ONE_TIME_WARNING } from '../../../constants/apiConsumption';
 import { useCreateEndpointApiKey, useEndpointSecurity } from '../../../hooks/useConsumers';
 import type { EndpointRef } from '../../../types/consumers';
 import { isKeyNameTaken } from '../../../utils/apiConsumption';
@@ -37,14 +37,19 @@ interface ApiKeyDrawerProps {
   /** Display label shown in the header badge. */
   envLabel: string;
   /**
-   * Names of the live keys on this endpoint. Uniqueness is per endpoint, so the
-   * same name on a sibling endpoint is fine and must not be rejected here.
+   * Names of this endpoint's live and revoked keys. A revoked key keeps its name, so neither can be issued
+   * again. Uniqueness is per endpoint, so the same name on a sibling endpoint is fine and must not be
+   * rejected here.
    */
-  existingNames: readonly string[];
+  liveNames: readonly string[];
+  revokedNames: readonly string[];
 }
 
-/** Right drawer that issues a named API key for this API and shows it once. */
-export default function ApiKeyDrawer({ open, onClose, endpointRef, envLabel, existingNames }: ApiKeyDrawerProps): JSX.Element {
+/**
+ * Right drawer that issues a named API key for this API and shows it once. Its parent mounts a new one for
+ * each open, so it starts empty without resetting itself.
+ */
+export default function ApiKeyDrawer({ open, onClose, endpointRef, envLabel, liveNames, revokedNames }: ApiKeyDrawerProps): JSX.Element {
   const createMutation = useCreateEndpointApiKey(endpointRef);
   const { data: security } = useEndpointSecurity(endpointRef, open);
   const header = security?.apiKey?.header || DEFAULT_API_KEY_HEADER;
@@ -54,17 +59,8 @@ export default function ApiKeyDrawer({ open, onClose, endpointRef, envLabel, exi
   const [error, setError] = useState<string | null>(null);
 
   const issued = createMutation.data ?? null;
-  const nameTaken = isKeyNameTaken(name, existingNames);
-
-  useEffect(() => {
-    if (!open) return;
-    setName('');
-    setRevealKey(false);
-    setError(null);
-    createMutation.reset();
-    // Mutation objects are new each render, so they cannot be dependencies.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  const nameHint = isKeyNameTaken(name, liveNames) ? API_KEY_NAME_TAKEN : isKeyNameTaken(name, revokedNames) ? API_KEY_NAME_REVOKED : null;
+  const nameTaken = nameHint !== null;
 
   const handleGenerate = async () => {
     if (!name.trim() || nameTaken) return;
@@ -83,6 +79,12 @@ export default function ApiKeyDrawer({ open, onClose, endpointRef, envLabel, exi
 
   const handleClose = () => {
     if (!busy) guardNavigation(onClose);
+  };
+
+  // The closing drawer stays on screen as it slides out, so the key is masked before it goes.
+  const handleDone = () => {
+    setRevealKey(false);
+    onClose();
   };
 
   return (
@@ -116,7 +118,7 @@ export default function ApiKeyDrawer({ open, onClose, endpointRef, envLabel, exi
           required={!issued}
           disabled={!!issued || busy}
           error={!issued && nameTaken}
-          helperText={!issued && nameTaken ? API_KEY_NAME_TAKEN : 'Name the key after the client that uses it, so you know which key to revoke.'}
+          helperText={!issued && nameHint ? nameHint : 'Name the key after the client that uses it, so you know which key to revoke.'}
           sx={issued ? styles.lockedField : undefined}
         />
 
@@ -152,7 +154,7 @@ export default function ApiKeyDrawer({ open, onClose, endpointRef, envLabel, exi
 
       <DrawerPanel.Footer>
         {issued ? (
-          <Button variant="contained" onClick={onClose}>
+          <Button variant="contained" onClick={handleDone}>
             Done
           </Button>
         ) : (

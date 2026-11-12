@@ -245,9 +245,22 @@ export async function gatewayFailure(page: Page): Promise<string | null> {
   return failedAgain ? text() : null;
 }
 
-/** An API key's row on the env card, found from its name up to the row that carries its status chip. */
+/**
+ * An API key's row on the env card: the list item that carries its name. A revoked key is listed only
+ * once its keys are shown (showRevokedApiKeys).
+ */
 export function apiKeyRow(page: Page, name: string): Locator {
-  return envCard(page).getByText(name, { exact: true }).locator('xpath=ancestor::*[.//*[normalize-space()="Active" or normalize-space()="Revoked"]][1]');
+  return envCard(page)
+    .getByRole('list', { name: 'API keys' })
+    .getByRole('listitem')
+    .filter({ has: page.getByText(name, { exact: true }) });
+}
+
+/** Lists the env card's revoked API keys beside its live ones. */
+export async function showRevokedApiKeys(page: Page): Promise<void> {
+  await envCard(page)
+    .getByRole('button', { name: /^Show revoked keys/ })
+    .click();
 }
 
 /** Opens the drawer that issues an API key. */

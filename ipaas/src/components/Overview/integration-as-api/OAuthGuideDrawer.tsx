@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, DrawerPanel, Link, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, DrawerPanel, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { ExternalLink } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, type JSX } from 'react';
 import type { SecurityConfig } from '../../../types/consumers';
 import type { EnvironmentIdentityProvider } from '../../../types/environment';
 import { apiCallCurl, jwtScopes, tokenRequestCurl } from '../../../utils/apiConsumption';
+import { friendlyApiError } from '../../../utils/apiSecurity';
 import { tokenHeaderExample } from '../../../utils/jwtSecurity';
 import CopyButton from './CopyButton';
 import * as styles from './apiConsumption.styles';
@@ -35,6 +36,10 @@ interface OAuthGuideDrawerProps {
   security: SecurityConfig;
   /** The org's identity platform in the environment; absent while it loads or when it can't be read. */
   identityProvider: EnvironmentIdentityProvider | undefined;
+  /** The read of `identityProvider`, so the guide tells loading and a failed read from a platform not set up. */
+  identityLoading: boolean;
+  identityError: unknown;
+  onRetryIdentity: () => void;
 }
 
 function CodeBlock({ code, label }: { code: string; label: string }): JSX.Element {
@@ -66,7 +71,7 @@ function CopyField({ label, value }: { label: string; value: string }): JSX.Elem
  * Read-only "how do I call this API" reference for an OAuth-secured API: how to create a client in the
  * Identity Platform console, the identity platform's endpoints, and sample requests for a token and a call.
  */
-export default function OAuthGuideDrawer({ open, onClose, envLabel, security, identityProvider }: OAuthGuideDrawerProps): JSX.Element {
+export default function OAuthGuideDrawer({ open, onClose, envLabel, security, identityProvider, identityLoading, identityError, onRetryIdentity }: OAuthGuideDrawerProps): JSX.Element {
   const jwt = security.jwt;
   const scopes = useMemo(() => jwtScopes(jwt), [jwt]);
   const audiences = jwt?.audiences ?? [];
@@ -140,7 +145,20 @@ export default function OAuthGuideDrawer({ open, onClose, envLabel, security, id
             <Typography variant="subtitle2" sx={styles.sectionTitle}>
               2. Get an access token
             </Typography>
-            {idp ? (
+            {identityLoading ? (
+              <Skeleton variant="rounded" height={56} sx={styles.dialogAlert} />
+            ) : identityError ? (
+              <Alert
+                severity="warning"
+                sx={styles.dialogAlert}
+                action={
+                  <Button color="inherit" size="small" onClick={onRetryIdentity}>
+                    Retry
+                  </Button>
+                }>
+                {friendlyApiError(identityError, 'Could not read this environment’s identity platform.')} The token endpoint below is a placeholder until it can be read.
+              </Alert>
+            ) : idp ? (
               <Stack gap={1.5}>
                 {idp.tokenEndpoint && <CopyField label="Token endpoint" value={idp.tokenEndpoint} />}
                 {idp.issuer && <CopyField label="Issuer" value={idp.issuer} />}
@@ -162,7 +180,11 @@ export default function OAuthGuideDrawer({ open, onClose, envLabel, security, id
               3. Call the API
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={styles.dialogAlert}>
-              Send the access token in the <Box component="code" sx={styles.summaryCode}>{tokenHeader.split(':')[0]}</Box> header. Request a new token when it expires.
+              Send the access token in the{' '}
+              <Box component="code" sx={styles.summaryCode}>
+                {tokenHeader.split(':')[0]}
+              </Box>{' '}
+              header. Request a new token when it expires.
             </Typography>
             <CodeBlock code={apiCallCurl(security.publicUrl, tokenHeader)} label="Copy API call" />
           </Box>

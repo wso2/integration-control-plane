@@ -81,6 +81,7 @@ import {
   requireSampleActive,
   serverResponseCode,
   showAllExecutions,
+  showRevokedApiKeys,
   swaggerOperation,
   waitForConfigureGate,
   waitForDeploymentSettled,
@@ -401,7 +402,10 @@ test.describe('04b endpoint and API keys @smoke', () => {
     await apiKeyRow(page, apiKeyName).getByRole('button', { name: `Revoke ${apiKeyName}`, exact: true }).click();
     const confirm = page.getByRole('dialog').filter({ hasText: `Revoke “${apiKeyName}”?` });
     await confirm.getByRole('button', { name: 'Revoke', exact: true }).click();
-    await expect(apiKeyRow(page, apiKeyName).getByText('Revoked', { exact: true })).toBeVisible({ timeout: 60_000 });
+    // Revoked keys wait behind a toggle, so the key leaves the list until they are shown.
+    await expect(apiKeyRow(page, apiKeyName)).toBeHidden({ timeout: 60_000 });
+    await showRevokedApiKeys(page);
+    await expect(apiKeyRow(page, apiKeyName).getByText('Revoked', { exact: true })).toBeVisible();
   });
 });
 

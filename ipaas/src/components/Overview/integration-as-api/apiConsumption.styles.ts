@@ -147,6 +147,14 @@ export const keyNameRow = {
   minWidth: 0,
 } as const;
 
+/** The text button under the key list that shows or hides revoked keys. */
+export const revokedToggle = {
+  mt: 1,
+  px: 0.75,
+  color: 'text.secondary',
+  textTransform: 'none',
+} as const;
+
 export const emptyState = {
   mt: 1.5,
   p: 2.25,

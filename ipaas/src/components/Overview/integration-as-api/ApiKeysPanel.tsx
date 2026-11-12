@@ -52,13 +52,21 @@ export default function ApiKeysPanel({ endpointRef, envLabel, oauth }: ApiKeysPa
   const revokeMutation = useRevokeEndpointApiKey(endpointRef);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Each open mounts a fresh drawer, so it never shows the key issued the last time it was open.
+  const [drawerSession, setDrawerSession] = useState(0);
   const [pendingRevoke, setPendingRevoke] = useState<ApiKeySummary | null>(null);
   const [revokeError, setRevokeError] = useState<string | null>(null);
+  const [showRevoked, setShowRevoked] = useState(false);
 
-  // Live keys first; a revoked key stays listed so its history is visible.
-  const sorted = useMemo(() => [...keys].sort((a, b) => Number(normalizeKeyStatus(a.status) === 'revoked') - Number(normalizeKeyStatus(b.status) === 'revoked')), [keys]);
-  const activeCount = useMemo(() => keys.filter((k) => normalizeKeyStatus(k.status) === 'active').length, [keys]);
-  const existingNames = useMemo(() => keys.filter((k) => normalizeKeyStatus(k.status) === 'active').map(apiKeyLabel), [keys]);
+  // Revoked keys are kept by the platform for good, so they wait behind a toggle rather than outgrow the live ones.
+  const live = useMemo(() => keys.filter((k) => normalizeKeyStatus(k.status) === 'active'), [keys]);
+  const revoked = useMemo(() => keys.filter((k) => normalizeKeyStatus(k.status) === 'revoked'), [keys]);
+  const listed = showRevoked ? [...live, ...revoked] : live;
+
+  const openDrawer = () => {
+    setDrawerSession((s) => s + 1);
+    setDrawerOpen(true);
+  };
 
   const handleRevoke = async () => {
     if (!pendingRevoke) return;
@@ -72,7 +80,7 @@ export default function ApiKeysPanel({ endpointRef, envLabel, oauth }: ApiKeysPa
   };
 
   // Under OAuth with no live key, there is nothing to revoke and none to issue.
-  if (oauth && !isLoading && !error && activeCount === 0) return null;
+  if (oauth && !isLoading && !error && live.length === 0) return null;
 
   return (
     <Box sx={styles.subCard}>
@@ -81,11 +89,11 @@ export default function ApiKeysPanel({ endpointRef, envLabel, oauth }: ApiKeysPa
           <KeyRound size={16} />
           API keys
           <Typography component="span" variant="caption" color="text.secondary">
-            ({activeCount})
+            ({live.length})
           </Typography>
         </Typography>
         {canManageKeys && !oauth && (
-          <Button variant="contained" size="small" startIcon={<Plus size={14} />} onClick={() => setDrawerOpen(true)}>
+          <Button variant="contained" size="small" startIcon={<Plus size={14} />} onClick={openDrawer}>
             Generate API key
           </Button>
         )}
@@ -112,47 +120,56 @@ export default function ApiKeysPanel({ endpointRef, envLabel, oauth }: ApiKeysPa
           }>
           {friendlyApiError(error, 'Could not load the API keys.')}
         </Alert>
-      ) : sorted.length > 0 ? (
-        <Stack gap={1} sx={styles.keyList}>
-          {sorted.map((key) => {
-            const label = apiKeyLabel(key);
-            const revoked = normalizeKeyStatus(key.status) === 'revoked';
-            return (
-              <Box key={key.name} sx={styles.keyRow}>
-                <Box sx={styles.keyIcon}>
-                  <KeyRound size={16} />
-                </Box>
-                <Box sx={styles.keyRowText}>
-                  <Stack direction="row" alignItems="center" gap={0.75} sx={styles.keyNameRow}>
-                    <Typography variant="body2" fontWeight={500} noWrap>
-                      {label}
-                    </Typography>
-                    <Chip label={revoked ? 'Revoked' : 'Active'} size="small" color={revoked ? 'error' : 'success'} variant="outlined" sx={styles.statusChip} />
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary" noWrap sx={styles.keyRowSubtitle}>
-                    {apiKeySubtitle(key)}
-                  </Typography>
-                </Box>
-                {canManageKeys && !revoked && (
-                  <Tooltip title="Revoke API key">
-                    <IconButton size="small" aria-label={`Revoke ${label}`} onClick={() => setPendingRevoke(key)} sx={styles.revokeButton}>
-                      <Ban size={15} />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-            );
-          })}
-        </Stack>
       ) : (
-        <Box sx={styles.emptyState}>
-          <Typography variant="caption" color="text.secondary">
-            No API keys yet. Generate one to start calling this API.
-          </Typography>
-        </Box>
+        <>
+          {listed.length > 0 ? (
+            <Stack gap={1} role="list" aria-label="API keys" sx={styles.keyList}>
+              {listed.map((key) => {
+                const label = apiKeyLabel(key);
+                const isRevoked = normalizeKeyStatus(key.status) === 'revoked';
+                return (
+                  <Box key={key.name} role="listitem" sx={styles.keyRow}>
+                    <Box sx={styles.keyIcon}>
+                      <KeyRound size={16} />
+                    </Box>
+                    <Box sx={styles.keyRowText}>
+                      <Stack direction="row" alignItems="center" gap={0.75} sx={styles.keyNameRow}>
+                        <Typography variant="body2" fontWeight={500} noWrap>
+                          {label}
+                        </Typography>
+                        <Chip label={isRevoked ? 'Revoked' : 'Active'} size="small" color={isRevoked ? 'error' : 'success'} variant="outlined" sx={styles.statusChip} />
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={styles.keyRowSubtitle}>
+                        {apiKeySubtitle(key)}
+                      </Typography>
+                    </Box>
+                    {canManageKeys && !isRevoked && (
+                      <Tooltip title="Revoke API key">
+                        <IconButton size="small" aria-label={`Revoke ${label}`} onClick={() => setPendingRevoke(key)} sx={styles.revokeButton}>
+                          <Ban size={15} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                );
+              })}
+            </Stack>
+          ) : (
+            <Box sx={styles.emptyState}>
+              <Typography variant="caption" color="text.secondary">
+                {revoked.length > 0 ? 'No active API keys. Generate one to start calling this API.' : 'No API keys yet. Generate one to start calling this API.'}
+              </Typography>
+            </Box>
+          )}
+          {revoked.length > 0 && (
+            <Button size="small" color="inherit" onClick={() => setShowRevoked((v) => !v)} aria-expanded={showRevoked} sx={styles.revokedToggle}>
+              {showRevoked ? 'Hide revoked keys' : `Show revoked keys (${revoked.length})`}
+            </Button>
+          )}
+        </>
       )}
 
-      <ApiKeyDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} endpointRef={endpointRef} envLabel={envLabel} existingNames={existingNames} />
+      <ApiKeyDrawer key={drawerSession} open={drawerOpen} onClose={() => setDrawerOpen(false)} endpointRef={endpointRef} envLabel={envLabel} liveNames={live.map(apiKeyLabel)} revokedNames={revoked.map(apiKeyLabel)} />
 
       {pendingRevoke && (
         <ConfirmDeleteDialog

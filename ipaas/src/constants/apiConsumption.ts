@@ -47,6 +47,9 @@ export const TOKEN_ONE_TIME_WARNING = 'This key is shown once and can’t be ret
 
 export const API_KEY_NAME_TAKEN = 'An API key with this name already exists for this endpoint.';
 
+/** A revoked key keeps its name on the platform, so the name can't be issued again. */
+export const API_KEY_NAME_REVOKED = 'A revoked API key on this endpoint used this name. Choose another.';
+
 export const SECURITY_MODE_LABEL: Record<SecurityMode, string> = {
   none: 'No auth',
   'api-key': 'API key',

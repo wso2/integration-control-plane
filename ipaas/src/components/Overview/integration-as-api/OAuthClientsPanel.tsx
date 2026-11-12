@@ -98,7 +98,7 @@ export default function OAuthClientsPanel({ envName, envLabel, security }: OAuth
         </Button>
       </Box>
 
-      <OAuthGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} envLabel={envLabel} security={security} identityProvider={idp} />
+      <OAuthGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} envLabel={envLabel} security={security} identityProvider={idp} identityLoading={isLoading} identityError={error} onRetryIdentity={() => void refetch()} />
     </Box>
   );
 }
