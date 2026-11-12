@@ -322,3 +322,11 @@ export function agentVoiceWsUrl(endpoints: readonly AgentEndpointLike[] | undefi
 export function isVoiceEndpoint(endpoint: { type: string } | undefined): boolean {
   return !!endpoint && /^(ws|wss|websocket)$/i.test(endpoint.type);
 }
+
+// The endpoint an AI agent chats on: the first listed HTTP, REST or GraphQL endpoint with a public URL, else the
+// first one of those types. The AI gateway fronts only such an endpoint; a voice agent's WebSocket endpoint and
+// any gRPC, TCP or UDP one are reached on their own routes and take no chat requests. Null when there is none.
+export function agentChatEndpoint<T extends { type: string; publicUrl?: string | null }>(endpoints: readonly T[]): T | null {
+  const chat = endpoints.filter((e) => /^(http|rest|graphql)$/i.test(e.type));
+  return chat.find((e) => e.publicUrl) ?? chat[0] ?? null;
+}

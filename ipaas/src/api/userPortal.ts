@@ -32,6 +32,8 @@ import { orderEnvironmentsByPipeline, pipelineEnvOrder } from '../utils/environm
 
 // models.UserPortalStatus. `state` is the orchestrator provision's: PENDING, APPLIED (in
 // progress), DONE, FAILED, MIGRATING, DELETING. It is missing when the environment has no portal.
+// `readiness` is UP-DP's latest render: READY, STARTING, UNHEALTHY or SUSPENDED. It is missing until
+// the portal first runs, while it is DELETING, for a retried portal, and from an older ipaas-service.
 interface BffUserPortalStatus {
   environment: string;
   enabled: boolean;
@@ -39,6 +41,8 @@ interface BffUserPortalStatus {
   state?: string;
   portalUrl?: string;
   error?: string;
+  readiness?: string;
+  readinessMessage?: string;
 }
 
 // The provision states of a portal still being set up. Any other, a state added later or none,
@@ -47,23 +51,47 @@ const SETTING_UP = new Set(['PENDING', 'APPLIED', 'MIGRATING']);
 
 // A suspended portal only carries the portal's API to a later environment, so it reads as not
 // enabled: enabling it there makes it active.
-function portalState(s: BffUserPortalStatus): { state: UserPortalState; error?: string } {
+function portalState(s: BffUserPortalStatus): { state: UserPortalState; error?: string; readinessMessage?: string } {
   const state = s.state?.toUpperCase();
   if (state === 'DELETING') return { state: 'removing' };
   if (state === 'FAILED') return { state: 'failed', ...(s.error ? { error: s.error } : {}) };
   if (!s.enabled) return { state: 'not-enabled' };
-  if (state === 'DONE') return { state: 'active' };
+  if (state === 'DONE') return readyState(s);
   if (state && SETTING_UP.has(state)) return { state: 'setting-up' };
   return { state: 'failed', error: state ? `The User Portal is in a state the console doesn't know: ${state}.` : 'ipaas-service reported no state for the User Portal.' };
 }
 
+// A finished provision doesn't mean UP-DP answers yet: its pods may still be starting, so it opens
+// only once READY. With no readiness, as from an ipaas-service older than it, it reads as active, as
+// it did before. One the console doesn't know reads as not ready, saying so, as an unknown provision
+// state reads as failed: read as active, it would link a portal that may not answer.
+function readyState(s: BffUserPortalStatus): { state: UserPortalState; readinessMessage?: string } {
+  const readiness = s.readiness?.toUpperCase();
+  switch (readiness) {
+    case undefined:
+    case '':
+    case 'READY':
+      return { state: 'active' };
+    // ipaas-service sends SUSPENDED only for a portal that isn't enabled, which reads as not enabled
+    // above. An enabled one would be on its way up.
+    case 'STARTING':
+    case 'SUSPENDED':
+      return { state: 'starting' };
+    case 'UNHEALTHY':
+      return { state: 'unhealthy', ...(s.readinessMessage ? { readinessMessage: s.readinessMessage } : {}) };
+    default:
+      return { state: 'unhealthy', readinessMessage: `The User Portal reports a readiness the console doesn't know: ${readiness}.` };
+  }
+}
+
 export const toUserPortal = (s: BffUserPortalStatus): UserPortal => {
-  const { state, error } = portalState(s);
+  const { state, error, readinessMessage } = portalState(s);
   return {
     environment: s.environment,
     state,
     ...(s.portalUrl && state === 'active' ? { url: s.portalUrl } : {}),
     ...(error ? { error } : {}),
+    ...(readinessMessage ? { readinessMessage } : {}),
   };
 };
 
@@ -100,12 +128,16 @@ interface BffUserPortalPublishability {
   redeploys?: boolean;
   publishing?: boolean;
   publishError?: { code: string; message: string };
+  unpublishing?: boolean;
+  unpublishError?: { code: string; message: string };
   rejectedScopes?: string[];
 }
 
 // models.UserPortalPublications.
 interface BffUserPortalPublications {
   environments?: string[];
+  unpublishing?: string[];
+  notGivenBack?: string[];
 }
 
 // models.UserPortalPublication.
@@ -113,6 +145,7 @@ interface BffUserPortalPublication {
   environment: string;
   published: boolean;
   publishing?: boolean;
+  unpublishing?: boolean;
   rejectedScopes?: string[];
 }
 
@@ -127,10 +160,13 @@ export const toUserPortalPublishability = (p: BffUserPortalPublishability): User
   redeploys: p.redeploys ?? false,
   publishing: p.publishing ?? false,
   ...(p.publishError ? { publishError: p.publishError } : {}),
+  // A BFF from before unpublishing finished in the background answers once the workflow is given back.
+  unpublishing: p.unpublishing ?? false,
+  ...(p.unpublishError ? { unpublishError: p.unpublishError } : {}),
   rejectedScopes: p.rejectedScopes ?? [],
 });
 
-export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [] });
+export const toUserPortalPublications = (p: BffUserPortalPublications): UserPortalPublications => ({ environments: p.environments ?? [], unpublishing: p.unpublishing ?? [], notGivenBack: p.notGivenBack ?? [] });
 
 /** The environments the integration is published to the User Portal in. */
 export const fetchUserPortalPublications = (componentId: string): Promise<UserPortalPublications> => bff.get<BffUserPortalPublications>(`/components/${seg(componentId)}/user-portal`).then(toUserPortalPublications);
@@ -138,7 +174,7 @@ export const fetchUserPortalPublications = (componentId: string): Promise<UserPo
 /** Runs a publish's rules without publishing: whether it is published there, and every rule it breaks. */
 export const fetchUserPortalPublishability = (componentId: string, environment: string): Promise<UserPortalPublishability> => bff.get<BffUserPortalPublishability>(publicationPath(componentId, environment)).then(toUserPortalPublishability);
 
-const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, publishing: p.publishing ?? false, rejectedScopes: p.rejectedScopes ?? [] });
+const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, publishing: p.publishing ?? false, unpublishing: p.unpublishing ?? false, rejectedScopes: p.rejectedScopes ?? [] });
 
 export const publishToUserPortal = (componentId: string, environment: string): Promise<UserPortalPublication> => bff.put<BffUserPortalPublication>(publicationPath(componentId, environment)).then(toPublication);
 

@@ -28,6 +28,7 @@ import { useCan } from '../../hooks/useCan';
 import { useUserPortalPublications } from '../../hooks/useUserPortal';
 import { Scopes } from '../../constants/permissions';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
+import type { UserPortalPublications } from '../../types/userPortal';
 
 interface PromoteButtonProps {
   orgHandler: string;
@@ -49,9 +50,10 @@ interface PromoteButtonProps {
 /**
  * What promoting a workflow does to the console's workflow views in the target. `carried`: it is published to the User
  * Portal in the source, so its Management API takes only User Portal sign-ins there, and the promotion carries that to a
- * target it isn't published in. `unchecked`: where it is published couldn't be read.
+ * target it isn't published in. `unchecked`: where it is published couldn't be read. `unpublishing`: the target is still
+ * being redeployed to take the console's API key after an unpublish, which the promotion waits for.
  */
-type PortalSignIn = 'carried' | 'unchecked' | null;
+type PortalSignIn = 'carried' | 'unchecked' | 'unpublishing' | null;
 
 export default function PromoteButton({ orgHandler, projectId, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason, isWorkflow = false }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
@@ -84,7 +86,7 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
     setChecking(false);
     const withoutValues = read.isSuccess ? promoteWithoutValues(read.data, sourceEnvId, targetEnvId) : [];
     // A failed read can still hold what an earlier one answered: decide on this one.
-    const portal = published ? portalSignIn(published.isSuccess ? published.data.environments : undefined, published.error, sourceEnvId, targetEnvId) : null;
+    const portal = published ? portalSignIn(published.isSuccess ? published.data : undefined, published.error, sourceEnvId, targetEnvId) : null;
     if (!read.isSuccess || withoutValues.length > 0 || portal) setConfirming({ withoutValues, unchecked: !read.isSuccess, portal });
     else handlePromote();
   };
@@ -148,10 +150,16 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
             </Typography>
           )}
           {confirming?.portal === 'unchecked' && <Typography variant="body2">Couldn&apos;t check where this workflow is published to the User Portal.</Typography>}
+          {confirming?.portal === 'unpublishing' && (
+            <Typography variant="body2">
+              This workflow was just unpublished from the User Portal in {targetEnvId}, and is still being redeployed there to take the console&apos;s API key again. Promote once that&apos;s done: a promotion redeploys it too, and whichever
+              lands last decides which key it takes.
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirming(null)}>Cancel</Button>
-          <Button variant="contained" onClick={handlePromote}>
+          <Button variant="contained" onClick={handlePromote} disabled={confirming?.portal === 'unpublishing'}>
             Promote
           </Button>
         </DialogActions>
@@ -161,10 +169,12 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
 }
 
 /**
- * What the promotion does to a workflow's User Portal sign-in in the target, from the environments it is published in, or
- * the read's failure. A BFF that serves no User Portal publishes nowhere.
+ * What the promotion does to a workflow's User Portal sign-in in the target, from where it is published, or the read's
+ * failure. A BFF that serves no User Portal publishes nowhere. A target still being given back to the console after an
+ * unpublish waits for that, which ipaas-service holds the promotion to as well.
  */
-function portalSignIn(published: string[] | undefined, error: unknown, source: string, target: string): PortalSignIn {
-  if (!published) return error && !isUserPortalUnavailable(error) ? 'unchecked' : null;
-  return published.includes(source) && !published.includes(target) ? 'carried' : null;
+function portalSignIn(publications: UserPortalPublications | undefined, error: unknown, source: string, target: string): PortalSignIn {
+  if (!publications) return error && !isUserPortalUnavailable(error) ? 'unchecked' : null;
+  if (publications.unpublishing.includes(target)) return 'unpublishing';
+  return publications.environments.includes(source) && !publications.environments.includes(target) ? 'carried' : null;
 }

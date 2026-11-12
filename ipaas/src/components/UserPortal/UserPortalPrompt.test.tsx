@@ -41,7 +41,7 @@ const publishability = vi.mocked(api.fetchUserPortalPublishability);
 const publish = vi.mocked(api.publishToUserPortal);
 
 const ACTIVE: UserPortal = { environment: 'production', state: 'active', url: 'https://portal.example/acme' };
-const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, rejectedScopes: [] };
+const PUBLISHABLE: UserPortalPublishability = { environment: 'production', published: false, publishable: true, reasons: [], redeploys: true, publishing: false, unpublishing: false, rejectedScopes: [] };
 const NOT_ENABLED: UserPortalPublishability = {
   ...PUBLISHABLE,
   publishable: false,
@@ -100,7 +100,7 @@ describe('the way to a workflow in the User Portal', () => {
   it('shows the scopes the portal could not hold once a publish from here goes through', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValueOnce({ ...PUBLISHABLE, redeploys: false }).mockResolvedValue({ ...PUBLISHABLE, published: true, redeploys: false });
-    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: ['bad scope'] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await prompt(DEVELOPER);
     await act(async () => button(container, 'Publish to User Portal')?.click());
     await flush();
@@ -147,7 +147,7 @@ describe('the way to a workflow in the User Portal', () => {
   it('offers to publish where the User Portal runs, warning first of the redeploy', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValue(PUBLISHABLE);
-    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
 
     await act(async () => button(container, 'Publish to User Portal')?.click());
@@ -247,7 +247,7 @@ describe('a publish that finishes in the background, from the prompt', () => {
   it('shows Publishing… after the 202 and offers to open the portal once published', async () => {
     portal.mockResolvedValue(ACTIVE);
     publishability.mockResolvedValueOnce(PUBLISHABLE).mockResolvedValue({ ...PUBLISHABLE, publishing: true });
-    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, rejectedScopes: [] });
+    publish.mockResolvedValue({ environment: 'production', published: false, publishing: true, unpublishing: false, rejectedScopes: [] });
     const container = await prompt(DEVELOPER);
     await act(async () => button(container, 'Publish to User Portal')?.click());
     await flush();
@@ -258,7 +258,7 @@ describe('a publish that finishes in the background, from the prompt', () => {
     expect(button(container, 'Publishing…')?.disabled).toBe(true);
     expect(container.textContent).toContain('this takes a minute or two');
 
-    publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, publishing: false, rejectedScopes: ['bad scope'] });
+    publishability.mockResolvedValue({ ...PUBLISHABLE, published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     await poll();
     await flush();
     expect(container.textContent).toContain('Open User Portal');
@@ -276,5 +276,52 @@ describe('a publish that finishes in the background, from the prompt', () => {
     await flush();
     expect(container.textContent).toContain("Publishing didn't finish. Publish again.");
     expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+  });
+});
+
+describe("a User Portal that isn't ready yet", () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
+  afterEach(() => vi.useRealTimers());
+  const wait = (ms: number) => act(async () => vi.advanceTimersByTimeAsync(ms));
+  const openLink = (container: HTMLElement) => [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Open User Portal');
+  const PUBLISHED: UserPortalPublishability = { ...PUBLISHABLE, published: true, redeploys: false };
+
+  // ipaas-service publishes to a provisioned portal whether or not its pods are ready, as the env card's switch does.
+  it('offers to publish while it starts or is not ready', async () => {
+    publishability.mockResolvedValue(PUBLISHABLE);
+    for (const state of ['starting', 'unhealthy'] as const) {
+      portal.mockResolvedValue({ environment: 'production', state });
+      const container = await prompt(DEVELOPER);
+      expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+      unmount();
+    }
+  });
+
+  it('says it is starting in place of the link, and offers to open it once a re-read finds it ready', async () => {
+    portal.mockResolvedValueOnce({ environment: 'production', state: 'starting' }).mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue(PUBLISHED);
+    const container = await prompt(DEVELOPER);
+    expect(button(container, 'Starting User Portal…')?.disabled).toBe(true);
+    expect(openLink(container)).toBeUndefined();
+
+    await wait(3_000);
+    await flush();
+    expect(openLink(container)?.getAttribute('href')).toBe('https://portal.example/acme');
+  });
+
+  it("says it isn't ready in place of the link, with OpenChoreo's reason only as a detail, offers no Enable, and reads it again", async () => {
+    portal.mockResolvedValueOnce({ environment: 'production', state: 'unhealthy', readinessMessage: 'pods are crash-looping' }).mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue(PUBLISHED);
+    const container = await prompt(PLATFORM_ENGINEER);
+    const notReady = button(container, 'User Portal not ready');
+    expect(notReady?.disabled).toBe(true);
+    expect(reasonFor(notReady)).toBe('pods are crash-looping');
+    expect(container.textContent).not.toContain('pods are crash-looping');
+    expect(button(container, 'Enable User Portal')).toBeUndefined();
+    expect(openLink(container)).toBeUndefined();
+
+    await wait(30_000);
+    await flush();
+    expect(openLink(container)?.getAttribute('href')).toBe('https://portal.example/acme');
   });
 });

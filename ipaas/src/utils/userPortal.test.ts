@@ -18,7 +18,14 @@
 
 import { describe, expect, it } from 'vitest';
 import { BffError } from '../api/_client';
-import { refusalText, shownRefusals, userPortalErrorText } from './userPortal';
+import { portalBusy, refusalText, shownRefusals, userPortalErrorText } from './userPortal';
+
+describe('portalBusy', () => {
+  it('holds for a portal setting up, starting or being removed, and no other', () => {
+    expect((['setting-up', 'starting', 'removing'] as const).every(portalBusy)).toBe(true);
+    expect((['not-enabled', 'active', 'unhealthy', 'failed'] as const).some(portalBusy)).toBe(false);
+  });
+});
 
 describe('refusalText', () => {
   it('words a known code for the environment', () => {

@@ -27,7 +27,10 @@ const ERROR_TITLES: Record<McpErrorKind, string> = {
   other: 'Could not connect',
 };
 
-/** Through ipaas-service's relay no key is involved: a refusal is the integration platform's, for this user. */
+/**
+ * Through ipaas-service's relay the key is the relay's: it waits out or replaces a key the AI gateway refuses, and
+ * answers a refusal it can't recover from as 502. A 401 is the integration platform's, for this user.
+ */
 const KEYLESS_AUTH_HINT = 'The integration platform refused the call. Your role may not be allowed to test endpoints, or your session may have ended.';
 
 const ERROR_HINTS: Record<'auth' | 'blocked', string> = {

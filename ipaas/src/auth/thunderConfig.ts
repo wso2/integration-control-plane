@@ -76,10 +76,14 @@ export function thunderConfig(): ThunderIDProviderProps {
  */
 function bffConfig(): ThunderIDProviderProps {
   const { authBffContext, authBffSignInUrl, authBffProxyContext, asgardeoSignInRedirectUrl } = window.API_CONFIG;
+  const proxy = authBffProxyContext ?? '/_api';
   return {
     instanceId: THUNDER_INSTANCE_ID,
     baseUrl: window.location.origin,
     endpoints: {
+      // The organizations the header's switcher lists: Thunder's /users/me/ous, which the gateway exposes
+      // under its API root (/_api/idp). Absolute and under backend.proxy, or the SDK skips it.
+      usersMeOrganizationUnits: `${window.location.origin}${proxy}/idp/users/me/ous`,
       backend: {
         signIn: authBffSignInUrl ?? `${authBffContext}/signin`,
         // The policy names this one userinfoPath.
@@ -88,7 +92,7 @@ function bffConfig(): ThunderIDProviderProps {
         refresh: `${authBffContext}/refresh`,
         signOut: `${authBffContext}/logout`,
         // The gateway's API root, under which each product's oauth2-session-proxy sits.
-        proxy: authBffProxyContext ?? '/_api',
+        proxy,
         token: `${authBffContext}/token`,
       },
     },

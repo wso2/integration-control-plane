@@ -18,7 +18,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { usePublishToUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
-import { publishingText, refusalText, userPortalErrorText } from '../../utils/userPortal';
+import { publishingText, refusalText, unpublishingText, userPortalErrorText } from '../../utils/userPortal';
 import PublishWorkflowDialog from './PublishWorkflowDialog';
 
 interface PublishFlowOptions {
@@ -26,8 +26,12 @@ interface PublishFlowOptions {
   /** The environment's slug. */
   environment: string;
   envName: string;
+  /** A workflow's publish and unpublish redeploy it, which their notes say. */
+  isWorkflow?: boolean;
   /** Runs as a publish is asked for, before it is confirmed, so what the last one left on screen goes. */
   onStart?: () => void;
+  /** Runs when a publish is done within its request, with the scopes the User Portal couldn't hold. */
+  onPublished?: (rejectedScopes: string[]) => void;
 }
 
 export interface PublishFlow {
@@ -40,7 +44,10 @@ export interface PublishFlow {
    * reports. A confirmed publish shows its refusal in the dialog instead.
    */
   error: string | null;
-  /** What a publish running in the background is doing, worded for the reader; null when none is running. */
+  /**
+   * What a publish running in the background is doing, or an unpublish giving a workflow back to the console, worded for
+   * the reader; null when neither is running.
+   */
   progress: string | null;
   /** Scopes the last publish's endpoints require that the User Portal couldn't hold (`RejectedScopes` says so). */
   rejectedScopes: string[];
@@ -54,10 +61,11 @@ export interface PublishFlow {
  * Publishing an integration to an environment's User Portal, as every place in the console offers it. A publish that
  * redeploys a workflow so its Workflow Management API takes only User Portal sign-ins turns the console's workflow
  * management off in the environment, so it is confirmed first (`PublishWorkflowDialog`); any other publish goes
- * straight ahead. A workflow's publish finishes in the background after it is accepted: the flow stays pending, and
- * the publishability, which survives a page reload, says when it ends and how.
+ * straight ahead. An AI agent's or a workflow's publish finishes in the background after it is accepted, as bringing
+ * the User Portal's scopes in step can take a while: the flow stays pending, and the publishability, which survives a
+ * page reload, says when it ends and how.
  */
-export function usePublishFlow({ componentId, environment, envName, onStart }: PublishFlowOptions): PublishFlow {
+export function usePublishFlow({ componentId, environment, envName, isWorkflow = false, onStart, onPublished }: PublishFlowOptions): PublishFlow {
   const publish = usePublishToUserPortal();
   const { data: report } = useUserPortalPublishability(componentId, environment);
   const publishing = !!report?.publishing;
@@ -71,6 +79,7 @@ export function usePublishFlow({ componentId, environment, envName, onStart }: P
         onSuccess: (out) => {
           setConfirming(false);
           setRejectedScopes(out.rejectedScopes);
+          if (!out.publishing) onPublished?.(out.rejectedScopes);
         },
       },
     );
@@ -95,7 +104,7 @@ export function usePublishFlow({ componentId, environment, envName, onStart }: P
     request,
     dialog: confirming ? <PublishWorkflowDialog envName={envName} onConfirm={start} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} /> : null,
     error: publish.isError && !confirming ? userPortalErrorText(publish.error, envName) : publish.isPending ? null : backgroundError,
-    progress: publishing ? publishingText(envName) : null,
+    progress: publishing ? publishingText(envName, isWorkflow) : report?.unpublishing ? unpublishingText(envName, isWorkflow) : null,
     // The sync answer's scopes, or those of the background publish the report carries, only while it is published.
     rejectedScopes: rejectedScopes.length > 0 ? rejectedScopes : report?.published ? report.rejectedScopes : [],
     isPending: publish.isPending || publishing,

@@ -26,7 +26,7 @@ import type { EnvCardActionsProps } from '../../../types/integration';
 import type { ScheduleButtonProps } from '../_shared/ScheduleButton';
 
 const mutation = { mutate: vi.fn(), isPending: false };
-vi.mock('../../../hooks/useExecutions', () => ({ useExecutionConfigs: () => ({ data: undefined }), useTriggerComponent: () => mutation }));
+vi.mock('../../../hooks/useExecutions', () => ({ useExecutionConfigs: () => ({ data: undefined }), useTriggerComponent: () => mutation, useRuntimeArguments: () => ({ data: undefined, isLoading: false, isError: false }) }));
 vi.mock('../../../hooks/useConfiguration', async (importOriginal) => ({ ...(await importOriginal<object>()), useSchemaConfig: () => ({ data: undefined }) }));
 const scheduleButton = vi.fn();
 vi.mock('../_shared/ScheduleButton', () => ({ default: (props: ScheduleButtonProps) => (scheduleButton(props), null) }));

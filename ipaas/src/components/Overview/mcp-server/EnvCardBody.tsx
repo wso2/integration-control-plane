@@ -42,8 +42,8 @@ import type { McpTool } from '../../../types/mcp';
  * replaces the swagger/operations view with a tools list. The credential and the
  * enforcing gateway URL come from `useEndpointTestAccess`: the API Platform for an
  * MCP proxy, Agent Manager's AI gateway for an MCP server published there. The AI
- * gateway gives keys only to Agent Manager agents, so that server's tools come from
- * the BFF instead (`AiGatewayTools`).
+ * gateway answers no browser's CORS preflight, so that server's tools come from the
+ * BFF instead (`AiGatewayTools`), which reads what Agent Manager listed.
  * Shared by both MCP flavors (server-from-source and proxy) via the registry.
  */
 export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {

@@ -76,6 +76,46 @@ describe('toUserPortal', () => {
     expect(toUserPortal({ environment: 'prod', enabled: true, state: 'PENDING', portalUrl: 'https://prod-up.example' })).not.toHaveProperty('url');
   });
 
+  describe('once its provision is done', () => {
+    const done = { environment: 'prod', enabled: true, state: 'DONE', portalUrl: 'https://prod-up.example' };
+
+    it('reads a ready portal as active, with its URL', () => {
+      expect(toUserPortal({ ...done, readiness: 'READY' })).toEqual({ environment: 'prod', state: 'active', url: 'https://prod-up.example' });
+    });
+
+    // An ipaas-service from before readiness never sends it, and a portal's first run hasn't written it yet.
+    it('reads a portal with no readiness as active, with its URL', () => {
+      expect(toUserPortal(done)).toEqual({ environment: 'prod', state: 'active', url: 'https://prod-up.example' });
+    });
+
+    // Read as active, it would link a portal that may not answer.
+    it('reads a readiness the console does not know as not ready, saying so', () => {
+      expect(toUserPortal({ ...done, readiness: 'DEGRADED' })).toEqual({ environment: 'prod', state: 'unhealthy', readinessMessage: "The User Portal reports a readiness the console doesn't know: DEGRADED." });
+    });
+
+    it('reads a portal whose pods are starting as starting, with no URL', () => {
+      expect(toUserPortal({ ...done, readiness: 'STARTING', readinessMessage: 'Resource "deployment" (Deployment) is Progressing' })).toEqual({ environment: 'prod', state: 'starting' });
+    });
+
+    // ipaas-service doesn't send this; were it to, the portal would be on its way up.
+    it('reads an enabled portal reported suspended as starting', () => {
+      expect(toUserPortal({ ...done, readiness: 'SUSPENDED' })).toEqual({ environment: 'prod', state: 'starting' });
+    });
+
+    it("reads an unhealthy portal as not ready, with OpenChoreo's reason and no URL", () => {
+      expect(toUserPortal({ ...done, readiness: 'UNHEALTHY', readinessMessage: 'pods are crash-looping' })).toEqual({ environment: 'prod', state: 'unhealthy', readinessMessage: 'pods are crash-looping' });
+      expect(toUserPortal({ ...done, readiness: 'UNHEALTHY' })).toEqual({ environment: 'prod', state: 'unhealthy' });
+    });
+  });
+
+  // Readiness only splits a finished provision.
+  it('keeps every other provision state as it was, whatever the readiness', () => {
+    expect(toUserPortal({ environment: 'prod', enabled: true, state: 'APPLIED', readiness: 'READY' }).state).toBe('setting-up');
+    expect(toUserPortal({ environment: 'prod', enabled: true, state: 'DELETING', readiness: 'UNHEALTHY' }).state).toBe('removing');
+    expect(toUserPortal({ environment: 'prod', enabled: true, state: 'FAILED', readiness: 'STARTING' }).state).toBe('failed');
+    expect(toUserPortal({ environment: 'dev', enabled: false, suspended: true, state: 'DONE', readiness: 'SUSPENDED' }).state).toBe('not-enabled');
+  });
+
   // A disable answers with the portal still enabled and its provision DELETING.
   it('reads a portal being deleted as removing, enabled or not', () => {
     expect(toUserPortal({ environment: 'prod', enabled: true, state: 'DELETING' }).state).toBe('removing');
@@ -101,6 +141,7 @@ describe('toUserPortalPublishability', () => {
       reasons,
       redeploys: true,
       publishing: false,
+      unpublishing: false,
       rejectedScopes: [],
     });
   });
@@ -122,11 +163,19 @@ describe('toUserPortalPublishability', () => {
     expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: true, publishing: true, publishError })).toMatchObject({ publishing: true, publishError });
     expect(toUserPortalPublishability({ environment: 'prod', published: true, publishable: true, rejectedScopes: ['bad'] }).rejectedScopes).toEqual(['bad']);
   });
+
+  it('carries a running background unpublish and its failure to give the workflow back', () => {
+    const unpublishError = { code: 'USER_PORTAL_CONSOLE_ACCESS_NOT_RESTORED', message: 'unpublish it again' };
+    expect(toUserPortalPublishability({ environment: 'prod', published: false, publishable: false, unpublishing: true })).toMatchObject({ unpublishing: true });
+    const report = toUserPortalPublishability({ environment: 'prod', published: false, publishable: true, unpublishError });
+    expect(report).toMatchObject({ unpublishing: false, unpublishError });
+    expect(report.publishError).toBeUndefined();
+  });
 });
 
 describe('toUserPortalPublications', () => {
   it('reads an integration the BFF lists no environments for as published nowhere', () => {
-    expect(toUserPortalPublications({})).toEqual({ environments: [] });
-    expect(toUserPortalPublications({ environments: ['development'] })).toEqual({ environments: ['development'] });
+    expect(toUserPortalPublications({})).toEqual({ environments: [], unpublishing: [], notGivenBack: [] });
+    expect(toUserPortalPublications({ environments: ['development'], unpublishing: ['production'], notGivenBack: ['staging'] })).toEqual({ environments: ['development'], unpublishing: ['production'], notGivenBack: ['staging'] });
   });
 });

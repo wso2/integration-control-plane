@@ -18,7 +18,7 @@
 
 import { DEFAULT_FORWARDED_TOKEN_HEADER } from '../constants/apiConsumption';
 import type { Environment } from '../types/environment';
-import type { UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
+import type { UserPortalPublishability, UserPortalRefusal, UserPortalState } from '../types/userPortal';
 import { apiErrorMessage, httpCodeOf } from './apiErrors';
 import { WORKFLOW_MANAGEMENT_API_TITLE } from './workflowIntegration';
 
@@ -26,6 +26,9 @@ import { WORKFLOW_MANAGEMENT_API_TITLE } from './workflowIntegration';
 export type SomeEnvironments = [Environment, ...Environment[]];
 
 export const hasSomeEnvironments = (environments: Environment[]): environments is SomeEnvironments => environments.length > 0;
+
+/** A portal on its way somewhere: setting up, starting or being removed. It is read again every few seconds. */
+export const portalBusy = (state: UserPortalState): boolean => state === 'setting-up' || state === 'starting' || state === 'removing';
 
 export const USER_PORTAL_NOT_ENABLED = 'USER_PORTAL_NOT_ENABLED';
 export const USER_PORTAL_NOT_DEPLOYED = 'USER_PORTAL_NOT_DEPLOYED';
@@ -72,8 +75,18 @@ export const refusalText = ({ code, message }: UserPortalRefusal, env: string): 
 /** A failed User Portal call: its code worded, or else the API's sentence. */
 export const userPortalErrorText = (error: unknown, env: string): string => MESSAGES[httpCodeOf(error)]?.(env) ?? apiErrorMessage(error, 'Something went wrong.');
 
-/** The note shown while a workflow's publish finishes in the background. */
-export const publishingText = (env: string): string => `Publishing to the User Portal in ${env}. The workflow is redeployed for the User Portal's sign-in; this takes a minute or two.`;
+/**
+ * The note shown while a publish finishes in the background: a workflow's redeploys it for the User Portal's sign-in,
+ * and every publish adds its scopes to the User Portal.
+ */
+export const publishingText = (env: string, isWorkflow: boolean): string =>
+  isWorkflow ? `Publishing to the User Portal in ${env}. The workflow is redeployed for the User Portal's sign-in; this takes a minute or two.` : `Publishing to the User Portal in ${env}. Its scopes are added to the User Portal; this can take a minute.`;
+
+/** The note shown while an unpublish finishes in the background: a workflow is given back to the console, and its scopes taken off. */
+export const unpublishingText = (env: string, isWorkflow: boolean): string =>
+  isWorkflow
+    ? `Unpublished from the User Portal in ${env}. The workflow is redeployed to take the console's API key again; this takes a minute or two.`
+    : `Unpublished from the User Portal in ${env}. Its scopes are being taken off the User Portal; this can take a minute.`;
 
 // The rules about what runs in the environment. With nothing deployed there they all fail, and deploying is the fix.
 const NEEDS_A_DEPLOYMENT = new Set(['USER_PORTAL_NO_PUBLIC_ENDPOINT', 'USER_PORTAL_NO_MANAGEMENT_API', 'USER_PORTAL_API_KEY', 'USER_PORTAL_SECURED_BY_PROMOTION', 'USER_PORTAL_AUDIENCE_MISSING', 'USER_PORTAL_TOKEN_NOT_FORWARDED']);

@@ -31,6 +31,8 @@ interface PublishButtonProps {
   redeploys: boolean;
   /** Something else holds the publish back for now, such as the rules being read again. */
   busy?: boolean;
+  /** Why a publish waits for now, said in place of the rules, which aren't read meanwhile; it holds the button back. */
+  holdReason?: string;
   label: string;
   variant?: 'text' | 'contained';
   size?: 'small' | 'medium';
@@ -40,12 +42,12 @@ interface PublishButtonProps {
  * Publish to the User Portal, as every place in the console offers it: refused, with the reason, to a role that can't
  * deploy and while a publishing rule is broken, and confirmed first when it redeploys a workflow (`usePublishFlow`).
  */
-export default function PublishButton({ flow, publishable, redeploys, busy = false, label, variant = 'text', size = 'small' }: PublishButtonProps): JSX.Element {
+export default function PublishButton({ flow, publishable, redeploys, busy = false, holdReason, label, variant = 'text', size = 'small' }: PublishButtonProps): JSX.Element {
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   return (
-    <Tooltip title={!canDeploy ? DEPLOY_REFUSAL : publishable ? '' : 'Fix what is listed below to publish.'}>
+    <Tooltip title={!canDeploy ? DEPLOY_REFUSAL : (holdReason ?? (publishable ? '' : 'Fix what is listed below to publish.'))}>
       <span>
-        <Button variant={variant} size={size} onClick={() => flow.request(redeploys)} disabled={!canDeploy || !publishable || flow.isPending || busy} startIcon={flow.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
+        <Button variant={variant} size={size} onClick={() => flow.request(redeploys)} disabled={!canDeploy || !publishable || flow.isPending || busy || !!holdReason} startIcon={flow.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
           {flow.isPending ? 'Publishing…' : label}
         </Button>
       </span>

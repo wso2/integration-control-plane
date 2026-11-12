@@ -100,6 +100,7 @@ describe('thunderConfig on the gateway (BFF)', () => {
           proxy: '/_api',
           token: '/_auth/integration/token',
         },
+        usersMeOrganizationUnits: `${window.location.origin}/_api/idp/users/me/ous`,
       },
     });
   });
@@ -110,6 +111,7 @@ describe('thunderConfig on the gateway (BFF)', () => {
     const backend = thunderConfig().endpoints?.backend as { signIn: string; proxy: string };
     expect(backend.signIn).toBe('/_auth/cloud/login?returnTo=%2F_auth%2Fintegration%2Fsignin');
     expect(backend.proxy).toBe('/gw/_api');
+    expect(thunderConfig().endpoints?.usersMeOrganizationUnits).toBe(`${window.location.origin}/gw/_api/idp/users/me/ous`);
   });
 
   it('reaches nothing at the IdP: no discovery, flow metadata, profile fetch or client', () => {

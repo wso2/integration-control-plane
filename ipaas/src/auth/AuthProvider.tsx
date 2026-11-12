@@ -28,8 +28,9 @@ import { decodeJwtPayload, isExpired, stringClaim } from './jwt';
 import { clearBrowserSignInSession, clearLegacySession } from './legacySession';
 import { connect, disconnect, type CloudSession, type CloudUser } from './session';
 import { THUNDER_INSTANCE_ID, bffSignInUrl, gatewaySignedIn, isBffAuth, signInParams, thunderConfig } from './thunderConfig';
+import { loadConsoleHome } from './orgSwitch';
 import { stripBase } from '../utils/basePath';
-import { local, session as browserSession } from '../utils/storage';
+import { local, prefixed, session as browserSession } from '../utils/storage';
 
 const ORG_HANDLE_KEY = 'org_handle';
 const MISSING_ORG = 'Missing organization context after sign-in. Please try logging in again.';
@@ -236,6 +237,19 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       endSession(null);
     }
   }, [bff, status.kind, isSignedIn, endSession]);
+
+  // On the gateway every tab shares one session cookie. When another tab moves it to another
+  // organization (the header's switcher), that tab stores the new org handle on its reload; this tab
+  // still shows the old organization while the gateway answers for the new one, so it reloads too.
+  const sessionOrg = status.kind === 'signedIn' ? status.session.orgHandle : null;
+  useEffect(() => {
+    if (!bff || !sessionOrg) return;
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key === prefixed(ORG_HANDLE_KEY) && event.newValue && event.newValue !== sessionOrg) loadConsoleHome();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [bff, sessionOrg]);
 
   // Read once in the initialiser above; cleared here, not there, so StrictMode's second call agrees.
   useEffect(() => {

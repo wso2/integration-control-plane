@@ -21,19 +21,22 @@ import { AppWindow, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
-import { useEnableUserPortal, useUserPortalEnvironments, useUserPortals } from '../hooks/useUserPortal';
+import { useDisableUserPortal, useEnableUserPortal, useUserPortalEnvironments, useUserPortals } from '../hooks/useUserPortal';
 import type { OrgScope } from '../nav';
 import { apiErrorMessage, isUserPortalUnavailable } from '../utils/apiErrors';
+import type { Environment } from '../types/environment';
 import type { UserPortal as Portal, UserPortalState } from '../types/userPortal';
 import OrgSettingsTabs from '../components/Settings/OrgConfigureTabs';
+import DeprovisionUserPortalDialog from '../components/UserPortal/DeprovisionUserPortalDialog';
 import EnableUserPortalDialog from '../components/UserPortal/EnableUserPortalDialog';
 import UserPortalCard from '../components/UserPortal/UserPortalCard';
 import UserPortalSkeleton from '../components/UserPortal/UserPortalSkeleton';
 import { ComingSoonInline } from './ComingSoon';
 import * as styles from '../components/UserPortal/UserPortal.styles';
-import { hasSomeEnvironments } from '../utils/userPortal';
+import { hasSomeEnvironments, userPortalErrorText } from '../utils/userPortal';
 
 const MANAGE_REFUSAL = "Your role can't enable the User Portal.";
+const DEPROVISION_REFUSAL = "Your role can't deprovision the User Portal.";
 
 const SUBHEADER = 'One place for your organization’s users to chat with AI agents, run automations and act on workflow tasks you publish to it.';
 
@@ -49,12 +52,17 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
   const envs = environments.data ?? [];
   const portals = useUserPortals(envs.map((e) => e.id));
   const can = useCan();
-  const manageRefusal = can(Scopes.ENVIRONMENT_MANAGE) ? '' : MANAGE_REFUSAL;
+  const canManage = can(Scopes.ENVIRONMENT_MANAGE);
+  const manageRefusal = canManage ? '' : MANAGE_REFUSAL;
+  const deprovisionRefusal = canManage ? '' : DEPROVISION_REFUSAL;
 
   const enable = useEnableUserPortal();
   // A card's Retry is an enable of its own, so opening the Enable dialog can't reset it.
   const retryEnable = useEnableUserPortal();
   const [enableOpen, setEnableOpen] = useState(false);
+  const deprovision = useDisableUserPortal();
+  // The environment whose portal a deprovision is being confirmed for.
+  const [deprovisionTarget, setDeprovisionTarget] = useState<Environment | null>(null);
   // The last notice stays while the snackbar closes, so it doesn't go blank on its way out.
   const [notice, setNotice] = useState<{ text: string; severity: 'info' | 'error' }>({ text: '', severity: 'info' });
   const [noticeOpen, setNoticeOpen] = useState(false);
@@ -89,6 +97,20 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
     retryEnable.mutate(environment, {
       onSuccess: () => notify('Retrying the User Portal setup.', 'info'),
       onError: (err) => notify(errorText(err), 'error'),
+    });
+
+  const openDeprovision = (environment: Environment) => {
+    deprovision.reset();
+    setDeprovisionTarget(environment);
+  };
+
+  // A portal that a later environment's portal still needs is suspended, not removed: it reads as not enabled at once.
+  const confirmDeprovision = (environment: Environment) =>
+    deprovision.mutate(environment.id, {
+      onSuccess: (portal) => {
+        setDeprovisionTarget(null);
+        notify(portal.state === 'removing' ? `Deprovisioning the User Portal in ${environment.name}.` : `Deprovisioned the User Portal in ${environment.name}.`, 'info');
+      },
     });
 
   const enableButton = (label: string) => {
@@ -163,7 +185,16 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
         {failedAlert}
         <Box sx={styles.cardGridSx}>
           {enabled.map(({ environment, portal }) => (
-            <UserPortalCard key={environment.id} environment={environment} portal={portal} manageRefusal={manageRefusal} retrying={retryEnable.isPending && retryEnable.variables === environment.id} onRetry={() => retry(environment.id)} />
+            <UserPortalCard
+              key={environment.id}
+              environment={environment}
+              portal={portal}
+              manageRefusal={manageRefusal}
+              retrying={retryEnable.isPending && retryEnable.variables === environment.id}
+              onRetry={() => retry(environment.id)}
+              deprovisionRefusal={deprovisionRefusal}
+              onDeprovision={() => openDeprovision(environment)}
+            />
           ))}
         </Box>
       </Stack>
@@ -185,6 +216,16 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
       {body()}
 
       {enableOpen && hasSomeEnvironments(available) && <EnableUserPortalDialog environments={available} isPending={enable.isPending} error={enable.isError ? errorText(enable.error) : null} onEnable={startEnable} onClose={() => setEnableOpen(false)} />}
+
+      {deprovisionTarget && (
+        <DeprovisionUserPortalDialog
+          environment={deprovisionTarget}
+          isPending={deprovision.isPending}
+          error={deprovision.isError ? userPortalErrorText(deprovision.error, deprovisionTarget.name) : null}
+          onDeprovision={() => confirmDeprovision(deprovisionTarget)}
+          onClose={() => setDeprovisionTarget(null)}
+        />
+      )}
 
       <Snackbar open={noticeOpen} autoHideDuration={4000} onClose={() => setNoticeOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert onClose={() => setNoticeOpen(false)} severity={notice.severity} variant="filled">

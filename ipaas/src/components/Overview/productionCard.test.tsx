@@ -35,7 +35,7 @@ vi.mock('../../hooks/useDeployments', () => ({
   usePromote: () => mutation,
   useComponentDeployment: (_o: string, _u: string, _c: string, _v: string, envId: string) => (envId === 'development' ? source : { data: undefined, isLoading: false }),
 }));
-vi.mock('../../hooks/useExecutions', () => ({ useExecutionConfigs: () => ({ data: undefined }), useTriggerComponent: () => mutation }));
+vi.mock('../../hooks/useExecutions', () => ({ useExecutionConfigs: () => ({ data: undefined }), useTriggerComponent: () => mutation, useRuntimeArguments: () => ({ data: undefined, isLoading: false, isError: false }) }));
 vi.mock('../../hooks/useConfiguration', () => ({ useSchemaConfig: () => ({ data: undefined }), useIntegrationLinks: () => ({ data: undefined, refetch: vi.fn() }) }));
 vi.mock('../../hooks/useAppNavigate', () => ({ useAppNavigate: () => vi.fn() }));
 vi.mock('../../hooks/useOrgUuid', () => ({ useOrgUuid: () => 'acme' }));
@@ -48,7 +48,8 @@ const controls: [string, ReactElement][] = [
   ['Stop', <ApiEnvCardActions {...slot('ACTIVE')} />],
   ['Redeploy', <ApiEnvCardActions {...slot('ERROR')} />],
   ['Promote', <PromoteButton orgHandler="acme" projectId="default" componentId="orders" versionId="v1" deploymentPipelineId="default" sourceEnvId="development" targetEnvId="production" />],
-  ['Test', <TaskEnvCardActions {...slot('ACTIVE')} />],
+  // A critical environment's split button reads Run rather than Test.
+  ['Run', <TaskEnvCardActions {...slot('ACTIVE')} />],
 ];
 let unmount = () => {};
 afterEach(() => unmount());

@@ -17,19 +17,18 @@
  */
 
 import { Box, Button, Chip, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { useState, type JSX } from 'react';
+import type { JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
-import { useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
+import { useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { DEPLOY_REFUSAL, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
-import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
+import { DEPLOY_REFUSAL, shownRefusals, unpublishingText, userPortalIsOff } from '../../utils/userPortal';
 import PublishButton from './PublishButton';
 import PublishRefusals from './PublishRefusals';
 import RejectedScopes from './RejectedScopes';
 import * as styles from './UserPortal.styles';
-import UnpublishNote from './UnpublishNote';
 import { usePublishFlow } from './usePublishFlow';
+import { useUnpublishFlow } from './useUnpublishFlow';
 import UserPortalOffRow from './UserPortalOffRow';
 
 interface UserPortalRowProps {
@@ -51,13 +50,14 @@ interface UserPortalRowProps {
  * console's workflow management off in the environment. Unpublishing it redeploys it too, to take the console's API key
  * again, which turns that back on, except in an environment that takes its API security by promotion: the gateway there
  * keeps taking only User Portal sign-ins until a promotion brings an API key. The unpublish confirmation says which.
+ * That redeploy finishes in the background: the row says so until it ends, and offers to finish it if it fails.
  */
 export default function UserPortalRow({ orgHandler, projectId, componentId, environment, envName, isWorkflow = false }: UserPortalRowProps): JSX.Element | null {
   const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
-  const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
-  const [confirmUnpublish, setConfirmUnpublish] = useState(false);
-  const publish = usePublishFlow({ componentId, environment, envName, onStart: () => unpublish.reset() });
+  // Each clears what the other left on the row as it starts.
+  const unpublish = useUnpublishFlow({ componentId, projectId, environment, envName, isWorkflow, onStart: () => publish.reset() });
+  const publish = usePublishFlow({ componentId, environment, envName, isWorkflow, onStart: () => unpublish.reset() });
 
   if (isLoading) return <Skeleton variant="rounded" height={40} sx={styles.rowSx} />;
   // A BFF that serves no User Portal has nothing to publish to.
@@ -80,25 +80,17 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
 
   const reasons = shownRefusals(data.reasons);
   const pending = publish.isPending || unpublish.isPending;
-  const closeUnpublish = () => {
-    unpublish.reset();
-    setConfirmUnpublish(false);
-  };
-  const startUnpublish = () => {
-    publish.reset();
-    unpublish.mutate({ componentId, environment }, { onSuccess: () => setConfirmUnpublish(false) });
-  };
 
   const action = data.published ? (
     <Tooltip title={canDeploy ? '' : DEPLOY_REFUSAL}>
       <span>
-        <Button size="small" color="inherit" onClick={() => setConfirmUnpublish(true)} disabled={!canDeploy || pending}>
+        <Button size="small" color="inherit" onClick={unpublish.request} disabled={!canDeploy || pending}>
           Unpublish
         </Button>
       </span>
     </Tooltip>
   ) : (
-    <PublishButton flow={publish} publishable={data.publishable} redeploys={data.redeploys} busy={unpublish.isPending || isFetching} label="Publish" />
+    <PublishButton flow={publish} publishable={data.publishable} redeploys={data.redeploys} busy={unpublish.isPending || isFetching} holdReason={data.unpublishing ? unpublishingText(envName, isWorkflow) : undefined} label="Publish" />
   );
 
   return (
@@ -113,8 +105,8 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
         {action}
       </Stack>
 
-      {/* A running publish is switching the workflow, so the rules read mid-switch aren't shown until it ends. */}
-      {!data.published && !data.publishing && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={envName} />}
+      {/* A running publish or unpublish is switching the workflow, so the rules read mid-switch aren't shown until it ends. */}
+      {!data.published && !data.publishing && !data.unpublishing && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={envName} />}
 
       {publish.progress && (
         <Typography variant="caption" color="text.secondary" component="p" sx={styles.rowNoteSx}>
@@ -130,18 +122,21 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
       )}
       <RejectedScopes scopes={publish.rejectedScopes} sx={styles.rowNoteSx} />
 
-      {publish.dialog}
-
-      {confirmUnpublish && (
-        <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
-          <UnpublishNote isWorkflow={isWorkflow} projectId={projectId} environment={environment} envName={envName} />
-          {unpublish.isError && (
-            <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
-              {userPortalErrorText(unpublish.error, envName)}
-            </Typography>
+      {unpublish.failure && (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={styles.rowNoteSx}>
+          <Typography variant="caption" color="error">
+            {unpublish.failure}
+          </Typography>
+          {canDeploy && (
+            <Button size="small" color="inherit" onClick={unpublish.finish} disabled={pending} sx={{ flexShrink: 0 }}>
+              Finish unpublishing
+            </Button>
           )}
-        </ConfirmDeleteDialog>
+        </Stack>
       )}
+
+      {publish.dialog}
+      {unpublish.dialog}
     </Box>
   );
 }
