@@ -24,6 +24,10 @@ import type { SecurityConfig } from '../../../types/consumers';
 import OAuthClientsPanel from './OAuthClientsPanel';
 
 vi.mock('../../../api/environments', () => ({ fetchEnvironmentIdentityProvider: vi.fn() }));
+vi.mock('../../../api/projects', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/projects')>()),
+  fetchProject: vi.fn(async () => ({ id: 'orders', name: 'Orders Team', handler: 'orders' })),
+}));
 
 const security = { mode: 'jwt', jwt: {}, editable: true } as SecurityConfig;
 const NOT_READY = 'isn’t ready in this environment yet';
@@ -31,8 +35,8 @@ const NOT_READY = 'isn’t ready in this environment yet';
 let unmount = () => {};
 afterEach(() => unmount());
 
-async function openGuide() {
-  const view = await renderWithScopes(<OAuthClientsPanel envName="development" envLabel="Development" security={security} />, []);
+async function openGuide(config: SecurityConfig = security) {
+  const view = await renderWithScopes(<OAuthClientsPanel envName="development" envLabel="Development" projectId="orders" security={config} />, []);
   unmount = view.unmount;
   await act(async () => button(view.container, 'How to call this API')!.click());
   return view.container;
@@ -66,6 +70,28 @@ describe('OAuthGuideDrawer', () => {
     const container = await openGuide();
     await flush();
     expect(guideText(container)).toContain(NOT_READY);
+  });
+
+  it('creates the client in the integration’s project and deploys it to the environment', async () => {
+    vi.mocked(fetchEnvironmentIdentityProvider).mockResolvedValue({ available: false });
+    const container = await openGuide();
+    await flush();
+    const text = guideText(container);
+    expect(text).toContain('select the Orders Team project in the header');
+    expect(text).toContain('Backend service');
+    expect(text).toContain('Deploy it to Development');
+    expect(text).toContain('Variables & secrets');
+    expect(text).not.toContain('select the Development environment');
+  });
+
+  it('asks for a token for the API its scopes belong to', async () => {
+    vi.mocked(fetchEnvironmentIdentityProvider).mockResolvedValue({ available: false });
+    const scoped = { ...security, jwt: { audiences: ['https://orders.example'], operations: { 'GET /orders': { allOf: ['orders:read'] } } } } as SecurityConfig;
+    const container = await openGuide(scoped);
+    await flush();
+    const text = guideText(container);
+    expect(text).toContain("-d 'resource=https://orders.example'");
+    expect(text).toContain('Roles');
   });
 
   it('shows the endpoints of a ready platform', async () => {

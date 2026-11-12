@@ -32,6 +32,11 @@ interface OAuthGuideDrawerProps {
   onClose: () => void;
   /** Display label shown in the header badge. */
   envLabel: string;
+  /**
+   * Display name of the integration's project. The Identity Platform keeps a copy of each of the organization's
+   * projects under the same name, and the client belongs in this one.
+   */
+  projectName: string | undefined;
   /** What the environment's API enforces; its mode is OAuth (`jwt`). */
   security: SecurityConfig;
   /** The org's identity platform in the environment; absent while it loads or when it can't be read. */
@@ -53,6 +58,14 @@ function CodeBlock({ code, label }: { code: string; label: string }): JSX.Elemen
   );
 }
 
+function Code({ children }: { children: string }): JSX.Element {
+  return (
+    <Box component="code" sx={styles.summaryCode}>
+      {children}
+    </Box>
+  );
+}
+
 function CopyField({ label, value }: { label: string; value: string }): JSX.Element {
   return (
     <Box>
@@ -69,14 +82,28 @@ function CopyField({ label, value }: { label: string; value: string }): JSX.Elem
 
 /**
  * Read-only "how do I call this API" reference for an OAuth-secured API: how to create a client in the
- * Identity Platform console, the identity platform's endpoints, and sample requests for a token and a call.
+ * Identity Platform console and deploy it to the environment, the identity platform's endpoints, and sample
+ * requests for a token and a call. A client belongs to an Identity Platform project and reaches an environment
+ * only through that project's deployment pipeline, which carries its ID and secret to the first environment
+ * alone.
  */
-export default function OAuthGuideDrawer({ open, onClose, envLabel, security, identityProvider, identityLoading, identityError, onRetryIdentity }: OAuthGuideDrawerProps): JSX.Element {
+export default function OAuthGuideDrawer({ open, onClose, envLabel, projectName, security, identityProvider, identityLoading, identityError, onRetryIdentity }: OAuthGuideDrawerProps): JSX.Element {
   const jwt = security.jwt;
   const scopes = useMemo(() => jwtScopes(jwt), [jwt]);
   const audiences = jwt?.audiences ?? [];
   const tokenHeader = tokenHeaderExample(jwt);
   const idp = identityProvider?.available ? identityProvider : undefined;
+  // The console opens in the project last picked in that browser, or the organization's first one, so the step
+  // names the project rather than trusting the one already selected.
+  const selectProject = projectName ? (
+    <>
+      select the <strong>{projectName}</strong> project in the header: the project this integration is in.
+    </>
+  ) : (
+    <>select this integration’s project in the header.</>
+  );
+  // Scopes are issued only for a token requested for an API (resource server), which is also its audience.
+  const resource = scopes.length > 0 ? (audiences[0] ?? '<api-identifier>') : undefined;
 
   return (
     <DrawerPanel open={open} onClose={onClose}>
@@ -104,35 +131,36 @@ export default function OAuthGuideDrawer({ open, onClose, envLabel, security, id
                     <Link href={identityProvider.consoleUrl} target="_blank" rel="noopener noreferrer">
                       Identity Platform console
                     </Link>{' '}
-                    and select the {envLabel} environment.
+                    and {selectProject}
                   </>
                 ) : (
-                  <>Open the Identity Platform console and select the {envLabel} environment.</>
+                  <>Open the Identity Platform console and {selectProject}</>
                 )}
               </Typography>
               <Typography component="li" variant="body2">
-                Create a machine-to-machine application that uses the client credentials grant.
+                Go to <strong>Applications</strong>, select <strong>Add application</strong>, and choose <strong>Backend service</strong>.
               </Typography>
-              {audiences.length > 0 && (
-                <Typography component="li" variant="body2">
-                  Set its access token audience to {audiences.length === 1 ? '' : 'one of '}
-                  {audiences.map((aud, i) => (
-                    <Box component="code" key={aud} sx={styles.summaryCode}>
-                      {i > 0 ? ', ' : ''}
-                      {aud}
-                    </Box>
-                  ))}
-                  : this API refuses tokens meant for any other audience.
-                </Typography>
-              )}
-              {scopes.length > 0 && (
-                <Typography component="li" variant="body2">
-                  Allow it the scopes the operations it calls require: {scopes.join(', ')}.
-                </Typography>
-              )}
               <Typography component="li" variant="body2">
-                Copy the client ID and secret into the client that calls this API.
+                Copy the client ID and client secret. The secret is shown only once.
               </Typography>
+              {scopes.length > 0 ? (
+                <Typography component="li" variant="body2">
+                  Under <strong>APIs</strong>, give the API
+                  {audiences.length > 0 && (
+                    <>
+                      {' '}
+                      <Code>{audiences[0]}</Code>
+                    </>
+                  )}{' '}
+                  the permissions {scopes.join(', ')}. Under <strong>Roles</strong>, give the application a role that holds them: a token carries only the scopes the client is granted through its roles.
+                </Typography>
+              ) : (
+                audiences.length > 0 && (
+                  <Typography component="li" variant="body2">
+                    On the application’s <strong>Advanced</strong> tab, set <strong>Default audience (aud)</strong> to <Code>{audiences[0]}</Code>: this API refuses tokens meant for any other audience.
+                  </Typography>
+                )
+              )}
             </Box>
             {identityProvider?.consoleUrl && (
               <Button variant="outlined" size="small" component="a" href={identityProvider.consoleUrl} target="_blank" rel="noopener noreferrer" startIcon={<ExternalLink size={14} />} sx={styles.panelAlert}>
@@ -143,7 +171,21 @@ export default function OAuthGuideDrawer({ open, onClose, envLabel, security, id
 
           <Box>
             <Typography variant="subtitle2" sx={styles.sectionTitle}>
-              2. Get an access token
+              2. Deploy it to {envLabel}
+            </Typography>
+            <Box component="ol" sx={styles.stepList}>
+              <Typography component="li" variant="body2">
+                A client takes effect in an environment only once it is deployed there. Under <strong>Project</strong>, open <strong>Deployment pipeline</strong>, deploy the latest version to the first environment, and promote it until it reaches {envLabel}.
+              </Typography>
+              <Typography component="li" variant="body2">
+                Only the first environment receives the client ID and secret. For every later one, set them when the deploy asks for its values, or under that environment’s <strong>Variables &amp; secrets</strong>.
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" sx={styles.sectionTitle}>
+              3. Get an access token
             </Typography>
             {identityLoading ? (
               <Skeleton variant="rounded" height={56} sx={styles.dialogAlert} />
@@ -172,12 +214,12 @@ export default function OAuthGuideDrawer({ open, onClose, envLabel, security, id
             <Typography variant="body2" color="text.secondary" sx={styles.panelAlert}>
               Request a token with the client’s credentials:
             </Typography>
-            <CodeBlock code={tokenRequestCurl(idp?.tokenEndpoint, scopes)} label="Copy token request" />
+            <CodeBlock code={tokenRequestCurl(idp?.tokenEndpoint, scopes, resource)} label="Copy token request" />
           </Box>
 
           <Box>
             <Typography variant="subtitle2" sx={styles.sectionTitle}>
-              3. Call the API
+              4. Call the API
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={styles.dialogAlert}>
               Send the access token in the{' '}

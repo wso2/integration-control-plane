@@ -89,6 +89,9 @@ describe('tokenRequestCurl', () => {
   it('holds a placeholder while the token endpoint is unknown', () => {
     expect(tokenRequestCurl(undefined)).toContain("'<token-endpoint>'");
   });
+  it('names the API the scopes are requested for', () => {
+    expect(tokenRequestCurl('https://idp.example/oauth2/token', ['a'], 'https://api.example')).toContain("-d 'resource=https://api.example' \\\n  -d 'scope=a'");
+  });
 });
 
 describe('apiCallCurl', () => {

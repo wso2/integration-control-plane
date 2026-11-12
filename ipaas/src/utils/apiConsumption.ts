@@ -60,9 +60,13 @@ export function jwtScopes(jwt: JwtSecurity | undefined): string[] {
   return [...scopes].sort();
 }
 
-/** A client credentials token request to the identity platform, with placeholders for the client's own ID and secret. */
-export function tokenRequestCurl(tokenEndpoint: string | undefined, scopes: readonly string[] = []): string {
+/**
+ * A client credentials token request to the identity platform, with placeholders for the client's own ID and secret.
+ * `resource` names the API (resource server) the token is for: the identity platform issues scopes only for one.
+ */
+export function tokenRequestCurl(tokenEndpoint: string | undefined, scopes: readonly string[] = [], resource?: string): string {
   const parts = [`curl -X POST '${tokenEndpoint || '<token-endpoint>'}'`, "-u '<client-id>:<client-secret>'", "-d 'grant_type=client_credentials'"];
+  if (resource) parts.push(`-d 'resource=${resource}'`);
   if (scopes.length) parts.push(`-d 'scope=${scopes.join(' ')}'`);
   return shellLines(parts);
 }

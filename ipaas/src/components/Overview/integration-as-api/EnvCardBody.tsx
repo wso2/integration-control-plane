@@ -158,7 +158,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !!securityRef && gatewayExposureEnabled && (
         <>
           <SecuritySummary endpointRef={securityRef} />
-          {oauth && !!apiSecurity && <OAuthClientsPanel envName={env.id} envLabel={env.name} security={apiSecurity} />}
+          {oauth && !!apiSecurity && <OAuthClientsPanel envName={env.id} envLabel={env.name} projectId={projectId} security={apiSecurity} />}
           {!loadingSecurity && <ApiKeysPanel endpointRef={securityRef} envLabel={env.name} oauth={oauth} />}
         </>
       )}

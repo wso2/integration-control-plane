@@ -20,6 +20,7 @@ import { Alert, Box, Button, Skeleton, Typography } from '@wso2/oxygen-ui';
 import { BookOpen, ExternalLink, UserKey } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useEnvironmentIdentityProvider } from '../../../hooks/useEnvironments';
+import { useProject } from '../../../hooks/useProjects';
 import type { SecurityConfig } from '../../../types/consumers';
 import { friendlyApiError } from '../../../utils/apiSecurity';
 import CopyButton from './CopyButton';
@@ -31,6 +32,8 @@ interface OAuthClientsPanelProps {
   envName: string;
   /** Display label of the environment. */
   envLabel: string;
+  /** The integration's project, which its OAuth clients belong in. */
+  projectId: string;
   /** What the environment's API enforces; its mode is OAuth (`jwt`). */
   security: SecurityConfig;
 }
@@ -41,8 +44,9 @@ interface OAuthClientsPanelProps {
  * OAuth client in the Identity Platform console and get tokens from its token endpoint: the console points
  * the way rather than issuing credentials itself.
  */
-export default function OAuthClientsPanel({ envName, envLabel, security }: OAuthClientsPanelProps): JSX.Element {
+export default function OAuthClientsPanel({ envName, envLabel, projectId, security }: OAuthClientsPanelProps): JSX.Element {
   const { data: idp, isLoading, error, refetch } = useEnvironmentIdentityProvider(envName);
+  const { data: project } = useProject(projectId);
   const [guideOpen, setGuideOpen] = useState(false);
 
   return (
@@ -55,7 +59,7 @@ export default function OAuthClientsPanel({ envName, envLabel, security }: OAuth
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={styles.panelAlert}>
-        Callers authenticate with access tokens from your organization’s identity platform in {envLabel}. Create an OAuth client for each caller in the Identity Platform console, then request tokens with the client credentials grant.
+        Callers authenticate with access tokens from your organization’s identity platform in {envLabel}. Create an OAuth client for each caller in an Identity Platform project and deploy it to {envLabel}, then request tokens with the client credentials grant.
       </Typography>
 
       {isLoading ? (
@@ -98,7 +102,7 @@ export default function OAuthClientsPanel({ envName, envLabel, security }: OAuth
         </Button>
       </Box>
 
-      <OAuthGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} envLabel={envLabel} security={security} identityProvider={idp} identityLoading={isLoading} identityError={error} onRetryIdentity={() => void refetch()} />
+      <OAuthGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} envLabel={envLabel} projectName={project?.name} security={security} identityProvider={idp} identityLoading={isLoading} identityError={error} onRetryIdentity={() => void refetch()} />
     </Box>
   );
 }
