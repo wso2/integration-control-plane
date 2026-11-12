@@ -46,10 +46,6 @@ const selectDisplayProps = { 'aria-label': 'Select organization' };
 // reads the card's own label instead.
 const decorativeDisplayProps = { tabIndex: -1 };
 
-function OrganizationText({ name }: { name: string }): JSX.Element {
-  return <ComplexSelect.MenuItem.Text primary={name} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: name }} />;
-}
-
 /**
  * The organization alone, as a card that opens its overview. The card is the one control: the select
  * inside only matches the look of the Project and Integration cards.
@@ -64,9 +60,10 @@ function OrganizationCard({ ref, org, name, onHome }: OrganizationSwitcherProps)
   return (
     <Box ref={ref} role="button" tabIndex={0} aria-label={`Open ${name} overview`} sx={homeCardSx} onClick={onHome} onKeyDown={onKeyDown}>
       <Box aria-hidden display="contents">
-        <ComplexSelect value={org} open={false} onChange={() => {}} onOpen={() => {}} size="small" sx={selectSx} IconComponent={() => null} SelectDisplayProps={decorativeDisplayProps} renderValue={() => <OrganizationText name={name} />} label="Organization">
+        <ComplexSelect value={org} open={false} onChange={() => {}} onOpen={() => {}} size="small" sx={selectSx} IconComponent={() => null} SelectDisplayProps={decorativeDisplayProps} label="Organization">
           <ComplexSelect.MenuItem value={org}>
-            <OrganizationText name={name} />
+            {/* A direct MenuItem.Text, so ComplexSelect can show its "Organization" label above the name, as the select does. */}
+            <ComplexSelect.MenuItem.Text primary={name} primaryTypographyProps={{ noWrap: true, title: name }} />
           </ComplexSelect.MenuItem>
         </ComplexSelect>
       </Box>
@@ -112,7 +109,6 @@ function OrganizationSelect({ ref, org, name, onHome, organizationUnits, error, 
             });
           }}
           SelectDisplayProps={selectDisplayProps}
-          renderValue={() => <OrganizationText name={shown.id === current.id ? name : shown.name} />}
           label="Organization">
           {organizationUnits.map((unit) => (
             <ComplexSelect.MenuItem key={unit.id} value={unit.id} onClick={unit.id === current.id ? onHome : undefined}>

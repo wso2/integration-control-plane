@@ -157,6 +157,16 @@ describe('OrganizationSwitcher', () => {
     expect(options()).toEqual([]);
   });
 
+  it.each([
+    ['the card', () => (auth.canSwitch = false)],
+    ['the select', () => {}],
+  ])('shows the "Organization" label above the name in %s', async (_, arrange) => {
+    arrange();
+    const container = await render();
+
+    expect(combobox(container).textContent).toMatch(/^Organization(Acme|Acme Corp)$/);
+  });
+
   it('makes the card one labelled control: one tab stop, its look hidden from assistive technology', async () => {
     auth.canSwitch = false;
     const container = await render();
