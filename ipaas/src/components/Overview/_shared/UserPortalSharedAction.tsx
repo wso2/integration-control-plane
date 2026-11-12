@@ -27,7 +27,7 @@ import { footerSx } from '../../UserPortal/UserPortal.styles';
 
 /**
  * The env card's User Portal action, in the card's footer: Publish, Unpublish, or
- * "User Portal off" while the environment has none. For the types the portal shows.
+ * "Share with your users" while the environment has none. For the types the portal shows.
  */
 export default function UserPortalSharedAction({ component, env, orgHandler, projectId, onNotify, deploymentStatusV2, loadingDeployment }: EnvCardSharedActionProps): JSX.Element {
   const isWorkflow = isWorkflowIntegration(component);

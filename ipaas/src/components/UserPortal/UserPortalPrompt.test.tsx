@@ -235,7 +235,7 @@ describe('the way to a workflow in the User Portal', () => {
       await flush();
       // The stale report would say the portal is off: the switch's placeholder holds its place instead.
       expect(container.querySelector('[aria-label="Loading the User Portal"]')).not.toBeNull();
-      expect(button(container, 'User Portal off')).toBeUndefined();
+      expect(button(container, 'Share with your users')).toBeUndefined();
       await act(async () => void (await vi.advanceTimersByTimeAsync(3_000)));
       await flush();
       expect(publishability).toHaveBeenCalledTimes(3);

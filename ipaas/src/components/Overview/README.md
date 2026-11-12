@@ -27,7 +27,7 @@ Overview/
 │   ├── configStatus.ts          hasMissingRequiredConfigs() — shared by automation,
 │   │                            file/event, ai-agent (drives the button + Run/Schedule)
 │   ├── UserPortalSharedAction.tsx  EnvCardSharedAction: the User Portal's Publish /
-│   │                            Unpublish / "User Portal off" action. useIntegrationModule
+│   │                            Unpublish / "Share with your users" action. useIntegrationModule
 │   │                            adds it to the types in constants/userPortal.ts USER_PORTAL_TYPES
 │   ├── FileEventHeader.tsx      shared CustomHeader for file- + event-integration
 │   │                            (status dot + Configure + Stop/Start; logs are in the body)

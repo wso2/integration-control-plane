@@ -86,11 +86,11 @@ const toggle = (container: HTMLElement) => container.querySelector<HTMLInputElem
 const dialogButton = (container: HTMLElement, name: string) => [...(dialog(container)?.querySelectorAll('button') ?? [])].find((b) => b.textContent === name);
 
 describe("the env card's User Portal action", () => {
-  it('says the portal is off, and explains it with a way to turn it on', async () => {
+  it('invites sharing with the User Portal where it is off, and explains it with a way to turn it on', async () => {
     publishability.mockResolvedValue(portalOff);
     const container = await action(PLATFORM_ENGINEER);
     expect(toggle(container)).toBeUndefined();
-    await act(async () => button(container, 'User Portal off')?.click());
+    await act(async () => button(container, 'Share with your users')?.click());
     expect(dialog(container)?.textContent).toContain('Turn it on in Production to publish this integration there.');
     const link = dialog(container)?.querySelector('a');
     expect(link?.textContent).toBe('Enable User Portal');
@@ -100,7 +100,7 @@ describe("the env card's User Portal action", () => {
   it('asks a role that cannot enable the portal to ask an admin', async () => {
     publishability.mockResolvedValue(portalOff);
     const container = await action(DEVELOPER);
-    await act(async () => button(container, 'User Portal off')?.click());
+    await act(async () => button(container, 'Share with your users')?.click());
     expect(dialog(container)?.textContent).toContain('Ask an admin to turn it on.');
     expect(dialog(container)?.querySelector('a')).toBeNull();
   });

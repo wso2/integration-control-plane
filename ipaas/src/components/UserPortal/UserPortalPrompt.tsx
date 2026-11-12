@@ -172,7 +172,7 @@ function EnvironmentPrompt({ orgHandler, projectId, componentId, environment, on
   return (
     <Stack alignItems="center" gap={1}>
       {report.published && <OpenUserPortal portal={portal} />}
-      {/* A stale report would turn the switch into "User Portal off" until it is read again, so its placeholder waits. */}
+      {/* A stale report would turn the switch into "Share with your users" until it is read again, so its placeholder waits. */}
       {staleReport ? <UserPortalActionSkeleton /> : <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={environment.id} envName={environment.name} onNotify={onNotify} isWorkflow showPortalLink={false} />}
     </Stack>
   );
