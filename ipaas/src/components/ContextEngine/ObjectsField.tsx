@@ -17,11 +17,11 @@
  */
 
 import { Box, Button, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { Boxes, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { BLANK_OBJECT, objectErrors, parseObjects, serializeObjects } from '../../utils/contextEngine';
-import { addTableButtonSx, fieldGroupIntroSx, tableCardHeaderSx, tableCardIconSx, tableCardSx } from './styles';
+import { tableCardHeaderSx, tableCardSx } from './styles';
 import type { SourceObject } from '../../types/contextEngine';
 
 interface ObjectsFieldProps {
@@ -40,35 +40,16 @@ export default function ObjectsField({ value, onChange }: ObjectsFieldProps): JS
   const input = (index: number, key: keyof SourceObject, label: string, extra: { placeholder: string; helper?: string }) => {
     const v = objects[index][key];
     const error = v.trim() ? errors[index][key] : '';
-    return (
-      <TextField
-        label={label}
-        required
-        fullWidth
-        size="small"
-        value={v}
-        placeholder={extra.placeholder}
-        error={!!error}
-        helperText={error || extra.helper}
-        onChange={(e) => edit(index, key, e.target.value)}
-        sx={REQUIRED_FIELD_SX}
-      />
-    );
+    return <TextField label={label} required fullWidth size="small" value={v} placeholder={extra.placeholder} error={!!error} helperText={error || extra.helper} onChange={(e) => edit(index, key, e.target.value)} sx={REQUIRED_FIELD_SX} />;
   };
 
   return (
     <Stack sx={{ gap: 2 }}>
-      <Typography variant="body2" sx={fieldGroupIntroSx}>
-        Each record of an object becomes one record. Add every object the engine should read; each must have Change Data Capture enabled.
-      </Typography>
       {objects.map((o, i) => {
         const title = o.name.trim() || `Object ${i + 1}`;
         return (
           <Box key={i} sx={tableCardSx}>
             <Box sx={tableCardHeaderSx}>
-              <Box sx={tableCardIconSx}>
-                <Boxes size={16} />
-              </Box>
               <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, minWidth: 0 }} noWrap>
                 {title}
               </Typography>
@@ -78,12 +59,12 @@ export default function ObjectsField({ value, onChange }: ObjectsFieldProps): JS
                 </IconButton>
               )}
             </Box>
-            {input(i, 'name', 'Object', { placeholder: 'Account' })}
+            {input(i, 'name', 'Object', { placeholder: 'Account', helper: 'Must have Change Data Capture enabled.' })}
             {input(i, 'fields', 'Fields', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated, in the order they are published.' })}
           </Box>
         );
       })}
-      <Button variant="outlined" color="primary" fullWidth startIcon={<Plus size={16} />} onClick={() => set([...objects, { ...BLANK_OBJECT }])} sx={addTableButtonSx}>
+      <Button variant="outlined" color="primary" fullWidth startIcon={<Plus size={16} />} onClick={() => set([...objects, { ...BLANK_OBJECT }])}>
         Add object
       </Button>
     </Stack>

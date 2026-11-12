@@ -638,14 +638,6 @@ export function summarizeSource(source: ContextSourceConfig): string {
       const def = connector.fields.find((f) => f.key === key);
       const value = (source.values[key] ?? '').trim();
       if (!value) return '';
-      if (def?.kind === 'tables') {
-        const tables = parseTables(value);
-        return tablesBlank(tables) ? '' : plural(tables.length, 'table');
-      }
-      if (def?.kind === 'objects') {
-        const objects = parseObjects(value);
-        return objectsBlank(objects) ? '' : plural(objects.length, 'object');
-      }
       if (def?.kind === 'urls') {
         const n = splitUrls(value).length;
         return `${n} URL${n === 1 ? '' : 's'}`;

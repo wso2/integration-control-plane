@@ -17,11 +17,11 @@
  */
 
 import { Box, Button, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { Plus, Table, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { BLANK_TABLE, parseTables, serializeTables, tableErrors } from '../../utils/contextEngine';
-import { addTableButtonSx, fieldGroupIntroSx, tableCardHeaderSx, tableCardIconSx, tableCardPairSx, tableCardSx } from './styles';
+import { tableCardHeaderSx, tableCardSx } from './styles';
 import type { SourceTable } from '../../types/contextEngine';
 
 interface TablesFieldProps {
@@ -58,17 +58,11 @@ export default function TablesField({ value, onChange }: TablesFieldProps): JSX.
 
   return (
     <Stack sx={{ gap: 2 }}>
-      <Typography variant="body2" sx={fieldGroupIntroSx}>
-        Each row of a table becomes one record. Add every table the engine should read.
-      </Typography>
       {tables.map((t, i) => {
         const title = t.tableName.trim() || `Table ${i + 1}`;
         return (
           <Box key={i} sx={tableCardSx}>
             <Box sx={tableCardHeaderSx}>
-              <Box sx={tableCardIconSx}>
-                <Table size={16} />
-              </Box>
               <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, minWidth: 0 }} noWrap>
                 {title}
               </Typography>
@@ -78,16 +72,14 @@ export default function TablesField({ value, onChange }: TablesFieldProps): JSX.
                 </IconButton>
               )}
             </Box>
-            <Box sx={tableCardPairSx}>
-              {input(i, 'tableName', 'Table', { required: true, placeholder: 'employees' })}
-              {input(i, 'primaryKey', 'Primary Key', { required: true, placeholder: 'id' })}
-            </Box>
+            {input(i, 'tableName', 'Table', { required: true, placeholder: 'employees' })}
+            {input(i, 'primaryKey', 'Primary Key', { required: true, placeholder: 'id' })}
             {input(i, 'columns', 'Columns', { placeholder: 'id, name, dept_id', helper: 'Comma-separated. Leave empty for all columns.' })}
             {input(i, 'updatedAtColumn', 'Updated-at Column', { placeholder: 'updated_at', helper: 'Last-updated time. Recommended.' })}
           </Box>
         );
       })}
-      <Button variant="outlined" color="primary" fullWidth startIcon={<Plus size={16} />} onClick={() => set([...tables, { ...BLANK_TABLE }])} sx={addTableButtonSx}>
+      <Button variant="outlined" color="primary" fullWidth startIcon={<Plus size={16} />} onClick={() => set([...tables, { ...BLANK_TABLE }])}>
         Add table
       </Button>
     </Stack>

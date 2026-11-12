@@ -394,10 +394,6 @@ describe('source validation', () => {
       { tableName: '', primaryKey: '', columns: '', updatedAtColumn: '' },
       { tableName: 'Another table has this name.', primaryKey: 'Primary Key is required.', columns: '', updatedAtColumn: '' },
     ]);
-
-    // The summary counts the tables rather than showing the raw value.
-    expect(summarizeSource(db(table('EMPLOYEE', 'ID'), table('DEPT', 'ID')))).toBe('h · d · 2 tables');
-    expect(summarizeSource(withValues('mysql', conn))).toBe('h · d');
   });
 
   it('moves a restored draft from before multiple tables into the tables field', () => {
@@ -420,7 +416,6 @@ describe('source validation', () => {
     // Every object needs fields, and names are unique ignoring case.
     expect(sourceFieldError(objectsDef, serializeObjects([{ name: 'Account', fields: 'Name' }, { name: 'Contact', fields: ' , ' }]))).toBe('Object 2: Fields is required.');
     expect(objectErrors([{ name: 'Account', fields: 'Name' }, { name: ' account ', fields: 'Name' }])[1].name).toBe('Another object has this name.');
-    expect(summarizeSource(sf({ name: 'Account', fields: 'Name' }, { name: 'Contact', fields: 'Email' }))).toBe('https://acme.my.salesforce.com · 2 objects');
   });
 
   it('moves a restored Salesforce draft from before multiple objects into the objects field', () => {
