@@ -35,12 +35,13 @@ import {
   deployDeploymentTrack,
   triggerBuild,
   promote,
+  fetchProxyReconciliation,
   retryProxyReconciliation,
   stopDeployment,
   redeployDeployment,
   deployPrebuiltImage,
 } from '../api/deployments';
-import type { ComponentDeployment, BuildRun, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, RecentDeployment } from '../types/deployment';
+import type { ComponentDeployment, BuildRun, ProxyReconciliationStatus, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, RecentDeployment } from '../types/deployment';
 import type { DeployComponentInput } from '../types/build';
 import type { ComponentDetail, EnvEndpoint } from '../types/component';
 import type { IntegrationKind } from '../types/insights';
@@ -59,6 +60,30 @@ export function useComponentDeployment(
     queryKey: ['componentDeployment', orgHandler, orgUuid, componentId, versionId, environmentId],
     queryFn: () => fetchComponentDeployment(orgHandler, orgUuid, componentId, versionId!, environmentId),
     enabled: !!orgHandler && !!orgUuid && !!componentId && !!versionId && !!environmentId,
+    retry: false,
+    refetchInterval: options?.refetchInterval,
+  });
+}
+
+/**
+ * One environment's API gateway state, which only the Promote button and the Integration-as-API card use. It is
+ * keyed under the environment's deployment, so whatever invalidates the deployment reads it again too, and by the
+ * release the deployment runs, so a deployment poll that finds a new release reads the new release's state.
+ */
+export function useProxyReconciliation(
+  orgHandler: string,
+  orgUuid: string,
+  componentId: string,
+  versionId: string | undefined,
+  environmentId: string,
+  projectName: string,
+  releaseId: string | undefined,
+  options?: { enabled?: boolean; refetchInterval?: number | false | ((query: Query<ProxyReconciliationStatus | null>) => number | false) },
+) {
+  return useQuery<ProxyReconciliationStatus | null, Error, ProxyReconciliationStatus | null>({
+    queryKey: ['componentDeployment', orgHandler, orgUuid, componentId, versionId, environmentId, 'proxyReconciliation', releaseId],
+    queryFn: () => fetchProxyReconciliation(componentId, environmentId, projectName, versionId!),
+    enabled: (options?.enabled ?? true) && !!orgHandler && !!orgUuid && !!componentId && !!versionId && !!environmentId && !!projectName,
     retry: false,
     refetchInterval: options?.refetchInterval,
   });

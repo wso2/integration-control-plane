@@ -34,6 +34,7 @@ vi.mock('../../hooks/useDeployments', () => ({
   useRedeployDeployment: () => mutation,
   usePromote: () => mutation,
   useComponentDeployment: (_o: string, _u: string, _c: string, _v: string, envId: string) => (envId === 'development' ? source : { data: undefined, isLoading: false }),
+  useProxyReconciliation: () => ({ data: undefined, isLoading: false }),
 }));
 vi.mock('../../hooks/useExecutions', () => ({ useExecutionConfigs: () => ({ data: undefined }), useTriggerComponent: () => mutation, useRuntimeArguments: () => ({ data: undefined, isLoading: false, isError: false }) }));
 vi.mock('../../hooks/useConfiguration', () => ({ useSchemaConfig: () => ({ data: undefined }), useIntegrationLinks: () => ({ data: undefined, refetch: vi.fn() }) }));

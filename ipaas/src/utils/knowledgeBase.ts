@@ -229,8 +229,9 @@ export function retrievalUnavailableReason(kb: Pick<KnowledgeBase, 'status'>): s
 }
 
 /** Why an active knowledge base cannot be queried on the gateway with a test key yet, or null when it can. */
-export function retrievalAccessReason(access: Pick<EndpointTestAccess, 'keyError' | 'needsApiKeyAuth' | 'securityError' | 'mode' | 'gatewayUrl' | 'isAuthorized' | 'isMinting'>, apiStatus?: KnowledgeBaseApiStatus): string | null {
+export function retrievalAccessReason(access: Pick<EndpointTestAccess, 'keyError' | 'needsApiKeyAuth' | 'apiKeyNotEnforced' | 'securityError' | 'mode' | 'gatewayUrl' | 'isAuthorized' | 'isMinting'>, apiStatus?: KnowledgeBaseApiStatus): string | null {
   if (access.keyError) return access.keyError;
+  if (access.apiKeyNotEnforced) return "The knowledge base's API is set to API key authentication, but the gateway doesn't enforce it, so it can't be queried with a test key.";
   if (access.needsApiKeyAuth) return "The knowledge base's API takes another kind of credential, so it can't be queried with a test key.";
   if (access.securityError) {
     // Only a 409 says the API is not on the gateway; anything else is a read that failed, read again.

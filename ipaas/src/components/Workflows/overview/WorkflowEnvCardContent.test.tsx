@@ -27,6 +27,7 @@ import { WorkflowApiError } from '../api/http';
 import type { WorkflowDefinition } from '../api/types';
 import type { WorkflowApi } from '../api/useWorkflowApi';
 import type { WorkflowTarget } from '../connection/useWorkflowConnection';
+import { workflowKeys } from '../api/queryKeys';
 import WorkflowEnvCardContent from './WorkflowEnvCardContent';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -100,10 +101,10 @@ afterEach(async () => {
   container.remove();
 });
 
-async function renderContent() {
+async function renderContent(queryClient = new QueryClient()) {
   await act(async () =>
     root.render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[`${BASE}?track=track-2`]}>
           <WorkflowEnvCardContent target={TARGET} />
         </MemoryRouter>
@@ -194,6 +195,16 @@ describe('WorkflowEnvCardContent', () => {
 
     await act(async () => state.dialog?.onClose());
     expect(state.dialog?.open).toBe(false);
+  });
+
+  // The worker counts change without a deploy, so definitions the connection has just read are read again.
+  it('reads the definitions again when it mounts, however recently they were read', async () => {
+    const client = ready(async () => [definition('orderWorkflow', { workerCount: 3 })]);
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(workflowKeys.definitions('scope-1'), [definition('orderWorkflow')]);
+    await renderContent(queryClient);
+    expect(client.definitions.list).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData<WorkflowDefinition[]>(workflowKeys.definitions('scope-1'))?.[0].workerCount).toBe(3);
   });
 
   it('counts the whole integration when no definition is registered', async () => {

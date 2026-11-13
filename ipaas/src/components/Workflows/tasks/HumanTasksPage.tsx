@@ -22,6 +22,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { useMemo, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import SearchField from '../../SearchField';
+import { definitionsQuery } from '../api/definitionsQuery';
 import { retryWorkflowRead } from '../api/http';
 import { workflowKeys } from '../api/queryKeys';
 import { markSettling } from '../api/settleRegistry';
@@ -103,12 +104,7 @@ export default function HumanTasksPage({ environment, api }: WorkflowPageSlotPro
   // A task's parent workflow opens in the Workflows page, on the environment this queue shows.
   const openWorkflow = (workflowId: string) => goToWorkflowRuns({ envId: environment.id, workflowId });
 
-  const { data: definitions = [] } = useQuery({
-    queryKey: workflowKeys.definitions(scopeId),
-    queryFn: () => client.definitions.list(),
-    staleTime: 5 * 60_000,
-    retry: retryWorkflowRead,
-  });
+  const { data: definitions = [] } = useQuery(definitionsQuery(client, scopeId));
 
   // Each source pages on its own cursor; "Load more" asks for the next page of each that has one.
   const tasks = useInfiniteQuery({

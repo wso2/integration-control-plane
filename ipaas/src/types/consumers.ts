@@ -76,6 +76,8 @@ export interface ApiKeyResult {
   apiKey: string;
   /** When the key expires (RFC 3339). A test key states it; without it, the default validity applies. */
   expiresAt?: string;
+  /** The request header a test key goes in; absent means the default. */
+  header?: string;
 }
 
 /** Payload for creating an API key on an exposed endpoint API. */

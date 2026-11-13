@@ -17,7 +17,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { apiErrorMessage, httpStatusOf, isNotFoundError, isPermissionError, isQuotaError, isUnsupportedError, isUserPortalUnavailable } from './apiErrors';
+import { BffError } from '../api/_client';
+import { apiErrorMessage, httpStatusOf, isApiKeyAuthNotEnforced, isApiKeyAuthRequired, isNotFoundError, isPermissionError, isQuotaError, isUnsupportedError, isUserPortalUnavailable } from './apiErrors';
 
 describe('httpStatusOf', () => {
   it('prefers a structured status field over the message', () => {
@@ -172,5 +173,18 @@ describe('isPermissionError', () => {
 
   it('is not another status', () => {
     expect(isPermissionError(refusal(400, '{"code":"INSUFFICIENT_SCOPE"}'))).toBe(false);
+  });
+});
+
+describe('test-key refusals', () => {
+  const refusal = (code: string, status = 409) => new BffError(status, JSON.stringify({ code, message: 'refused' }));
+  it.each([
+    ['another auth mode', refusal('API_KEY_AUTH_REQUIRED'), true, false],
+    ['API-key auth set but not enforced', refusal('API_KEY_AUTH_NOT_ENFORCED'), true, true],
+    ['another 409', refusal('MCP_KEYS_UNAVAILABLE'), false, false],
+    ['the code on another status', refusal('API_KEY_AUTH_NOT_ENFORCED', 400), false, false],
+  ])('%s', (_name, error, required, notEnforced) => {
+    expect(isApiKeyAuthRequired(error)).toBe(required);
+    expect(isApiKeyAuthNotEnforced(error)).toBe(notEnforced);
   });
 });

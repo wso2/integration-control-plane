@@ -115,6 +115,7 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     canCreateKey: true,
     keyError: null,
     needsApiKeyAuth: false,
+    apiKeyNotEnforced: false,
     canSwitch: true,
     managedIn: null,
     isSwitching: false,
@@ -210,8 +211,30 @@ describe('useWorkflowConnection', () => {
     // The endpoint the test key is for, and its discovered public URL as the gateway URL fallback.
     expect(testAccessCalls.at(-1)).toEqual([
       { componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' },
-      { enabled: true, mint: true, gatewayUrlFallback: GATEWAY_URL },
+      { enabled: true, mint: true, gatewayUrlFallback: GATEWAY_URL, mintEarly: true },
     ]);
+  });
+
+  it('reads the definitions alongside the probe, so a view that lists them has them when it is ready', async () => {
+    fetchMock.mockImplementation((to) => (String(to) === `${GATEWAY_URL}/runtime` ? new Promise<Response>(() => {}) : Promise.resolve(json({ definitions: [] }))));
+    mount();
+    await vi.waitFor(() => expect(sentTo(`${GATEWAY_URL}/definitions`)).toEqual([{ 'X-API-Key': 'key-1' }]));
+    expect(status()).toBe('loading');
+  });
+
+  it('reads nothing with a key minted before the security read, then reads through the gateway URL it reports', async () => {
+    const route = 'https://orders-workflow-ma-cf1.openchoreoapis.example.dev/workflow';
+    access.reset(keyAccess({ mode: null, gatewayUrl: route, isResolving: true }));
+    mount();
+    await vi.waitFor(() => expect(status()).toBe('loading'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    access.set({ mode: 'api-key', gatewayUrl: GATEWAY_URL, isResolving: false });
+    await vi.waitFor(() => expect(status()).toBe('ready'));
+    expect(sentTo(`${GATEWAY_URL}/runtime`)).toEqual([{ 'X-API-Key': 'key-1' }]);
+    expect(sentTo(`${GATEWAY_URL}/definitions`)).toEqual([{ 'X-API-Key': 'key-1' }]);
+    expect(fetchMock.mock.calls.filter(([to]) => String(to).startsWith(route))).toEqual([]);
   });
 
   // Publishing redeploys the workflow to take only User Portal sign-ins, so no test key opens it.
