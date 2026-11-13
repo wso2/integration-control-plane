@@ -481,7 +481,6 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                       endIcon={<ArrowRight size={14} />}
                       onClick={() => {
                         trackEvent('prebuilt-integration-explore-click', { org: scope.org, project: scope.project });
-                        optionSelected('prebuilt');
                         navigate(prebuiltIntegrationsUrl(scope.org, scope.project));
                       }}
                       sx={{ textTransform: 'none', pl: 0 }}>
@@ -526,7 +525,6 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                       endIcon={<ArrowRight size={14} />}
                       onClick={() => {
                         trackEvent('components-new-browse-more-samples', { org: scope.org, project: scope.project });
-                        optionSelected('sample');
                         navigate(browseSamplesUrl(scope.org, scope.project));
                       }}
                       sx={{ textTransform: 'none', pl: 0 }}>
