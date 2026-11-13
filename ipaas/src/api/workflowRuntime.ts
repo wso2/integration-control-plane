@@ -72,4 +72,6 @@ export const acceptedWorkflowDeploy = (body: unknown): WorkflowDeploy | undefine
 };
 
 // GET /components/{c}/workflow-deploy reads one annotation of the component, cheap enough to poll.
-export const fetchWorkflowDeploy = (componentId: string, environment: string): Promise<WorkflowDeploy> => bff.get<BffWorkflowDeploy>(`/components/${seg(componentId)}/workflow-deploy${q({ environment })}`).then(toWorkflowDeploy);
+// An empty answer reads as no deploy, like a missing record.
+export const fetchWorkflowDeploy = (componentId: string, environment: string): Promise<WorkflowDeploy> =>
+  bff.get<BffWorkflowDeploy | null>(`/components/${seg(componentId)}/workflow-deploy${q({ environment })}`).then((d): WorkflowDeploy => (d ? toWorkflowDeploy(d) : { environment, state: 'none' }));
