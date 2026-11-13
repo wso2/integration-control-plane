@@ -26,7 +26,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { useAuth } from '../auth';
 import { ConsoleAction, flushConsoleActions, trackConsoleAction, type AbandonedEntity, type ConsoleActionDimensions, type ConsoleActionName } from '../services/telemetry/consoleActions';
-import { httpCodeOf, httpStatusOf, isPermissionError, refusedScope } from '../utils/apiErrors';
+import { httpCodeOf, httpStatusOf, isPermissionError, refusedRoute, refusedScope } from '../utils/apiErrors';
 import { entityScopeOf, routeTemplate, type RouteNode } from '../utils/consoleRoute';
 import type { FunnelOperation } from '../types/telemetry';
 
@@ -117,7 +117,8 @@ export function useMutationErrorTracking(): void {
         const { error } = event.mutation.state;
         const operation = event.mutation.meta?.operation;
         if (isPermissionError(error)) {
-          trackConsoleAction(ConsoleAction.PermissionDenied, { feature: operation ?? 'unspecified', required_permission: refusedScope(error) ?? 'unknown' });
+          // The funnel operation when the mutation names one, else the refused route's pattern, which ipaas-service sends.
+          trackConsoleAction(ConsoleAction.PermissionDenied, { feature: operation ?? refusedRoute(error) ?? 'unspecified', required_permission: refusedScope(error) ?? 'unknown' });
           return;
         }
         if (!operation) return;

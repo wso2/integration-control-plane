@@ -30,7 +30,7 @@ Only IDs, codes and counts. Each action carries:
 | `intent.form-abandoned`         | `useFormAbandonment`: Create Project, Import Project, Import Integration, MCP proxy, and the prebuilt flow   |
 | `onboarding.git-authorization`  | `CreateIntegrationPanels` and `useGitHubAuth`: GitHub authorization started, completed, failed or cancelled  |
 | `friction.error-shown`          | `useMutationErrorTracking`: a failed mutation whose `meta.operation` is set (create, build, deploy, promote) |
-| `friction.permission-denied`    | `useMutationErrorTracking` (a scope refusal) and `CreateIntegrationPanels` (no permission to create)         |
+| `friction.permission-denied`    | `useMutationErrorTracking` (a scope refusal, named by its `meta.operation` or else the route pattern ipaas-service returns) and `CreateIntegrationPanels` (no permission to create)         |
 | `friction.empty-state`          | `EmptyListing` with a `report` prop, and a project's empty state                                             |
 | `friction.quota-blocked`        | `CreateIntegrationPanels`: the free plan limit blocks creating an integration                                |
 

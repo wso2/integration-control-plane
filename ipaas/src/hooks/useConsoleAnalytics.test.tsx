@@ -166,6 +166,28 @@ describe('useMutationErrorTracking', () => {
     expect(calls(ConsoleAction.ErrorShown)).toEqual([]);
   });
 
+  it('names a refused mutation outside the funnel by the route pattern ipaas-service sends', async () => {
+    await render(
+      <Tracker>
+        <Mutation fail={new BffError(403, '{"code":"INSUFFICIENT_SCOPE","scope":"ipaas:integration:delete","route":"DELETE /projects/{projectId}/components/{componentId}"}')} />
+      </Tracker>,
+    );
+    await act(async () => mutate());
+    await settle();
+    expect(calls(ConsoleAction.PermissionDenied)).toEqual([{ feature: 'DELETE /projects/{projectId}/components/{componentId}', required_permission: 'ipaas:integration:delete' }]);
+  });
+
+  it('prefers the funnel operation to the route pattern', async () => {
+    await render(
+      <Tracker>
+        <Mutation operation="create-integration" fail={new BffError(403, '{"code":"INSUFFICIENT_SCOPE","scope":"ipaas:integration:create","route":"POST /projects/{projectId}/components"}')} />
+      </Tracker>,
+    );
+    await act(async () => mutate());
+    await settle();
+    expect(calls(ConsoleAction.PermissionDenied)).toEqual([{ feature: 'create-integration', required_permission: 'ipaas:integration:create' }]);
+  });
+
   it('ignores a failed mutation outside the funnel', async () => {
     await render(
       <Tracker>

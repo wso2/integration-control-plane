@@ -115,16 +115,22 @@ export function refusedScope(error: unknown): string | undefined {
   return isPermissionError(error) && typeof scope === 'string' ? scope : undefined;
 }
 
+/** The route pattern a permission refusal names, e.g. `POST /projects/{projectId}/components`, if any. */
+export function refusedRoute(error: unknown): string | undefined {
+  const { route } = bodyOf(error);
+  return isPermissionError(error) && typeof route === 'string' && route !== '' ? route : undefined;
+}
+
 /** A test key was refused because the endpoint doesn't use API-key auth (`code: API_KEY_AUTH_REQUIRED`). */
 export function isApiKeyAuthRequired(error: unknown): boolean {
   return httpStatusOf(error) === 409 && bodyOf(error).code === 'API_KEY_AUTH_REQUIRED';
 }
 
-/** The `code` and `scope` of an ipaas-service error body. */
-function bodyOf(error: unknown): { code?: unknown; scope?: unknown } {
+/** The `code`, `scope` and `route` of an ipaas-service error body. */
+function bodyOf(error: unknown): { code?: unknown; scope?: unknown; route?: unknown } {
   if (typeof error !== 'object' || error === null || !('body' in error)) return {};
   try {
-    return (JSON.parse(String(error.body)) as { code?: unknown; scope?: unknown } | null) ?? {};
+    return (JSON.parse(String(error.body)) as { code?: unknown; scope?: unknown; route?: unknown } | null) ?? {};
   } catch {
     return {};
   }
