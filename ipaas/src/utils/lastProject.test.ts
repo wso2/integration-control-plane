@@ -17,7 +17,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readLastProject, rememberLastProject } from './lastProject';
+import { lastProjectIn, readLastProject, rememberLastProject } from './lastProject';
 
 describe('lastProject', () => {
   afterEach(() => {
@@ -49,5 +49,28 @@ describe('lastProject', () => {
     vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
     expect(() => rememberLastProject('payments')).not.toThrow();
     expect(readLastProject()).toBeUndefined();
+  });
+});
+
+describe('lastProjectIn', () => {
+  afterEach(() => localStorage.clear());
+
+  it('returns the last opened project when the org has it', () => {
+    rememberLastProject('payments');
+    expect(lastProjectIn([{ handler: 'orders' }, { handler: 'payments' }])).toBe('payments');
+  });
+
+  it('ignores a project the org does not have', () => {
+    rememberLastProject('payments');
+    expect(lastProjectIn([{ handler: 'orders' }])).toBeUndefined();
+  });
+
+  it('ignores a project being deleted', () => {
+    rememberLastProject('payments');
+    expect(lastProjectIn([{ handler: 'payments', deleting: true }])).toBeUndefined();
+  });
+
+  it('returns nothing when no project was opened', () => {
+    expect(lastProjectIn([{ handler: 'payments' }])).toBeUndefined();
   });
 });

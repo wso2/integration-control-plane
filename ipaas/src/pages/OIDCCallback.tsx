@@ -28,7 +28,7 @@ import { loginUrl, projectHomeUrl, projectsRedirectUrl } from '../paths';
 import { trackEvent } from '../services/tracking/tracking';
 import { stripBase, withBase } from '../utils/basePath';
 import { local } from '../utils/storage';
-import { readLastProject } from '../utils/lastProject';
+import { lastProjectIn } from '../utils/lastProject';
 
 export default function OIDCCallback(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -81,25 +81,15 @@ export default function OIDCCallback(): JSX.Element {
           // Try to navigate to the last visited project (for existing users)
           let navigatedToLastProject = false;
           try {
-            // 1. The project last opened, in this console or another WSO2 Cloud platform.
-            const lastProject = readLastProject();
-            if (lastProject) {
-              // Mark ToS accepted — this user has already been through onboarding
+            // The org's own projects decide: the last one opened, if it is among them, else the most recently updated.
+            const projects = (await fetchProjectsApi()).filter((p) => p.handler && !p.deleting);
+            const recent = [...projects].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+            const landing = lastProjectIn(projects) ?? recent?.handler;
+            if (landing) {
+              // Mark ToS accepted — this user already has projects, they've been through onboarding
               local.set(`tos_accepted:${userId}:${orgHandle}`, 'true');
-              navigate(projectHomeUrl(orgHandle, lastProject), { replace: true });
+              navigate(projectHomeUrl(orgHandle, landing), { replace: true });
               navigatedToLastProject = true;
-            }
-
-            // 2. No stored last project — fetch from API and use the most recently updated one.
-            if (!navigatedToLastProject) {
-              const projects = (await fetchProjectsApi()).filter((p) => p.handler);
-              if (projects.length > 0) {
-                const recent = projects.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
-                // Mark ToS accepted — this user already has projects, they've been through onboarding
-                local.set(`tos_accepted:${userId}:${orgHandle}`, 'true');
-                navigate(projectHomeUrl(orgHandle, recent.handler), { replace: true });
-                navigatedToLastProject = true;
-              }
             }
           } catch {
             // ignore — fall through to default

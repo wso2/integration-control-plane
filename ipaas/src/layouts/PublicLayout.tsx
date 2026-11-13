@@ -21,17 +21,23 @@ import { Box, ColorSchemeToggle, Layout, ParticleBackground, Stack } from '@wso2
 import type { JSX } from 'react';
 import { useAuth } from '../auth';
 import { orgHomeUrl, projectHomeUrl } from '../paths';
-import { readLastProject } from '../utils/lastProject';
+import PageLoader from '../components/PageLoader';
+import { useProjects } from '../hooks/useProjects';
+import { lastProjectIn } from '../utils/lastProject';
+
+/** The last opened project when this org has it, else the org home. Mounted only once signed in, so projects are never asked for before. */
+function SignedInRedirect({ orgHandle }: { orgHandle: string }): JSX.Element {
+  const { data: projects, isLoading } = useProjects();
+  if (isLoading) return <PageLoader viewport />;
+  const project = projects && lastProjectIn(projects);
+  return <Navigate to={project ? projectHomeUrl(orgHandle, project) : orgHomeUrl(orgHandle)} replace />;
+}
 
 export default function PublicLayout(): JSX.Element {
   const { isAuthenticated, orgHandle } = useAuth();
 
   // A signed-in session always carries its org, so the public pages hand over to it.
-  if (isAuthenticated) {
-    const lastProject = readLastProject();
-    if (lastProject) return <Navigate to={projectHomeUrl(orgHandle, lastProject)} replace />;
-    return <Navigate to={orgHomeUrl(orgHandle)} replace />;
-  }
+  if (isAuthenticated) return <SignedInRedirect orgHandle={orgHandle} />;
 
   return (
     <Layout.Content>

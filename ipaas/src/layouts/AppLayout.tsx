@@ -257,8 +257,8 @@ export default function AppLayout(): JSX.Element {
   // to any other org shows "no access" with a way back to the user's own org.
   const orgAccessDenied = !!scope.org && scope.org !== sessionOrg;
 
-  // A project URL may name the project by id; the other consoles know it by handle.
-  const openProject = hasProject(scope) ? (isProjectUuid ? project?.handler : scope.project) : undefined;
+  // Only a project that loaded is remembered, by handle: a URL may name it by id, or name one that doesn't exist.
+  const openProject = hasProject(scope) ? project?.handler : undefined;
   useEffect(() => {
     if (orgAccessDenied || (hasProject(scope) && !openProject)) return;
     rememberLastProject(openProject);

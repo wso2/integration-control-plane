@@ -34,6 +34,7 @@ const pillSx = { flexShrink: 0 } as const;
 const pulse = {
   '@keyframes buildPillPulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
   animation: 'buildPillPulse 1.4s ease-in-out infinite',
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
 } as const;
 
 const segmentSx = (status: StepStatus) =>

@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import type { Project } from '../types/project';
 import { shared } from './storage';
 
 // The name the WSO2 Cloud platforms agreed on. They share this origin, so the project opened in one
@@ -42,4 +43,13 @@ export function rememberLastProject(project: string | undefined): void {
   } catch {
     // A convenience only: without it the console opens on the organization.
   }
+}
+
+/**
+ * The last opened project, when it is one of `projects` (the session org's) and not being deleted. The
+ * stored handle names no org, so one opened in another org or another console is never landed on here.
+ */
+export function lastProjectIn(projects: Pick<Project, 'handler' | 'deleting'>[]): string | undefined {
+  const last = readLastProject();
+  return last && projects.some((p) => p.handler === last && !p.deleting) ? last : undefined;
 }
