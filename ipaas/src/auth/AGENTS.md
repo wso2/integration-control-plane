@@ -11,6 +11,7 @@ Code outside this folder imports only from `src/auth` (`index.ts`):
 | `AuthProvider`, `useAuth()`                                 | React session state: `isAuthenticated`, user fields, `loginWithOIDC(fidp?)`, `completeSignIn(params)`, `logout()` |
 | `authenticatedFetch`, `getAccessToken`                      | Bearer requests outside React (used by `src/api/_client.ts`)                                                      |
 | `getOrgUuidFromToken`                                       | The session's organization UUID (`useOrgUuid` wraps it for components)                                            |
+| `OrganizationList`, `canSwitchOrganization`                 | The user's organizations and the switch to one, for the header's organization switcher                            |
 | `saveRedirectUrl`, `getAndClearRedirectUrl`                 | Return to a deep link after sign-in                                                                               |
 | `generateAndSaveGitHubState`, `validateAndClearGitHubState` | CSRF state for the GitHub App authorization round trip                                                            |
 
@@ -19,7 +20,7 @@ Add to `index.ts` only when code outside needs it. ESLint rejects imports of the
 ## How it works
 
 - `AuthProvider` waits for the SDK to settle and shows a loader until then, so no child renders or sends a request before the session is known.
-- Once signed in, it connects the session to `session.ts`, the one place code outside React gets tokens from. It also stores the org handle as `icp:org_handle` in localStorage (`src/utils/storage.ts`).
+- Once signed in, it connects the session to `session.ts`, the one place code outside React gets tokens from. It also stores the org handle as `icp:org_handle` in localStorage (`src/utils/storage.ts`). On the gateway, a change to that stored handle from another tab means the shared session moved, so the tab reloads.
 - The SDK refreshes tokens itself. A 401 on an expired token ends the session.
 - **Sign-in on the gateway (BFF):** with `AUTH_BFF_CONTEXT` set (`isBffAuth()`), the gateway holds the tokens and the browser an HttpOnly session cookie (`docs/runtime-config.md`). The session comes from the SDK's `getDecodedIdToken()` (the session's ID token claims) and its scopes from `getGrantedPermissions()` (the session's `scope`; none if that fails), `getAccessToken` hands out an empty token, so `authenticatedFetch` sends the cookie and no `Authorization` header, plus `X-Requested-With: XMLHttpRequest` on same-origin requests only (cross-origin ones would need a CORS preflight). A 401 from another host (the observability proxy) goes back to the caller: the cookie never reaches it. A same-origin 401 asks `<AUTH_BFF_CONTEXT>/checksession`: signed out ends the session; still signed in retries the request once, because the gateway's session proxy refreshes the token after passing one 401 through. The session also ends when the SDK's own session check flips `isSignedIn` to false. Sign-in starts at `bffSignInUrl`, which nests the page inside `AUTH_BFF_SIGN_IN_URL`'s `returnTo`, and startup clears SDK keys an earlier PKCE build left (`*-instance_0-<clientId>`). Never call the SDK's own `getAccessToken` in this mode: it asks the gateway for a token it never hands out.
 - `/signin` (`OIDCCallback`) only routes after sign-in: it forwards Cloud Editor results, then opens the saved deep link or the user's last project.
@@ -27,7 +28,7 @@ Add to `index.ts` only when code outside needs it. ESLint rejects imports of the
 
 ## Rules
 
-- **One organization per session.** The token is scoped to the organization chosen at sign-in and cannot be switched. A URL for another organization shows "no access" (`AppLayout`). Do not add org switching on the client.
+- **One organization per session.** The session is scoped to one organization and a URL for another organization shows "no access" (`AppLayout`). The only way to change it is the header's switcher (`ORGANIZATION_SWITCHER`, gateway sign-in only). It has the gateway move the cloud console's session and then this console's (`switchOrganization`), and reloads the console (`loadConsoleHome`). Do not switch organizations on the client any other way.
 - **No org creation in the console.** Thunder creates the organization at sign-up.
 - **No password flows.** Thunder owns credentials, so the console has no password sign-in or password change.
 - **Config keys** come from `window.API_CONFIG` (`thunderConfig.ts`): `VITE_AUTH_BASE_URL`, `ASGARDEO_CLIENT_ID`, `ASGARDEO_SCOPE`, `ASGARDEO_RESOURCE` and `ASGARDEO_SIGN_IN_REDIRECT_URL`. The names are historical and the deployments set them, so do not rename them here.

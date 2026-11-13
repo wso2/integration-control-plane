@@ -50,6 +50,9 @@ export const detailRowSx = { display: 'flex', alignItems: 'center', justifyConte
 
 export const actionButtonSx = { height: 36, minHeight: 36, py: 0.5 } as const;
 
+/** A destructive card action: its outline at full strength, where an outlined button's is faint by default, while it can be used. */
+export const dangerActionButtonSx = { ...actionButtonSx, '&:not(.Mui-disabled)': { borderColor: 'error.main' } } as const;
+
 export const emptySx = { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', px: 3, py: 6 } as const;
 
 export const emptyStackSx = { maxWidth: 440, textAlign: 'center' } as const;
@@ -64,6 +67,12 @@ export const headerActionSx = { flexShrink: 0 } as const;
 
 /** A disabled button doesn't fire events, so its tooltip hangs on a wrapper. */
 export const tooltipAnchorSx = { display: 'inline-flex' } as const;
+
+/** The same wrapper for a card's full-width action. */
+export const cardActionAnchorSx = { display: 'inline-flex', flex: 1 } as const;
+
+/** The same wrapper for a card's action beside it, which keeps its label on one line. */
+export const cardSideActionAnchorSx = { display: 'inline-flex', flexShrink: 0 } as const;
 
 // The env card's User Portal row.
 

@@ -44,3 +44,20 @@ describe('loadConfig: gateway sign-in (BFF)', () => {
     expect(window.API_CONFIG.authBffSignInUrl).toBeUndefined();
   });
 });
+
+describe('loadConfig: organization switcher', () => {
+  it.each([
+    ['true', true],
+    [true, true],
+    ['false', false],
+    ['', false],
+  ] as const)('reads ORGANIZATION_SWITCHER %j as %s', async (value, expected) => {
+    await load({ ORGANIZATION_SWITCHER: value } as unknown as Record<string, string>);
+    expect(window.API_CONFIG.organizationSwitcher).toBe(expected);
+  });
+
+  it('is off when unset', async () => {
+    await load({});
+    expect(window.API_CONFIG.organizationSwitcher).toBe(false);
+  });
+});

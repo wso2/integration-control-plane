@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Button, ButtonGroup, ClickAwayListener, Grow, MenuItem, MenuList, Paper, Popper } from '@wso2/oxygen-ui';
+import { Button, ButtonGroup, CircularProgress, ClickAwayListener, Grow, MenuItem, MenuList, Paper, Popper } from '@wso2/oxygen-ui';
 import { ChevronDown, Play } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState } from 'react';
 
@@ -24,13 +24,15 @@ interface RunButtonProps {
   envCritical?: boolean | null;
   disabled?: boolean;
   pending?: boolean;
+  /** Shows progress without disabling, for work the other action does not wait on. */
+  loading?: boolean;
   onRun: () => void;
   onRunWithArgs: () => void;
 }
 
 type SelectedAction = 'run' | 'runWithArgs';
 
-export default function RunButton({ envCritical, disabled, pending, onRun, onRunWithArgs }: RunButtonProps) {
+export default function RunButton({ envCritical, disabled, pending, loading, onRun, onRunWithArgs }: RunButtonProps) {
   const [splitOpen, setSplitOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<SelectedAction>('run');
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -57,7 +59,7 @@ export default function RunButton({ envCritical, disabled, pending, onRun, onRun
   return (
     <>
       <ButtonGroup variant="contained" size="small" ref={anchorRef} disabled={disabled || pending}>
-        <Button startIcon={<Play size={14} />} aria-label={selectedAction === 'runWithArgs' ? `${label} with arguments` : label} onClick={handlePrimaryClick}>
+        <Button startIcon={pending || loading ? <CircularProgress color="inherit" size={14} /> : <Play size={14} />} aria-label={selectedAction === 'runWithArgs' ? `${label} with arguments` : label} onClick={handlePrimaryClick}>
           {selectedAction === 'runWithArgs' ? `${label} with arguments` : label}
         </Button>
         <Button size="small" sx={{ px: 0.5 }} aria-label="More run options" aria-expanded={splitOpen} aria-haspopup="menu" aria-controls="menu-run-options" onClick={() => setSplitOpen((prev) => !prev)}>

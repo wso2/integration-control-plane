@@ -21,17 +21,25 @@ import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } f
 import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublications, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
 import type { UserPortal, UserPortalPublications, UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
 import { isUserPortalUnavailable } from '../utils/apiErrors';
+import { portalBusy } from '../utils/userPortal';
 import { invalidateEndpointSettings } from './useConsumers';
 
 const ROOT_KEY = 'userPortal';
 
 /**
- * How often a portal that is still setting up or being removed is read again. Short enough that
+ * How often a portal that is setting up, starting or being removed is read again. Short enough that
  * Open portal shows soon after it is ready; the poll stops once every portal has settled.
  */
 const SETTLING_POLL_MS = 3_000;
 
-const settling = (portal: UserPortal | undefined): boolean => portal?.state === 'setting-up' || portal?.state === 'removing';
+/** How often a portal that isn't ready is read again: it can stay so for hours, so less often. */
+const NOT_READY_POLL_MS = 30_000;
+
+const pollInterval = (portal: UserPortal | undefined): number | false => {
+  if (!portal) return false;
+  if (portalBusy(portal.state)) return SETTLING_POLL_MS;
+  return portal.state === 'unhealthy' ? NOT_READY_POLL_MS : false;
+};
 
 /** The environments a User Portal can run in, in promotion order. */
 export function useUserPortalEnvironments() {
@@ -45,7 +53,7 @@ export function useUserPortals(environments: string[]) {
       queryKey: [ROOT_KEY, 'portal', environment],
       queryFn: () => fetchUserPortal(environment),
       retry: (failures: number, err: unknown) => !isUserPortalUnavailable(err) && failures < 2,
-      refetchInterval: (query: { state: { data?: UserPortal } }) => (settling(query.state.data) ? SETTLING_POLL_MS : false),
+      refetchInterval: (query: { state: { data?: UserPortal } }) => pollInterval(query.state.data),
     })),
   });
 }
@@ -62,7 +70,7 @@ export function useUserPortal(environment: string, enabled: boolean) {
     enabled: enabled && !!environment,
     retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
     staleTime: 60_000,
-    refetchInterval: (query) => (settling(query.state.data) ? SETTLING_POLL_MS : false),
+    refetchInterval: (query) => pollInterval(query.state.data),
   });
 }
 
@@ -85,6 +93,8 @@ function useWritePortal(write: (environment: string) => Promise<UserPortal>) {
       void qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publishability'] });
       void qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publications'] });
     },
+    // A refusal can mean the portal changed elsewhere, removed for one, so it is read again.
+    onError: (_err, environment) => void qc.invalidateQueries({ queryKey: [ROOT_KEY, 'portal', environment] }),
   });
 }
 

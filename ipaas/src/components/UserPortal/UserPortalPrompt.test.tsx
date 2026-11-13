@@ -278,3 +278,50 @@ describe('a publish that finishes in the background, from the prompt', () => {
     expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
   });
 });
+
+describe("a User Portal that isn't ready yet", () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
+  afterEach(() => vi.useRealTimers());
+  const wait = (ms: number) => act(async () => vi.advanceTimersByTimeAsync(ms));
+  const openLink = (container: HTMLElement) => [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Open User Portal');
+  const PUBLISHED: UserPortalPublishability = { ...PUBLISHABLE, published: true, redeploys: false };
+
+  // ipaas-service publishes to a provisioned portal whether or not its pods are ready, as the env card's switch does.
+  it('offers to publish while it starts or is not ready', async () => {
+    publishability.mockResolvedValue(PUBLISHABLE);
+    for (const state of ['starting', 'unhealthy'] as const) {
+      portal.mockResolvedValue({ environment: 'production', state });
+      const container = await prompt(DEVELOPER);
+      expect(button(container, 'Publish to User Portal')?.disabled).toBe(false);
+      unmount();
+    }
+  });
+
+  it('says it is starting in place of the link, and offers to open it once a re-read finds it ready', async () => {
+    portal.mockResolvedValueOnce({ environment: 'production', state: 'starting' }).mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue(PUBLISHED);
+    const container = await prompt(DEVELOPER);
+    expect(button(container, 'Starting User Portal…')?.disabled).toBe(true);
+    expect(openLink(container)).toBeUndefined();
+
+    await wait(3_000);
+    await flush();
+    expect(openLink(container)?.getAttribute('href')).toBe('https://portal.example/acme');
+  });
+
+  it("says it isn't ready in place of the link, with OpenChoreo's reason only as a detail, offers no Enable, and reads it again", async () => {
+    portal.mockResolvedValueOnce({ environment: 'production', state: 'unhealthy', readinessMessage: 'pods are crash-looping' }).mockResolvedValue(ACTIVE);
+    publishability.mockResolvedValue(PUBLISHED);
+    const container = await prompt(PLATFORM_ENGINEER);
+    const notReady = button(container, 'User Portal not ready');
+    expect(notReady?.disabled).toBe(true);
+    expect(reasonFor(notReady)).toBe('pods are crash-looping');
+    expect(container.textContent).not.toContain('pods are crash-looping');
+    expect(button(container, 'Enable User Portal')).toBeUndefined();
+    expect(openLink(container)).toBeUndefined();
+
+    await wait(30_000);
+    await flush();
+    expect(openLink(container)?.getAttribute('href')).toBe('https://portal.example/acme');
+  });
+});

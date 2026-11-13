@@ -32,9 +32,12 @@ const gatewayUrl = 'https://npvdrmdwhj-gw-p1.gateway.dp.dev.cloud.wso2.com/math-
 const listed = vi.hoisted(() => ({ endpoints: [] as unknown[] }));
 const agentEndpoint = { id: 'math-tutor-endpoint', displayName: 'math-tutor-endpoint', networkVisibilities: ['Project'], exposure: 'none', projectUrl, publicUrl: rawRoute, invokeUrl: rawRoute };
 vi.mock('../../../hooks/useDeployments', () => ({ useEnvEndpoints: () => ({ data: listed.endpoints }) }));
-const security = vi.hoisted(() => ({ data: undefined as { publicUrl?: string } | undefined, error: null as Error | null, refetch: (() => {}) as () => void }));
+const security = vi.hoisted(() => ({ data: undefined as { publicUrl?: string } | undefined, error: null as Error | null, refetch: (() => {}) as () => void, endpointName: undefined as string | undefined }));
 vi.mock('../../../hooks/useConsumers', () => ({
-  useEndpointSecurity: () => ({ data: security.data, isError: !!security.error, error: security.error, isFetching: false, refetch: security.refetch }),
+  useEndpointSecurity: (ref: { endpointName: string } | null) => {
+    security.endpointName = ref?.endpointName;
+    return { data: security.data, isError: !!security.error, error: security.error, isFetching: false, refetch: security.refetch };
+  },
 }));
 vi.mock('../../AgentChat', () => ({ default: () => null }));
 vi.mock('../../../hooks/useVoiceAgents', () => ({ useLinkedVoiceAgents: () => ({ voiceAgents: [], isLoading: false, isError: false, refetch: () => {} }) }));
@@ -44,6 +47,7 @@ let container: HTMLDivElement;
 
 beforeEach(() => {
   listed.endpoints = [agentEndpoint];
+  security.endpointName = undefined;
   security.error = null;
   security.refetch = () => {};
   container = document.createElement('div');
@@ -115,5 +119,40 @@ describe('ai-agent EnvCardBody URLs', () => {
     await render();
     expect(container.querySelector('[aria-label="No public URL"]')?.textContent).toBe('—');
     expect(container.querySelector('[aria-label="Download API specification"]')?.hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('ai-agent EnvCardBody endpoint', () => {
+  const voiceEndpoint = { id: 'math-tutor-voice', displayName: 'math-tutor-voice', type: 'Websocket', publicUrl: 'wss://gw.example/math-tutor-voice' };
+  const grpcEndpoint = { id: 'math-tutor-greeter', displayName: 'greeter', type: 'gRPC' };
+  it.each([
+    ['a WebSocket endpoint', [voiceEndpoint, { ...agentEndpoint, type: 'HTTP' }]],
+    ['a gRPC endpoint', [grpcEndpoint, voiceEndpoint, { ...agentEndpoint, type: 'HTTP', publicUrl: undefined }]],
+  ])('opens on the agent’s chat endpoint, not on %s that sorts first', async (_, endpoints) => {
+    listed.endpoints = endpoints;
+    security.data = { publicUrl: gatewayUrl };
+    const text = await render();
+    expect(text).not.toContain('This WebSocket endpoint serves voice conversations');
+    expect(security.endpointName).toBe('math-tutor-endpoint');
+  });
+
+  it('lists a voice endpoint’s own wss:// route as Public, without asking for a gateway URL', async () => {
+    const wssRoute = 'wss://gw.example/math-tutor-voice';
+    listed.endpoints = [
+      {
+        ...voiceEndpoint,
+        exposure: 'public',
+        networkVisibilities: ['Project', 'Public'],
+        visibilityStatus: { public: { status: 'ENABLED', url: wssRoute }, organization: { status: 'DISABLED' } },
+        publicUrl: wssRoute,
+        projectUrl,
+      },
+    ];
+    security.data = { publicUrl: gatewayUrl };
+    const text = await render();
+    expect(text).toContain(wssRoute);
+    expect(text).not.toContain(gatewayUrl);
+    expect(text).toContain('This WebSocket endpoint serves voice conversations');
+    expect(security.endpointName).toBeUndefined();
   });
 });

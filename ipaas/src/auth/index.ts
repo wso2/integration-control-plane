@@ -23,6 +23,9 @@
 export { AuthProvider, useAuth } from './AuthProvider';
 export { authenticatedFetch, getAccessToken, getOrgUuidFromToken, getSession } from './session';
 export type { CloudSession } from './session';
+export { OrganizationList } from './OrganizationList';
+export { canSwitchOrganization } from './orgSwitch';
+export type { OrganizationSwitchState } from './OrganizationList';
 export { saveRedirectUrl, getAndClearRedirectUrl } from './redirectUrl';
 export { generateAndSaveGitHubState, validateAndClearGitHubState } from './githubState';
 export { generateAndSaveAzureDevOpsState, validateAndClearAzureDevOpsState } from './azureDevOpsState';

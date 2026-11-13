@@ -41,6 +41,7 @@ interface RuntimeConfig {
   AUTH_BFF_CONTEXT?: string;
   AUTH_BFF_SIGN_IN_URL?: string;
   AUTH_BFF_PROXY_CONTEXT?: string;
+  ORGANIZATION_SWITCHER?: string | boolean;
   CHOREO_BASE_API_URL?: string;
   SYS_API_PREFIX?: string;
   GITHUB_APP_CLIENT_ID?: string;
@@ -84,6 +85,11 @@ export interface ApiConfig {
   authBffSignInUrl?: string;
   /** The gateway's API root that the per-product session proxies sit under (e.g. /_api). */
   authBffProxyContext?: string;
+  /**
+   * Turns on the header's organization switcher. Takes effect only with gateway sign-in (authBffContext):
+   * the switch moves the cloud console's session and then this console's on the gateway.
+   */
+  organizationSwitcher: boolean;
   choreoBaseApiUrl: string;
   choreoOrgApiUrl: string;
   systemApisBaseUrl?: string;
@@ -202,6 +208,7 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
   trackingEnv: 'dev',
+  organizationSwitcher: false,
 };
 
 const localPath = (value: string | undefined): string | undefined => (value && /^\/(?![/\\])/.test(value) ? value : undefined);
@@ -232,6 +239,7 @@ export async function loadConfig(): Promise<void> {
       authBffContext: localPath(config.AUTH_BFF_CONTEXT ? trim(config.AUTH_BFF_CONTEXT.trim()) : undefined),
       authBffSignInUrl: localPath(config.AUTH_BFF_SIGN_IN_URL?.trim()),
       authBffProxyContext: config.AUTH_BFF_PROXY_CONTEXT ? trim(config.AUTH_BFF_PROXY_CONTEXT.trim()) || undefined : undefined,
+      organizationSwitcher: config.ORGANIZATION_SWITCHER === 'true' || config.ORGANIZATION_SWITCHER === true,
       choreoBaseApiUrl: choreoBase,
       choreoOrgApiUrl: `${choreoBase}/orgs/1.0.0`,
       systemApisBaseUrl: systemApisBase || DEFAULT_CONFIG.systemApisBaseUrl,

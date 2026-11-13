@@ -26,7 +26,7 @@ flowchart LR
 
 **Console.** This repository. `pnpm build` produces static files, and the `Dockerfile` serves them with nginx. On startup the console fetches `/config.json` for its backend URLs, so one image runs in every environment (see [runtime-config.md](runtime-config.md)).
 
-**Thunder.** The WSO2 Cloud identity provider. Users sign in on Thunder's hosted page (Google or GitHub), and the Thunder SDK manages the tokens in the browser. Each access token is scoped to one organization, chosen at sign-in. Thunder also creates the organization when a user signs up.
+**Thunder.** The WSO2 Cloud identity provider. Users sign in on Thunder's hosted page (Google or GitHub), and the Thunder SDK manages the tokens in the browser. Each access token is scoped to one organization, chosen at sign-in. With gateway sign-in, the header's organization switcher can move the session to another of the user's organizations (see [runtime-config.md](runtime-config.md)). Thunder also creates the organization when a user signs up.
 
 **ipaas-service (BFF).** The backend-for-frontend. Almost every console request goes to it:
 

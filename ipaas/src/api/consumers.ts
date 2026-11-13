@@ -71,8 +71,10 @@ export const createEndpointApiKey = (ref: EndpointRef, input: CreateApiKeyInput)
 export const revokeEndpointApiKey = (ref: EndpointRef, keyName: string): Promise<void> => bff.delete<void>(endpointUrl(ref, `/api-keys/${seg(keyName)}`));
 
 /**
- * One-click 1h credential, for an endpoint on API-key auth only: for another mode ipaas-service refuses it
- * (`API_KEY_AUTH_REQUIRED`) rather than switch the endpoint, which only `setEndpointApiKeyAuth` does.
+ * One-click 1h credential. On the API Platform it is minted for an endpoint on API-key auth only: for another mode
+ * ipaas-service refuses it (`API_KEY_AUTH_REQUIRED`, or `API_KEY_AUTH_NOT_ENFORCED` for API-key auth the gateway
+ * doesn't enforce) rather than switch the endpoint, which only `setEndpointApiKeyAuth` does. For an MCP server on the
+ * AI gateway it is an Agent Manager key, and only while the binding checks keys.
  */
 export const createEndpointTestKey = (ref: EndpointRef): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(`${endpointPath(ref)}/test-key${q({ deploymentTrackId: ref.deploymentTrackId, keepSecurity: true })}`);
 
@@ -99,14 +101,14 @@ export const getEndpointSecurity = (ref: EndpointRef): Promise<SecurityConfig> =
 
 /**
  * Where the Test page's MCP client connects for an MCP server on the AI gateway: ipaas-service relays each
- * request to the server, since the AI gateway gives the console no key and answers no browser's CORS preflight.
+ * request to the server with a key of its own, since the AI gateway answers no browser's CORS preflight.
  * Send with `bffFetch`, which carries the console's session.
  */
 export const mcpRelayUrl = (ref: EndpointRef): string => bffAbsoluteUrl(endpointUrl(ref, '/mcp'));
 
 /**
- * The tools an MCP server on the AI gateway exposes (`GET .../mcp-tools`). The BFF lists them over the
- * server's own route: the AI gateway gives keys only to Agent Manager agents, so the console can't ask it.
+ * The tools an MCP server on the AI gateway exposes (`GET .../mcp-tools`), as Agent Manager listed them through
+ * the gateway after the server's last deploy or refresh.
  */
 export const getMcpServerTools = (ref: EndpointRef): Promise<McpTool[]> => bff.get<{ tools?: McpTool[] }>(endpointUrl(ref, '/mcp-tools')).then((r) => r?.tools ?? []);
 

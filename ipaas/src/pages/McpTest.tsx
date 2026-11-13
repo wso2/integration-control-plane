@@ -42,8 +42,9 @@ import { PILL_SELECT_SX } from '../constants/styles';
  * MCP Server "Test" page: resolves the deployed MCP endpoint's gateway URL + a test
  * credential for the selected environment, then hands them to the in-house
  * {@link McpPlayground} (the interactive connect / list-tools / invoke / ping surface).
- * An MCP server on Agent Manager's AI gateway takes no test key: the page shows its proxy
- * URL and connects through ipaas-service's relay instead.
+ * An MCP server on Agent Manager's AI gateway answers no browser's CORS preflight: the page
+ * connects through ipaas-service's relay, which holds a key of its own, and offers a test key only
+ * for calling the proxy URL from another MCP client.
  */
 export default function McpTest(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
@@ -83,15 +84,16 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.
   const mcpUrl = access.mcpUrl;
-  // The AI gateway gives the console no key, so the page talks to an MCP server there through ipaas-service's relay.
+  // The AI gateway answers no browser's CORS preflight, so the page talks to an MCP server there through ipaas-service's relay.
   const onAiGateway = !!access.aiGateway;
   const relay = useMemo(() => (onAiGateway && accessRef ? { url: mcpRelayUrl(accessRef), fetch: bffFetch } : undefined), [onAiGateway, accessRef]);
 
   const endpointSwitcher = { options: testableEndpoints.map((e) => ({ label: e.displayName, value: e.id })), value: activeEndpointId, onChange: setSelectedEndpointId };
 
   const regenerate = () => void access.mintKey();
-  // Not offered for an open endpoint: the test-key route switches enforcement to api-key, so
-  // minting would secure an endpoint whose api-key scheme the user turned off.
+  // Not offered for an open endpoint: on the API Platform the test-key route switches enforcement to api-key, so
+  // minting would secure an endpoint whose api-key scheme the user turned off, and an open AI gateway binding takes
+  // no key. On the AI gateway the key is for another MCP client: the relay holds one of its own.
   const canMint = access.canCreateKey && access.mode === 'api-key';
 
   // Non-MCP components keep this route's previous Coming Soon behaviour.
@@ -128,7 +130,24 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
         ) : relay ? (
           // Keyed by where it connects: a session is to one environment's endpoint, and the environment can
           // change while it is open, so a new target starts a new playground rather than reusing the old session.
-          <McpPlayground key={relay.url} url={mcpUrl} token={null} relay={relay} visibility="Public" endpointSwitcher={endpointSwitcher} />
+          <>
+            {access.keyError && (
+              <Alert severity="warning" sx={{ mb: 1.5 }}>
+                {access.keyError}
+              </Alert>
+            )}
+            <McpPlayground
+              key={relay.url}
+              url={mcpUrl}
+              token={access.apiKey}
+              headerName={access.authHeader}
+              isTokenFetching={access.isMinting}
+              onTokenRegenerate={canMint ? regenerate : undefined}
+              relay={relay}
+              visibility="Public"
+              endpointSwitcher={endpointSwitcher}
+            />
+          </>
         ) : !mcpUrl ? (
           // Deployed, but with no enforcing URL to call — a different state from "not deployed".
           <Alert severity="info">{access.isUnavailable ? 'This MCP server isn’t exposed as an API on the gateway yet, so it cannot be tested from here.' : 'No testable endpoint URL is available for this MCP server yet.'}</Alert>

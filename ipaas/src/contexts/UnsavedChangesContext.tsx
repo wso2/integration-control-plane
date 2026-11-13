@@ -25,8 +25,13 @@ import { historyIndex, historyRestoreDelta, isLeavingLinkClick } from '../utils/
 interface UnsavedChangesContextType {
   setDirty: (id: string, dirty: boolean) => void;
   remove: (id: string) => void;
-  /** Runs `proceed` at once when no form is dirty; otherwise only after the user chooses to leave. */
-  guardNavigation: (proceed: () => void) => void;
+  /**
+   * Runs `proceed` at once when no form is dirty; otherwise only after the user chooses to leave. A
+   * `proceed` that returns a promise (a navigation that makes requests first) keeps leaving allowed until
+   * the promise settles, and the guard is back once it has; one that never settles keeps it allowed while
+   * the page unloads.
+   */
+  guardNavigation: (proceed: () => void | Promise<unknown>) => void;
 }
 
 const UnsavedChangesContext = createContext<UnsavedChangesContextType | undefined>(undefined);
@@ -37,7 +42,7 @@ const BYPASS_MS = 1000;
 export function UnsavedChangesProvider({ children }: { children: ReactNode }): JSX.Element {
   const entries = useRef(new Map<string, boolean>());
   const [blocking, setBlocking] = useState(false);
-  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
+  const [pendingLeave, setPendingLeave] = useState<(() => void | Promise<unknown>) | null>(null);
   const historyIdx = useRef<number | null>(null);
   const restoringPop = useRef(false);
   // Set by "Leave page" so the one navigation goes through; forms keep their own dirty state.
@@ -71,7 +76,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }): J
   );
 
   const guardNavigation = useCallback(
-    (proceed: () => void) => {
+    (proceed: () => void | Promise<unknown>) => {
       if (!anyDirty()) {
         proceed();
         return;
@@ -86,11 +91,14 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }): J
   const leave = () => {
     bypass.current = true;
     clearTimeout(bypassTimer.current);
-    bypassTimer.current = setTimeout(() => {
-      bypass.current = false;
-    }, BYPASS_MS);
     setPendingLeave(null);
-    pendingLeave?.();
+    const result = pendingLeave?.();
+    const release = () => {
+      bypass.current = false;
+    };
+    // A timer would lapse before a slow navigation reloads the page and the browser asked again.
+    if (result instanceof Promise) result.then(release, release);
+    else bypassTimer.current = setTimeout(release, BYPASS_MS);
   };
 
   useEffect(() => {
@@ -191,6 +199,6 @@ export function useUnsavedChanges(isDirty: boolean): () => void {
 
 /** For navigation code: wraps a navigation so it waits for the user's answer while a form is dirty. */
 // eslint-disable-next-line react-refresh/only-export-components
-export function useLeaveGuard(): (proceed: () => void) => void {
+export function useLeaveGuard(): (proceed: () => void | Promise<unknown>) => void {
   return useUnsavedChangesContext().guardNavigation;
 }

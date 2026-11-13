@@ -51,6 +51,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import Logo from '../components/Logo';
 import MarketingConsentDialog from '../components/MarketingConsentDialog';
 import PlatformSwitcher from '../components/PlatformSwitcher';
+import OrganizationSwitcher from '../components/OrganizationSwitcher';
 import NotFound from '../components/NotFound';
 import {
   Activity,
@@ -251,8 +252,8 @@ export default function AppLayout(): JSX.Element {
     return '';
   };
 
-  // The session is scoped to the org chosen at sign-in and can't be switched, so a link to any
-  // other org shows "no access" with a way back to the user's own org.
+  // The session is scoped to one org (only the header's switcher moves it, and reloads), so a link
+  // to any other org shows "no access" with a way back to the user's own org.
   const orgAccessDenied = !!scope.org && scope.org !== sessionOrg;
 
   // Persist last visited project so post-login can navigate back to it
@@ -311,35 +312,7 @@ export default function AppLayout(): JSX.Element {
             </Header.BrandLogo>
           </Header.Brand>
           <Header.Switchers showDivider={false}>
-            {/* Matches the Project/Integration cards. */}
-            <Box
-              ref={orgCardRef}
-              role="button"
-              tabIndex={0}
-              sx={{ position: 'relative', display: 'inline-flex', alignSelf: 'center', cursor: 'pointer', ml: 1 }}
-              onClick={() => navigateTo(orgHomeUrl(scope.org))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  navigateTo(orgHomeUrl(scope.org));
-                }
-              }}>
-              <ComplexSelect
-                value={scope.org}
-                open={false}
-                onChange={() => {}}
-                onOpen={() => {}}
-                size="small"
-                sx={{ minWidth: 180, maxWidth: 220, '& .MuiListItemText-root': { minWidth: 0, overflow: 'hidden' } }}
-                IconComponent={() => null}
-                SelectDisplayProps={{ 'aria-label': 'Select organization' }}
-                renderValue={() => <ComplexSelect.MenuItem.Text primary={orgDisplayName} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: orgDisplayName }} />}
-                label="Organization">
-                <ComplexSelect.MenuItem value={scope.org}>
-                  <ComplexSelect.MenuItem.Text primary={orgDisplayName} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: orgDisplayName }} />
-                </ComplexSelect.MenuItem>
-              </ComplexSelect>
-            </Box>
+            <OrganizationSwitcher ref={orgCardRef} org={scope.org} name={orgDisplayName} onHome={() => navigateTo(orgHomeUrl(scope.org))} />
             {!hasProject(scope) && !projectMenuAnchor && (
               <Tooltip title="Select project">
                 <IconButton

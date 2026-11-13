@@ -479,6 +479,17 @@ describe('cloud AuthProvider — actions', () => {
   });
 });
 
+it('ignores another tab’s organization when the browser signs in itself: each tab holds its own session', async () => {
+  const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+  signedInSdk();
+  await render();
+
+  act(() => {
+    window.dispatchEvent(new StorageEvent('storage', { key: 'icp:org_handle', newValue: 'globex' }));
+  });
+  expect(assign).not.toHaveBeenCalled();
+});
+
 describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
   const GATEWAY_CLAIMS = { ...ID_CLAIMS, ouHandle: 'acme', ouId: 'org-uuid', ouName: 'Acme' };
 
@@ -593,6 +604,29 @@ describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
     sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
     await render();
     expect(sessionStorage.getItem('session_data-instance_0-IPAAS_CONSOLE')).toBeNull();
+  });
+
+  const storeOrg = (handle: string | null): void => {
+    window.dispatchEvent(new StorageEvent('storage', { key: 'icp:org_handle', newValue: handle }));
+  };
+
+  it('reloads the console home when another tab moves the shared session to another organization', async () => {
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    act(() => storeOrg('globex'));
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('stays put when another tab stores the same organization, or clears it on sign-out', async () => {
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    act(() => storeOrg('acme'));
+    act(() => storeOrg(null));
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('starts sign-in at the gateway with the page nested inside the configured returnTo', async () => {

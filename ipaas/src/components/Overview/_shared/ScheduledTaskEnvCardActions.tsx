@@ -16,24 +16,32 @@
  * under the License.
  */
 
-import { Button, Tooltip } from '@wso2/oxygen-ui';
-import { Play } from '@wso2/oxygen-ui-icons-react';
+import { Tooltip } from '@wso2/oxygen-ui';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useExecutionConfigs, useTriggerComponent } from '../../../hooks/useExecutions';
+import { useExecutionConfigs, useRuntimeArguments, useTriggerComponent } from '../../../hooks/useExecutions';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
+import type { RuntimeArgument } from '../../../types/executions';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import { apiErrorMessage } from '../../../utils/apiErrors';
+import { isCommitSha } from '../../../utils/runtimeArguments';
 import { useMissingRequiredConfigs } from './configStatus';
 import NextRunLabel from '../../NextRunLabel';
 import ScheduleButton from './ScheduleButton';
+import RunButton from '../automation/RunButton';
+import RunWithArgsDialog from '../automation/RunWithArgsDialog';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 import type { ScheduleKind } from '../../../types/schedule';
 
+const NO_ARGUMENTS: RuntimeArgument[] = [];
+
 /**
  * The right-header slot of a scheduled task: an automation's, or with `scheduleKind="ingestion"` a
- * knowledge base data source's. Test only leaves the card when the task takes runtime arguments.
+ * knowledge base data source's. Test runs the task as is; Test with Arguments asks for its
+ * runtime arguments in a drawer first, one row per argument the task declares.
  */
 export default function EnvCardActions({
   component,
@@ -78,17 +86,28 @@ export default function EnvCardActions({
 
   const triggerRun = useTriggerComponent();
   const canRun = useCan()(Scopes.INTEGRATION_EXECUTE);
+  const [argsDialogOpen, setArgsDialogOpen] = useState(false);
+  // Read the arguments the deployed build recorded only once Test with Arguments is picked,
+  // since plain Test sends none. A deployment whose commit is not a SHA, such as an image
+  // deployed without a build, has no build to read them from. A failed lookup leaves
+  // runtimeArgs empty, so the drawer offers free-form rows and says why.
+  const argsCommit = deployedCommitSha && isCommitSha(deployedCommitSha) ? deployedCommitSha : '';
+  const { data: runtimeArgs = NO_ARGUMENTS, isLoading: runtimeArgsLoading, isError: runtimeArgsError, error: runtimeArgsErr } = useRuntimeArguments(component.id, versionId, argsCommit, argsDialogOpen && !!argsCommit);
+
+  const handleRunSuccess = () => {
+    onNotify({ text: 'Execution triggered successfully', severity: 'success' });
+    // Surfaces the run in this card's executions table before the list refetches.
+    onTrigger(Date.now());
+    queryClient.invalidateQueries({ queryKey: ['taskExecutions'] });
+  };
 
   const handleTest = () => {
+    // Test while the arguments still load backs out of Test with Arguments.
+    setArgsDialogOpen(false);
     triggerRun.mutate(
       { orgHandler, projectId, componentId: component.id, releaseId, args: [] },
       {
-        onSuccess: () => {
-          onNotify({ text: 'Execution triggered successfully', severity: 'success' });
-          // Surfaces the run in this card's executions table before the list refetches.
-          onTrigger(Date.now());
-          queryClient.invalidateQueries({ queryKey: ['taskExecutions'] });
-        },
+        onSuccess: handleRunSuccess,
         onError: (err) => onNotify({ text: err instanceof Error ? err.message : 'Failed to trigger execution', severity: 'error' }),
       },
     );
@@ -115,13 +134,29 @@ export default function EnvCardActions({
         onStopSuccess={() => onNotify({ text: 'Schedule stopped successfully', severity: 'success' })}
       />
       {canRun && (
-        <Tooltip title={blockedReason} placement="top">
-          <span>
-            <Button variant="contained" size="small" startIcon={<Play size={14} />} disabled={actionsDisabled || triggerRun.isPending} onClick={handleTest}>
-              Test
-            </Button>
-          </span>
-        </Tooltip>
+        <>
+          <Tooltip title={blockedReason} placement="top">
+            <span>
+              <RunButton envCritical={env.critical} disabled={actionsDisabled} pending={triggerRun.isPending} loading={argsDialogOpen && runtimeArgsLoading} onRun={handleTest} onRunWithArgs={() => setArgsDialogOpen(true)} />
+            </span>
+          </Tooltip>
+          {/* Mounted once the arguments have loaded, so its rows are laid out from them. */}
+          {argsDialogOpen && !runtimeArgsLoading && (
+            <RunWithArgsDialog
+              open
+              onClose={() => setArgsDialogOpen(false)}
+              onRunSuccess={handleRunSuccess}
+              envCritical={env.critical}
+              orgHandler={orgHandler}
+              projectId={projectId}
+              componentId={component.id}
+              releaseId={releaseId}
+              runtimeArguments={runtimeArgs}
+              argumentsUnavailable={runtimeArgsError}
+              unavailableReason={runtimeArgsError ? apiErrorMessage(runtimeArgsErr, "Couldn't read this automation's arguments.") : undefined}
+            />
+          )}
+        </>
       )}
     </>
   );
