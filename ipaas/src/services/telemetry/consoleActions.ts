@@ -35,6 +35,7 @@ import { getSession } from '../../auth';
 import type { ConsoleActionDimensionValue, ConsoleActionPayload } from '../../types/telemetry';
 import { stripBase } from '../../utils/basePath';
 import { routeTemplate, type EntityScope, type RouteNode } from '../../utils/consoleRoute';
+import type { ReferrerSource } from '../../utils/referrer';
 
 const PREFIX = 'integration-platform.console';
 
@@ -64,13 +65,13 @@ export interface ConsoleActionDimensions {
   [ConsoleAction.PageView]: { route: string; entity_scope?: EntityScope; referrer_route?: string };
   [ConsoleAction.CreateOptionSelected]: { option: CreateOption; surface: CreateSurface };
   [ConsoleAction.FormAbandoned]: { entity: AbandonedEntity; seconds_on_form: number; furthest_step?: string };
-  [ConsoleAction.FirstSession]: { referrer: string };
+  [ConsoleAction.FirstSession]: { referrer: ReferrerSource };
   [ConsoleAction.GitAuthorization]: { outcome: 'started' | 'completed' | 'needs-install' | 'failed' | 'cancelled'; git_provider: 'github' };
   [ConsoleAction.ErrorShown]: { operation: string; status?: number; error_code?: string };
   [ConsoleAction.EmptyState]: { resource: EmptyResource; state: 'no-data' | 'no-results' };
   [ConsoleAction.PermissionDenied]: { feature: string; required_permission: string };
   [ConsoleAction.QuotaBlocked]: { limit: number; interaction: 'shown' | 'clicked'; option?: CreateOption; surface?: CreateSurface };
-  [ConsoleAction.SessionStart]: { referrer: string; viewport: 'mobile' | 'tablet' | 'desktop'; browser: string };
+  [ConsoleAction.SessionStart]: { referrer: ReferrerSource; viewport: 'mobile' | 'tablet' | 'desktop'; browser: string };
 }
 
 /** Flush cadence. */

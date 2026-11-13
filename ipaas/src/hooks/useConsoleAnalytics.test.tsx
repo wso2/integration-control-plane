@@ -127,6 +127,17 @@ describe('useSessionAnalytics', () => {
     expect(calls(ConsoleAction.FirstSession)).toHaveLength(1);
   });
 
+  it('reports where the tab came from as recorded before sign-in, not the sign-in host', async () => {
+    resetSessionForTest();
+    window.sessionStorage.setItem('icp:console_entry_referrer', 'search');
+    Object.defineProperty(document, 'referrer', { value: 'https://auth.example.com/oauth2/authorize', configurable: true });
+    await render(<Session />);
+    expect(calls(ConsoleAction.SessionStart)).toEqual([expect.objectContaining({ referrer: 'search' })]);
+    expect(calls(ConsoleAction.FirstSession)).toEqual([{ referrer: 'search' }]);
+    Object.defineProperty(document, 'referrer', { value: '', configurable: true });
+    window.sessionStorage.clear();
+  });
+
   it("remembers the first session under this console's storage prefix", async () => {
     resetSessionForTest();
     await render(<Session />);

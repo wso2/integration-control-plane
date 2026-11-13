@@ -25,6 +25,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { useAuth } from '../auth';
+import { entryReferrer } from '../services/telemetry/entryReferrer';
 import { ConsoleAction, flushConsoleActions, trackConsoleAction, type AbandonedEntity, type ConsoleActionDimensions, type ConsoleActionName } from '../services/telemetry/consoleActions';
 import { httpCodeOf, httpStatusOf, isPermissionError, refusedRoute, refusedScope } from '../utils/apiErrors';
 import { entityScopeOf, routeTemplate, type RouteNode } from '../utils/consoleRoute';
@@ -61,15 +62,6 @@ function isFirstSession(userId: string): boolean {
   }
 }
 
-/** The referring site's host only: a full referrer can carry a search query. */
-function referrerHost(): string {
-  try {
-    return document.referrer ? new URL(document.referrer).host : 'direct';
-  } catch {
-    return 'unknown';
-  }
-}
-
 function viewport(): 'mobile' | 'tablet' | 'desktop' {
   if (window.innerWidth < 600) return 'mobile';
   return window.innerWidth < 1024 ? 'tablet' : 'desktop';
@@ -98,7 +90,7 @@ export function useSessionAnalytics(): void {
   useEffect(() => {
     if (sessionStarted || !userId) return;
     sessionStarted = true;
-    const referrer = referrerHost();
+    const referrer = entryReferrer();
     trackConsoleAction(ConsoleAction.SessionStart, { referrer, viewport: viewport(), browser: browserFamily() });
     if (isFirstSession(userId)) trackConsoleAction(ConsoleAction.FirstSession, { referrer });
   }, [userId]);

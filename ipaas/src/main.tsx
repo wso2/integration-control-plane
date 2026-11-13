@@ -29,6 +29,8 @@ import { FeaturePreviewProvider } from './contexts/FeaturePreviewContext';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import './index.css';
 import { initTracking } from './services/tracking/tracking';
+import { isConsoleAnalyticsEnabled } from './services/telemetry/consoleActions';
+import { rememberEntryReferrer } from './services/telemetry/entryReferrer';
 import { basePath } from './utils/basePath';
 
 const queryClient = new QueryClient();
@@ -39,6 +41,8 @@ const hideRequiredAsterisk = { '.MuiFormLabel-asterisk': { display: 'none' } } a
 // Load runtime configuration before rendering the app
 loadConfig().then(() => {
   initTracking();
+  // Before rendering, which may redirect to sign in and replace the referrer.
+  if (isConsoleAnalyticsEnabled()) rememberEntryReferrer();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <OxygenUIThemeProvider themes={[{ key: 'choreoLabs', label: 'Choreo Labs', theme: ChoreoLabsTheme }]} initialTheme="choreoLabs">

@@ -18,6 +18,7 @@ Only IDs, codes and counts. Each action carries:
 - `page`: the route template, such as `/organizations/:orgHandler/projects/:projectHandler/home` (`utils/consoleRoute.ts`). Never the path, which holds the organization handle and the names customers chose. It is resolved from the location when the action is recorded. ipaas-service keeps only the segments its `route_segments` list in `growth/console_actions.yaml` names, so a route that adds a new literal segment or parameter name is reported with `:redacted` in its place until that list has it.
 - `sessionId`: a random per-tab ID.
 - `occurredAt` and the action's dimensions. A dimension never holds what the user typed.
+- `session.start` and `onboarding.first-session` carry a `referrer` bucket (`direct`, `wso2-cloud`, `wso2`, `search`, `github`, `other` or `unknown`), never a host. `services/telemetry/entryReferrer.ts` records it on the tab's first load, before any sign-in redirect replaces `document.referrer` with the identity provider's host.
 
 ## Phase 1 actions
 
