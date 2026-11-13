@@ -81,6 +81,14 @@ describe('trackConsoleAction', () => {
     expect(JSON.stringify(batch)).not.toMatch(/acme|shop/);
   });
 
+  it('names the page an action belongs to when the caller gives it', () => {
+    setConsoleRoutes(routes);
+    window.history.pushState(null, '', '/organizations/acme');
+    trackConsoleAction(ConsoleAction.FormAbandoned, { entity: 'integration', seconds_on_form: 12 }, { page: '/organizations/:orgHandler/projects/:projectHandler/components/new' });
+    vi.advanceTimersByTime(FLUSH_INTERVAL_MS);
+    expect(sent()[0][0].page).toBe('/organizations/:orgHandler/projects/:projectHandler/components/new');
+  });
+
   it('sends at once when a batch is full', () => {
     for (let i = 0; i < MAX_BATCH_SIZE; i++) trackConsoleAction(ConsoleAction.QuotaBlocked, quota);
     expect(post).toHaveBeenCalledTimes(1);

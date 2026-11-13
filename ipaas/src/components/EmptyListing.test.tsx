@@ -67,6 +67,17 @@ describe('EmptyListing report', () => {
     expect(reports()).toHaveLength(1);
   });
 
+  it('reports again when the same empty listing changes from no data to no results', () => {
+    // An org with no projects: the user searches anyway, and the listing stays on screen.
+    show(<EmptyListing icon={null} title="No projects found" description="Create one to get started." report={{ resource: 'projects', state: 'no-data' }} />);
+    show(<EmptyListing icon={null} title="No projects found" description="Create one to get started." report={{ resource: 'projects', state: 'no-results' }} />);
+    show(<EmptyListing icon={null} title="No projects found" description="Create one to get started." report={{ resource: 'projects', state: 'no-results' }} />);
+    expect(reports()).toEqual([
+      { resource: 'projects', state: 'no-data' },
+      { resource: 'projects', state: 'no-results' },
+    ]);
+  });
+
   it('reports again when the listing empties again after showing results', () => {
     show(<EmptyListing icon={null} title="No integrations found" description="Create one to get started." report={{ resource: 'integrations', state: 'no-results' }} />);
     show(<p>3 integrations</p>);

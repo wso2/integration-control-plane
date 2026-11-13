@@ -101,17 +101,27 @@ export function setConsoleRoutes(routes: RouteNode[]): void {
   pageRoutes = routes;
 }
 
-// Read from the location when the action is recorded. Mount effects of a newly shown page run before any effect
-// higher in the tree, so a page held in state would still name the previous page for them.
-function currentPage(): string {
+/**
+ * The route template the user is on now. Read from the location, not held in state: mount effects of a newly shown
+ * page run before any effect higher in the tree, so a page held in state would still name the previous page for them.
+ */
+export function currentConsolePage(): string {
   return pageRoutes ? routeTemplate(pageRoutes, stripBase(window.location.pathname)) : '/';
 }
 
+export interface TrackOptions {
+  /**
+   * The page the action belongs to, when that is not the page the user is on as it is recorded: an action reported
+   * after the user has left, such as an abandoned form, names the page they left.
+   */
+  page?: string;
+}
+
 /** Records one console action. Never throws and never waits: the action joins the next batch. */
-export function trackConsoleAction<A extends ConsoleActionName>(action: A, dimensions: ConsoleActionDimensions[A]): void {
+export function trackConsoleAction<A extends ConsoleActionName>(action: A, dimensions: ConsoleActionDimensions[A], options: TrackOptions = {}): void {
   if (!isConsoleAnalyticsEnabled()) return;
   try {
-    buffer.push({ action, occurredAt: new Date().toISOString(), page: currentPage(), sessionId, dimensions: scalarDimensions(dimensions) });
+    buffer.push({ action, occurredAt: new Date().toISOString(), page: options.page ?? currentConsolePage(), sessionId, dimensions: scalarDimensions(dimensions) });
     listenForPageHide();
     if (buffer.length >= MAX_BATCH_SIZE) {
       flushConsoleActions();

@@ -34,7 +34,7 @@ vi.mock('../services/telemetry/consoleActions', async (importOriginal) => ({
 const auth = vi.hoisted(() => ({ userId: 'user-1' }));
 vi.mock('../auth', () => ({ useAuth: () => auth }));
 
-import { ConsoleAction } from '../services/telemetry/consoleActions';
+import { ConsoleAction, setConsoleRoutes } from '../services/telemetry/consoleActions';
 import { resetSessionForTest, useConsoleActionWhen, useFormAbandonment, useMutationErrorTracking, usePageViewTracking, useSessionAnalytics } from './useConsoleAnalytics';
 
 let unmount: () => Promise<void> = async () => {};
@@ -61,6 +61,7 @@ async function render(ui: ReactNode, path = '/', { strict = false } = {}): Promi
 const calls = (action: string) => track.mock.calls.filter(([name]) => name === action).map(([, dims]) => dims);
 
 beforeEach(() => {
+  (window as unknown as { API_CONFIG: object }).API_CONFIG = { consoleAnalyticsEnabled: true };
   track.mockClear();
   flush.mockClear();
   client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
@@ -136,6 +137,21 @@ describe('useSessionAnalytics', () => {
     expect(calls(ConsoleAction.FirstSession)).toEqual([{ referrer: 'search' }]);
     Object.defineProperty(document, 'referrer', { value: '', configurable: true });
     window.sessionStorage.clear();
+  });
+
+  it('remembers nothing while reporting is off, so the first session is reported once it is on', async () => {
+    (window as unknown as { API_CONFIG: object }).API_CONFIG = { consoleAnalyticsEnabled: false };
+    resetSessionForTest();
+    await render(<Session />);
+    await unmount();
+    expect(window.localStorage.getItem('icp:console_seen:user-1')).toBeNull();
+
+    // Reporting is turned on; the page loads again.
+    (window as unknown as { API_CONFIG: object }).API_CONFIG = { consoleAnalyticsEnabled: true };
+    resetSessionForTest();
+    await render(<Session />);
+    expect(calls(ConsoleAction.SessionStart)).toHaveLength(1);
+    expect(calls(ConsoleAction.FirstSession)).toHaveLength(1);
   });
 
   it("remembers the first session under this console's storage prefix", async () => {
@@ -277,6 +293,30 @@ describe('useFormAbandonment', () => {
     window.dispatchEvent(new Event('pagehide'));
     await unmount();
     expect(calls(ConsoleAction.FormAbandoned)).toHaveLength(1);
+  });
+
+  describe('names the form that was left', () => {
+    const formPage = '/organizations/:orgHandler/projects/new';
+    const abandonedOn = () => track.mock.calls.filter(([name]) => name === ConsoleAction.FormAbandoned).map(([, , options]) => (options as { page?: string } | undefined)?.page);
+    beforeEach(() => {
+      setConsoleRoutes([{ children: [{ path: 'organizations/:orgHandler/projects/new' }, { path: 'organizations/:orgHandler/projects' }] }]);
+      window.history.pushState(null, '', '/organizations/acme/projects/new');
+    });
+    afterEach(() => window.history.pushState(null, '', '/'));
+
+    it('when the user navigates away, not the page they went to', async () => {
+      await render(<Form />);
+      // The router moves first; the form unmounts and is reported after.
+      window.history.pushState(null, '', '/organizations/acme/projects');
+      await unmount();
+      expect(abandonedOn()).toEqual([formPage]);
+    });
+
+    it('when the tab closes, the same page', async () => {
+      await render(<Form />);
+      window.dispatchEvent(new Event('pagehide'));
+      expect(abandonedOn()).toEqual([formPage]);
+    });
   });
 
   it('does not count StrictMode remounting the page as leaving it', async () => {

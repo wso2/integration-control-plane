@@ -26,7 +26,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { useAuth } from '../auth';
 import { entryReferrer } from '../services/telemetry/entryReferrer';
-import { ConsoleAction, flushConsoleActions, trackConsoleAction, type AbandonedEntity, type ConsoleActionDimensions, type ConsoleActionName } from '../services/telemetry/consoleActions';
+import { ConsoleAction, currentConsolePage, flushConsoleActions, isConsoleAnalyticsEnabled, trackConsoleAction, type AbandonedEntity, type ConsoleActionDimensions, type ConsoleActionName } from '../services/telemetry/consoleActions';
 import { httpCodeOf, httpStatusOf, isPermissionError, refusedRoute, refusedScope } from '../utils/apiErrors';
 import { entityScopeOf, routeTemplate, type RouteNode } from '../utils/consoleRoute';
 import { local } from '../utils/storage';
@@ -88,7 +88,9 @@ export function resetSessionForTest(): void {
 export function useSessionAnalytics(): void {
   const { userId } = useAuth();
   useEffect(() => {
-    if (sessionStarted || !userId) return;
+    // Off, nothing is sent, so nothing may be remembered either: a first session marked as seen while off would
+    // never be reported once reporting is turned on.
+    if (!isConsoleAnalyticsEnabled() || sessionStarted || !userId) return;
     sessionStarted = true;
     const referrer = entryReferrer();
     trackConsoleAction(ConsoleAction.SessionStart, { referrer, viewport: viewport(), browser: browserFamily() });
@@ -129,7 +131,7 @@ export function useMutationErrorTracking(): void {
  */
 export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOperation): void {
   const queryClient = useQueryClient();
-  const visit = useRef<{ openedAt: number; done: boolean } | undefined>(undefined);
+  const visit = useRef<{ openedAt: number; page: string; done: boolean } | undefined>(undefined);
   const pendingLeave = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     // An unmount counts only once the effect has not run again in the same task. StrictMode unmounts and remounts a
@@ -137,7 +139,9 @@ export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOpe
     const resumed = pendingLeave.current !== undefined ? visit.current : undefined;
     clearTimeout(pendingLeave.current);
     pendingLeave.current = undefined;
-    const current = resumed ?? { openedAt: Date.now(), done: false };
+    // The page is noted on opening: an unmount is reported after the router has moved on, and must still name the
+    // form that was left, as the report on closing the tab does.
+    const current = resumed ?? { openedAt: Date.now(), page: currentConsolePage(), done: false };
     visit.current = current;
     const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
       if (event.type === 'updated' && event.action.type === 'success' && event.mutation.meta?.operation === operation) current.done = true;
@@ -145,7 +149,7 @@ export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOpe
     const report = () => {
       if (current.done) return;
       current.done = true;
-      trackConsoleAction(ConsoleAction.FormAbandoned, { entity, seconds_on_form: Math.round((Date.now() - current.openedAt) / 1000) });
+      trackConsoleAction(ConsoleAction.FormAbandoned, { entity, seconds_on_form: Math.round((Date.now() - current.openedAt) / 1000) }, { page: current.page });
     };
     // The page is going away, so the next timed flush never comes: send it now.
     const reportOnPageHide = () => {
@@ -165,22 +169,25 @@ export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOpe
 }
 
 /**
- * Reports `action` each time `when` turns true, such as an empty state or a blocked control being shown. The
- * dimensions are read when it fires, so a new object on every render does not report again.
+ * Reports `action` each time `when` turns true, such as an empty state or a blocked control being shown, and again
+ * when its dimensions change while it is shown: an empty list that goes from `no-data` to `no-results` is a new
+ * showing. The dimensions are compared by value, so a new object with the same values on every render does not
+ * report again.
  */
 export function useConsoleActionWhen<A extends ConsoleActionName>(when: boolean, action: A, dimensions: ConsoleActionDimensions[A]): void {
   const latest = useRef(dimensions);
   latest.current = dimensions;
-  // The action reported for the current stretch of `when`: StrictMode runs a mount effect twice, and that is still
+  const showing = `${action} ${JSON.stringify(dimensions)}`;
+  // What was reported for the current stretch of `when`: StrictMode runs a mount effect twice, and that is still
   // one showing.
-  const reported = useRef<A | undefined>(undefined);
+  const reported = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!when) {
       reported.current = undefined;
       return;
     }
-    if (reported.current === action) return;
-    reported.current = action;
+    if (reported.current === showing) return;
+    reported.current = showing;
     trackConsoleAction(action, latest.current);
-  }, [when, action]);
+  }, [when, action, showing]);
 }
