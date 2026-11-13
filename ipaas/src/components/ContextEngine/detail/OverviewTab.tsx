@@ -97,20 +97,13 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
   );
 }
 
-/** One public surface: its access switch, a link to its tab, and what an off switch means. */
+/** One public surface: its access switch and a link to its tab. */
 function ExposureRow({ engine, surface, label, disabledReason, onOpen }: { engine: ContextEngineDetail; surface: keyof ContextEngineAccess; label: string; disabledReason?: string; onOpen: () => void }): JSX.Element {
   return (
     <Box sx={summaryRowSx}>
-      <Box>
-        <Link component="button" type="button" variant="body2" onClick={onOpen}>
-          {label}
-        </Link>
-        {engine.access?.[surface] === false && (
-          <Typography variant="caption" sx={mutedSx}>
-            Clients get a 403 until it&apos;s turned on.
-          </Typography>
-        )}
-      </Box>
+      <Link component="button" type="button" variant="body2" onClick={onOpen}>
+        {label}
+      </Link>
       {engine.access ? (
         <AccessSwitch engineId={engine.id} access={engine.access} surface={surface} disabledReason={disabledReason} />
       ) : (
