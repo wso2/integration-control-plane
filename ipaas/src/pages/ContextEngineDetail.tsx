@@ -19,7 +19,7 @@
 import { Alert, Box, Button, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
-import { useLocation, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
@@ -33,12 +33,12 @@ import NotFound from '../components/NotFound';
 import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
+import SetupStatusAlert from '../components/ContextEngine/detail/SetupStatusAlert';
 import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
 import GraphTab from '../components/ContextEngine/detail/GraphTab';
 import ApiTab from '../components/ContextEngine/detail/ApiTab';
 import McpTab from '../components/ContextEngine/detail/McpTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
-import type { CreateContextEngineLocationState } from './CreateContextEngine';
 import type { ContextEngineState, ContextEngineTabKey } from '../types/contextEngine';
 import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
@@ -99,9 +99,6 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
   const { tab = 'overview' } = useParams();
   const engineId = useRouteEngineId();
-  const { state } = useLocation() as { state: CreateContextEngineLocationState | null };
-  const [warnings, setWarnings] = useState<string[]>(state?.warnings ?? []);
-  const openFilesSourceId = state?.openFiles;
   const { data: engine, isLoading, isError, error, refetch } = useContextEngine(engineId);
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
@@ -204,16 +201,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
       )}
       {!running && !deleting && <EngineNotRunning state={engine.state} reason={engine.statusReason} />}
 
-      {warnings.length > 0 && (
-        <Alert severity="warning" variant="outlined" onClose={() => setWarnings([])} sx={{ mb: 3 }}>
-          The engine was created, but not every step completed:
-          <Box component="ul" sx={{ m: 0, mt: 1, pl: 2.5 }}>
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </Box>
-        </Alert>
-      )}
+      {!deleting && <SetupStatusAlert engineId={engine.id} setup={engine.setup} />}
 
       {deleteError && !confirmDelete && (
         <Alert severity="error" variant="outlined" onClose={() => setDeleteError(null)} sx={{ mb: 3 }}>
@@ -227,9 +215,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {shownTab === 'overview' && (
-        <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting || !canManage ? undefined : () => setConfirmDelete(true)} />
-      )}
+      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} readOnly={!running} onRequestDelete={deleting || !canManage ? undefined : () => setConfirmDelete(true)} />}
       {shownTab === 'playground' && (canManage ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'graph' && (canManage ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'api' && <ApiTab engine={engine} />}

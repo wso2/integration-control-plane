@@ -659,6 +659,15 @@ export const CONSOLE_ACCESS_REFRESH_MARGIN_MS = 2 * 60 * 1000;
 /** How often an engine that is starting is checked again. */
 export const ENGINE_STATUS_POLL_MS = 4000;
 
+/**
+ * The BFF adds a new engine's sources for its creator's token, for up to 15 minutes, so a create
+ * with sources first refreshes a token with less than this left.
+ */
+export const CREATE_TOKEN_MIN_VALIDITY_MS = 20 * 60_000;
+
+/** How long files staged on the wizard wait in this tab for the new engine to run. */
+export const STAGED_SOURCE_WAIT_MS = 15 * 60_000;
+
 /** How many engines the listing reads a summary from at once. */
 export const SUMMARY_CONCURRENCY = 2;
 

@@ -66,6 +66,17 @@ export interface ContextEngine {
   startedAt?: string;
   /** When the engine was last asked to restart; a running pod that started before it is still restarting. */
   restartedAt?: string;
+  /** Adding the sources it was created with, which the BFF does once it runs; unset when it was created with none. */
+  setup?: ContextEngineSetup;
+}
+
+/** Interrupted is a setup still pending long after it began, which nothing is finishing. */
+export type ContextEngineSetupStatus = 'pending' | 'done' | 'failed' | 'interrupted';
+
+export interface ContextEngineSetup {
+  status: ContextEngineSetupStatus;
+  /** The steps that failed. */
+  warnings: string[];
 }
 
 export interface ContextEngineAccess {
@@ -549,19 +560,6 @@ export interface CreateContextEngineInput {
   /** Whether the engine offers answers, and the model that writes them; a null model is the language model. */
   answers: { enabled: boolean; model: LlmConfig | null };
   storage: ContextEngineStorage;
-}
-
-/** What is set up on an engine once it runs: the creator's grant, the sources and the query roles. */
-export interface ContextEngineSetupInput {
-  sources: ContextSourceConfig[];
-  roles: string[];
-}
-
-export interface ContextEngineSetupResult {
-  /** Engine ids of the registered sources, by the name the wizard gave them. */
-  sources: Record<string, string>;
-  /** Steps the engine refused; what succeeded is kept. */
-  warnings: string[];
 }
 
 /** A source run by an integration the BFF deploys next to the engine. Settings never come back. */

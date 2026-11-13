@@ -45,7 +45,6 @@ interface OverviewTabProps {
   roleNames: Record<string, string>;
   onGoTab: (tab: ContextEngineTabKey) => void;
   /** Open the Files drawer for this source on arrival, e.g. right after the wizard uploaded to it. */
-  openFilesSourceId?: string;
   /** The engine is being deleted: show what it holds, offer nothing that changes it. */
   readOnly?: boolean;
   /** Ask to delete the engine. The page owns the confirmation dialog. */
@@ -128,9 +127,9 @@ const canSeeModels = (actions: string[] | undefined): boolean => !actions || act
 const SOURCES_CARD_ID = 'context-engine-sources';
 
 /** Overview — first-run checklist, source progress, access, models, storage and exposure, each linking to its tab. */
-export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTab, openFilesSourceId, readOnly = false, onRequestDelete }: OverviewTabProps): JSX.Element {
-  const [filesSource, setFilesSource] = useState<ContextSource | null>(() => engine.sources.find((s) => s.id === openFilesSourceId && s.type === 'upload') ?? null);
-  const [filesOpen, setFilesOpen] = useState(!!openFilesSourceId);
+export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTab, readOnly = false, onRequestDelete }: OverviewTabProps): JSX.Element {
+  const [filesSource, setFilesSource] = useState<ContextSource | null>(null);
+  const [filesOpen, setFilesOpen] = useState(false);
   const openFiles = (source: ContextSource) => {
     setFilesSource(source);
     setFilesOpen(true);

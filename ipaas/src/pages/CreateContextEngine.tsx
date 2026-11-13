@@ -18,13 +18,27 @@
 
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
+import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useContextEngine, useContextEngineDraft, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
-import { answerChoice, checkStagedFile, effectiveVisibility, engineMessage, isFormDirty, modelsStepBlocker, nameStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
+import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import {
+  answerChoice,
+  checkStagedFile,
+  effectiveVisibility,
+  engineMessage,
+  integrationTypeFor,
+  isFormDirty,
+  modelsStepBlocker,
+  nameStepBlocker,
+  sourcesStepBlocker,
+  storageStepBlocker,
+  toCreateInput,
+  visibilityTags,
+  withSourceVisibilityRules,
+} from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -35,8 +49,7 @@ import SourcesStep from '../components/ContextEngine/steps/SourcesStep';
 import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
 import StorageStep from '../components/ContextEngine/steps/StorageStep';
 import ReviewStep from '../components/ContextEngine/steps/ReviewStep';
-import SetupProgress, { type SetupPhase, type SetupUploadSource } from '../components/ContextEngine/files/SetupProgress';
-import { rememberSourceRules, startUploads } from '../hooks/contextUploads';
+import { stageEngineSources, type StagedEngineSource } from '../hooks/stagedEngineSources';
 import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
 import type { ContextSourceConfig } from '../types/contextEngine';
@@ -49,24 +62,20 @@ const LAST_STEP = STEP_LABELS.length - 1;
 const MODELS_STEP = STEP_LABELS.indexOf('Configure Models');
 const STORAGE_STEP = STEP_LABELS.indexOf('Configure Storage');
 
-/** Passed to the detail page so it can show which steps the engine could not complete yet. */
-export interface CreateContextEngineLocationState {
-  warnings?: string[];
-  /** A File Upload source to open the Files drawer for on arrival. */
-  openFiles?: string;
-}
-
-/** The engine the wizard created, and what it still has to hand over once the engine runs. */
-interface CreatedEngine {
-  id: string;
-  name: string;
-  sources: ContextSourceConfig[];
-  roles: string[];
-}
-
-interface SetupResult {
-  warnings: string[];
-  uploads: SetupUploadSource[];
+/** The sources the engine serves itself, with their staged files, which this tab hands to the engine once it runs. */
+function stagedEngineSources(sources: ContextSourceConfig[], everyone: string[]): StagedEngineSource[] {
+  return sources
+    .filter((source) => integrationTypeFor(source.type) === null)
+    .map((source) => {
+      const staged = source.staged ?? [];
+      const files = staged.flatMap((m) => {
+        const content = getStagedFile(m.id);
+        return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
+      });
+      staged.forEach((m) => dropStagedFile(m.id));
+      const visibility = effectiveVisibility(source.stagedVisibility);
+      return { source, files, visibility, audience: visibilityTags(visibility, everyone) };
+    });
 }
 
 export default function CreateContextEngine(scope: OrgScope): JSX.Element {
@@ -79,22 +88,15 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const [form, dispatch] = useReducer(contextEngineFormReducer, undefined, () => draft.restore() ?? initialContextEngineForm);
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<CreatedEngine | null>(null);
-  const [result, setResult] = useState<SetupResult | null>(null);
   const [showRestored, setShowRestored] = useState(restored);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const create = useCreateContextEngine();
-  const setUp = useSetUpContextEngine();
-  const live = useContextEngine(created?.id ?? '', { pollOnError: true });
-  const setupStarted = useRef(false);
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   // The roles "everyone who can query" stands for when files are shared; the creator's groups are unknown until the engine runs.
   const { everyone, myGroups } = useUploadAudience(scope.org, form.roles, null);
   const base = contextEnginesUrl(scope.org);
   const dirty = isFormDirty(form);
-  const engineState = live.data?.state;
-  const phase: SetupPhase = result ? 'done' : engineState === 'failed' ? 'failed' : engineState === 'ready' ? 'setting-up' : 'starting';
 
   // Mirror the form into session storage so leaving the wizard loses nothing but secrets.
   useEffect(() => {
@@ -102,53 +104,6 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     if (dirty) saveDraft(form);
     else clearDraft();
   }, [form, dirty, create.isSuccess, saveDraft, clearDraft]);
-
-  // The sources, roles and staged files live only in this page until the engine runs.
-  const settingUp = !!created && !result && phase !== 'failed';
-
-  // Warn before the tab closes on them.
-  useEffect(() => {
-    if (!settingUp) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [settingUp]);
-
-  // Once the new engine runs, hand it the creator's grant, the sources and the roles, then the staged files.
-  useEffect(() => {
-    if (!created || engineState !== 'ready' || setupStarted.current) return;
-    setupStarted.current = true;
-    setUp.mutate(
-      { engineId: created.id, input: { sources: created.sources, roles: created.roles } },
-      {
-        onSuccess: ({ sources, warnings }) => {
-          const uploads: SetupUploadSource[] = [];
-          for (const source of created.sources) {
-            const sourceId = sources[source.name.trim()];
-            if (!sourceId) continue;
-            rememberSourceRules(sourceId, source.audience ?? []);
-            const staged = source.staged ?? [];
-            if (source.type !== 'upload' || staged.length === 0) continue;
-            const files = staged.flatMap((m) => {
-              const content = getStagedFile(m.id);
-              return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
-            });
-            staged.forEach((m) => dropStagedFile(m.id));
-            if (files.length === 0) continue;
-            const visibility = effectiveVisibility(source.stagedVisibility);
-            startUploads(created.id, sourceId, files, visibility, visibilityTags(visibility, everyone));
-            uploads.push({ sourceId, name: source.name.trim() });
-          }
-          if (uploads.length === 0) {
-            navigate(contextEngineUrl(scope.org, created.id), { state: { warnings } satisfies CreateContextEngineLocationState });
-            return;
-          }
-          setResult({ warnings, uploads });
-        },
-        onError: (e) => setResult({ warnings: [`Set up the engine: ${engineMessage(e, 'the engine refused it')}`], uploads: [] }),
-      },
-    );
-  }, [created, engineState, setUp, everyone, navigate, scope.org]);
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
@@ -181,7 +136,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     create.mutate(toCreateInput({ ...form, sources: withRules }), {
       onSuccess: (engine) => {
         draft.clear();
-        setCreated({ id: engine.id, name: engine.name, sources: withRules, roles: form.roles });
+        stageEngineSources(engine.id, stagedEngineSources(withRules, everyone));
+        navigate(contextEngineUrl(scope.org, engine.id));
       },
       onError: (e) => {
         if (e instanceof HttpError && e.status === 409) setError(`Couldn't create the context engine: ${engineMessage(e, 'the name is taken')}`);
@@ -195,7 +151,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent sx={wrapSx}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (settingUp || (dirty && !created) ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
       <PageTitle>
@@ -206,20 +162,6 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         <Alert severity="info" variant="outlined" sx={{ mt: 3 }}>
           Your role can&apos;t create context engines.
         </Alert>
-      ) : created ? (
-        <Box sx={{ mt: 3 }}>
-          <SetupProgress
-            engineId={created.id}
-            engineName={created.name}
-            phase={phase}
-            statusUnknown={live.isError}
-            sourceCount={created.sources.length}
-            roleCount={created.roles.length}
-            warnings={result?.warnings ?? []}
-            uploads={result?.uploads ?? []}
-            onOpen={() => navigate(contextEngineUrl(scope.org, created.id), { state: { warnings: result?.warnings, openFiles: result?.uploads[0]?.sourceId } satisfies CreateContextEngineLocationState })}
-          />
-        </Box>
       ) : (
         <Stack direction="row" gap={4} alignItems="flex-start" sx={{ mt: 3 }}>
           <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
@@ -291,19 +233,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         </Stack>
       )}
 
-      <Dialog open={leaveOpen && settingUp} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Leave before setup finishes?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>The engine is created, but its sources and access are not added yet. If you leave, add them from the engine&apos;s page.</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLeaveOpen(false)}>Stay</Button>
-          <Button variant="contained" color="error" onClick={() => leave(false)}>
-            Leave
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={leaveOpen && !settingUp} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Leave without creating?</DialogTitle>
         <DialogContent>
           <DialogContentText>Your draft is kept for this tab. API keys and tokens are not.</DialogContentText>

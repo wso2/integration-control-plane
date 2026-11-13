@@ -1580,17 +1580,28 @@ export interface BffCreateEngineRequest {
   displayName: string;
   description?: string;
   models: { llm: BffEngineModel; embedding: BffEngineModel; answer?: BffEngineModel; answersEnabled: boolean };
+  setup?: { sources: BffIntegrationRequest[] };
 }
 
-/** `POST /context-engines`. A separate answer model reuses the language model's key when it has none of its own. */
+export type BffIntegrationRequest = ReturnType<typeof toIntegrationRequest>;
+
+/**
+ * `POST /context-engines`. A separate answer model reuses the language model's key when it has none of its own.
+ * The BFF adds the connector sources once the engine runs; a source the engine itself serves is left to the console.
+ */
 export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEngineRequest {
   const model = (m: { provider: string; model: string; apiKey: string }): BffEngineModel => ({ provider: m.provider, model: m.model.trim(), ...(m.apiKey ? { apiKey: m.apiKey } : {}) });
   const answer = input.answers.enabled && input.answers.model ? model(input.answers.model) : undefined;
+  const sources = input.sources.flatMap((s) => {
+    const type = integrationTypeFor(s.type);
+    return type === null ? [] : [toIntegrationRequest(s, type)];
+  });
   return {
     name: engineHandleFrom(input.name),
     displayName: input.name.trim(),
     ...(input.description.trim() ? { description: input.description.trim() } : {}),
     models: { llm: model(input.llm), embedding: model(input.embedding), ...(answer ? { answer } : {}), answersEnabled: input.answers.enabled },
+    ...(sources.length ? { setup: { sources } } : {}),
   };
 }
 

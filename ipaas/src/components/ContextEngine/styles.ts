@@ -361,26 +361,6 @@ export const filesToolbarSx = { display: 'flex', alignItems: 'center', gap: 1.5,
 
 export const sectionLabelSx = { fontWeight: 600, mb: 1 } as const;
 
-/** The post-create card on the wizard: steps down the left, the file list under the upload step. */
-export const setupCardSx = { border: '1px solid', borderColor: 'divider', borderRadius: 2.5, p: 3, bgcolor: 'background.paper', maxWidth: 720 } as const;
-
-export const setupStepSx = { display: 'flex', alignItems: 'center', gap: 1.5, py: 1.25 } as const;
-
-export const setupDotSx = (tone: 'done' | 'running' | 'skipped' | 'failed') =>
-  ({
-    width: 24,
-    height: 24,
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    color: tone === 'done' ? 'success.contrastText' : tone === 'failed' ? 'error.main' : tone === 'skipped' ? 'warning.dark' : 'primary.main',
-    bgcolor: tone === 'done' ? 'success.main' : 'transparent',
-    border: tone === 'done' ? 0 : '1px solid',
-    borderColor: tone === 'failed' ? 'error.main' : tone === 'skipped' ? 'warning.main' : 'divider',
-  }) as const;
-
 // ── Source progress ─────────────────────────────────────────────────────────
 
 /** A source with its progress bar and captions under the name line. */
