@@ -25,11 +25,11 @@ import { BffError } from '../api/_client';
 import type { FunnelOperation } from '../types/telemetry';
 
 const track = vi.hoisted(() => vi.fn());
-const setPage = vi.hoisted(() => vi.fn());
+const flush = vi.hoisted(() => vi.fn());
 vi.mock('../services/telemetry/consoleActions', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   trackConsoleAction: track,
-  setCurrentPage: setPage,
+  flushConsoleActions: flush,
 }));
 const auth = vi.hoisted(() => ({ userId: 'user-1' }));
 vi.mock('../auth', () => ({ useAuth: () => auth }));
@@ -58,7 +58,7 @@ const calls = (action: string) => track.mock.calls.filter(([name]) => name === a
 
 beforeEach(() => {
   track.mockClear();
-  setPage.mockClear();
+  flush.mockClear();
   client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   window.localStorage.clear();
 });
@@ -84,7 +84,6 @@ describe('usePageViewTracking', () => {
       { route: '/organizations/:orgHandler', entity_scope: 'organization', referrer_route: undefined },
       { route: '/organizations/:orgHandler/projects/:projectHandler/home', entity_scope: 'project', referrer_route: '/organizations/:orgHandler' },
     ]);
-    expect(setPage).toHaveBeenLastCalledWith('/organizations/:orgHandler/projects/:projectHandler/home');
     expect(JSON.stringify(track.mock.calls)).not.toMatch(/acme|shop/);
   });
 });
@@ -205,5 +204,13 @@ describe('useFormAbandonment', () => {
     window.dispatchEvent(new Event('pagehide'));
     unmount();
     expect(calls(ConsoleAction.FormAbandoned)).toHaveLength(1);
+  });
+
+  it('sends the report at once when the tab closes, since no timed flush will run', async () => {
+    await render(<Form />);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(flush).toHaveBeenCalledWith(true);
+    const reported = track.mock.invocationCallOrder[track.mock.calls.findIndex(([name]) => name === ConsoleAction.FormAbandoned)];
+    expect(reported).toBeLessThan(flush.mock.invocationCallOrder[0]);
   });
 });

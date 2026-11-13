@@ -33,7 +33,8 @@
 import { postConsoleActions } from '../../api/telemetry';
 import { getSession } from '../../auth';
 import type { ConsoleActionDimensionValue, ConsoleActionPayload } from '../../types/telemetry';
-import type { EntityScope } from '../../utils/consoleRoute';
+import { stripBase } from '../../utils/basePath';
+import { routeTemplate, type EntityScope, type RouteNode } from '../../utils/consoleRoute';
 
 const PREFIX = 'integration-platform.console';
 
@@ -80,7 +81,7 @@ export const MAX_BATCH_SIZE = 50;
 let buffer: ConsoleActionPayload[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | undefined;
 let listening = false;
-let currentPage = '/';
+let pageRoutes: RouteNode[] | undefined;
 let sessionId = newSessionId();
 
 function newSessionId(): string {
@@ -94,16 +95,22 @@ function newSessionId(): string {
 
 export const isConsoleAnalyticsEnabled = (): boolean => window.API_CONFIG?.consoleAnalyticsEnabled === true;
 
-/** The route template the user is on; set by the page-view tracker so every action carries its page. */
-export function setCurrentPage(template: string): void {
-  currentPage = template;
+/** The app's route table, so every action can name the route template it happened on. Set once, before the first render. */
+export function setConsoleRoutes(routes: RouteNode[]): void {
+  pageRoutes = routes;
+}
+
+// Read from the location when the action is recorded. Mount effects of a newly shown page run before any effect
+// higher in the tree, so a page held in state would still name the previous page for them.
+function currentPage(): string {
+  return pageRoutes ? routeTemplate(pageRoutes, stripBase(window.location.pathname)) : '/';
 }
 
 /** Records one console action. Never throws and never waits: the action joins the next batch. */
 export function trackConsoleAction<A extends ConsoleActionName>(action: A, dimensions: ConsoleActionDimensions[A]): void {
   if (!isConsoleAnalyticsEnabled()) return;
   try {
-    buffer.push({ action, occurredAt: new Date().toISOString(), page: currentPage, sessionId, dimensions: scalarDimensions(dimensions) });
+    buffer.push({ action, occurredAt: new Date().toISOString(), page: currentPage(), sessionId, dimensions: scalarDimensions(dimensions) });
     listenForPageHide();
     if (buffer.length >= MAX_BATCH_SIZE) {
       flushConsoleActions();
@@ -157,6 +164,6 @@ export function resetConsoleActionsForTest(): void {
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = undefined;
   buffer = [];
-  currentPage = '/';
+  pageRoutes = undefined;
   sessionId = newSessionId();
 }

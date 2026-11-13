@@ -15,7 +15,7 @@ This is separate from the Moesif browser SDK in `services/tracking/` (`MOESIF_AP
 
 Only IDs, codes and counts. Each action carries:
 
-- `page`: the route template, such as `/organizations/:orgHandler/projects/:projectHandler/home` (`utils/consoleRoute.ts`). Never the path, which holds the organization handle and the names customers chose.
+- `page`: the route template, such as `/organizations/:orgHandler/projects/:projectHandler/home` (`utils/consoleRoute.ts`). Never the path, which holds the organization handle and the names customers chose. It is resolved from the location when the action is recorded. ipaas-service keeps only the segments its `route_segments` list in `growth/console_actions.yaml` names, so a route that adds a new literal segment or parameter name is reported with `:redacted` in its place until that list has it.
 - `sessionId`: a random per-tab ID.
 - `occurredAt` and the action's dimensions. A dimension never holds what the user typed.
 

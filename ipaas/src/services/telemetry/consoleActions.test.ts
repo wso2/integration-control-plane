@@ -24,11 +24,12 @@ vi.mock('../../auth', () => ({ getSession: () => session.current }));
 const post = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock('../../api/telemetry', () => ({ postConsoleActions: post }));
 
-import { ConsoleAction, FLUSH_INTERVAL_MS, MAX_BATCH_SIZE, flushConsoleActions, resetConsoleActionsForTest, setCurrentPage, trackConsoleAction } from './consoleActions';
+import { ConsoleAction, FLUSH_INTERVAL_MS, MAX_BATCH_SIZE, flushConsoleActions, resetConsoleActionsForTest, setConsoleRoutes, trackConsoleAction } from './consoleActions';
 import type { ConsoleActionPayload } from '../../types/telemetry';
 
 const sent = (): ConsoleActionPayload[][] => post.mock.calls.map((call) => (call as unknown as [ConsoleActionPayload[]])[0]);
 const quota = { limit: 5, interaction: 'shown', surface: 'create-page' } as const;
+const routes = [{ children: [{ path: 'organizations/:orgHandler' }, { path: 'organizations/:orgHandler/projects/:projectHandler/components/new' }] }];
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -51,7 +52,8 @@ describe('trackConsoleAction', () => {
   });
 
   it('batches actions and sends them after the flush interval', () => {
-    setCurrentPage('/organizations/:orgHandler/projects/:projectHandler/components/new');
+    setConsoleRoutes(routes);
+    window.history.pushState(null, '', '/organizations/acme/projects/shop/components/new');
     trackConsoleAction(ConsoleAction.QuotaBlocked, quota);
     trackConsoleAction(ConsoleAction.CreateOptionSelected, { option: 'sample', surface: 'empty-project' });
     expect(post).not.toHaveBeenCalled();
@@ -64,6 +66,19 @@ describe('trackConsoleAction', () => {
     expect(batch[0]).toMatchObject({ page: '/organizations/:orgHandler/projects/:projectHandler/components/new', dimensions: quota });
     expect(batch[0].sessionId).toBe(batch[1].sessionId);
     expect(new Date(batch[0].occurredAt).toString()).not.toBe('Invalid Date');
+  });
+
+  it('names the page the user is on when the action is recorded, as its route template', () => {
+    setConsoleRoutes(routes);
+    window.history.pushState(null, '', '/organizations/acme');
+    trackConsoleAction(ConsoleAction.EmptyState, { resource: 'projects', state: 'no-data' });
+    window.history.pushState(null, '', '/organizations/acme/projects/shop/components/new');
+    trackConsoleAction(ConsoleAction.QuotaBlocked, quota);
+    vi.advanceTimersByTime(FLUSH_INTERVAL_MS);
+
+    const [batch] = sent();
+    expect(batch.map((a) => a.page)).toEqual(['/organizations/:orgHandler', '/organizations/:orgHandler/projects/:projectHandler/components/new']);
+    expect(JSON.stringify(batch)).not.toMatch(/acme|shop/);
   });
 
   it('sends at once when a batch is full', () => {

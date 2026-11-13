@@ -18,7 +18,7 @@
 
 import { matchRoutes, type RouteObject } from 'react-router';
 
-interface RouteNode {
+export interface RouteNode {
   path?: string;
   index?: boolean;
   children?: RouteNode[];

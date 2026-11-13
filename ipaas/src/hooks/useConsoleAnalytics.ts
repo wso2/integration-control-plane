@@ -25,15 +25,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { useAuth } from '../auth';
-import { ConsoleAction, setCurrentPage, trackConsoleAction, type AbandonedEntity, type ConsoleActionDimensions, type ConsoleActionName } from '../services/telemetry/consoleActions';
+import { ConsoleAction, flushConsoleActions, trackConsoleAction, type AbandonedEntity, type ConsoleActionDimensions, type ConsoleActionName } from '../services/telemetry/consoleActions';
 import { httpCodeOf, httpStatusOf, isPermissionError, refusedScope } from '../utils/apiErrors';
-import { entityScopeOf, routeTemplate } from '../utils/consoleRoute';
+import { entityScopeOf, routeTemplate, type RouteNode } from '../utils/consoleRoute';
 import type { FunnelOperation } from '../types/telemetry';
-
-interface RouteNode {
-  path?: string;
-  children?: RouteNode[];
-}
 
 /** Reports a page view on every navigation, as the route template the path renders. Mount once, in App. */
 export function usePageViewTracking(routes: RouteNode[]): void {
@@ -41,7 +36,6 @@ export function usePageViewTracking(routes: RouteNode[]): void {
   const previous = useRef<string | undefined>(undefined);
   useEffect(() => {
     const route = routeTemplate(routes, pathname);
-    setCurrentPage(route);
     trackConsoleAction(ConsoleAction.PageView, { route, entity_scope: entityScopeOf(route), referrer_route: previous.current });
     previous.current = route;
   }, [routes, pathname]);
@@ -148,10 +142,15 @@ export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOpe
       done = true;
       trackConsoleAction(ConsoleAction.FormAbandoned, { entity, seconds_on_form: Math.round((Date.now() - openedAt) / 1000) });
     };
-    window.addEventListener('pagehide', report);
+    // The page is going away, so the next timed flush never comes: send it now.
+    const reportOnPageHide = () => {
+      report();
+      flushConsoleActions(true);
+    };
+    window.addEventListener('pagehide', reportOnPageHide);
     return () => {
       unsubscribe();
-      window.removeEventListener('pagehide', report);
+      window.removeEventListener('pagehide', reportOnPageHide);
       report();
     };
   }, [queryClient, entity, operation]);

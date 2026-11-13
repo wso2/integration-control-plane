@@ -21,7 +21,11 @@ import { Route, Routes } from 'react-router';
 import routes, { type AppRoute } from './config/routes';
 import NavigationProgress from './components/NavigationProgress';
 import { usePageViewTracking } from './hooks/useConsoleAnalytics';
+import { setConsoleRoutes } from './services/telemetry/consoleActions';
 import './App.css';
+
+// Before the first render, so actions reported from the first page's mount effects already name their route.
+setConsoleRoutes(routes);
 
 function renderRoutes(routeList: AppRoute[]): JSX.Element[] {
   return routeList.map((route, i) => {
