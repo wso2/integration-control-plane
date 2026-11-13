@@ -52,6 +52,8 @@ export default function GitHubOAuthCallback(): JSX.Element {
     channel.postMessage({
       authCode: code ?? null,
       state: state ?? null,
+      // GitHub's reason when it sends no code; access_denied is the user cancelling.
+      error: params.get('error'),
       installationId: params.get('installation_id'),
       setupAction: params.get('setup_action'),
     });

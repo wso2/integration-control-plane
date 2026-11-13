@@ -65,7 +65,7 @@ export interface ConsoleActionDimensions {
   [ConsoleAction.CreateOptionSelected]: { option: CreateOption; surface: CreateSurface };
   [ConsoleAction.FormAbandoned]: { entity: AbandonedEntity; seconds_on_form: number; furthest_step?: string };
   [ConsoleAction.FirstSession]: { referrer: string };
-  [ConsoleAction.GitAuthorization]: { outcome: 'started' | 'completed' | 'failed' | 'cancelled'; git_provider: 'github' };
+  [ConsoleAction.GitAuthorization]: { outcome: 'started' | 'completed' | 'needs-install' | 'failed' | 'cancelled'; git_provider: 'github' };
   [ConsoleAction.ErrorShown]: { operation: string; status?: number; error_code?: string };
   [ConsoleAction.EmptyState]: { resource: EmptyResource; state: 'no-data' | 'no-results' };
   [ConsoleAction.PermissionDenied]: { feature: string; required_permission: string };

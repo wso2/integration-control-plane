@@ -55,6 +55,7 @@ import { trackEvent } from '../services/tracking/tracking';
 import { ConsoleAction, trackConsoleAction, type CreateOption } from '../services/telemetry/consoleActions';
 import { useConsoleActionWhen } from '../hooks/useConsoleAnalytics';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
+import { noCodeOutcome, pollUntilPopupGone } from '../utils/githubPopup';
 
 
 /** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
@@ -170,21 +171,22 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
     const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
     channelRef.current = channel;
-    const pollClosed = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(pollClosed);
+    const pollClosed = pollUntilPopupGone(
+      popup,
+      () => {
         channel.close();
         channelRef.current = null;
         setIsImportAuthenticating(false);
         gitAuthorization('cancelled');
-      }
-    }, GITHUB_AUTH.POPUP_POLL_INTERVAL_MS);
+      },
+      GITHUB_AUTH.POPUP_POLL_INTERVAL_MS,
+    );
     pollRef.current = pollClosed;
 
     channel.onmessage = (event) => {
       clearInterval(pollClosed);
       channel.close();
-      const { authCode, state: returnedState } = event.data as { authCode: string | null; state: string | null };
+      const { authCode, state: returnedState, error } = event.data as { authCode: string | null; state: string | null; error?: string | null };
       if (!returnedState || !validateAndClearGitHubState(returnedState)) {
         setIsImportAuthenticating(false);
         setPageError({ message: 'GitHub authorization failed (invalid state). Please try again.', severity: 'error' });
@@ -194,7 +196,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       if (!authCode) {
         setIsImportAuthenticating(false);
         setPageError({ message: 'GitHub authorization failed. Please try again.', severity: 'error' });
-        gitAuthorization('failed');
+        gitAuthorization(noCodeOutcome(error));
         return;
       }
       // The import page exchanges the code, and reports the authorization as completed or failed.

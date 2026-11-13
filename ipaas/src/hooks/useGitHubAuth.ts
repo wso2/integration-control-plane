@@ -24,9 +24,10 @@ import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth
 import type { AuthStatus } from '../types/import';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
+import { noCodeOutcome, pollUntilPopupGone } from '../utils/githubPopup';
 import { ConsoleAction, trackConsoleAction } from '../services/telemetry/consoleActions';
 
-const gitAuthorization = (outcome: 'started' | 'completed' | 'failed' | 'cancelled'): void => trackConsoleAction(ConsoleAction.GitAuthorization, { outcome, git_provider: 'github' });
+const gitAuthorization = (outcome: 'started' | 'completed' | 'needs-install' | 'failed' | 'cancelled'): void => trackConsoleAction(ConsoleAction.GitAuthorization, { outcome, git_provider: 'github' });
 
 export interface UseGitHubAuthReturn {
   authStatus: AuthStatus;
@@ -75,6 +76,8 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
     }
     if (result.needsInstallation && window.API_CONFIG.githubAppSlug) {
       setAuthStatus('needs-install');
+      // Authorized, but the App is not installed: the user installs it and authorizes again.
+      gitAuthorization('needs-install');
       return;
     }
     setAuthStatus('failed');
@@ -149,19 +152,20 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
     const url = buildGitHubOAuthUrl(githubAppAuthRedirectUrl ?? '', githubAppClientId, state);
     const popup = window.open(url, 'github-oauth', GITHUB_AUTH.POPUP_DIMENSIONS);
     const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
-    const pollClosed = setInterval(() => {
-      if (popup?.closed) {
-        clearInterval(pollClosed);
+    // The popup answers on the channel, which stops this poll; closing without an answer means the user gave up.
+    const pollClosed = pollUntilPopupGone(
+      popup,
+      () => {
         channel.close();
         setAuthStatus((prev) => (prev === 'authenticating' ? 'idle' : prev));
-        // The popup answers on the channel, which stops this poll; closing first means the user gave up.
         gitAuthorization('cancelled');
-      }
-    }, GITHUB_AUTH.POPUP_POLL_INTERVAL_MS);
+      },
+      GITHUB_AUTH.POPUP_POLL_INTERVAL_MS,
+    );
     channel.onmessage = async (event) => {
       clearInterval(pollClosed);
       channel.close();
-      const { authCode, state: returnedState } = event.data as { authCode: string | null; state: string | null };
+      const { authCode, state: returnedState, error } = event.data as { authCode: string | null; state: string | null; error?: string | null };
       if (!returnedState || !validateAndClearGitHubState(returnedState)) {
         setAuthStatus('failed');
         gitAuthorization('failed');
@@ -169,7 +173,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
       }
       if (!authCode) {
         setAuthStatus('failed');
-        gitAuthorization('failed');
+        gitAuthorization(noCodeOutcome(error));
         return;
       }
       try {
