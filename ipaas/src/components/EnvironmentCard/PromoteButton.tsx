@@ -61,8 +61,9 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
-  // A workflow promotes after its request: the target's promote holds the button until it ends.
-  const { isDeploying: targetDeploying } = useWorkflowDeploy(componentId, targetEnvId, isWorkflow);
+  // A workflow promotes after its request: the target's promote holds the button until it ends,
+  // and so does the read that tells whether one is running.
+  const { isDeploying: targetDeploying, isChecking: targetChecking } = useWorkflowDeploy(componentId, targetEnvId, isWorkflow);
   const promoting = promote.isPending || targetDeploying;
   const links = useIntegrationLinks(projectId, componentId, true);
   // Read only when promoting, as the resource values are.
@@ -138,7 +139,7 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
     <>
       <Tooltip title={tooltipTitle}>
         <span>
-          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={loading || !canPromote || checking || promoting} onClick={checkThenPromote}>
+          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={loading || !canPromote || checking || promoting || targetChecking} onClick={checkThenPromote}>
             {checking ? 'Checking…' : promoting ? 'Promoting…' : 'Promote'}
           </Button>
         </span>

@@ -107,6 +107,16 @@ describe('workflow EnvCardBody', () => {
     expect(container.querySelector('[data-testid="workflow-deploy-running"]')?.textContent).toBe('Deploying to this environment. Connecting the workflow runtime can take a minute.');
   });
 
+  it('says when it could not check for a running deploy, and reads again on Retry', async () => {
+    const refetch = vi.fn();
+    workflowDeploy.value = { isDeploying: false, isError: true, refetch };
+    await renderBody({ hasDeployment: true, loadingDeployment: false, deploymentStatusV2: 'ACTIVE' });
+    const notice = container.querySelector('[data-testid="workflow-deploy-unknown"]');
+    expect(notice?.textContent).toContain("Couldn't check whether a deployment to this environment is running.");
+    await act(async () => notice?.querySelector('button')?.click());
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it('says why the last promote to this environment failed', async () => {
     const failure = { environment: 'production', state: 'failed', operation: 'promote', message: 'the workflow runtime is unavailable; try again later' };
     workflowDeploy.value = { isDeploying: false, deploy: failure, failure };

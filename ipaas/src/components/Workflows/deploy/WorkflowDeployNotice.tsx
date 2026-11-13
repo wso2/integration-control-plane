@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, CircularProgress } from '@wso2/oxygen-ui';
+import { Alert, Button, CircularProgress } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useWorkflowDeploy } from '../../../hooks/useWorkflowDeploy';
 
@@ -29,13 +29,30 @@ interface WorkflowDeployNoticeProps {
 const noticeSx = { mt: 2 } as const;
 
 /**
- * A workflow's deploy or promote to this environment that is still running or failed. The
+ * A workflow's deploy or promote to this environment that is still running or failed, or a
+ * status read that failed. The
  * platform finishes a workflow's deploy after the request: it connects the workflow runtime
  * first, which can take a minute. Nothing shows for a deploy that succeeded, since the
  * environment's own deployment then reports it.
  */
 export default function WorkflowDeployNotice({ componentId, environment }: WorkflowDeployNoticeProps): JSX.Element | null {
-  const { deploy, isDeploying, failure } = useWorkflowDeploy(componentId, environment);
+  const { deploy, isDeploying, isError, refetch, failure } = useWorkflowDeploy(componentId, environment);
+  if (isError) {
+    // Not knowing is not the same as nothing running: say so, so a deploy is not started blind.
+    return (
+      <Alert
+        severity="warning"
+        sx={noticeSx}
+        data-testid="workflow-deploy-unknown"
+        action={
+          <Button size="small" color="inherit" onClick={() => void refetch()}>
+            Retry
+          </Button>
+        }>
+        Couldn&apos;t check whether a deployment to this environment is running.
+      </Alert>
+    );
+  }
   if (isDeploying) {
     return (
       <Alert severity="info" icon={<CircularProgress size={16} />} sx={noticeSx} data-testid="workflow-deploy-running">

@@ -24,9 +24,13 @@ import type { WorkflowDeploy } from '../types/workflowRuntime';
 import { trackWorkflowDeploy, useWorkflowDeploy } from './useWorkflowDeploy';
 
 // What ipaas-service answers for the workflow's deploy to development, read by read.
-const server = vi.hoisted(() => ({ answers: [] as WorkflowDeploy[], reads: 0 }));
+// A read with no answer left fails, as when the BFF can't be reached.
+const server = vi.hoisted(() => ({ answers: [] as WorkflowDeploy[], reads: 0, fail: false }));
 vi.mock('../api/workflowRuntime', () => ({
-  fetchWorkflowDeploy: async () => server.answers[Math.min(server.reads++, server.answers.length - 1)],
+  fetchWorkflowDeploy: async () => {
+    if (server.fail) throw new Error('HTTP 503');
+    return server.answers[Math.min(server.reads++, server.answers.length - 1)];
+  },
 }));
 
 const running: WorkflowDeploy = { environment: 'development', state: 'deploying', operation: 'deploy', startedAt: '2026-11-10T11:33:09Z' };
@@ -54,7 +58,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   // Polls run only while the page has focus.
   focusManager.setFocused(true);
-  Object.assign(server, { answers: [], reads: 0 });
+  Object.assign(server, { answers: [], reads: 0, fail: false });
   qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   container = document.createElement('div');
   root = createRoot(container);
@@ -109,5 +113,40 @@ describe('useWorkflowDeploy', () => {
     await wait(0);
     expect(seen.isDeploying).toBe(false);
     expect(seen.failure?.message).toBe('the workflow runtime is unavailable; try again later');
+  });
+
+  it('holds actions until the first read lands', async () => {
+    server.answers = [deployed];
+    await render();
+    expect(seen.isChecking).toBe(true);
+    expect(seen.isDeploying).toBe(false);
+    await wait(50);
+    expect(seen.isChecking).toBe(false);
+  });
+
+  it('reports a read that failed, rather than nothing running', async () => {
+    server.fail = true;
+    await render();
+    await wait(50);
+    expect(seen.isError).toBe(true);
+    expect(seen.isDeploying).toBe(false);
+    expect(seen.isChecking).toBe(false);
+  });
+
+  it('re-reads the environment once when a deploy ends, however many cards show it', async () => {
+    server.answers = [running, deployed];
+    const invalidate = vi.spyOn(qc, 'invalidateQueries');
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={qc}>
+          <Probe />
+          <Probe />
+        </QueryClientProvider>,
+      ),
+    );
+    await wait(50);
+    await poll();
+    expect(seen.isDeploying).toBe(false);
+    expect(invalidate.mock.calls.filter(([filters]) => JSON.stringify(filters?.queryKey) === '["componentDeployment"]')).toHaveLength(1);
   });
 });
