@@ -49,14 +49,11 @@ import {
   updateContextSource,
 } from '../api/contextEngine';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
-import { everyoneRoles, fromDraft, isEngineProgressActive, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
+import { everyoneRoles, fromDraft, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, toDraft, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
-
-/** An engine's models are set when it is created; the BFF cannot change them yet. */
-export const CONTEXT_ENGINE_MODEL_UPDATES = false;
 
 /** Context Engines: the feature flag on. */
 export function isContextEngineEnabled(): boolean {
@@ -143,18 +140,24 @@ export function useSeenOnScreen<T extends Element>(): [(el: T | null) => void, b
   return [setEl, seen];
 }
 
-/** One engine; checked again while it starts or is being deleted. */
+/** Shown while an engine restarts onto new models and its old pod still runs. */
+export const ENGINE_RESTARTING_REASON = 'Restarting with the new models';
+
+/** One engine; checked again while it starts, restarts or is being deleted. A restart shows the engine as starting until a pod that started after it runs. */
 export function useContextEngine(engineId: string, { pollOnError = false }: { pollOnError?: boolean } = {}) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: [ROOT_KEY, 'detail', engineId],
-    queryFn: () => getContextEngine(engineId),
+    queryFn: async () => withLastKnownFacets(await getContextEngine(engineId), qc.getQueryData<ContextEngineDetail>([ROOT_KEY, 'detail', engineId])),
     enabled: isContextEngineEnabled() && !!engineId,
     retry: false,
+    select: (engine) => (engine.state === 'ready' && isRestartPending(engine.startedAt, engine.restartedAt) ? { ...engine, state: 'starting' as const, statusReason: ENGINE_RESTARTING_REASON } : engine),
     refetchInterval: (query) => {
       if (pollOnError && query.state.status === 'error') return ENGINE_STATUS_POLL_MS;
-      const state = query.state.data?.state;
-      if (state === 'deleting') return DELETION_POLL_MS;
-      return state && TRANSIENT_STATES.has(state) ? ENGINE_STATUS_POLL_MS : false;
+      const engine = query.state.data;
+      if (engine?.state === 'deleting') return DELETION_POLL_MS;
+      if (engine?.state === 'ready' && isRestartPending(engine.startedAt, engine.restartedAt)) return ENGINE_STATUS_POLL_MS;
+      return engine && TRANSIENT_STATES.has(engine.state) ? ENGINE_STATUS_POLL_MS : false;
     },
   });
 }
@@ -170,12 +173,16 @@ export function useContextPermissions(engineId: string) {
   });
 }
 
-/** Replace the engine's models; the engine's page refetches to show the new ones and their key status. */
+/** Save the engine's models and keys, which restarts it; the engine shows as restarting until its new pod runs. */
 export function useUpdateContextModels(engineId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Omit<UpdateContextModelsInput, 'engineId'>) => updateContextModels({ ...input, engineId }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] }),
+    onSuccess: async ({ restartedAt }, input) => {
+      await qc.cancelQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+      qc.setQueryData<ContextEngineDetail>([ROOT_KEY, 'detail', engineId], (engine) => engine && { ...engine, restartedAt, models: modelsAfterUpdate(engine.models, input) });
+      return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
+    },
   });
 }
 

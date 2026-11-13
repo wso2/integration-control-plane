@@ -25,9 +25,10 @@ import type { ContextEngineDetail } from '../types/contextEngine';
 vi.mock('../api/contextEngine', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/contextEngine')>()),
   setContextEngineAccess: async () => ({ api: true, mcp: false }),
+  updateContextModels: async () => ({ restartedAt: '2026-11-12T00:00:00Z' }),
 }));
 
-import { useSetContextEngineAccess } from './useContextEngine';
+import { useSetContextEngineAccess, useUpdateContextModels } from './useContextEngine';
 
 describe('useSetContextEngineAccess', () => {
   it('puts the access the engine acknowledged into its cached detail', async () => {
@@ -50,6 +51,35 @@ describe('useSetContextEngineAccess', () => {
     );
     await act(() => hook.mutateAsync({ mcp: false }));
     expect(client.getQueryData<ContextEngineDetail>(key)).toMatchObject({ access: { api: true, mcp: false }, exposure: { api: true, mcp: false, answers: true } });
+    act(() => root.unmount());
+  });
+});
+
+describe('useUpdateContextModels', () => {
+  it('keeps the restart when an older detail read lands after the save', async () => {
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    const key = ['contextEngines', 'detail', 'e'];
+    const client = new QueryClient();
+    const before = { id: 'e', models: { embedding: null, llm: { provider: 'openai', model: 'a' }, answer: null } } as unknown as ContextEngineDetail;
+    client.setQueryData(key, before);
+    let land!: (engine: ContextEngineDetail) => void;
+    void client.prefetchQuery({ queryKey: key, queryFn: () => new Promise<ContextEngineDetail>((resolve) => (land = resolve)) });
+    let hook!: ReturnType<typeof useUpdateContextModels>;
+    function Probe() {
+      hook = useUpdateContextModels('e');
+      return null;
+    }
+    const root = createRoot(document.createElement('div'));
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <Probe />
+        </QueryClientProvider>,
+      ),
+    );
+    await act(() => hook.mutateAsync({ ingestion: { provider: 'openai', model: 'b' } }));
+    await act(async () => land(before));
+    expect(client.getQueryData<ContextEngineDetail>(key)).toMatchObject({ restartedAt: '2026-11-12T00:00:00Z', models: { llm: { model: 'b' } } });
     act(() => root.unmount());
   });
 });

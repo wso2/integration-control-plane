@@ -33,6 +33,7 @@ import {
   deliveryIdentity,
   engineMessage,
   integrationTypeFor,
+  isRestartPending,
   ownerGrantId,
   roleGrantId,
   rolesFromGrants,
@@ -110,8 +111,6 @@ async function viaBff<T>(call: () => Promise<T>): Promise<T> {
 const V1 = '/v1';
 /** Grants on the engine itself; every engine uses the same root resource. */
 const grantsPath = (): string => `${V1}/resources/${encodeURIComponent(CONTEXT_ENGINE_ID)}/grants`;
-
-const provisioningRefused = (what: string): Error => new Error(`${what} is not supported yet: an engine keeps the models it was created with.`);
 
 // ── Raw wire shapes — private to this file ──────────────────────────────────
 
@@ -240,6 +239,9 @@ interface BffEngine {
   publicApiUrl?: string;
   apiEnabled?: boolean;
   mcpEnabled?: boolean;
+  startedAt?: string;
+  restartedAt?: string;
+  answerOwnKey?: boolean;
 }
 
 interface BffIntegration {
@@ -320,6 +322,8 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   createdAt: raw.createdAt ?? '',
   ...(raw.publicApiUrl ? { publicApiUrl: raw.publicApiUrl.replace(/\/+$/, '') } : {}),
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
+  ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
+  ...(raw.restartedAt ? { restartedAt: raw.restartedAt } : {}),
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -341,7 +345,7 @@ const toEvidence = (raw: RawEvidence): ContextEvidence => ({
 
 const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary | null => (raw ? { provider: raw.provider, model: raw.model } : null);
 
-/** The environment's models; they change only by redeploying the engine, so nothing here is editable. */
+/** The engine's models; changing them restarts the engine. */
 const toModels = (raw: RawEngineConfig | null): ContextEngineModels => ({
   embedding: toModel(raw?.models?.embedding),
   llm: toModel(raw?.models?.llm),
@@ -535,8 +539,9 @@ export async function getContextEngineSummary(engineId: string): Promise<Context
 
 /** The engine with its sources, models, query roles and exposure. Until it runs, only what the BFF knows. */
 export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
-  const engine = toEngine(await viaBff(() => bff.get<BffEngine>(enginePath(engineId))));
-  if (engine.state !== 'ready') {
+  const raw = await viaBff(() => bff.get<BffEngine>(enginePath(engineId)));
+  const engine = toEngine(raw);
+  if (engine.state !== 'ready' || isRestartPending(engine.startedAt, engine.restartedAt)) {
     return { ...engine, sources: [], models: toModels(null), queryRoles: [], exposure: toExposure(null, engine.access), storage: null };
   }
   const { engine: config, sources, grants } = await fetchEngineFacets(engineId);
@@ -544,7 +549,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     ...engine,
     description: engine.description || config?.description || '',
     sources: sources.map(toSource),
-    models: toModels(config),
+    models: { ...toModels(config), ...(typeof raw.answerOwnKey === 'boolean' ? { answerOwnKey: raw.answerOwnKey } : {}) },
     queryRoles: rolesFromGrants(grants.map(toGrant)),
     exposure: toExposure(config, engine.access),
     storage: toStorage(config),
@@ -615,9 +620,10 @@ export async function deleteContextEngine(engineId: string): Promise<void> {
   forgetConsoleAccess(engineId);
 }
 
-/** The BFF cannot change an engine's models yet. */
-export async function updateContextModels(_input: UpdateContextModelsInput): Promise<ContextEngineModels> {
-  throw provisioningRefused('Changing the models');
+/** PUT /context-engines/{engine}/models: saves the models and starts the engine's restart, which ends after the call returns. */
+export async function updateContextModels({ engineId, ...input }: UpdateContextModelsInput): Promise<{ restartedAt: string }> {
+  const raw = await viaBff(() => bff.put<{ restartedAt: string }>(`${enginePath(engineId)}/models`, input));
+  return { restartedAt: raw.restartedAt };
 }
 
 // ── Integrations and API keys (BFF) ─────────────────────────────────────────

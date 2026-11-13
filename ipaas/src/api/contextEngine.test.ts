@@ -32,7 +32,7 @@ vi.mock('./_client', async (importOriginal) => ({ ...(await importOriginal<typeo
 vi.mock('./_contextEngineAccess', async (importOriginal) => ({ ...(await importOriginal<typeof import('./_contextEngineAccess')>()), engineRequest }));
 
 import { BffError } from './_client';
-import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, setUpContextEngine, toEngineManagedServer } from './contextEngine';
+import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, setUpContextEngine, toEngineManagedServer, updateContextModels } from './contextEngine';
 import type { ContextSourceConfig, CreateContextEngineInput } from '../types/contextEngine';
 
 const ENGINE = 'docs';
@@ -76,6 +76,24 @@ describe('engines', () => {
 
     expect(engine.access).toEqual({ api: false, mcp: true });
     expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true });
+  });
+
+  it('reads an engine that is restarting from the BFF alone', async () => {
+    const restartedAt = new Date().toISOString();
+    bff.get.mockResolvedValueOnce({ ...bffEngine, startedAt: '2026-11-06T09:00:00Z', restartedAt });
+
+    const engine = await getContextEngine(ENGINE);
+
+    expect(engine).toMatchObject({ state: 'ready', startedAt: '2026-11-06T09:00:00Z', restartedAt, sources: [] });
+    expect(engineRequest).not.toHaveBeenCalled();
+  });
+
+  it('saves the models through the BFF and returns when the restart began', async () => {
+    bff.put.mockResolvedValueOnce({ restartedAt: '2026-11-11T09:00:00Z' });
+    const input = { embeddingKey: 'sk-new' };
+
+    await expect(updateContextModels({ engineId: ENGINE, ...input })).resolves.toEqual({ restartedAt: '2026-11-11T09:00:00Z' });
+    expect(bff.put).toHaveBeenCalledWith('/context-engines/docs/models', input);
   });
 
   it('sets access through the BFF', async () => {
