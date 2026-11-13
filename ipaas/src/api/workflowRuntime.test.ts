@@ -16,8 +16,14 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
-import { acceptedWorkflowDeploy, toWorkflowDeploy, toWorkflowRuntime } from './workflowRuntime';
+import { describe, expect, it, vi } from 'vitest';
+import { acceptedWorkflowDeploy, fetchWorkflowDeploy, toWorkflowDeploy, toWorkflowRuntime } from './workflowRuntime';
+
+const bffGet = vi.hoisted(() => vi.fn());
+vi.mock('./_client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./_client')>();
+  return { ...actual, bff: { ...actual.bff, get: bffGet } };
+});
 
 describe('toWorkflowRuntime', () => {
   it('maps the server name and namespaces', () => {
@@ -66,5 +72,18 @@ describe('toWorkflowDeploy', () => {
       operation: 'promote',
       message: 'the workflow runtime is unavailable; try again later',
     });
+  });
+});
+
+describe('fetchWorkflowDeploy', () => {
+  it('reads an empty answer as no deploy', async () => {
+    bffGet.mockResolvedValueOnce(null);
+    await expect(fetchWorkflowDeploy('orders', 'development')).resolves.toEqual({ environment: 'development', state: 'none' });
+  });
+
+  it('reads the status of the environment it asked for', async () => {
+    bffGet.mockResolvedValueOnce({ environment: 'development', state: 'deploying', operation: 'deploy' });
+    await expect(fetchWorkflowDeploy('orders', 'development')).resolves.toMatchObject({ state: 'deploying' });
+    expect(bffGet).toHaveBeenLastCalledWith('/components/orders/workflow-deploy?environment=development');
   });
 });

@@ -1146,13 +1146,14 @@ function GenericServiceConfigureDrawer({
   // A field marked invalid before its link loaded is no longer the form's to fill.
   const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
-  // A workflow deploys after Apply's answer: while one to this environment runs, or the read
-  // that tells whether one is, Apply holds, rather than saving values a refused deploy won't apply.
+  // A workflow deploys after Apply's answer: while one to this environment runs, Apply holds and
+  // says so, rather than saving values a refused deploy won't apply. While the read that tells
+  // whether one is running is out, Apply is only disabled: nothing is being applied yet.
   const { isDeploying: workflowDeploying, isChecking: workflowChecking } = useWorkflowDeploy(componentId, envId, isWorkflow && open);
-  const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending || workflowDeploying || workflowChecking;
+  const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending || workflowDeploying;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === lastStep ? (workflowDeploying ? 'Deploying…' : isApplying ? 'Applying…' : 'Apply') : step === 1 && generateEp.isPending ? 'Loading…' : 'Next';
-  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
+  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && (isApplying || workflowChecking));
   const showFooter = !(step === lastStep && managingEp !== null);
 
   return (
