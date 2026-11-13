@@ -17,7 +17,7 @@
  */
 
 import { QueryClient, QueryClientProvider, useMutation } from '@tanstack/react-query';
-import { act, useEffect, type ReactNode } from 'react';
+import { StrictMode, act, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, useNavigate } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,23 +35,27 @@ const auth = vi.hoisted(() => ({ userId: 'user-1' }));
 vi.mock('../auth', () => ({ useAuth: () => auth }));
 
 import { ConsoleAction } from '../services/telemetry/consoleActions';
-import { resetSessionForTest, useFormAbandonment, useMutationErrorTracking, usePageViewTracking, useSessionAnalytics } from './useConsoleAnalytics';
+import { resetSessionForTest, useConsoleActionWhen, useFormAbandonment, useMutationErrorTracking, usePageViewTracking, useSessionAnalytics } from './useConsoleAnalytics';
 
-let unmount: () => void = () => {};
+let unmount: () => Promise<void> = async () => {};
 let client: QueryClient;
 
-async function render(ui: ReactNode, path = '/'): Promise<void> {
+async function render(ui: ReactNode, path = '/', { strict = false } = {}): Promise<void> {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const container = document.createElement('div');
   const root = createRoot(container);
-  await act(async () =>
-    root.render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
-      </QueryClientProvider>,
-    ),
+  const tree = (
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+    </QueryClientProvider>
   );
-  unmount = () => act(() => root.unmount());
+  await act(async () => root.render(strict ? <StrictMode>{tree}</StrictMode> : tree));
+  // An unmount is reported a task later (see useFormAbandonment), so wait for that task too.
+  unmount = async () => {
+    act(() => root.unmount());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    unmount = async () => {};
+  };
 }
 
 const calls = (action: string) => track.mock.calls.filter(([name]) => name === action).map(([, dims]) => dims);
@@ -86,6 +90,15 @@ describe('usePageViewTracking', () => {
     ]);
     expect(JSON.stringify(track.mock.calls)).not.toMatch(/acme|shop/);
   });
+
+  it('reports one page view per location under StrictMode', async () => {
+    await render(<Pages />, '/organizations/acme', { strict: true });
+    await act(async () => go('/organizations/acme/projects/shop/home'));
+    expect(calls(ConsoleAction.PageView)).toEqual([
+      { route: '/organizations/:orgHandler', entity_scope: 'organization', referrer_route: undefined },
+      { route: '/organizations/:orgHandler/projects/:projectHandler/home', entity_scope: 'project', referrer_route: '/organizations/:orgHandler' },
+    ]);
+  });
 });
 
 describe('useSessionAnalytics', () => {
@@ -97,7 +110,7 @@ describe('useSessionAnalytics', () => {
   it('reports the session start once per tab, however often the shell mounts', async () => {
     resetSessionForTest();
     await render(<Session />);
-    unmount();
+    await unmount();
     await render(<Session />);
 
     expect(calls(ConsoleAction.SessionStart)).toHaveLength(1);
@@ -106,7 +119,7 @@ describe('useSessionAnalytics', () => {
   it('reports the first session only once per user', async () => {
     resetSessionForTest();
     await render(<Session />);
-    unmount();
+    await unmount();
     resetSessionForTest();
     await render(<Session />);
 
@@ -165,6 +178,26 @@ describe('useMutationErrorTracking', () => {
   });
 });
 
+describe('useConsoleActionWhen', () => {
+  let show: (shown: boolean) => void = () => {};
+  function EmptyProjects() {
+    const [shown, setShown] = useState(true);
+    useEffect(() => {
+      show = setShown;
+    }, []);
+    useConsoleActionWhen(shown, ConsoleAction.EmptyState, { resource: 'projects', state: 'no-data' });
+    return null;
+  }
+
+  it('reports each showing once, under StrictMode too', async () => {
+    await render(<EmptyProjects />, '/', { strict: true });
+    expect(calls(ConsoleAction.EmptyState)).toHaveLength(1);
+    await act(async () => show(false));
+    await act(async () => show(true));
+    expect(calls(ConsoleAction.EmptyState)).toHaveLength(2);
+  });
+});
+
 describe('useFormAbandonment', () => {
   function Form({ children }: { children?: ReactNode }) {
     useFormAbandonment('project', 'create-project');
@@ -173,7 +206,7 @@ describe('useFormAbandonment', () => {
 
   it('reports leaving the form without creating anything', async () => {
     await render(<Form />);
-    unmount();
+    await unmount();
     expect(calls(ConsoleAction.FormAbandoned)).toEqual([{ entity: 'project', seconds_on_form: 0 }]);
   });
 
@@ -184,7 +217,7 @@ describe('useFormAbandonment', () => {
       </Form>,
     );
     await act(async () => mutate());
-    unmount();
+    await unmount();
     expect(calls(ConsoleAction.FormAbandoned)).toEqual([]);
   });
 
@@ -195,15 +228,23 @@ describe('useFormAbandonment', () => {
       </Form>,
     );
     await act(async () => mutate());
-    unmount();
+    await unmount();
     expect(calls(ConsoleAction.FormAbandoned)).toHaveLength(1);
   });
 
   it('reports when the tab closes, and only once', async () => {
     await render(<Form />);
     window.dispatchEvent(new Event('pagehide'));
-    unmount();
+    await unmount();
     expect(calls(ConsoleAction.FormAbandoned)).toHaveLength(1);
+  });
+
+  it('does not count StrictMode remounting the page as leaving it', async () => {
+    await render(<Form />, '/', { strict: true });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(calls(ConsoleAction.FormAbandoned)).toEqual([]);
+    await unmount();
+    expect(calls(ConsoleAction.FormAbandoned)).toEqual([{ entity: 'project', seconds_on_form: 0 }]);
   });
 
   it('sends the report at once when the tab closes, since no timed flush will run', async () => {

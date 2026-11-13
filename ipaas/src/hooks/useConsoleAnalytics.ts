@@ -34,7 +34,11 @@ import type { FunnelOperation } from '../types/telemetry';
 export function usePageViewTracking(routes: RouteNode[]): void {
   const { pathname } = useLocation();
   const previous = useRef<string | undefined>(undefined);
+  const reportedPath = useRef<string | undefined>(undefined);
   useEffect(() => {
+    // StrictMode runs a mount effect twice; one location is one page view.
+    if (reportedPath.current === pathname) return;
+    reportedPath.current = pathname;
     const route = routeTemplate(routes, pathname);
     trackConsoleAction(ConsoleAction.PageView, { route, entity_scope: entityScopeOf(route), referrer_route: previous.current });
     previous.current = route;
@@ -131,16 +135,23 @@ export function useMutationErrorTracking(): void {
  */
 export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOperation): void {
   const queryClient = useQueryClient();
+  const visit = useRef<{ openedAt: number; done: boolean } | undefined>(undefined);
+  const pendingLeave = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    const openedAt = Date.now();
-    let done = false;
+    // An unmount counts only once the effect has not run again in the same task. StrictMode unmounts and remounts a
+    // page at once, and that is the same visit, not one abandoned at 0 seconds and another started.
+    const resumed = pendingLeave.current !== undefined ? visit.current : undefined;
+    clearTimeout(pendingLeave.current);
+    pendingLeave.current = undefined;
+    const current = resumed ?? { openedAt: Date.now(), done: false };
+    visit.current = current;
     const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
-      if (event.type === 'updated' && event.action.type === 'success' && event.mutation.meta?.operation === operation) done = true;
+      if (event.type === 'updated' && event.action.type === 'success' && event.mutation.meta?.operation === operation) current.done = true;
     });
     const report = () => {
-      if (done) return;
-      done = true;
-      trackConsoleAction(ConsoleAction.FormAbandoned, { entity, seconds_on_form: Math.round((Date.now() - openedAt) / 1000) });
+      if (current.done) return;
+      current.done = true;
+      trackConsoleAction(ConsoleAction.FormAbandoned, { entity, seconds_on_form: Math.round((Date.now() - current.openedAt) / 1000) });
     };
     // The page is going away, so the next timed flush never comes: send it now.
     const reportOnPageHide = () => {
@@ -151,7 +162,10 @@ export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOpe
     return () => {
       unsubscribe();
       window.removeEventListener('pagehide', reportOnPageHide);
-      report();
+      pendingLeave.current = setTimeout(() => {
+        pendingLeave.current = undefined;
+        report();
+      }, 0);
     };
   }, [queryClient, entity, operation]);
 }
@@ -163,7 +177,16 @@ export function useFormAbandonment(entity: AbandonedEntity, operation: FunnelOpe
 export function useConsoleActionWhen<A extends ConsoleActionName>(when: boolean, action: A, dimensions: ConsoleActionDimensions[A]): void {
   const latest = useRef(dimensions);
   latest.current = dimensions;
+  // The action reported for the current stretch of `when`: StrictMode runs a mount effect twice, and that is still
+  // one showing.
+  const reported = useRef<A | undefined>(undefined);
   useEffect(() => {
-    if (when) trackConsoleAction(action, latest.current);
+    if (!when) {
+      reported.current = undefined;
+      return;
+    }
+    if (reported.current === action) return;
+    reported.current = action;
+    trackConsoleAction(action, latest.current);
   }, [when, action]);
 }
