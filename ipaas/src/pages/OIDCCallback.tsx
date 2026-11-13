@@ -28,6 +28,7 @@ import { loginUrl, projectHomeUrl, projectsRedirectUrl } from '../paths';
 import { trackEvent } from '../services/tracking/tracking';
 import { stripBase, withBase } from '../utils/basePath';
 import { local } from '../utils/storage';
+import { readLastProject } from '../utils/lastProject';
 
 export default function OIDCCallback(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -80,16 +81,13 @@ export default function OIDCCallback(): JSX.Element {
           // Try to navigate to the last visited project (for existing users)
           let navigatedToLastProject = false;
           try {
-            // 1. Try the last-visited project stored by AppLayout
-            const lastProjectRaw = local.get(`last_project:${userId}`);
-            if (lastProjectRaw) {
-              const { org, project } = JSON.parse(lastProjectRaw) as { org: string; project: string };
-              if (org === orgHandle && project) {
-                // Mark ToS accepted — this user has already been through onboarding
-                local.set(`tos_accepted:${userId}:${orgHandle}`, 'true');
-                navigate(projectHomeUrl(orgHandle, project), { replace: true });
-                navigatedToLastProject = true;
-              }
+            // 1. The project last opened, in this console or another WSO2 Cloud platform.
+            const lastProject = readLastProject();
+            if (lastProject) {
+              // Mark ToS accepted — this user has already been through onboarding
+              local.set(`tos_accepted:${userId}:${orgHandle}`, 'true');
+              navigate(projectHomeUrl(orgHandle, lastProject), { replace: true });
+              navigatedToLastProject = true;
             }
 
             // 2. No stored last project — fetch from API and use the most recently updated one.

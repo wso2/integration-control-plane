@@ -64,9 +64,7 @@ describe('local — values left by a build from before the prefix', () => {
   });
 
   it('copies the keyed forms too', () => {
-    localStorage.setItem('last_project:u1', '{"org":"acme"}');
     localStorage.setItem('persona:u1:acme', 'developer');
-    expect(local.get('last_project:u1')).toBe('{"org":"acme"}');
     expect(local.get('persona:u1:acme')).toBe('developer');
   });
 

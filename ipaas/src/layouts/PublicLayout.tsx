@@ -21,26 +21,15 @@ import { Box, ColorSchemeToggle, Layout, ParticleBackground, Stack } from '@wso2
 import type { JSX } from 'react';
 import { useAuth } from '../auth';
 import { orgHomeUrl, projectHomeUrl } from '../paths';
-import { local } from '../utils/storage';
+import { readLastProject } from '../utils/lastProject';
 
 export default function PublicLayout(): JSX.Element {
-  const { isAuthenticated, userId, orgHandle } = useAuth();
+  const { isAuthenticated, orgHandle } = useAuth();
 
   // A signed-in session always carries its org, so the public pages hand over to it.
   if (isAuthenticated) {
-    // Restore the last visited project if it belongs to the session's org
-    try {
-      const lastProjectRaw = local.get(`last_project:${userId}`);
-      if (lastProjectRaw) {
-        const { org: lastOrg, project } = JSON.parse(lastProjectRaw) as { org: string; project: string };
-        if (lastOrg === orgHandle && project) {
-          return <Navigate to={projectHomeUrl(orgHandle, project)} replace />;
-        }
-      }
-    } catch {
-      /* ignore malformed data */
-    }
-
+    const lastProject = readLastProject();
+    if (lastProject) return <Navigate to={projectHomeUrl(orgHandle, lastProject)} replace />;
     return <Navigate to={orgHomeUrl(orgHandle)} replace />;
   }
 

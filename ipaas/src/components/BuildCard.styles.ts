@@ -40,6 +40,6 @@ export const logsButtonSx = {
   ml: 'auto',
 } as const;
 
-// The gap above the divider lives inside the log panel's Collapse, so it closes with the panel
+// The gap above the logs lives inside the log panel's Collapse, so it closes with the panel
 // instead of snapping shut the moment the logs are hidden.
-export const dividerSx = { mt: 1.5, mb: 2 } as const;
+export const logsSx = { pt: 2 } as const;

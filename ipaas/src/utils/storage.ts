@@ -31,7 +31,7 @@ export function prefixed(key: string): string {
 
 /**
  * Keys an earlier, unprefixed build of this console wrote, whose value is worth keeping across
- * the upgrade: the active organization, the last project, and display preferences.
+ * the upgrade: the active organization and display preferences.
  *
  * Deliberately not here. On a shared origin an unprefixed slot may hold another console's value,
  * so nothing is adopted that would carry weight if it did:
@@ -39,7 +39,7 @@ export function prefixed(key: string): string {
  * - `tos_accepted:*` records this console's own consent, which is not another console's to give;
  * - `redirect_url` becomes a navigation target on the next sign-in.
  */
-const MIGRATABLE = [/^org_handle$/, /^last_project:/, /^persona:/, /^sidebar:collapsed$/, /^feature_preview$/];
+const MIGRATABLE = [/^org_handle$/, /^persona:/, /^sidebar:collapsed$/, /^feature_preview$/];
 
 interface ScopedStorage {
   get(key: string): string | null;
@@ -82,3 +82,13 @@ export const local = scoped(() => localStorage, MIGRATABLE);
 
 /** This console's sessionStorage, for values that belong to one tab. Nothing is adopted here. */
 export const session = scoped(() => sessionStorage, []);
+
+/**
+ * localStorage under the names the WSO2 Cloud consoles agreed on, stored as given: the other
+ * consoles on this origin read and write the same keys.
+ */
+export const shared: ScopedStorage = {
+  get: (key) => localStorage.getItem(key),
+  set: (key, value) => localStorage.setItem(key, value),
+  remove: (key) => localStorage.removeItem(key),
+};

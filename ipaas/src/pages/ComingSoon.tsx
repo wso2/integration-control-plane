@@ -20,7 +20,7 @@ import { Box, Button, PageContent, Stack, Typography, type SxProps, type Theme }
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { artSx, descriptionSx, inlineArtSx, inlineSx, pageSx, textStackSx } from './ComingSoon.styles';
+import { artSx, descriptionSx, inlineArtSx, inlineSx, pageSx, textStackSx, unavailableArtSx } from './ComingSoon.styles';
 
 const HEADING = 'Coming soon';
 
@@ -73,6 +73,23 @@ function ClockArt({ sx }: { sx: SxProps<Theme> }): JSX.Element {
   );
 }
 
+/** The illustration for what will never be here: the same frame, closed, round a no-entry sign that draws itself in. */
+function UnavailableArt({ sx }: { sx: SxProps<Theme> }): JSX.Element {
+  return (
+    <Box sx={sx}>
+      <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="auto" role="img" aria-label="A no-entry sign">
+        <circle cx="100" cy="100" r="92" fill="currentColor" fillOpacity="0.04" />
+        <circle cx="100" cy="100" r="74" fill="currentColor" fillOpacity="0.05" />
+        <circle className="cs-ring" cx="100" cy="100" r="84" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="0.5 7" />
+        <circle cx="100" cy="100" r="66" stroke="currentColor" strokeOpacity="0.09" strokeWidth="7" />
+        <circle cx="100" cy="100" r="52" fill="var(--oxygen-palette-background-paper, #fff)" />
+        <circle className="na-sign" cx="100" cy="100" r="28" stroke="currentColor" strokeOpacity="0.85" strokeWidth="6" pathLength="1" strokeDasharray="1" />
+        <line className="na-slash" x1="80.2" y1="80.2" x2="119.8" y2="119.8" stroke="currentColor" strokeOpacity="0.85" strokeWidth="6" strokeLinecap="round" pathLength="1" strokeDasharray="1" />
+      </svg>
+    </Box>
+  );
+}
+
 /**
  * "Coming soon" for a panel inside a page: smaller, and with no way back since the page stays. `action` offers what
  * can be done meanwhile.
@@ -92,15 +109,13 @@ export function ComingSoonInline({ title = HEADING, description, action }: { tit
   );
 }
 
-export default function ComingSoon({ title = HEADING, description = 'This feature is currently under development. Check back soon!' }: ComingSoonProps): JSX.Element {
+function StatePage({ art, title, description }: { art: JSX.Element; title: string; description: string }): JSX.Element {
   const navigate = useAppNavigate();
 
   return (
     <PageContent fullWidth sx={pageSx}>
       <Stack alignItems="center" gap={3} sx={textStackSx}>
-        {/* Illustration: the wait itself — a dotted ring drifting round a clock whose second
-            hand sweeps. Sized tight to the art so the text sits close beneath it. */}
-        <ClockArt sx={artSx} />
+        {art}
 
         <Stack alignItems="center" gap={0.75}>
           <Typography variant="h4" fontWeight={700}>
@@ -117,4 +132,13 @@ export default function ComingSoon({ title = HEADING, description = 'This featur
       </Stack>
     </PageContent>
   );
+}
+
+/** For what this integration will never have, such as a build step for one deployed from an image. */
+export function NotAvailable({ title, description }: { title: string; description: string }): JSX.Element {
+  return <StatePage art={<UnavailableArt sx={unavailableArtSx} />} title={title} description={description} />;
+}
+
+export default function ComingSoon({ title = HEADING, description = 'This feature is currently under development. Check back soon!' }: ComingSoonProps): JSX.Element {
+  return <StatePage art={<ClockArt sx={artSx} />} title={title} description={description} />;
 }

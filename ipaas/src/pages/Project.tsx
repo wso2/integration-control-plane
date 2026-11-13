@@ -55,7 +55,7 @@ import {
 } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX, SEARCH_STANDARD_WIDTH_SX } from '../constants/styles';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
-import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search } from '@wso2/oxygen-ui-icons-react';
+import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, Settings } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
 import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
@@ -1012,7 +1012,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </div>
             </Stack>
           </Stack>
-          {/* Beside the editor, Edit project steps back to a link under it so the editor stays the one prominent action. */}
+          {/* Beside the editor, Project settings steps back to a link under it so the editor stays the one prominent action. */}
           <Stack direction={showEditor ? 'column' : 'row'} alignItems={showEditor ? 'flex-end' : 'center'} gap={showEditor ? 0.5 : 1.5} sx={{ flexShrink: 0 }}>
             {showEditor && (
               <Box sx={{ position: 'relative', flexShrink: 0 }}>
@@ -1080,8 +1080,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </Box>
             )}
             <Authorized permissions={Scopes.PROJECT_UPDATE}>
-              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<Pencil size={14} />} href={cloudConsoleProjectManageUrl(scope.project)} sx={{ whiteSpace: 'nowrap' }}>
-                Edit project
+              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<Settings size={14} />} href={cloudConsoleProjectManageUrl(scope.project)} sx={{ whiteSpace: 'nowrap' }}>
+                Project settings
               </Button>
             </Authorized>
           </Stack>
