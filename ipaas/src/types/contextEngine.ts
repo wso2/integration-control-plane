@@ -197,6 +197,8 @@ export interface SourceFieldDef {
   verbatim?: boolean;
   /** Accepted file types for a `file` field, as an input `accept` string (e.g. ".rml.ttl,.ttl"). */
   accept?: string;
+  /** The most characters the value may have. */
+  maxLength?: number;
   /** Render this field only when its condition is met; always shown when absent. */
   showWhen?: SourceFieldCondition;
   /**

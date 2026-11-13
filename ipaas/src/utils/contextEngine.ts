@@ -35,6 +35,7 @@ import {
   LLM_PROVIDERS,
   MCP_CLIENTS,
   RML_MAPPING,
+  RML_MAPPING_KEY,
   PLAYGROUND_SUGGESTIONS,
   PROGRESS_POLL_ACTIVE_MS,
   RETIRED_MODEL_PROVIDER_NAMES,
@@ -151,6 +152,7 @@ export function visibleFields(connector: SourceConnector, values: Record<string,
 export function sourceFieldError(def: SourceFieldDef, value: string | undefined): string {
   const v = (value ?? '').trim();
   if (!v) return def.required ? `${def.label} is required.` : '';
+  if (def.maxLength && v.length > def.maxLength) return `${def.label} must be at most ${def.maxLength.toLocaleString('en-US')} characters.`;
   if (def.kind === 'url' && !isHttpUrl(v)) return 'Enter a full http(s) URL.';
   if (def.valueType === 'integer' && !/^\d+$/.test(v)) return 'Enter a whole number.';
   if (def.valueType === 'number' && !Number.isFinite(Number(v))) return 'Enter a number.';
@@ -1609,16 +1611,18 @@ export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEn
  * `POST …/integrations`: every field the connector shows, secrets included, typed and placed as the
  * integration's settings say. The BFF names the integration and its source with a DNS label. With
  * visibility rules, the integration labels every record with each rule's group; without, the BFF
- * lets every console user see them.
+ * lets every console user see them. A structured connector's RML mapping goes beside its settings.
  */
-export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> } } {
+export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> }; rmlMapping?: string } {
   const audienceMapping = audienceMappingFromRules(source.audience);
   const audience = Object.keys(audienceMapping);
+  const rmlMapping = connectorFor(source.type)?.isStructuredData ? (source.values[RML_MAPPING_KEY] ?? '').trim() : '';
   return {
     name: engineHandleFrom(source.name),
     type,
     settings: integrationSettings(source),
     ...(audience.length ? { source: { audience, audienceMapping } } : {}),
+    ...(rmlMapping ? { rmlMapping } : {}),
   };
 }
 
