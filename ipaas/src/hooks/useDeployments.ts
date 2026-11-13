@@ -23,7 +23,7 @@ import { fetchComponentByHandler } from '../api/components';
 import { trackEvent } from '../services/tracking/tracking';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { isExposureTransitioning } from '../utils/endpoints';
-import { invalidateEndpointSettings } from './useConsumers';
+import { invalidateAfterDeploy, trackWorkflowDeploy } from './useWorkflowDeploy';
 import { TYPE_TO_KIND } from '../constants/insights';
 import {
   fetchComponentDeployment,
@@ -212,11 +212,11 @@ export function useDeployDeploymentTrack() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: DeployDeploymentTrackInput) => deployDeploymentTrack(input),
-    onSuccess: (_data, input) => {
+    onSuccess: (data, input) => {
       trackEvent('component-deploy');
-      qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId, input.id] });
-      qc.invalidateQueries({ queryKey: ['executionConfigs', input.componentId] });
-      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+      // A workflow's deploy runs after the answer: its status re-reads the environment once it ends.
+      if (data.workflowDeploy) trackWorkflowDeploy(qc, input.componentId, data.workflowDeploy);
+      else invalidateAfterDeploy(qc, input.componentId, input.environmentId);
     },
   });
 }
@@ -237,15 +237,13 @@ export function usePromote() {
   return useMutation({
     mutationKey: ['promote'],
     mutationFn: (input: PromoteInput) => promote(input),
-    onSuccess: (_data, input) => {
+    onSuccess: (data, input) => {
       trackEvent('component-promote');
-      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
-      // The links report what the target's release carries; they follow it until it is the promoted one.
-      qc.invalidateQueries({ queryKey: ['integrationLinks'] });
-      // A promotion carries the source's API settings and visibility to the target.
-      qc.invalidateQueries({ queryKey: ['envEndpoints', input.componentId] });
-      invalidateEndpointSettings(qc, input.componentId, input.targetEnvironmentId);
-      qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId] });
+      // A promotion carries the source's release, API settings and visibility to the target; the
+      // links report what the target's release carries. A workflow's promote runs after the
+      // answer, and its status re-reads the target once it ends.
+      if (data.workflowDeploy) trackWorkflowDeploy(qc, input.componentId, data.workflowDeploy);
+      else invalidateAfterDeploy(qc, input.componentId, input.targetEnvironmentId);
     },
   });
 }

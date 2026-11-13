@@ -21,6 +21,7 @@ import { Workflow } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import WorkflowDeployNotice from '../../Workflows/deploy/WorkflowDeployNotice';
 import WorkflowEnvCardContent from '../../Workflows/overview/WorkflowEnvCardContent';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 
@@ -38,9 +39,11 @@ export default function EnvCardBody(props: EnvCardBodyProps): ReactNode {
   const { component, env, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 } = props;
 
   if (loadingDeployment) return <EnvCardSkeleton />;
+  const notice = <WorkflowDeployNotice componentId={component.id} environment={env.id} />;
   if (!hasDeployment) {
     return (
       <>
+        {notice}
         <Divider sx={{ my: 2 }} />
         <Typography variant="body2" color="text.secondary" sx={notDeployedSx}>
           This integration has not been deployed to this environment yet.
@@ -51,6 +54,7 @@ export default function EnvCardBody(props: EnvCardBodyProps): ReactNode {
 
   return (
     <>
+      {notice}
       <Divider sx={{ my: 2 }} />
       {isDeploymentHealthy(deploymentStatusV2) ? (
         <WorkflowEnvCardContent target={{ componentId: component.id, environmentId: env.id, trackId: versionId, deployment: { releaseId, deploymentStatusV2 }, isDeploymentLoading: false }} />
