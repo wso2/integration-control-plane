@@ -19,13 +19,13 @@
 import { useEffect, type JSX } from 'react';
 import { Button, CircularProgress, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
 import type { ProjectScope } from '../nav';
-import { cloudConsoleProjectManageUrl } from '../paths';
+import { cloudConsoleProjectSettingsUrl } from '../paths';
 
 const waitingSx = { py: 8 } as const;
 
 /** Projects are edited in the WSO2 Cloud console; the old in-console edit URL forwards there. */
 export default function ProjectManageRedirect({ project }: ProjectScope): JSX.Element {
-  const url = cloudConsoleProjectManageUrl(project);
+  const url = cloudConsoleProjectSettingsUrl(project);
   useEffect(() => window.location.replace(url), [url]);
   return (
     <PageContent fullWidth>

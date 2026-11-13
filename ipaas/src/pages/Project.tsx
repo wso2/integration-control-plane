@@ -79,7 +79,7 @@ import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { newComponentUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
-import { cloudConsoleProjectManageUrl, componentOverviewUrl, orgProjectsUrl } from '../paths';
+import { cloudConsoleProjectSettingsUrl, componentOverviewUrl, orgProjectsUrl } from '../paths';
 import { Scopes } from '../constants/permissions';
 import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
@@ -1080,7 +1080,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </Box>
             )}
             <Authorized permissions={Scopes.PROJECT_UPDATE}>
-              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<Settings size={14} />} href={cloudConsoleProjectManageUrl(scope.project)} sx={{ whiteSpace: 'nowrap' }}>
+              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<Settings size={14} />} href={cloudConsoleProjectSettingsUrl(scope.project)} sx={{ whiteSpace: 'nowrap' }}>
                 Project settings
               </Button>
             </Authorized>
