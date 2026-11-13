@@ -21,7 +21,7 @@
  */
 
 export { AuthProvider, useAuth } from './AuthProvider';
-export { authenticatedFetch, getAccessToken, getOrgUuidFromToken, getSession } from './session';
+export { authenticatedFetch, getAccessToken, getOrgUuidFromToken, getSession, refreshTokenExpiringWithin } from './session';
 export type { CloudSession } from './session';
 export { saveRedirectUrl, getAndClearRedirectUrl } from './redirectUrl';
 export { generateAndSaveGitHubState, validateAndClearGitHubState } from './githubState';
