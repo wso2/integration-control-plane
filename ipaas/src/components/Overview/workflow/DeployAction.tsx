@@ -26,12 +26,14 @@ import DeployButton from '../_shared/DeployButton';
  * A workflow's worker has nothing to connect to until the workflow runtime is
  * ready, so its deploy waits for it. A runtime on its way reads as progress; a
  * failed one is explained, with a retry, on the Deploy page. A deploy runs after
- * its request, so one still running holds the button until it ends.
+ * its request, so one still running holds the button until it ends, and so does
+ * the read that tells whether one is.
  */
 export default function DeployAction(props: DeployActionProps): ReactNode {
   const { data: runtime } = useWorkflowRuntime();
-  const { isDeploying } = useWorkflowDeploy(props.component.id, props.env.id);
+  const { isDeploying, isChecking } = useWorkflowDeploy(props.component.id, props.env.id);
   if (isDeploying) return <DeployButton {...props} blockedReason="A deployment to this environment is running" blockedLabel="Deploying…" />;
+  if (isChecking) return <DeployButton {...props} blockedReason="Checking for a running deployment" />;
   if (runtime?.status === 'READY') return <DeployButton {...props} />;
   const preparing = !runtime || runtime.status === 'NOT_PROVISIONED' || runtime.status === 'PROVISIONING';
   return <DeployButton {...props} blockedReason={preparing ? 'Preparing workflow runtime' : 'Workflow runtime unavailable'} blockedLabel={preparing ? 'Preparing workflow runtime' : undefined} />;
