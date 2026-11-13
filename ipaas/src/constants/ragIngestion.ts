@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { AutomationConfig, ChunkingConfig, ChunkingStrategy, DatasourceConfig, DatasourceType, EmbeddingConfig, EmbeddingProvider, GdriveAuthType, VectorStoreConfig, VectorStoreProvider } from '../types/ragIngestion';
+import type { AutomationConfig, ChunkingConfig, ChunkingStrategy, DatasourceConfig, DatasourceType, EmbeddingConfig, EmbeddingProvider, GdriveAuthType, ParsingConfig, VectorStoreConfig, VectorStoreProvider } from '../types/ragIngestion';
 
 const RAG_LOGO_BASE = 'assets/images/rag/';
 const DB_LOGO_BASE = 'assets/images/databases/';
@@ -93,6 +93,9 @@ export const CHUNKING_STRATEGIES: { value: ChunkingStrategy; label: string }[] =
 ];
 
 export const DEFAULT_CHUNKING: ChunkingConfig = { strategy: 'recursive', maxSegmentSize: 1000, maxOverlapSize: 200 };
+
+/** OCR is off by default: it makes ingestion slower. */
+export const DEFAULT_PARSING: ParsingConfig = { ocrEnabled: false };
 
 // ── Retrieval ───────────────────────────────────────────────────────────────
 

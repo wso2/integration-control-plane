@@ -20,7 +20,7 @@ import { AZURE_DEFAULT_API_VERSION, CHUNKING_STRATEGIES, DATASOURCES, DEFAULT_CH
 import type { EndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import { httpStatusOf } from './apiErrors';
 import type { KnowledgeBase, KnowledgeBaseApiStatus, KnowledgeBaseSettings } from '../types/knowledgeBase';
-import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, VectorStoreConfig } from '../types/ragIngestion';
+import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, ParsingConfig, VectorStoreConfig } from '../types/ragIngestion';
 import { datasourceEnvVars, embeddingEnvVars, isEmbeddingValid, isVectorStoreValid, vectorStoreEnvVars } from './ragIngestion';
 
 // Matches the BFF's name rule: a valid integration name with room for the
@@ -81,16 +81,17 @@ function split(env: Record<string, string>): KnowledgeBaseSettings {
 
 /**
  * The knowledge base's settings, as the KB Service and every data source read
- * them. Chunking travels with the knowledge base: every source must cut
- * documents the same way for retrieval to compare like with like.
+ * them. Chunking and parsing travel with the knowledge base: every source must
+ * cut and read documents the same way for retrieval to compare like with like.
  */
-export function buildKnowledgeBaseSettings(vectorStore: VectorStoreConfig, embedding: EmbeddingConfig, chunking: ChunkingConfig): KnowledgeBaseSettings {
+export function buildKnowledgeBaseSettings(vectorStore: VectorStoreConfig, embedding: EmbeddingConfig, chunking: ChunkingConfig, parsing: ParsingConfig): KnowledgeBaseSettings {
   return split({
     ...vectorStoreEnvVars(vectorStore),
     ...embeddingEnvVars(embedding),
     CHUNKING_STRATEGY: chunking.strategy,
     MAX_SEGMENT_SIZE: String(chunking.maxSegmentSize),
     MAX_OVERLAP_SIZE: String(chunking.maxOverlapSize),
+    ENABLE_OCR: String(parsing.ocrEnabled),
   });
 }
 
@@ -143,6 +144,16 @@ export function chunkingFromConfig(config: Record<string, string>): ChunkingConf
   return { strategy, maxSegmentSize: num(config.MAX_SEGMENT_SIZE, DEFAULT_CHUNKING.maxSegmentSize), maxOverlapSize: num(config.MAX_OVERLAP_SIZE, DEFAULT_CHUNKING.maxOverlapSize) };
 }
 
+/** Reads ENABLE_OCR as the services do: only "true", in any case, is on. */
+export function parsingFromConfig(config: Record<string, string>): ParsingConfig {
+  return { ocrEnabled: (config.ENABLE_OCR ?? '').trim().toLowerCase() === 'true' };
+}
+
+/** Whether the knowledge base predates the OCR setting. */
+export function isOcrUnset(config: Record<string, string>): boolean {
+  return !(config.ENABLE_OCR ?? '').trim();
+}
+
 // The form field holding each secret, so a stored secret can stand in for an empty field.
 const VECTOR_STORE_SECRET_FIELD: Partial<Record<VectorStoreConfig['provider'], { field: string; key: string }>> = {
   pinecone: { field: 'apiKey', key: 'PINECONE_APIKEY' },
@@ -180,6 +191,7 @@ export interface KnowledgeBaseSummary {
   collection: string;
   embedding: string;
   chunking: string;
+  ocr: string;
 }
 
 export function knowledgeBaseSummary(config: Record<string, string>): KnowledgeBaseSummary {
@@ -192,6 +204,7 @@ export function knowledgeBaseSummary(config: Record<string, string>): KnowledgeB
     collection: config.COLLECTION_NAME ?? '',
     embedding: [embeddingProvider, config.EMBEDDING_MODEL].filter(Boolean).join(' · '),
     chunking: `${strategy} · ${chunking.maxSegmentSize} / ${chunking.maxOverlapSize}`,
+    ocr: parsingFromConfig(config).ocrEnabled ? 'On' : 'Off',
   };
 }
 

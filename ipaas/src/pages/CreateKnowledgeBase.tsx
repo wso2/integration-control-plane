@@ -26,10 +26,10 @@ import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
-import { DATASOURCES, DEFAULT_CHUNKING } from '../constants/ragIngestion';
+import { DATASOURCES, DEFAULT_CHUNKING, DEFAULT_PARSING } from '../constants/ragIngestion';
 import { buildDataSourceSettings, buildKnowledgeBaseSettings, dataSourceNameFor, isNameValid, type NameFields } from '../utils/knowledgeBase';
 import { isChunkingValid, isDatasourceValid, isEmbeddingValid, isVectorStoreValid } from '../utils/ragIngestion';
-import type { ChunkingConfig, DatasourceConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
+import type { ChunkingConfig, DatasourceConfig, EmbeddingConfig, ParsingConfig, VectorStoreConfig } from '../types/ragIngestion';
 import type { CreateKnowledgeBaseDataSourceInput } from '../types/knowledgeBase';
 import { useScheduleForm } from '../components/Overview/_shared/useScheduleForm';
 import VerticalStepper from '../components/VerticalStepper';
@@ -41,7 +41,7 @@ import DatasourceStep from '../components/KnowledgeBase/steps/DatasourceStep';
 import IngestionScheduleStep, { type IngestionMode } from '../components/KnowledgeBase/steps/IngestionScheduleStep';
 import { wizardActionsSx, wizardBodySx, wizardLayoutSx, wizardStepperSx } from './KnowledgeBase.styles';
 
-const STEPS = ['Name', 'Vector Store', 'Embedding Model', 'Chunking', 'Data Source', 'Ingestion Schedule'];
+const STEPS = ['Name', 'Vector Store', 'Embedding Model', 'Chunking and Parsing', 'Data Source', 'Ingestion Schedule'];
 const DATA_SOURCE_STEP = 4;
 const LAST_STEP = STEPS.length - 1;
 
@@ -69,6 +69,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
   const [vectorStore, setVectorStore] = useState<VectorStoreConfig | null>(null);
   const [embedding, setEmbedding] = useState<EmbeddingConfig | null>(null);
   const [chunking, setChunking] = useState<ChunkingConfig>(DEFAULT_CHUNKING);
+  const [parsing, setParsing] = useState<ParsingConfig>(DEFAULT_PARSING);
   const [datasource, setDatasource] = useState<DatasourceConfig | null>(null);
   const [mode, setMode] = useState<IngestionMode>('scheduled');
   const schedule = useScheduleForm(null, usePlanAccess(), SCHEDULE_POLICIES.ingestion);
@@ -90,7 +91,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
       };
     }
     create.mutate(
-      { name: names.name, displayName: names.displayName.trim(), description: names.description.trim(), ...buildKnowledgeBaseSettings(vectorStore, embedding, chunking), dataSource },
+      { name: names.name, displayName: names.displayName.trim(), description: names.description.trim(), ...buildKnowledgeBaseSettings(vectorStore, embedding, chunking, parsing), dataSource },
       { onSuccess: (kb) => navigate(knowledgeBaseUrl(scope, kb.name)) },
     );
   };
@@ -110,7 +111,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
         {step === 0 && <NameStep heading="Name the Knowledge Base" value={names} onChange={setNames} />}
         {step === 1 && <VectorStoreStep value={vectorStore} onChange={setVectorStore} />}
         {step === 2 && <EmbeddingModelStep value={embedding} onChange={setEmbedding} />}
-        {step === 3 && <ChunkingStep value={chunking} onChange={setChunking} />}
+        {step === 3 && <ChunkingStep value={chunking} onChange={setChunking} parsing={parsing} onParsingChange={setParsing} />}
         {step === DATA_SOURCE_STEP && (
           <>
             <DatasourceStep value={datasource} onChange={setDatasource} />
