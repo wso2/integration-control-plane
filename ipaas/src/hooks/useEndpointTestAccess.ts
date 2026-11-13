@@ -273,10 +273,13 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const needsKey = !aiGateway && (mode === 'api-key' || mode === 'jwt');
   // A mint in flight is the answer to the last failure, so the failure is not shown meanwhile.
   const mintError = held.isFetching ? null : held.error;
-  const apiKeyRequired = !!mintError && isApiKeyAuthRequired(mintError);
+  const authRefused = !!mintError && isApiKeyAuthRequired(mintError);
+  // An open endpoint takes no key, so the refusal of a mint sent before its security read answered is neither a switch
+  // to offer nor a failure to show. The refusal stays on the held key's query, where every view of the endpoint reads it.
+  const apiKeyRequired = authRefused && mode !== 'none';
   // The API Platform's reading of a 404 or 409, an endpoint not exposed as an API yet, doesn't apply on the AI gateway.
   const gatewayMisread = !!aiGateway && !!mintError && !codedApiError(mintError) && [404, 409].includes(httpStatusOf(mintError));
-  const mintFailure = mintError && !apiKeyRequired && !isPermissionError(mintError) ? (gatewayMisread ? MINT_FAILED : friendlyApiError(mintError, MINT_FAILED)) : null;
+  const mintFailure = mintError && !authRefused && !isPermissionError(mintError) ? (gatewayMisread ? MINT_FAILED : friendlyApiError(mintError, MINT_FAILED)) : null;
   const keyError = !canCreateKey && needsKey ? MINT_REFUSED : switchFailure?.refKey === refKey ? switchFailure.message : mintFailure;
 
   const mintFor = useCallback(

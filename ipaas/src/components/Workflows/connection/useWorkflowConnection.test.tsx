@@ -115,6 +115,7 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     canCreateKey: true,
     keyError: null,
     needsApiKeyAuth: false,
+    apiKeyNotEnforced: false,
     canSwitch: true,
     managedIn: null,
     isSwitching: false,

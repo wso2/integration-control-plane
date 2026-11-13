@@ -155,6 +155,43 @@ describe('a key minted before the security is read', () => {
     expect(currentAccess?.keyError).toBeNull();
     expect(currentAccess?.canSwitch).toBe(true);
   });
+
+  it('offers no switch and shows no failure on an open endpoint, there or in a view of it that mounts later', async () => {
+    vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'none', publicUrl: 'https://gw.example/orders' } as never);
+    vi.mocked(createEndpointTestKey).mockRejectedValue(new BffError(409, JSON.stringify({ code: 'API_KEY_AUTH_REQUIRED', message: 'the endpoint does not use API-key auth' })));
+    // The Test Console on the same endpoint, which mints only once the security read says api-key.
+    const later: { access?: EndpointTestAccess } = {};
+    function Later() {
+      later.access = useEndpointTestAccess(a);
+      return null;
+    }
+    let showLater: (show: boolean) => void = () => {};
+    function Views() {
+      const [shown, setShown] = useState(false);
+      showLater = setShown;
+      return (
+        <>
+          <Early early />
+          {shown && <Later />}
+        </>
+      );
+    }
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+
+    expect(createEndpointTestKey).toHaveBeenCalledTimes(1);
+    expect(currentAccess?.isAuthorized).toBe(true);
+    expect(currentAccess?.needsApiKeyAuth).toBe(false);
+    expect(currentAccess?.keyError).toBeNull();
+
+    await act(async () => showLater(true));
+    await flush();
+    expect(createEndpointTestKey).toHaveBeenCalledTimes(1);
+    expect(later.access?.isAuthorized).toBe(true);
+    expect(later.access?.needsApiKeyAuth).toBe(false);
+    expect(later.access?.keyError).toBeNull();
+  });
 });
 
 describe('the key held for an endpoint', () => {
