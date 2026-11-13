@@ -22,7 +22,7 @@ import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
 import { isCompleteRef, useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
 import type { ApiKeyResult, EndpointRef, SecurityMode } from '../types/consumers';
 import { friendlyApiError } from '../utils/apiSecurity';
-import { isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
+import { isApiKeyAuthNotEnforced, isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
 import { aiGatewayAccessOf, mcpUrlOf, type AiGatewayAccess } from '../utils/mcpGateway';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
@@ -63,6 +63,11 @@ export interface EndpointTestAccess {
   /** The endpoint uses another auth mode (jwt, or a refused test key says so), so it takes no test key until switched to API-key auth. */
   needsApiKeyAuth: boolean;
   /**
+   * A `needsApiKeyAuth` where the endpoint reports API-key auth but the policy sits only at the API level, where the gateway
+   * doesn't enforce it, so calls get through without a key. `switchToApiKey()` enforces it.
+   */
+  apiKeyNotEnforced: boolean;
+  /**
    * The role may switch the endpoint to API-key auth, and the environment may change the API's security. Never for an AI
    * agent: its security comes from Agent Manager, while the switch edits the API Platform's API. Never where the API's
    * security comes only by promotion (`managedIn`): ipaas-service refuses the switch there.
@@ -75,7 +80,10 @@ export interface EndpointTestAccess {
   managedIn: string | null;
   /** The endpoint is being switched to API-key auth. */
   isSwitching: boolean;
-  /** Switch the endpoint to API-key auth, then mint. Resolves to the plaintext, or `null` on failure. */
+  /**
+   * Switch the endpoint to API-key auth, in the header it reports when it has one so no caller's header changes, then
+   * mint. Resolves to the plaintext, or `null` on failure.
+   */
   switchToApiKey: () => Promise<string | null>;
   /**
    * The endpoint cannot be reached through the gateway: its security config could
@@ -309,19 +317,20 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   }, [mintable, mode, refKey, renewKey, apiKey]);
 
   const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
+  const securityHeader = security?.apiKey?.header;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
     if (!endpoint || !switchable) return null;
     const target = endpoint;
     setSwitchFailure(null);
     try {
-      await enableApiKeyAuthFor(target);
+      await enableApiKeyAuthFor({ ref: target, header: securityHeader });
     } catch (err) {
       if (!isPermissionError(err)) setSwitchFailure({ refKey: keyOf(target), message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
       return null;
     }
     // Once the mode reads as api-key the held key's query would mint too; it joins this mint instead.
     return mintFor(target);
-  }, [endpoint, switchable, enableApiKeyAuthFor, mintFor]);
+  }, [endpoint, switchable, enableApiKeyAuthFor, securityHeader, mintFor]);
 
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
   // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
@@ -345,9 +354,10 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     canCreateKey,
     keyError,
     needsApiKeyAuth: mintable && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
+    apiKeyNotEnforced: mintable && !!mintError && isApiKeyAuthNotEnforced(mintError),
     canSwitch: switchable,
     managedIn,
-    isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
+    isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables?.ref) === refKey,
     switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never
     // reports unavailable — only a real answer does.

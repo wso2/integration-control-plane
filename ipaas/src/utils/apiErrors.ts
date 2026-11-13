@@ -115,9 +115,22 @@ export function refusedScope(error: unknown): string | undefined {
   return isPermissionError(error) && typeof scope === 'string' ? scope : undefined;
 }
 
-/** A test key was refused because the endpoint doesn't use API-key auth (`code: API_KEY_AUTH_REQUIRED`). */
+/**
+ * A test key was refused because the endpoint doesn't use API-key auth (`code: API_KEY_AUTH_REQUIRED`), or doesn't enforce
+ * the API-key auth it reports (`isApiKeyAuthNotEnforced`).
+ */
 export function isApiKeyAuthRequired(error: unknown): boolean {
-  return httpStatusOf(error) === 409 && bodyOf(error).code === 'API_KEY_AUTH_REQUIRED';
+  if (httpStatusOf(error) !== 409) return false;
+  const { code } = bodyOf(error);
+  return code === 'API_KEY_AUTH_REQUIRED' || code === 'API_KEY_AUTH_NOT_ENFORCED';
+}
+
+/**
+ * A test key was refused because the endpoint's API-key auth sits only at the API level, where the gateway doesn't enforce
+ * it (`code: API_KEY_AUTH_NOT_ENFORCED`): calls get through without a key until it is enforced.
+ */
+export function isApiKeyAuthNotEnforced(error: unknown): boolean {
+  return httpStatusOf(error) === 409 && bodyOf(error).code === 'API_KEY_AUTH_NOT_ENFORCED';
 }
 
 /** The `code` and `scope` of an ipaas-service error body. */

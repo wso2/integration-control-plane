@@ -30,6 +30,7 @@ const access = (patch: Partial<Parameters<typeof testKeyReasonOf>[0]> = {}) => (
   keyError: null,
   canCreateKey: true,
   needsApiKeyAuth: false,
+  apiKeyNotEnforced: false,
   canSwitch: true,
   managedIn: null as string | null,
   ...patch,
@@ -95,6 +96,13 @@ describe('testKeyNotice', () => {
       'The Workflow Management API uses OAuth authentication, so it can’t issue the test key the console calls it with. Switching it to API key changes how every caller of this API authenticates.',
     );
     expect(testKeyNotice('needs-api-key', access({ mode: 'jwt', canSwitch: false })).text).toContain('Your role can’t switch it to API key.');
+  });
+
+  it('says API-key auth set only at the API level is not enforced, and what enforcing it changes', () => {
+    expect(testKeyNotice('needs-api-key', access({ apiKeyNotEnforced: true })).text).toBe(
+      'The Workflow Management API is set to API key authentication, but the gateway doesn’t enforce it, so it can’t issue the test key the console calls it with. Enforcing it makes every caller of this API send a key.',
+    );
+    expect(testKeyNotice('needs-api-key', access({ apiKeyNotEnforced: true, canSwitch: false })).text).toContain('Your role can’t enforce it.');
   });
 
   it('says where an environment that takes its security by promotion gets it, and the ways out of it', () => {

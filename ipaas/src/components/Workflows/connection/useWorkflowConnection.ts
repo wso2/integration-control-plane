@@ -293,7 +293,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     // The switch changes every caller's auth, so it is offered, never made for the person.
     const action =
       reason === 'needs-api-key' && access.canSwitch
-        ? { label: 'Switch to API key', run: () => void access.switchToApiKey(), pending: access.isSwitching }
+        ? { label: access.apiKeyNotEnforced ? 'Enforce API key' : 'Switch to API key', run: () => void access.switchToApiKey(), pending: access.isSwitching }
         : reason === 'mint-failed'
           ? { label: 'Retry', run: () => void mintKey(), pending: access.isMinting }
           : null;
