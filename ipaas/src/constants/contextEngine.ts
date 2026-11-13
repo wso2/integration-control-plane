@@ -76,11 +76,15 @@ const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'au
  * set. A provided .rml.ttl is used to generate the context graph from the source's
  * records; left empty, the engine generates the graph with the LLM. Its own collapsible section.
  */
+export const RML_MAPPING_KEY = 'rmlMapping';
+
 export const RML_MAPPING = G(
   { label: 'RML Mapping', collapsed: true },
-  O('rmlMapping', 'Mapping file', 'file', {
+  O(RML_MAPPING_KEY, 'Mapping file', 'file', {
     accept: '.rml.ttl,.ttl',
     helper: 'Optional. Leave empty to let AI build the graph.',
+    // The engine's limit on one mapping.
+    maxLength: 100_000,
   }),
 );
 
@@ -658,6 +662,15 @@ export const CONSOLE_ACCESS_REFRESH_MARGIN_MS = 2 * 60 * 1000;
 
 /** How often an engine that is starting is checked again. */
 export const ENGINE_STATUS_POLL_MS = 4000;
+
+/**
+ * The BFF adds a new engine's sources for its creator's token, for up to 15 minutes, so a create
+ * with sources first refreshes a token with less than this left.
+ */
+export const CREATE_TOKEN_MIN_VALIDITY_MS = 20 * 60_000;
+
+/** How long files staged on the wizard wait in this tab for the new engine to run. */
+export const STAGED_SOURCE_WAIT_MS = 15 * 60_000;
 
 /** How many engines the listing reads a summary from at once. */
 export const SUMMARY_CONCURRENCY = 2;

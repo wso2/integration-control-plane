@@ -17,8 +17,8 @@
  */
 
 /**
- * The BFF side of Context Engines: engines map from the BFF's shape and are keyed by name, and a new engine's setup sends upload sources to the engine and connector sources to
- * the BFF as integrations.
+ * The BFF side of Context Engines: engines map from the BFF's shape and are keyed by name, and a new engine's connector sources go to
+ * the BFF with its create, which adds them as integrations once the engine runs.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,7 +32,7 @@ vi.mock('./_client', async (importOriginal) => ({ ...(await importOriginal<typeo
 vi.mock('./_contextEngineAccess', async (importOriginal) => ({ ...(await importOriginal<typeof import('./_contextEngineAccess')>()), engineRequest }));
 
 import { BffError } from './_client';
-import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, setUpContextEngine, toEngineManagedServer, updateContextModels } from './contextEngine';
+import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, toEngineManagedServer, updateContextModels } from './contextEngine';
 import type { ContextSourceConfig, CreateContextEngineInput } from '../types/contextEngine';
 
 const ENGINE = 'docs';
@@ -149,38 +149,33 @@ describe('engines', () => {
 describe('setting up a new engine', () => {
   const upload: ContextSourceConfig = { type: 'upload', name: 'Handbook', values: {}, audience: [] };
   const db: ContextSourceConfig = { type: 'mysql', name: 'Team DB', values: { tableName: 'articles' }, audience: [{ group: 'eng', role: 'eng' }] };
+  const input: CreateContextEngineInput = {
+    name: 'Docs',
+    description: '',
+    sources: [upload, db],
+    roles: [],
+    embedding: { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'e', azureBaseUrl: '', azureApiVersion: '' },
+    llm: { provider: 'openai', model: 'gpt-4.1', apiKey: 'l', azureBaseUrl: '', azureApiVersion: '' },
+    answers: { enabled: true, model: null },
+    storage: { vector: { mode: 'managed' }, relational: { mode: 'managed' }, graph: { mode: 'managed' } },
+  };
 
-  it('grants the creator, registers each source where it runs, and grants the roles', async () => {
-    engineRequest.mockImplementation(async (_id: string, method: string, path: string) => {
-      if (path === '/v1/auth/me') return { id: 'user-1', kind: 'user', groups: [] };
-      if (method === 'POST' && path === '/v1/sources') return { id: 'src-upload', name: 'Handbook', type: 'upload', state: 'ready' };
-      return {};
-    });
-    bff.post.mockResolvedValueOnce({ name: 'team-db', type: 'mysql', shape: 'service', sourceId: 'src-db', status: 'provisioning' });
+  it('sends the connector sources with the create, and leaves the engine’s own sources out', async () => {
+    bff.post.mockResolvedValueOnce({ ...bffEngine, status: 'provisioning', setup: { status: 'pending' } });
 
-    const result = await setUpContextEngine(ENGINE, { sources: [upload, db], roles: ['eng'] });
-
-    expect(result).toEqual({ sources: { Handbook: 'src-upload', 'Team DB': 'src-db' }, warnings: [] });
-    expect(engineRequest).toHaveBeenCalledWith(ENGINE, 'PUT', '/v1/resources/engine/grants/owner-user-1', expect.objectContaining({ principalId: 'user-1' }));
-    expect(bff.post).toHaveBeenCalledWith('/context-engines/docs/integrations', {
-      name: 'team-db',
-      type: 'mysql',
-      settings: { tableName: 'articles' },
-      source: { audience: ['eng'], audienceMapping: { eng: 'eng' } },
-    });
-    expect(engineRequest).toHaveBeenCalledWith(ENGINE, 'PUT', '/v1/resources/engine/grants/role-eng', { group: 'eng', actions: expect.any(Array) });
+    await expect(createContextEngine(input)).resolves.toMatchObject({ setup: { status: 'pending', warnings: [] } });
+    expect(bff.post).toHaveBeenCalledWith(
+      '/context-engines',
+      expect.objectContaining({
+        setup: { sources: [{ name: 'team-db', type: 'mysql', settings: { tableName: 'articles' }, source: { audience: ['eng'], audienceMapping: { eng: 'eng' } } }] },
+      }),
+    );
+    expect(engineRequest).not.toHaveBeenCalled();
   });
 
-  it('reports a refused step and keeps going', async () => {
-    engineRequest.mockImplementation(async (_id: string, _method: string, path: string) => {
-      if (path === '/v1/auth/me') return { id: 'user-1', kind: 'user', groups: [] };
-      return { id: 'src-upload', name: 'Handbook', type: 'upload', state: 'ready' };
-    });
-    bff.post.mockRejectedValueOnce(new BffError(400, JSON.stringify({ message: 'unknown integration type' })));
+  it('reads the setup the BFF reports', async () => {
+    bff.get.mockResolvedValueOnce({ ...bffEngine, status: 'starting', setup: { status: 'failed', warnings: ['Source "team-db" wasn\'t added.'] } });
 
-    const result = await setUpContextEngine(ENGINE, { sources: [db, upload], roles: [] });
-
-    expect(result.sources).toEqual({ Handbook: 'src-upload' });
-    expect(result.warnings).toEqual(['Register source “Team DB”: unknown integration type']);
+    await expect(getContextEngine(ENGINE)).resolves.toMatchObject({ setup: { status: 'failed', warnings: ['Source "team-db" wasn\'t added.'] } });
   });
 });

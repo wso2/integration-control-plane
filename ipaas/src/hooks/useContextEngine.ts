@@ -44,14 +44,13 @@ import {
   queryContextEngine,
   revokeContextApiKey,
   setContextEngineAccess,
-  setUpContextEngine,
   updateContextModels,
   updateContextSource,
 } from '../api/contextEngine';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
 import { everyoneRoles, fromDraft, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, toDraft, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -143,7 +142,7 @@ export function useSeenOnScreen<T extends Element>(): [(el: T | null) => void, b
 /** Shown while an engine restarts onto new models and its old pod still runs. */
 export const ENGINE_RESTARTING_REASON = 'Restarting with the new models';
 
-/** One engine; checked again while it starts, restarts or is being deleted. A restart shows the engine as starting until a pod that started after it runs. */
+/** One engine; checked again while it starts, restarts, is being set up or is being deleted. A restart shows the engine as starting until a pod that started after it runs. */
 export function useContextEngine(engineId: string, { pollOnError = false }: { pollOnError?: boolean } = {}) {
   const qc = useQueryClient();
   return useQuery({
@@ -157,7 +156,7 @@ export function useContextEngine(engineId: string, { pollOnError = false }: { po
       const engine = query.state.data;
       if (engine?.state === 'deleting') return DELETION_POLL_MS;
       if (engine?.state === 'ready' && isRestartPending(engine.startedAt, engine.restartedAt)) return ENGINE_STATUS_POLL_MS;
-      return engine && TRANSIENT_STATES.has(engine.state) ? ENGINE_STATUS_POLL_MS : false;
+      return engine && (TRANSIENT_STATES.has(engine.state) || engine.setup?.status === 'pending') ? ENGINE_STATUS_POLL_MS : false;
     },
   });
 }
@@ -261,18 +260,6 @@ export function useCreateContextEngine() {
       // An engine deleted and created again under the same name must not reuse the old one's status.
       qc.removeQueries({ queryKey: [ROOT_KEY, 'detail', created.id] });
       return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
-    },
-  });
-}
-
-/** Set up an engine the wizard created, once it runs: grants and sources. */
-export function useSetUpContextEngine() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ engineId, input }: { engineId: string; input: ContextEngineSetupInput }) => setUpContextEngine(engineId, input),
-    onSuccess: (_result, { engineId }) => {
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'summary', engineId] });
     },
   });
 }

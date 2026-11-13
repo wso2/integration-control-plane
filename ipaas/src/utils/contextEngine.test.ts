@@ -135,7 +135,7 @@ import {
   uploadSourceTitle,
   uploadIsSlow,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_EMBEDDING_PROVIDERS, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_MODES, defaultStorage, isConnectorEnabled, LLM_PROVIDERS, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import { blankLlm, blankSource, CONTEXT_EMBEDDING_PROVIDERS, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_MODES, defaultStorage, isConnectorEnabled, LLM_PROVIDERS, RML_MAPPING, SOURCE_CONNECTORS } from '../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress, UploadFileStatus } from '../types/contextEngine';
 import { HttpError } from '../types/http';
@@ -579,6 +579,18 @@ describe('wire payloads', () => {
 
     const calendar = withValues('google-calendar', { authType: 'bearer', token: 't', eventTypes: 'default' });
     expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pageSize: 250 });
+  });
+
+  it('sends a structured connector’s RML mapping with its integration request', () => {
+    const rml = '@prefix rr: <http://www.w3.org/ns/r2rml#> .';
+    expect(toIntegrationRequest(withValues('mysql', { rmlMapping: `${rml}\n` }), 'mysql').rmlMapping).toBe(rml);
+    expect(toIntegrationRequest(withValues('mysql', {}), 'mysql')).not.toHaveProperty('rmlMapping');
+  });
+
+  it('refuses an RML mapping over the engine’s limit', () => {
+    const [field] = RML_MAPPING;
+    expect(sourceFieldError(field, 'a'.repeat(100_000))).toBe('');
+    expect(sourceFieldError(field, 'a'.repeat(100_001))).toBe('Mapping file must be at most 100,000 characters.');
   });
 
   it('summarizes sources for review', () => {

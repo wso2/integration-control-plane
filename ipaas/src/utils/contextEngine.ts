@@ -35,6 +35,7 @@ import {
   LLM_PROVIDERS,
   MCP_CLIENTS,
   RML_MAPPING,
+  RML_MAPPING_KEY,
   PLAYGROUND_SUGGESTIONS,
   PROGRESS_POLL_ACTIVE_MS,
   RETIRED_MODEL_PROVIDER_NAMES,
@@ -151,6 +152,7 @@ export function visibleFields(connector: SourceConnector, values: Record<string,
 export function sourceFieldError(def: SourceFieldDef, value: string | undefined): string {
   const v = (value ?? '').trim();
   if (!v) return def.required ? `${def.label} is required.` : '';
+  if (def.maxLength && v.length > def.maxLength) return `${def.label} must be at most ${def.maxLength.toLocaleString('en-US')} characters.`;
   if (def.kind === 'url' && !isHttpUrl(v)) return 'Enter a full http(s) URL.';
   if (def.valueType === 'integer' && !/^\d+$/.test(v)) return 'Enter a whole number.';
   if (def.valueType === 'number' && !Number.isFinite(Number(v))) return 'Enter a number.';
@@ -1580,17 +1582,28 @@ export interface BffCreateEngineRequest {
   displayName: string;
   description?: string;
   models: { llm: BffEngineModel; embedding: BffEngineModel; answer?: BffEngineModel; answersEnabled: boolean };
+  setup?: { sources: BffIntegrationRequest[] };
 }
 
-/** `POST /context-engines`. A separate answer model reuses the language model's key when it has none of its own. */
+export type BffIntegrationRequest = ReturnType<typeof toIntegrationRequest>;
+
+/**
+ * `POST /context-engines`. A separate answer model reuses the language model's key when it has none of its own.
+ * The BFF adds the connector sources once the engine runs; a source the engine itself serves is left to the console.
+ */
 export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEngineRequest {
   const model = (m: { provider: string; model: string; apiKey: string }): BffEngineModel => ({ provider: m.provider, model: m.model.trim(), ...(m.apiKey ? { apiKey: m.apiKey } : {}) });
   const answer = input.answers.enabled && input.answers.model ? model(input.answers.model) : undefined;
+  const sources = input.sources.flatMap((s) => {
+    const type = integrationTypeFor(s.type);
+    return type === null ? [] : [toIntegrationRequest(s, type)];
+  });
   return {
     name: engineHandleFrom(input.name),
     displayName: input.name.trim(),
     ...(input.description.trim() ? { description: input.description.trim() } : {}),
     models: { llm: model(input.llm), embedding: model(input.embedding), ...(answer ? { answer } : {}), answersEnabled: input.answers.enabled },
+    ...(sources.length ? { setup: { sources } } : {}),
   };
 }
 
@@ -1598,16 +1611,18 @@ export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEn
  * `POST …/integrations`: every field the connector shows, secrets included, typed and placed as the
  * integration's settings say. The BFF names the integration and its source with a DNS label. With
  * visibility rules, the integration labels every record with each rule's group; without, the BFF
- * lets every console user see them.
+ * lets every console user see them. A structured connector's RML mapping goes beside its settings.
  */
-export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> } } {
+export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> }; rmlMapping?: string } {
   const audienceMapping = audienceMappingFromRules(source.audience);
   const audience = Object.keys(audienceMapping);
+  const rmlMapping = connectorFor(source.type)?.isStructuredData ? (source.values[RML_MAPPING_KEY] ?? '').trim() : '';
   return {
     name: engineHandleFrom(source.name),
     type,
     settings: integrationSettings(source),
     ...(audience.length ? { source: { audience, audienceMapping } } : {}),
+    ...(rmlMapping ? { rmlMapping } : {}),
   };
 }
 

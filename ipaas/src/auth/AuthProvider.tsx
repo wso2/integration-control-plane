@@ -88,6 +88,18 @@ function sdkHasCode(): boolean {
 // none to hand out; authenticatedFetch sets no Authorization header without one.
 const noBffToken = (): Promise<string> => Promise.resolve('');
 
+type ThunderContext = ReturnType<typeof useThunderID>;
+
+/**
+ * The SDK's own refresh, run now: the same refresh_token grant, through its token exchange, which
+ * stores the new session and reschedules its next refresh. The React SDK does not expose the refresh.
+ */
+async function refreshWithSdk(getStorageManager: ThunderContext['getStorageManager'], exchangeToken: ThunderContext['exchangeToken']): Promise<void> {
+  const refreshToken = (await (await getStorageManager())?.getSessionData())?.refresh_token;
+  if (!refreshToken) return;
+  await exchangeToken({ id: 'refresh-access-token', data: { client_id: '{{clientId}}', refresh_token: refreshToken, grant_type: 'refresh_token' }, attachToken: false, returnsSession: true, signInRequired: true });
+}
+
 /**
  * The org comes from the access token, which the backend reads too. The profile prefers the ID
  * token and falls back to the access token, which carries the same name and email claims — a
@@ -138,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 }
 
 function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Element {
-  const { isInitialized, isLoading, isSignedIn, getAccessToken, getDecodedIdToken, getGrantedPermissions, clearSession, signIn, signInSilently, signOut } = useThunderID();
+  const { isInitialized, isLoading, isSignedIn, getAccessToken, getDecodedIdToken, getGrantedPermissions, getStorageManager, exchangeToken, clearSession, signIn, signInSilently, signOut } = useThunderID();
   const [bff] = useState(isBffAuth);
   const [hasCode] = useState(sdkHasCode);
   const [status, setStatus] = useState<Status>({ kind: 'pending' });
@@ -213,7 +225,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       if (cancelled) return;
       if (!session) return endSession(MISSING_ORG);
 
-      connect({ session, getAccessToken, onExpired: () => endSession(null) });
+      connect({ session, getAccessToken, onExpired: () => endSession(null), refreshAccessToken: () => refreshWithSdk(getStorageManager, exchangeToken) });
       // Read by AppLayout and the post-login routing to know the active org.
       local.set(ORG_HANDLE_KEY, session.orgHandle);
       setStatus({ kind: 'signedIn', session });
@@ -225,7 +237,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [status.kind, bff, hasCode, silent, isInitialized, isLoading, isSignedIn, recheck, waitFrom, getAccessToken, getDecodedIdToken, getGrantedPermissions, endSession]);
+  }, [status.kind, bff, hasCode, silent, isInitialized, isLoading, isSignedIn, recheck, waitFrom, getAccessToken, getDecodedIdToken, getGrantedPermissions, getStorageManager, exchangeToken, endSession]);
 
   const sdkSignedIn = useRef(false);
   useEffect(() => {
