@@ -19,6 +19,10 @@
 import { Box, Button, Typography } from '@wso2/oxygen-ui';
 import { Plus } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
+import { useConsoleActionWhen } from '../hooks/useConsoleAnalytics';
+import { ConsoleAction, type ConsoleActionDimensions } from '../services/telemetry/consoleActions';
+
+type EmptyStateReport = ConsoleActionDimensions[typeof ConsoleAction.EmptyState];
 
 interface EmptyListingProps {
   icon: ReactNode;
@@ -27,11 +31,19 @@ interface EmptyListingProps {
   showAction?: boolean;
   actionLabel?: string;
   onAction?: () => void;
+  /** Reports the empty state as a console action (friction.empty-state) when shown. */
+  report?: EmptyStateReport;
 }
 
-export default function EmptyListing({ icon, title, description, showAction, actionLabel = 'Create', onAction }: EmptyListingProps) {
+function ReportEmptyState(report: EmptyStateReport): null {
+  useConsoleActionWhen(true, ConsoleAction.EmptyState, report);
+  return null;
+}
+
+export default function EmptyListing({ icon, title, description, showAction, actionLabel = 'Create', onAction, report }: EmptyListingProps) {
   return (
     <Box sx={{ textAlign: 'center', py: 8 }}>
+      {report && <ReportEmptyState {...report} />}
       <Box sx={{ opacity: 0.3, mb: 2 }}>{icon}</Box>
       <Typography variant="h6" component="h2" gutterBottom>
         {title}

@@ -67,6 +67,7 @@ interface RuntimeConfig {
   TRACKING_ENV?: string;
   MOESIF_APP_API_KEY?: string;
   SCOPES_ENFORCED?: string | boolean;
+  CONSOLE_ANALYTICS_ENABLED?: string | boolean;
 }
 
 export interface ApiConfig {
@@ -160,6 +161,8 @@ export interface ApiConfig {
   moesifAppApiKey?: string;
   /** Hide actions the user's role doesn't allow. Set from the same deployment variable as ipaas-service's SCOPES_ENFORCED, so the console hides what ipaas-service refuses. */
   scopesEnforced?: boolean;
+  /** Report console actions (page views, abandoned create flows, errors shown) to ipaas-service's POST /telemetry/console-actions. Set with ipaas-service's CONSOLE_ANALYTICS_ENABLED. */
+  consoleAnalyticsEnabled?: boolean;
 }
 
 // Extend window interface
@@ -287,6 +290,7 @@ export async function loadConfig(): Promise<void> {
       // config.json is untyped: a non-string value must not throw here and reset the whole config.
       moesifAppApiKey: typeof config.MOESIF_APP_API_KEY === 'string' ? config.MOESIF_APP_API_KEY.trim() || undefined : undefined,
       scopesEnforced: config.SCOPES_ENFORCED === 'true' || config.SCOPES_ENFORCED === true,
+      consoleAnalyticsEnabled: config.CONSOLE_ANALYTICS_ENABLED === 'true' || config.CONSOLE_ANALYTICS_ENABLED === true,
     };
 
     console.info('✓ Runtime configuration loaded from config.json');

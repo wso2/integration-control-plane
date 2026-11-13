@@ -68,6 +68,8 @@ State held:
 
 `clearAll()` is called once deployment succeeds, so the context is wiped before navigating to the new integration's overview page.
 
+The provider also reports the flow as abandoned (console action `intent.form-abandoned`, entity `prebuilt-integration`) when it unmounts before an integration is created. It spans both routes, so moving from setup to deploy is not counted.
+
 #### Why Context
 
 > [!IMPORTANT]

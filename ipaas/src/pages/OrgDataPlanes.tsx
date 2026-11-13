@@ -111,7 +111,7 @@ export default function OrgDataPlanes(_scope: OrgScope): JSX.Element {
           Failed to load data planes.
         </Alert>
       ) : isEmpty ? (
-        <EmptyListing icon={<Network size={48} />} title="No data planes yet" description="Data planes will appear here once available for your organization." />
+        <EmptyListing icon={<Network size={48} />} title="No data planes yet" description="Data planes will appear here once available for your organization." report={{ resource: 'data-planes', state: 'no-data' }} />
       ) : (
         <>
           {hasPdpInFlight && (

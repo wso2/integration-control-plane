@@ -52,6 +52,8 @@ import { useCan } from '../hooks/useCan';
 import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
 import { useSamples } from '../hooks/useSamples';
 import { trackEvent } from '../services/tracking/tracking';
+import { ConsoleAction, trackConsoleAction, type CreateOption } from '../services/telemetry/consoleActions';
+import { useConsoleActionWhen } from '../hooks/useConsoleAnalytics';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
 
 
@@ -97,6 +99,13 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
   const creationBlocked = !canManage || quotaReached;
   const canUseEditor = useCan()(Scopes.EDITOR_USE);
   const blockedTooltip = !canManage ? 'You do not have permission to create integrations.' : 'You have exceeded the allocated integration quota. Upgrade your subscription.';
+  const surface = standalone ? 'empty-project' : 'create-page';
+  // Reported once the project resolves, so a role check against an unknown project is not counted as a refusal.
+  useConsoleActionWhen(!!projectId && !canManage, ConsoleAction.PermissionDenied, { feature: 'create-integration', required_permission: Scopes.INTEGRATION_CREATE });
+  useConsoleActionWhen(canManage && quotaReached, ConsoleAction.QuotaBlocked, { limit: FREE_COMPONENT_LIMIT, interaction: 'shown', surface });
+  // Without a heading the panels are a project's empty state.
+  useConsoleActionWhen(standalone, ConsoleAction.EmptyState, { resource: 'integrations', state: 'no-data' });
+  const optionSelected = (option: CreateOption) => trackConsoleAction(ConsoleAction.CreateOptionSelected, { option, surface });
   const { features } = useFeaturePreview();
   const aiBuilderEnabled = !!features['AI Integration Builder'];
   const { data: samplesData, isLoading: samplesLoading, isError: samplesError } = useSamples();
@@ -127,6 +136,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       return;
     }
     trackEvent('open-cloud-editor-click', { org: scope.org, project: scope.project });
+    optionSelected('cloud-editor');
   };
 
   const importUrl = importComponentUrl(scope.org, scope.project);
@@ -134,6 +144,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
   const handleImportClick = () => {
     if (creationBlocked) return;
     const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
+    optionSelected('import-repo');
     if (!githubAppClientId) {
       // No GitHub App configured means private-repo authorization is impossible,
       // so land the import page in public-URL mode instead of its default
@@ -154,6 +165,8 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       return;
     }
     trackEvent('component-create-import-github', { org: scope.org, project: scope.project, provider: GitProvider.GITHUB });
+    const gitAuthorization = (outcome: 'started' | 'failed' | 'cancelled') => trackConsoleAction(ConsoleAction.GitAuthorization, { outcome, git_provider: 'github' });
+    gitAuthorization('started');
 
     const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
     channelRef.current = channel;
@@ -163,6 +176,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
         channel.close();
         channelRef.current = null;
         setIsImportAuthenticating(false);
+        gitAuthorization('cancelled');
       }
     }, GITHUB_AUTH.POPUP_POLL_INTERVAL_MS);
     pollRef.current = pollClosed;
@@ -174,13 +188,16 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       if (!returnedState || !validateAndClearGitHubState(returnedState)) {
         setIsImportAuthenticating(false);
         setPageError({ message: 'GitHub authorization failed (invalid state). Please try again.', severity: 'error' });
+        gitAuthorization('failed');
         return;
       }
       if (!authCode) {
         setIsImportAuthenticating(false);
         setPageError({ message: 'GitHub authorization failed. Please try again.', severity: 'error' });
+        gitAuthorization('failed');
         return;
       }
+      // The import page exchanges the code, and reports the authorization as completed or failed.
       navigate(importUrl, { state: { authCode } });
     };
   };
@@ -188,6 +205,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
   const handleQuickDeploy = (sample: Sample) => {
     if (!projectId || creationBlocked) return;
     trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
+    optionSelected('sample');
     setDeployingSample(sample);
     void sampleDeploy.deploy({
       sample,
@@ -336,6 +354,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           onClick={(e) => {
                             e.stopPropagation();
                             trackEvent('component-create-import-public-url', { org: scope.org, project: scope.project });
+                            optionSelected('import-repo');
                             navigate(importUrl, { state: { mode: 'public' } });
                           }}
                           sx={PROVIDER_ICON_SX}>
@@ -371,6 +390,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                               event.stopPropagation();
                               if (creationBlocked) return;
                               trackEvent('component-create-import-azure-devops', { org: scope.org, project: scope.project, provider: GitProvider.AZURE_DEVOPS });
+                              optionSelected('import-repo');
                               navigate(importUrl, { state: { mode: GitProvider.AZURE_DEVOPS } });
                             }}
                             sx={PROVIDER_ICON_SX}>
@@ -437,6 +457,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           integration={integration}
                           onClick={() => {
                             trackEvent('featured-prebuilt-integration-click', { org: scope.org, project: scope.project, integration: integration.displayName });
+                            optionSelected('prebuilt');
                             navigate(prebuiltIntegrationsUrl(scope.org, scope.project), {
                               state: {
                                 selectedApplications: integration.applications,
@@ -456,6 +477,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                       endIcon={<ArrowRight size={14} />}
                       onClick={() => {
                         trackEvent('prebuilt-integration-explore-click', { org: scope.org, project: scope.project });
+                        optionSelected('prebuilt');
                         navigate(prebuiltIntegrationsUrl(scope.org, scope.project));
                       }}
                       sx={{ textTransform: 'none', pl: 0 }}>
@@ -500,6 +522,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                       endIcon={<ArrowRight size={14} />}
                       onClick={() => {
                         trackEvent('components-new-browse-more-samples', { org: scope.org, project: scope.project });
+                        optionSelected('sample');
                         navigate(browseSamplesUrl(scope.org, scope.project));
                       }}
                       sx={{ textTransform: 'none', pl: 0 }}>

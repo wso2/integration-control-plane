@@ -112,7 +112,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
   if (environments.length === 0) {
     return (
       <PageContent fullWidth>
-        <EmptyListing icon={<ScrollText size={48} />} title="No environments available" description="No deployment environments were found for this project. Deploy your integration first." />
+        <EmptyListing icon={<ScrollText size={48} />} title="No environments available" description="No deployment environments were found for this project. Deploy your integration first." report={{ resource: 'environments', state: 'no-data' }} />
       </PageContent>
     );
   }

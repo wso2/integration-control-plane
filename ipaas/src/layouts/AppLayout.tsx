@@ -48,6 +48,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useMutationErrorTracking, useSessionAnalytics } from '../hooks/useConsoleAnalytics';
 import Logo from '../components/Logo';
 import MarketingConsentDialog from '../components/MarketingConsentDialog';
 import PlatformSwitcher from '../components/PlatformSwitcher';
@@ -139,6 +140,8 @@ export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const scope = useScope();
+  useSessionAnalytics();
+  useMutationErrorTracking();
 
   const { username, displayName, pictureUrl, logout, userId, orgHandle: sessionOrg } = useAuth();
   const userName = displayName || username || 'User';

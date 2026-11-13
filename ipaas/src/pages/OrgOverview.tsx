@@ -176,7 +176,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           Could not load the projects.
         </Alert>
       );
-    if (projects.length === 0) return <EmptyListing icon={<Folder size={48} />} title="No projects yet" description="Create a project to start building integrations." />;
+    if (projects.length === 0) return <EmptyListing icon={<Folder size={48} />} title="No projects yet" description="Create a project to start building integrations." report={{ resource: 'projects', state: 'no-data' }} />;
     return (
       <>
         {listed.map((p) => (

@@ -24,6 +24,9 @@ import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth
 import type { AuthStatus } from '../types/import';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
+import { ConsoleAction, trackConsoleAction } from '../services/telemetry/consoleActions';
+
+const gitAuthorization = (outcome: 'started' | 'completed' | 'failed' | 'cancelled'): void => trackConsoleAction(ConsoleAction.GitAuthorization, { outcome, git_provider: 'github' });
 
 export interface UseGitHubAuthReturn {
   authStatus: AuthStatus;
@@ -66,6 +69,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
   const handleExchangeResult = (result: { success: boolean; needsInstallation?: boolean }, onSuccess?: () => void): void => {
     if (result.success) {
       setAuthStatus('done');
+      gitAuthorization('completed');
       onSuccess?.();
       return;
     }
@@ -74,6 +78,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
       return;
     }
     setAuthStatus('failed');
+    gitAuthorization('failed');
   };
 
   const startGitHubAppInstall = (onClosed?: () => void): void => {
@@ -131,6 +136,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
       handleExchangeResult(result);
     } catch {
       setAuthStatus('failed');
+      gitAuthorization('failed');
     }
   };
 
@@ -138,6 +144,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
     const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
     if (!githubAppClientId || !canConnect) return;
     setAuthStatus('authenticating');
+    gitAuthorization('started');
     const state = generateAndSaveGitHubState();
     const url = buildGitHubOAuthUrl(githubAppAuthRedirectUrl ?? '', githubAppClientId, state);
     const popup = window.open(url, 'github-oauth', GITHUB_AUTH.POPUP_DIMENSIONS);
@@ -147,6 +154,8 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
         clearInterval(pollClosed);
         channel.close();
         setAuthStatus((prev) => (prev === 'authenticating' ? 'idle' : prev));
+        // The popup answers on the channel, which stops this poll; closing first means the user gave up.
+        gitAuthorization('cancelled');
       }
     }, GITHUB_AUTH.POPUP_POLL_INTERVAL_MS);
     channel.onmessage = async (event) => {
@@ -155,10 +164,12 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
       const { authCode, state: returnedState } = event.data as { authCode: string | null; state: string | null };
       if (!returnedState || !validateAndClearGitHubState(returnedState)) {
         setAuthStatus('failed');
+        gitAuthorization('failed');
         return;
       }
       if (!authCode) {
         setAuthStatus('failed');
+        gitAuthorization('failed');
         return;
       }
       try {
@@ -166,6 +177,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
         handleExchangeResult(result, onSuccess);
       } catch {
         setAuthStatus('failed');
+        gitAuthorization('failed');
       }
     };
   };

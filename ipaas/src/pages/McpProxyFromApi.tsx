@@ -21,6 +21,7 @@ import { ArrowLeft, Wrench } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useFormAbandonment } from '../hooks/useConsoleAnalytics';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useApimApi } from '../hooks/useApim';
@@ -44,6 +45,7 @@ const RESERVE_HELPER_SX = { '& .MuiFormHelperText-root': { minHeight: '1rem', mt
  * **proxy**, exposing every operation of the chosen API version as a tool.
  */
 export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
+  useFormAbandonment('integration', 'create-integration');
   const navigate = useAppNavigate();
   const [searchParams] = useSearchParams();
   // The source is the Integration as API whose Generate MCP button was clicked.

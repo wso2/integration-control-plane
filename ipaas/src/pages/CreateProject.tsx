@@ -20,6 +20,7 @@ import { Alert, Button, CircularProgress, Grid, IconButton, InputAdornment, Page
 import { ArrowLeft, Edit } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useFormAbandonment } from '../hooks/useConsoleAnalytics';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
@@ -33,6 +34,7 @@ import { isQuotaError } from '../utils/apiErrors';
 const editHandleSx = { color: 'text.primary' } as const;
 
 export default function CreateProject(scope: OrgScope): JSX.Element {
+  useFormAbandonment('project', 'create-project');
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);

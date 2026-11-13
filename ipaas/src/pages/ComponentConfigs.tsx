@@ -166,7 +166,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
                 <CircularProgress />
               </Box>
             ) : rows.length === 0 ? (
-              <EmptyListing icon={<KeyRound size={48} />} title="No configs or secrets" description="Inject environment variables or mount files into this integration's container." />
+              <EmptyListing icon={<KeyRound size={48} />} title="No configs or secrets" description="Inject environment variables or mount files into this integration's container." report={{ resource: 'configs', state: 'no-data' }} />
             ) : (
               <ListingTable.Container>
                 <ListingTable>

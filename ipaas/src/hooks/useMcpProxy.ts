@@ -54,6 +54,7 @@ interface CreateMcpProxyParams {
 export function useCreateMcpProxy() {
   const queryClient = useQueryClient();
   return useMutation<Component, unknown, CreateMcpProxyParams>({
+    meta: { operation: 'create-integration' },
     mutationFn: async ({ orgHandler, projectId, name, displayName, description, context, version, endpoint, policies, selectedOperations }) => {
       const operations = await generateMcpFeatures(selectedOperations);
       const api = await createMcpApi({ name, displayName, version, description, context, policies, operations, endpoint, projectId });

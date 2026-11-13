@@ -497,7 +497,12 @@ function IntegrationsTable({
           <CircularProgress size={24} color="primary" />
         </Box>
       ) : filtered.length === 0 ? (
-        <EmptyListing icon={<PlugZap size={48} />} title="No integrations found" description={query || selectedLabels.length > 0 ? 'Try adjusting your search or filters' : 'Create your first integration to get started'} />
+        <EmptyListing
+          icon={<PlugZap size={48} />}
+          title="No integrations found"
+          description={query || selectedLabels.length > 0 ? 'Try adjusting your search or filters' : 'Create your first integration to get started'}
+          report={{ resource: 'integrations', state: query || selectedLabels.length > 0 ? 'no-results' : 'no-data' }}
+        />
       ) : (
         <>
           {filteredIntegrations.length > 0 && (

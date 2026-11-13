@@ -37,7 +37,7 @@ src/
   contexts/     Narrow React contexts (see its README.md)
   types/        Domain types shared by api/, hooks and UI
   utils/        Pure functions, tested in a *.test.ts next to each file
-  services/     Client-side services (AI Integration Builder pipeline)
+  services/     Client-side services (AI Integration Builder pipeline, analytics: docs/console-analytics.md)
   unported/     Features the BFF cannot serve yet      → src/unported/AGENTS.md
 public/config.json   Runtime config for the local stack (docs/runtime-config.md)
 tests/e2e/           Playwright suite                  → tests/e2e/AGENTS.md
