@@ -17,25 +17,23 @@
  */
 
 /**
- * A chat request the browser could not complete. fetch rejects with a TypeError for every
- * network-level failure, and its message differs by browser ("Failed to fetch", "Load failed",
- * "NetworkError when attempting to fetch resource."). A gateway answer without CORS headers
- * lands here too, so the agent may well be running: the gateway may have no route for it yet,
- * which the browser cannot tell apart from an unreachable host.
+ * Shown when the chat request rejects with a TypeError, which fetch uses for every network-level
+ * failure, including a response the browser blocks for missing CORS headers, whatever message
+ * the browser gives it.
  */
 export const CHAT_UNREACHABLE = "Couldn't reach the agent through its gateway. It may still be deploying, or its endpoint may not be published on the gateway yet. Try again in a minute, and redeploy the agent if this persists.";
 
-/** The gateway is up but has no ready instance of the agent behind it, as while it starts. */
+/** Shown for a 502, 503 or 504 answer. */
 export const chatNotReady = (status: number): string => `The agent isn't ready to answer yet (HTTP ${status}). It may still be starting up; try again in a minute.`;
 
-/** What the chat shows for a request that threw instead of answering. */
+/** The message for a chat request that rejected. Any error other than a TypeError is shown with its own message. */
 export function chatRequestFailure(err: unknown): string {
   if (err instanceof TypeError) return CHAT_UNREACHABLE;
   const msg = err instanceof Error ? err.message : String(err);
   return `Failed to connect: ${msg}`;
 }
 
-/** What the chat shows for an answer outside 2xx. HTTP/2 answers carry no status text. */
+/** The message for a chat answer outside 2xx. An empty status text is left out. */
 export function chatResponseFailure(status: number, statusText: string): string {
   if (status === 502 || status === 503 || status === 504) return chatNotReady(status);
   return statusText ? `HTTP ${status} ${statusText}` : `HTTP ${status}`;

@@ -21,7 +21,7 @@ import { CHAT_UNREACHABLE, chatNotReady, chatRequestFailure, chatResponseFailure
 
 describe('chatRequestFailure', () => {
   // Each browser words a failed fetch differently; all reject with a TypeError.
-  it.each(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])('reads a network failure (%s) as an unreachable gateway, not an inactive agent', (message) => {
+  it.each(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])('reads a network failure (%s) as an unreachable gateway', (message) => {
     expect(chatRequestFailure(new TypeError(message))).toBe(CHAT_UNREACHABLE);
   });
 
@@ -36,7 +36,7 @@ describe('chatResponseFailure', () => {
     expect(chatResponseFailure(status, '')).toBe(chatNotReady(status));
   });
 
-  it('shows other statuses as they are, without a dangling space when HTTP/2 sends no status text', () => {
+  it('shows other statuses as they are, leaving out an empty status text', () => {
     expect(chatResponseFailure(500, 'Internal Server Error')).toBe('HTTP 500 Internal Server Error');
     expect(chatResponseFailure(404, '')).toBe('HTTP 404');
   });
