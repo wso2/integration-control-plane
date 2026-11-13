@@ -42,8 +42,10 @@ export default function TablesField({ value, onChange }: TablesFieldProps): JSX.
     const error = v.trim() ? errors[index][key] : '';
     return (
       <TextField
+        labelPlacement="top"
         label={label}
         required={extra.required}
+        optional={!extra.required}
         fullWidth
         size="small"
         value={v}

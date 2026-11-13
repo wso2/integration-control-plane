@@ -40,7 +40,7 @@ export default function ObjectsField({ value, onChange }: ObjectsFieldProps): JS
   const input = (index: number, key: keyof SourceObject, label: string, extra: { placeholder: string; helper?: string }) => {
     const v = objects[index][key];
     const error = v.trim() ? errors[index][key] : '';
-    return <TextField label={label} required fullWidth size="small" value={v} placeholder={extra.placeholder} error={!!error} helperText={error || extra.helper} onChange={(e) => edit(index, key, e.target.value)} sx={REQUIRED_FIELD_SX} />;
+    return <TextField labelPlacement="top" label={label} required fullWidth size="small" value={v} placeholder={extra.placeholder} error={!!error} helperText={error || extra.helper} onChange={(e) => edit(index, key, e.target.value)} sx={REQUIRED_FIELD_SX} />;
   };
 
   return (
