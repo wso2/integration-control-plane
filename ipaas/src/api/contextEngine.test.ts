@@ -148,7 +148,7 @@ describe('engines', () => {
 
 describe('setting up a new engine', () => {
   const upload: ContextSourceConfig = { type: 'upload', name: 'Handbook', values: {}, audience: [] };
-  const db: ContextSourceConfig = { type: 'mysql', name: 'Team DB', values: { tableName: 'articles' }, audience: [{ group: 'eng', role: 'eng' }] };
+  const db: ContextSourceConfig = { type: 'mysql', name: 'Team DB', values: { tables: '[{"tableName":"articles","primaryKey":"id","columns":"","updatedAtColumn":""}]' }, audience: [{ group: 'eng', role: 'eng' }] };
 
   it('grants the creator, registers each source where it runs, and grants the roles', async () => {
     engineRequest.mockImplementation(async (_id: string, method: string, path: string) => {
@@ -165,7 +165,7 @@ describe('setting up a new engine', () => {
     expect(bff.post).toHaveBeenCalledWith('/context-engines/docs/integrations', {
       name: 'team-db',
       type: 'mysql',
-      settings: { tableName: 'articles' },
+      settings: { tables: [{ name: 'articles', primaryKey: 'id' }] },
       source: { audience: ['eng'], audienceMapping: { eng: 'eng' } },
     });
     expect(engineRequest).toHaveBeenCalledWith(ENGINE, 'PUT', '/v1/resources/engine/grants/role-eng', { group: 'eng', actions: expect.any(Array) });

@@ -62,6 +62,21 @@ export const fieldGroupChevronSx = (open: boolean) =>
 /** Fields inside a collapsible group, spaced like the main field stack and set off from the header. */
 export const fieldGroupBodySx = { gap: 2.5, pt: 2.5 } as const;
 
+/** One database table a source syncs, as a card. */
+export const tableCardSx = {
+  p: 2,
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: '14px',
+  bgcolor: 'background.default',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+  minWidth: 0,
+} as const;
+
+export const tableCardHeaderSx = { display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 } as const;
+
 /** Source / provider tile grid spacing. */
 export const tileGridSx = { mb: 3 } as const;
 

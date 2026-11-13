@@ -114,7 +114,7 @@ const SQL_TABLES = (port: string) => [
 
 /**
  * Grouped form fields for a SQL database connector, mirroring the database integrations'
- * settings: the table, the columns to ingest and the poll for rows that Change Data Capture
+ * settings: the tables, the columns to ingest and the poll for rows that Change Data Capture
  * missed. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
  * MySQL has no schema layer and omits it.
  */
@@ -128,13 +128,8 @@ const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[]
     F('username', 'Username', 'text'),
     F('password', 'Password', 'secret', { verbatim: true }),
   ),
-  ...G(
-    'Data to sync',
-    F('tableName', 'Table', 'text'),
-    F('primaryKey', 'Primary Key', 'text'),
-    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated. Leave empty for all columns.', valueType: 'list' }),
-    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Last-updated time. Recommended.' }),
-  ),
+  // Every table the integration reads, edited as one card per table; the value is a JSON array of SourceTable.
+  ...G('Data to sync', F('tables', 'Tables', 'tables')),
   ...G(
     { label: 'Sync options', collapsed: true },
     O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for new rows the change listener missed.', valueType: 'number' }),
@@ -508,14 +503,15 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
         F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.refreshToken' }),
         F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.', setting: 'auth.token' }),
       ),
-      ...G('Data to sync', F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'Must have Change Data Capture enabled.' }), F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated.', valueType: 'list' })),
+      // Every object the integration reads, edited as one card per object; the value is a JSON array of SourceObject.
+      ...G('Data to sync', F('objects', 'Objects', 'objects')),
       ...G(
         { label: 'Sync options', collapsed: true },
         O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' }),
         O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for records the change listener missed.', valueType: 'number' }),
       ),
     ],
-    summaryKeys: ['baseUrl', 'sobject'],
+    summaryKeys: ['baseUrl'],
     isStructuredData: true,
   },
   { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}hubspot.svg`, icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },

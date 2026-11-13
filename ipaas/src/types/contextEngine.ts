@@ -152,9 +152,30 @@ export interface ContextSource {
  * How a connector field is entered. `url` must be one http(s) URL; `urls` is a
  * newline-separated list of them; `secret` is masked and travels as a credential;
  * `select` is one of a fixed set of `options`; `file` is a text file whose contents
- * become the value.
+ * become the value; `tables` and `objects` are lists of database tables and Salesforce
+ * objects, edited as one card each.
  */
-export type SourceFieldKind = 'text' | 'secret' | 'url' | 'urls' | 'multiline' | 'select' | 'file';
+export type SourceFieldKind = 'text' | 'secret' | 'url' | 'urls' | 'multiline' | 'select' | 'file' | 'tables' | 'objects';
+
+/**
+ * One database table a `tables` field syncs, as typed in the form. The field's value is a
+ * JSON-encoded array of these; the column lists stay comma-separated text until they become a setting.
+ */
+export interface SourceTable {
+  tableName: string;
+  primaryKey: string;
+  columns: string;
+  updatedAtColumn: string;
+}
+
+/**
+ * One Salesforce object an `objects` field syncs, as typed in the form. The field's value is a
+ * JSON-encoded array of these; `fields` stays comma-separated text until it becomes a setting.
+ */
+export interface SourceObject {
+  name: string;
+  fields: string;
+}
 
 /** One choice in a `select` field. */
 export interface SourceFieldOption {

@@ -61,9 +61,9 @@ describe('integrations', () => {
   });
 
   it('sends the settings, secrets included, and labels records with each rule group', () => {
-    const request = toIntegrationRequest({ type: 'mysql', name: 'Team DB', values: { tableName: '' }, audience: [] }, 'mysql');
+    const request = toIntegrationRequest({ type: 'mysql', name: 'Team DB', values: { tables: '' }, audience: [] }, 'mysql');
     expect(request).toEqual({ name: 'team-db', type: 'mysql', settings: {} });
-    const mapped = toIntegrationRequest({ type: 'mysql', name: 'DB', values: { tableName: 'eng' }, audience: [{ group: 'eng', role: 'engineers' }] }, 'mysql');
+    const mapped = toIntegrationRequest({ type: 'mysql', name: 'DB', values: { tables: '[{"tableName":"eng","primaryKey":"id"}]' }, audience: [{ group: 'eng', role: 'engineers' }] }, 'mysql');
     expect(mapped.source).toEqual({ audience: ['eng'], audienceMapping: { eng: 'engineers' } });
   });
 });

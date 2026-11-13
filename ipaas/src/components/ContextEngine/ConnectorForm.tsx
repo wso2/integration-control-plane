@@ -26,7 +26,9 @@ import SecretField from '../common/SecretField';
 import FileVisibilityField from './files/FileVisibilityField';
 import VisibilityComingSoon from './files/VisibilityComingSoon';
 import { StagedFilesSection, StagedVisibilityField } from './files/StagedFilesSection';
+import ObjectsField from './ObjectsField';
 import SourceMark from './SourceMark';
+import TablesField from './TablesField';
 import { connectorHeaderSx, fieldGroupBodySx, fieldGroupChevronSx, fieldGroupToggleSx, fieldStackSx } from './styles';
 import type { ContextSourceConfig, SourceConnector, SourceFieldDef } from '../../types/contextEngine';
 
@@ -109,6 +111,8 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
   // Required-but-empty is signalled by the disabled submit button, not red fields on first open.
   const error = value ? sourceFieldError(def, value) : '';
   if (def.kind === 'secret') return <SecretField label={def.label} required={def.required} value={value} onChange={onChange} error={error || undefined} />;
+  if (def.kind === 'tables') return <TablesField value={value} onChange={onChange} />;
+  if (def.kind === 'objects') return <ObjectsField value={value} onChange={onChange} />;
   if (def.kind === 'file') return <FileField def={def} value={value} onChange={onChange} />;
   const select = def.kind === 'select';
   const multiline = def.kind === 'urls' || def.kind === 'multiline';
