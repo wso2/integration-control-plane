@@ -16,7 +16,7 @@
  * under the License.
  */
 
-/** Managed PostgreSQL databases. Calls the BFF's /db-servers routes, which provision on WSO2 PaaS. */
+/** Managed PostgreSQL databases. Calls the BFF's /platform-services/db-servers routes, which provision on WSO2 PaaS. */
 
 import type { CreateDatabaseInput, DatabaseAvailability, DatabaseBackupPolicy, DatabaseCredentials, DatabaseOffering, DatabasePlan, DatabaseServer, DatabaseServerDetail, DatabaseStatus } from '../types/databases';
 import { bff, items, seg, type ListResponse } from './_client';
@@ -121,24 +121,24 @@ export const toDatabaseOffering = (o: BffOffering): DatabaseOffering => ({
   plane: o.plane,
 });
 
-export const fetchDatabaseAvailability = (): Promise<DatabaseAvailability> => bff.get<BffAvailability>('/db-servers/availability');
+export const fetchDatabaseAvailability = (): Promise<DatabaseAvailability> => bff.get<BffAvailability>('/platform-services/db-servers/availability');
 
-export const fetchDatabaseOffering = (): Promise<DatabaseOffering> => bff.get<BffOffering>('/db-servers/offering').then(toDatabaseOffering);
+export const fetchDatabaseOffering = (): Promise<DatabaseOffering> => bff.get<BffOffering>('/platform-services/db-servers/offering').then(toDatabaseOffering);
 
-export const fetchDatabaseServers = (): Promise<DatabaseServer[]> => bff.get<ListResponse<BffServer>>('/db-servers').then((r) => items(r).map(toDatabaseServer));
+export const fetchDatabaseServers = (): Promise<DatabaseServer[]> => bff.get<ListResponse<BffServer>>('/platform-services/db-servers').then((r) => items(r).map(toDatabaseServer));
 
-export const fetchDatabaseServer = (serverId: string): Promise<DatabaseServerDetail> => bff.get<BffServerDetail>(`/db-servers/${seg(serverId)}`).then(toDatabaseServerDetail);
+export const fetchDatabaseServer = (serverId: string): Promise<DatabaseServerDetail> => bff.get<BffServerDetail>(`/platform-services/db-servers/${seg(serverId)}`).then(toDatabaseServerDetail);
 
-export const createDatabaseServer = (input: CreateDatabaseInput): Promise<DatabaseServer> => bff.post<BffServer>('/db-servers', input).then(toDatabaseServer);
+export const createDatabaseServer = (input: CreateDatabaseInput): Promise<DatabaseServer> => bff.post<BffServer>('/platform-services/db-servers', input).then(toDatabaseServer);
 
 // Each call asks the provider for the credentials again; the BFF keeps nothing.
-export const revealDatabaseCredentials = (serverId: string): Promise<DatabaseCredentials> => bff.get<BffCredentials>(`/db-servers/${seg(serverId)}/credentials`);
+export const revealDatabaseCredentials = (serverId: string): Promise<DatabaseCredentials> => bff.get<BffCredentials>(`/platform-services/db-servers/${seg(serverId)}/credentials`);
 
 // Starts tearing the database down, its backups with it. It lists as DELETING
 // until the provider finishes, then drops out of the list.
-export const deleteDatabaseServer = (serverId: string): Promise<void> => bff.delete<void>(`/db-servers/${seg(serverId)}`);
+export const deleteDatabaseServer = (serverId: string): Promise<void> => bff.delete<void>(`/platform-services/db-servers/${seg(serverId)}`);
 
 // Turns on daily backups at the BFF's fixed retention. The provider applies it
 // asynchronously; the server detail shows it once it lands.
 
-export const enableDatabaseBackups = (serverId: string): Promise<DatabaseBackupPolicy> => bff.post<DatabaseBackupPolicy>(`/db-servers/${seg(serverId)}/backups/enable`);
+export const enableDatabaseBackups = (serverId: string): Promise<DatabaseBackupPolicy> => bff.post<DatabaseBackupPolicy>(`/platform-services/db-servers/${seg(serverId)}/backups/enable`);

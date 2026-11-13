@@ -34,7 +34,7 @@ export const toWorkflowRuntime = (r: BffWorkflowRuntime): WorkflowRuntime => ({
   namespaces: r.namespaces ?? [],
 });
 
-export const fetchWorkflowRuntime = (): Promise<WorkflowRuntime> => bff.get<BffWorkflowRuntime>('/workflow-runtime').then(toWorkflowRuntime);
+export const fetchWorkflowRuntime = (): Promise<WorkflowRuntime> => bff.get<BffWorkflowRuntime>('/platform-services/workflow-runtime').then(toWorkflowRuntime);
 
 // Starts creating the runtime when the organization has none. Creating a workflow integration starts it best-effort; this retries.
-export const ensureWorkflowRuntime = (): Promise<WorkflowRuntime> => bff.post<BffWorkflowRuntime>('/workflow-runtime').then(toWorkflowRuntime);
+export const ensureWorkflowRuntime = (): Promise<WorkflowRuntime> => bff.post<BffWorkflowRuntime>('/platform-services/workflow-runtime').then(toWorkflowRuntime);

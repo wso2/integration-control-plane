@@ -16,7 +16,7 @@
  * under the License.
  */
 
-/** Managed Temporal servers. Calls the BFF's /temporal-servers routes, which provision on WSO2 PaaS. */
+/** Managed Temporal servers. Calls the BFF's /platform-services/temporal-servers routes, which provision on WSO2 PaaS. */
 
 import type { DatabaseStatus } from '../types/databases';
 import type { CreateTemporalInput, TemporalAvailability, TemporalCredentials, TemporalOffering, TemporalPlan, TemporalServer, TemporalServerDetail } from '../types/temporal';
@@ -81,19 +81,19 @@ export const toTemporalOffering = (o: BffOffering): TemporalOffering => ({
   plane: o.plane,
 });
 
-export const fetchTemporalAvailability = (): Promise<TemporalAvailability> => bff.get<TemporalAvailability>('/temporal-servers/availability');
+export const fetchTemporalAvailability = (): Promise<TemporalAvailability> => bff.get<TemporalAvailability>('/platform-services/temporal-servers/availability');
 
-export const fetchTemporalOffering = (): Promise<TemporalOffering> => bff.get<BffOffering>('/temporal-servers/offering').then(toTemporalOffering);
+export const fetchTemporalOffering = (): Promise<TemporalOffering> => bff.get<BffOffering>('/platform-services/temporal-servers/offering').then(toTemporalOffering);
 
-export const fetchTemporalServers = (): Promise<TemporalServer[]> => bff.get<ListResponse<BffServer>>('/temporal-servers').then((r) => items(r).map(toTemporalServer));
+export const fetchTemporalServers = (): Promise<TemporalServer[]> => bff.get<ListResponse<BffServer>>('/platform-services/temporal-servers').then((r) => items(r).map(toTemporalServer));
 
-export const fetchTemporalServer = (serverId: string): Promise<TemporalServerDetail> => bff.get<BffServerDetail>(`/temporal-servers/${seg(serverId)}`).then(toTemporalServerDetail);
+export const fetchTemporalServer = (serverId: string): Promise<TemporalServerDetail> => bff.get<BffServerDetail>(`/platform-services/temporal-servers/${seg(serverId)}`).then(toTemporalServerDetail);
 
-export const createTemporalServer = (input: CreateTemporalInput): Promise<TemporalServer> => bff.post<BffServer>('/temporal-servers', input).then(toTemporalServer);
+export const createTemporalServer = (input: CreateTemporalInput): Promise<TemporalServer> => bff.post<BffServer>('/platform-services/temporal-servers', input).then(toTemporalServer);
 
 // Each call asks the provider for the key again; the BFF keeps nothing.
-export const revealTemporalCredentials = (serverId: string): Promise<TemporalCredentials> => bff.get<TemporalCredentials>(`/temporal-servers/${seg(serverId)}/credentials`);
+export const revealTemporalCredentials = (serverId: string): Promise<TemporalCredentials> => bff.get<TemporalCredentials>(`/platform-services/temporal-servers/${seg(serverId)}/credentials`);
 
 // Starts tearing the server down, its workflow history with it. It lists as
 // DELETING until the provider finishes, then drops out of the list.
-export const deleteTemporalServer = (serverId: string): Promise<void> => bff.delete<void>(`/temporal-servers/${seg(serverId)}`);
+export const deleteTemporalServer = (serverId: string): Promise<void> => bff.delete<void>(`/platform-services/temporal-servers/${seg(serverId)}`);
