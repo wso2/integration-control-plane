@@ -1220,7 +1220,7 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
   const done: Record<GetStartedStep['id'], boolean> = {
     index: !!progress && progress.processed > 0 && progress.active === 0,
     ask: asked,
-    publish: engine.exposure.api || engine.exposure.mcp,
+    publish: !engine.access || engine.access.api || engine.access.mcp,
     grant: engine.queryRoles.length > 0,
   };
   const n = engine.sources.length;

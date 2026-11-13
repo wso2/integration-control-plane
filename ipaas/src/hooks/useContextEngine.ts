@@ -43,6 +43,7 @@ import {
   putContextGrant,
   queryContextEngine,
   revokeContextApiKey,
+  setContextEngineAccess,
   setUpContextEngine,
   updateContextModels,
   updateContextSource,
@@ -50,7 +51,7 @@ import {
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
 import { everyoneRoles, fromDraft, isEngineProgressActive, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
-import type { ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -513,6 +514,19 @@ export function useRevokeContextApiKey(engineId: string) {
   return useMutation({
     mutationFn: (keyName: string) => revokeContextApiKey(engineId, keyName),
     onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'apiKeys', engineId] }),
+  });
+}
+
+/** Turns the engine's API or MCP access on or off; pending until the engine's detail shows the change. */
+export function useSetContextEngineAccess(engineId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<ContextEngineAccess>) => setContextEngineAccess(engineId, input),
+    onSuccess: (access) => {
+      qc.setQueryData<ContextEngineDetail>([ROOT_KEY, 'detail', engineId], (old) => old && { ...old, access, exposure: { ...old.exposure, api: access.api, mcp: access.mcp } });
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
+      return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+    },
   });
 }
 

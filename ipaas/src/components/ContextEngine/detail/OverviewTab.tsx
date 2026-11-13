@@ -33,9 +33,10 @@ import SourcesProgressCard from './SourcesProgressCard';
 import FilesDrawer from '../files/FilesDrawer';
 import EditSourceDrawer from './EditSourceDrawer';
 import EditModelsDrawer from './EditModelsDrawer';
+import AccessSwitch from './AccessSwitch';
 import SourceDrawer from '../SourceDrawer';
 import { deleteCardSx, mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
-import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
   engine: ContextEngineDetail;
@@ -96,6 +97,24 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
   );
 }
 
+/** One public surface: its access switch and a link to its tab. */
+function ExposureRow({ engine, surface, label, disabledReason, onOpen }: { engine: ContextEngineDetail; surface: keyof ContextEngineAccess; label: string; disabledReason?: string; onOpen: () => void }): JSX.Element {
+  return (
+    <Box sx={summaryRowSx}>
+      <Link component="button" type="button" variant="body2" onClick={onOpen}>
+        {label}
+      </Link>
+      {engine.access ? (
+        <AccessSwitch engineId={engine.id} access={engine.access} surface={surface} disabledReason={disabledReason} />
+      ) : (
+        <Typography variant="caption" sx={mutedSx}>
+          Not available yet
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 /** Who can see the models: the engine shows them to anyone with a grant on it. */
 const canSeeModels = (actions: string[] | undefined): boolean => !actions || actions.length > 0;
 
@@ -122,6 +141,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const permissions = useContextPermissions(readOnly ? '' : engine.id);
   // Models are set when the engine is created; the BFF cannot change them yet.
   const canEditModels = CONTEXT_ENGINE_MODEL_UPDATES && !readOnly && !!permissions.data?.includes('engine.manage');
+  const accessDisabledReason = readOnly ? 'The engine is being deleted.' : undefined;
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
   const openModels = () => {
@@ -292,18 +312,8 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
 
         <Grid size={{ xs: 12, md: 4 }}>
           <Card title="Exposure">
-            <Box sx={summaryRowSx}>
-              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('api')}>
-                REST API
-              </Link>
-              <Chip size="small" variant="outlined" color={engine.exposure.api ? 'success' : 'default'} label={engine.exposure.api ? 'Published' : 'Not published'} />
-            </Box>
-            <Box sx={summaryRowSx}>
-              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('mcp')}>
-                MCP server
-              </Link>
-              <Chip size="small" variant="outlined" color={engine.exposure.mcp ? 'success' : 'default'} label={engine.exposure.mcp ? 'Published' : 'Not published'} />
-            </Box>
+            <ExposureRow engine={engine} surface="api" label="REST API" disabledReason={accessDisabledReason} onOpen={() => onGoTab('api')} />
+            <ExposureRow engine={engine} surface="mcp" label="MCP server" disabledReason={accessDisabledReason} onOpen={() => onGoTab('mcp')} />
             <Box sx={summaryRowSx}>
               <Link component="button" type="button" variant="body2" onClick={() => onGoTab('playground')}>
                 Test playground

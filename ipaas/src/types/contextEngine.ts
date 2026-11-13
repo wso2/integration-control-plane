@@ -42,7 +42,6 @@ export interface ContextEngineSummary {
   /** Connector ids of the sources, for the mark cluster. */
   sourceTypes: string[];
   roleCount: number;
-  exposure: ContextEngineExposure;
   /** Source progress roll-up; null when the engine does not report progress. */
   progress: ContextEngineProgressSummary | null;
 }
@@ -61,6 +60,13 @@ export interface ContextEngine {
   createdAt: string;
   /** The gateway URL integrations call; set only while the engine runs. */
   publicApiUrl?: string;
+  /** Whether the gateway lets callers through to the REST API and the MCP server; set only while the engine runs. */
+  access?: ContextEngineAccess;
+}
+
+export interface ContextEngineAccess {
+  api: boolean;
+  mcp: boolean;
 }
 
 /** Which surfaces the engine is published on. */
