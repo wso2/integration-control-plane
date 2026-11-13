@@ -182,16 +182,21 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const getHeaders = useCallback(async () => workflowRequestHeaders(credential.current), []);
   const client = useMemo(() => (baseUrl ? createWorkflowClient({ baseUrl, getHeaders }) : null), [baseUrl, getHeaders]);
 
+  // The key can be held before the security read answers, but the gateway URL and the header the key
+  // goes in are the read's. Until it answers, the URL is the route discovery lists, which serves no
+  // test key and answers no CORS, and a read started then keeps that URL through its retries. So
+  // nothing is read from the API until the security read has answered.
+  const readable = !!client && !!scopeId && access.isAuthorized && access.mode !== null && publicationsKnown && !portalHeld;
   const probe = useQuery({
     queryKey: workflowKeys.runtime(scopeId),
     queryFn: () => client!.runtime.get(),
-    enabled: !!client && !!scopeId && access.isAuthorized && publicationsKnown && !portalHeld,
+    enabled: readable,
     staleTime: 5 * 60_000,
     retry: retryWorkflowRead,
   });
   // Every view on the connection lists the definitions, which don't depend on what the probe answers,
   // so they are read alongside it rather than once the connection is ready.
-  useQuery({ ...definitionsQuery(client!, scopeId), enabled: !!client && !!scopeId && access.isAuthorized && publicationsKnown && !portalHeld });
+  useQuery({ ...definitionsQuery(client!, scopeId), enabled: readable });
 
   // When the held key was minted, to tell a stale key's refusal from any other. The key is shared,
   // so it can be older than this connection.
