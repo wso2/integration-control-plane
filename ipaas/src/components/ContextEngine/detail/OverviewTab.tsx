@@ -98,16 +98,13 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
 }
 
 /** One public surface: its access switch, a link to its tab, and what an off switch means. */
-function ExposureRow({ engine, surface, label, link, disabledReason, onOpen }: { engine: ContextEngineDetail; surface: keyof ContextEngineAccess; label: string; link: string; disabledReason?: string; onOpen: () => void }): JSX.Element {
+function ExposureRow({ engine, surface, label, disabledReason, onOpen }: { engine: ContextEngineDetail; surface: keyof ContextEngineAccess; label: string; disabledReason?: string; onOpen: () => void }): JSX.Element {
   return (
     <Box sx={summaryRowSx}>
       <Box>
-        <Stack direction="row" alignItems="baseline" gap={1.5}>
-          <Typography variant="body2">{label}</Typography>
-          <Link component="button" type="button" variant="body2" onClick={onOpen}>
-            {link}
-          </Link>
-        </Stack>
+        <Link component="button" type="button" variant="body2" onClick={onOpen}>
+          {label}
+        </Link>
         {engine.access?.[surface] === false && (
           <Typography variant="caption" sx={mutedSx}>
             Clients get a 403 until it&apos;s turned on.
@@ -322,15 +319,12 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
 
         <Grid size={{ xs: 12, md: 4 }}>
           <Card title="Exposure">
-            <ExposureRow engine={engine} surface="api" label="REST API" link="View API →" disabledReason={accessDisabledReason} onOpen={() => onGoTab('api')} />
-            <ExposureRow engine={engine} surface="mcp" label="MCP server" link="View MCP →" disabledReason={accessDisabledReason} onOpen={() => onGoTab('mcp')} />
+            <ExposureRow engine={engine} surface="api" label="REST API" disabledReason={accessDisabledReason} onOpen={() => onGoTab('api')} />
+            <ExposureRow engine={engine} surface="mcp" label="MCP server" disabledReason={accessDisabledReason} onOpen={() => onGoTab('mcp')} />
             <Box sx={summaryRowSx}>
-              <Stack direction="row" alignItems="baseline" gap={1.5}>
-                <Typography variant="body2">Test playground</Typography>
-                <Link component="button" type="button" variant="body2" onClick={() => onGoTab('playground')}>
-                  Open →
-                </Link>
-              </Stack>
+              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('playground')}>
+                Test playground
+              </Link>
               <Chip size="small" variant="outlined" label="Always on" />
             </Box>
           </Card>
