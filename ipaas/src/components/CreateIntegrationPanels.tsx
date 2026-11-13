@@ -145,11 +145,11 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
   const handleImportClick = () => {
     if (creationBlocked) return;
     const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
-    optionSelected('import-repo');
     if (!githubAppClientId) {
       // No GitHub App configured means private-repo authorization is impossible,
       // so land the import page in public-URL mode instead of its default
       // (private) mode with a dead Authorize button.
+      optionSelected('import-repo');
       navigate(importUrl, { state: { mode: 'public' } });
       return;
     }
@@ -166,6 +166,8 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       return;
     }
     trackEvent('component-create-import-github', { org: scope.org, project: scope.project, provider: GitProvider.GITHUB });
+    // Counted once the popup is open: a blocked popup is retried, and one choice must not count twice.
+    optionSelected('import-repo');
     const gitAuthorization = (outcome: 'started' | 'failed' | 'cancelled') => trackConsoleAction(ConsoleAction.GitAuthorization, { outcome, git_provider: 'github' });
     gitAuthorization('started');
 
