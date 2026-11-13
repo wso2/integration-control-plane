@@ -16,13 +16,12 @@
  * under the License.
  */
 
-import { Box, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
-import { CircleCheck, CircleX, Clock } from '@wso2/oxygen-ui-icons-react';
+import { Box, Stack, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import type { Step, StepStatus } from '../types/stepper';
 import type { BuildTone } from '../utils/buildProgress';
 
-const TONE_COLOR: Record<BuildTone, 'warning' | 'success' | 'error' | null> = { running: 'warning', success: 'success', error: 'error', neutral: null };
+const TONE_COLOR: Record<BuildTone, string> = { running: 'warning.main', success: 'success.main', error: 'error.main', neutral: 'text.disabled' };
 
 const SEGMENT_COLOR: Partial<Record<StepStatus, string>> = {
   success: 'success.main',
@@ -32,17 +31,23 @@ const SEGMENT_COLOR: Partial<Record<StepStatus, string>> = {
 
 const pillSx = { flexShrink: 0 } as const;
 
+const pulse = {
+  '@keyframes buildPillPulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
+  animation: 'buildPillPulse 1.4s ease-in-out infinite',
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+} as const;
+
 const segmentSx = (status: StepStatus) =>
   ({
     width: 36,
     height: 6,
     borderRadius: 3,
     bgcolor: SEGMENT_COLOR[status] ?? 'divider',
-    ...(status === 'inProgress' && {
-      '@keyframes buildPillPulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
-      animation: 'buildPillPulse 1.4s ease-in-out infinite',
-    }),
+    ...(status === 'inProgress' && pulse),
   }) as const;
+
+// The environment cards' status dot (Overview/_shared/StatusDot), pulsing while the build runs.
+const dotSx = (tone: BuildTone) => ({ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: TONE_COLOR[tone], ...(tone === 'running' && pulse) }) as const;
 
 // A text line's box keeps room above the capitals and below the baseline, so a label like
 // "Completed" (no descenders) sits higher than its box's centre and the segments beside it look low.
@@ -50,8 +55,6 @@ const segmentSx = (status: StepStatus) =>
 // without text-box trimming fall back to a line height of 1, which gets most of the way.
 const textSx = { lineHeight: 1, textBox: 'trim-both cap alphabetic' } as const;
 const labelSx = { ...textSx, fontWeight: 500 } as const;
-
-const iconSx = (tone: BuildTone) => ({ display: 'inline-flex', color: TONE_COLOR[tone] ? `${TONE_COLOR[tone]}.main` : 'text.secondary' }) as const;
 
 interface BuildStatusPillProps {
   tone: BuildTone;
@@ -62,7 +65,7 @@ interface BuildStatusPillProps {
 }
 
 /**
- * The latest build's status in its card header: an icon in the build's colour and a label,
+ * The latest build's status in its card header: a dot in the build's colour and a label,
  * with one segment per stage while it runs or once it has failed. While the build runs it names the
  * stage it is on and how far along it is ("Build source & test ▬▬▭ 2/3").
  */
@@ -79,12 +82,12 @@ export default function BuildStatusPill({ tone, label, steps }: BuildStatusPillP
 
   return (
     <Stack direction="row" alignItems="center" gap={1.25} role="img" aria-label={spoken} sx={pillSx}>
-      <Box component="span" aria-hidden="true" sx={iconSx(tone)}>
-        {tone === 'running' ? <CircularProgress size={14} color="warning" /> : tone === 'success' ? <CircleCheck size={16} /> : tone === 'error' ? <CircleX size={16} /> : <Clock size={16} />}
-      </Box>
-      <Typography variant="body2" color="text.primary" sx={labelSx} aria-hidden="true">
-        {text}
-      </Typography>
+      <Stack direction="row" alignItems="center" gap={0.75}>
+        <Box component="span" aria-hidden="true" sx={dotSx(tone)} />
+        <Typography variant="body2" color="text.primary" sx={labelSx} aria-hidden="true">
+          {text}
+        </Typography>
+      </Stack>
       {showSegments && (
         <Stack direction="row" gap={0.5} aria-hidden="true">
           {steps.map((step) => (

@@ -21,9 +21,29 @@ import type { JSX } from 'react';
 import { SECURITY_MODE_LABEL } from '../constants/apiConsumption';
 import type { EndpointTestAccess } from '../hooks/useEndpointTestAccess';
 
+/** API-key auth set only at the API level, which the gateway does not enforce. */
+const NOT_ENFORCED = 'This endpoint is set to API key authentication, but the gateway doesn’t enforce it, so calls get through without a key and it can’t issue a test key.';
+
 /** Shown when ipaas-service refuses a test key because the endpoint uses another auth mode; offers the switch where `access.canSwitch`. */
 export default function ApiKeyAuthOffer({ access, sx }: { access: EndpointTestAccess; sx?: SxProps<Theme> }): JSX.Element | null {
   if (!access.needsApiKeyAuth) return null;
+  if (access.apiKeyNotEnforced) {
+    return (
+      <Alert
+        severity="info"
+        sx={sx}
+        action={
+          access.canSwitch && (
+            <Button color="inherit" size="small" disabled={access.isSwitching} onClick={() => void access.switchToApiKey()}>
+              Enforce API key
+            </Button>
+          )
+        }>
+        {NOT_ENFORCED}
+        {access.canSwitch && ' Enforcing it makes every caller of this API send a key.'}
+      </Alert>
+    );
+  }
   return (
     <Alert
       severity="info"

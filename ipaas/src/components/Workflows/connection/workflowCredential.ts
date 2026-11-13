@@ -78,7 +78,7 @@ export interface WorkflowNotice {
   text: string;
 }
 
-type TestKeyAccess = Pick<EndpointTestAccess, 'isUnavailable' | 'securityError' | 'mode' | 'isAuthorized' | 'keyError' | 'canCreateKey' | 'needsApiKeyAuth' | 'canSwitch' | 'managedIn'>;
+type TestKeyAccess = Pick<EndpointTestAccess, 'isUnavailable' | 'securityError' | 'mode' | 'isAuthorized' | 'keyError' | 'canCreateKey' | 'needsApiKeyAuth' | 'apiKeyNotEnforced' | 'canSwitch' | 'managedIn'>;
 
 /** The reason the endpoint's test access leaves the management API out of reach, or null. */
 export function testKeyReasonOf(access: TestKeyAccess): TestKeyReason | null {
@@ -114,6 +114,10 @@ export function testKeyNotice(reason: TestKeyReason, access: TestKeyAccess): Wor
     case 'key-refused':
       return { severity: 'info', text: 'Your role can’t create test keys, so the console can’t call the Workflow Management API.' };
     case 'needs-api-key': {
+      if (access.apiKeyNotEnforced) {
+        const enforce = access.canSwitch ? 'Enforcing it makes every caller of this API send a key.' : 'Your role can’t enforce it.';
+        return { severity: 'info', text: `The Workflow Management API is set to API key authentication, but the gateway doesn’t enforce it, so it can’t issue the test key the console calls it with. ${enforce}` };
+      }
       const mode = access.mode ? SECURITY_MODE_LABEL[access.mode] : 'another';
       const choice = access.canSwitch ? 'Switching it to API key changes how every caller of this API authenticates.' : 'Your role can’t switch it to API key.';
       return { severity: 'info', text: `The Workflow Management API uses ${mode} authentication, so it can’t issue the test key the console calls it with. ${choice}` };

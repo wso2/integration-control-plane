@@ -147,11 +147,12 @@ export function useSetEndpointSecurity(ref: EndpointRef | null | undefined) {
 
 /** Switches the endpoint to API-key auth (`PUT …/security/api-key`). */
 /** Switch an endpoint to API-key auth; the endpoint is the mutation's variable, so a later selection can't redirect it. */
+/** Enables API-key auth on `ref`, reading the key from `header` when given, else from the default header. */
 export function useEnableEndpointApiKeyAuth() {
   const qc = useQueryClient();
-  return useMutation<boolean, Error, EndpointRef>({
-    mutationFn: (ref) => setEndpointApiKeyAuth(ref, true),
-    onSuccess: (_, ref) => qc.invalidateQueries({ queryKey: securityKey(ref) }),
+  return useMutation<boolean, Error, { ref: EndpointRef; header?: string }>({
+    mutationFn: ({ ref, header }) => (header ? setEndpointApiKeyAuth(ref, true, { key: header }) : setEndpointApiKeyAuth(ref, true)),
+    onSuccess: (_, { ref }) => qc.invalidateQueries({ queryKey: securityKey(ref) }),
   });
 }
 

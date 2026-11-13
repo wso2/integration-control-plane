@@ -101,6 +101,23 @@ describe('ApiKeyAuthOffer', () => {
     expect(button(c, 'Switch to API key')).toBeUndefined();
   });
 
+  it('offers to enforce API-key auth the gateway does not enforce, in the header the endpoint reports', async () => {
+    vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'api-key', apiKey: { header: 'X-Orders-Key' }, publicUrl: 'https://gw.example/orders' } as never);
+    vi.mocked(createEndpointTestKey).mockRejectedValue(new BffError(409, JSON.stringify({ code: 'API_KEY_AUTH_NOT_ENFORCED', message: 'not enforced' })));
+    const c = await refusedTestKey(DEVELOPER);
+    await vi.waitFor(async () => {
+      await flush();
+      expect(document.body.textContent).toContain('the gateway doesn’t enforce it');
+    });
+    expect(button(c, 'Switch to API key')).toBeUndefined();
+
+    vi.mocked(createEndpointTestKey).mockResolvedValue({ keyId: 'k', apiKey: 'test-key-1' });
+    await act(async () => button(c, 'Enforce API key')!.click());
+    await flush();
+    expect(setEndpointApiKeyAuth).toHaveBeenCalledWith(ref, true, { key: 'X-Orders-Key' });
+    expect(c.querySelector('output')?.textContent).toBe('test-key-1');
+  });
+
   it('asks nothing for a Viewer, who may not create test keys', async () => {
     await refusedTestKey(VIEWER);
     expect(createEndpointTestKey).not.toHaveBeenCalled();

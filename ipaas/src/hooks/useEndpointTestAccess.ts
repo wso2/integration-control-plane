@@ -22,7 +22,7 @@ import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
 import { isCompleteRef, useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
 import type { ApiKeyResult, EndpointRef, SecurityMode } from '../types/consumers';
 import { codedApiError, friendlyApiError } from '../utils/apiSecurity';
-import { httpStatusOf, isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
+import { httpStatusOf, isApiKeyAuthNotEnforced, isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
 import { aiGatewayAccessOf, mcpUrlOf, type AiGatewayAccess } from '../utils/mcpGateway';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
@@ -64,6 +64,11 @@ export interface EndpointTestAccess {
   /** The endpoint uses another auth mode (jwt, or a refused test key says so), so it takes no test key until switched to API-key auth. */
   needsApiKeyAuth: boolean;
   /**
+   * A `needsApiKeyAuth` where the endpoint reports API-key auth but the policy sits only at the API level, where the gateway
+   * doesn't enforce it, so calls get through without a key. `switchToApiKey()` enforces it.
+   */
+  apiKeyNotEnforced: boolean;
+  /**
    * The role may switch the endpoint to API-key auth, and the environment may change the API's security. Never for an AI
    * agent: its security comes from Agent Manager, while the switch edits the API Platform's API. Never where the API's
    * security comes only by promotion (`managedIn`): ipaas-service refuses the switch there.
@@ -76,7 +81,10 @@ export interface EndpointTestAccess {
   managedIn: string | null;
   /** The endpoint is being switched to API-key auth. */
   isSwitching: boolean;
-  /** Switch the endpoint to API-key auth, then mint. Resolves to the plaintext, or `null` on failure. */
+  /**
+   * Switch the endpoint to API-key auth, in the header it reports when it has one so no caller's header changes, then
+   * mint. Resolves to the plaintext, or `null` on failure.
+   */
   switchToApiKey: () => Promise<string | null>;
   /**
    * The endpoint cannot be reached through the gateway: its security config could
@@ -141,6 +149,8 @@ interface HeldKey {
   mintedAt: number;
   /** When to mint again (epoch ms): a minute before it expires. */
   renewAt: number;
+  /** The request header it goes in, when the mint named one. */
+  header?: string;
 }
 
 const heldKeyQueryKey = (refKey: string) => ['endpoint-test-key', refKey] as const;
@@ -165,7 +175,7 @@ async function mintHeldKey(mint: (target: EndpointRef) => Promise<ApiKeyResult>,
   const result = await mint(target);
   // An answer without a key is a failed mint: held as one, a view that mounts tries again.
   if (!result?.apiKey) throw new Error('The test-key route answered without a key.');
-  return { key: result.apiKey, mintedAt, renewAt: keyRenewalTime(result.expiresAt, mintedAt) };
+  return { key: result.apiKey, mintedAt, renewAt: keyRenewalTime(result.expiresAt, mintedAt), header: result.header };
 }
 
 /**
@@ -199,9 +209,15 @@ interface TestAccessOptions {
   gatewayUrlFallback?: string;
   /** An AI agent's test key comes from Agent Manager, which also checks `amp:agent:api-key-manage`. */
   agent?: boolean;
+  /**
+   * Mint without waiting for the security read, for a caller that needs the key before anything else. ipaas-service
+   * mints only for an endpoint already on API-key auth, and refuses otherwise without changing it, so the outcome is
+   * the one waiting would give. The mint names the key's header, so the key is usable before the security read answers.
+   */
+  mintEarly?: boolean;
 }
 
-export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false }: TestAccessOptions = {}): EndpointTestAccess {
+export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { enabled = true, mint = true, gatewayUrlFallback = '', agent = false, mintEarly = false }: TestAccessOptions = {}): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError, isLoading: isSecurityLoading } = useEndpointSecurity(ref, enabled);
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
@@ -231,7 +247,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     queryKey: heldKeyQueryKey(refKey),
     queryFn: () => mintHeldKey(createKeyFor, endpoint!),
     // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
-    enabled: enabled && isCompleteRef(endpoint) && autoMint && mode === 'api-key',
+    enabled: enabled && isCompleteRef(endpoint) && autoMint && (mode === 'api-key' || (mintEarly && !security && !securityError)),
     // Fresh until it is due for renewal, so a view that mounts later uses the held key.
     staleTime: (query) => Math.max((query.state.data?.renewAt ?? 0) - Date.now(), 0),
     gcTime: HELD_KEY_GC_MS,
@@ -257,10 +273,13 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const needsKey = !aiGateway && (mode === 'api-key' || mode === 'jwt');
   // A mint in flight is the answer to the last failure, so the failure is not shown meanwhile.
   const mintError = held.isFetching ? null : held.error;
-  const apiKeyRequired = !!mintError && isApiKeyAuthRequired(mintError);
+  const authRefused = !!mintError && isApiKeyAuthRequired(mintError);
+  // An open endpoint takes no key, so the refusal of a mint sent before its security read answered is neither a switch
+  // to offer nor a failure to show. The refusal stays on the held key's query, where every view of the endpoint reads it.
+  const apiKeyRequired = authRefused && mode !== 'none';
   // The API Platform's reading of a 404 or 409, an endpoint not exposed as an API yet, doesn't apply on the AI gateway.
   const gatewayMisread = !!aiGateway && !!mintError && !codedApiError(mintError) && [404, 409].includes(httpStatusOf(mintError));
-  const mintFailure = mintError && !apiKeyRequired && !isPermissionError(mintError) ? (gatewayMisread ? MINT_FAILED : friendlyApiError(mintError, MINT_FAILED)) : null;
+  const mintFailure = mintError && !authRefused && !isPermissionError(mintError) ? (gatewayMisread ? MINT_FAILED : friendlyApiError(mintError, MINT_FAILED)) : null;
   const keyError = !canCreateKey && needsKey ? MINT_REFUSED : switchFailure?.refKey === refKey ? switchFailure.message : mintFailure;
 
   const mintFor = useCallback(
@@ -309,19 +328,20 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   }, [autoMint, mode, refKey, renewKey, apiKey]);
 
   const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
+  const securityHeader = security?.apiKey?.header;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
     if (!endpoint || !switchable) return null;
     const target = endpoint;
     setSwitchFailure(null);
     try {
-      await enableApiKeyAuthFor(target);
+      await enableApiKeyAuthFor({ ref: target, header: securityHeader });
     } catch (err) {
       if (!isPermissionError(err)) setSwitchFailure({ refKey: keyOf(target), message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
       return null;
     }
     // Once the mode reads as api-key the held key's query would mint too; it joins this mint instead.
     return mintFor(target);
-  }, [endpoint, switchable, enableApiKeyAuthFor, mintFor]);
+  }, [endpoint, switchable, enableApiKeyAuthFor, securityHeader, mintFor]);
 
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
   // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
@@ -335,7 +355,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     aiGateway,
     mcpUrl,
     mode,
-    authHeader: security?.apiKey?.header || DEFAULT_API_KEY_HEADER,
+    authHeader: security?.apiKey?.header || held.data?.header || DEFAULT_API_KEY_HEADER,
     apiKey,
     keyMintedAt: apiKey ? (held.data?.mintedAt ?? 0) : 0,
     // An open (mode `none`) endpoint needs no credential; anything else does.
@@ -345,9 +365,10 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     canCreateKey,
     keyError,
     needsApiKeyAuth: autoMint && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
+    apiKeyNotEnforced: autoMint && !!mintError && isApiKeyAuthNotEnforced(mintError),
     canSwitch: switchable,
     managedIn,
-    isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
+    isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables?.ref) === refKey,
     switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never
     // reports unavailable — only a real answer does.

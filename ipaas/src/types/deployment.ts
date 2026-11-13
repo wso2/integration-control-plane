@@ -95,8 +95,6 @@ export interface ComponentDeployment {
       author: { name: string; date: string; email: string; avatarUrl: string };
     };
   };
-  /** Integration-as-API only: the API gateway's state for this environment. */
-  proxyReconciliation?: ProxyReconciliationStatus;
 }
 
 export interface BuildRun {

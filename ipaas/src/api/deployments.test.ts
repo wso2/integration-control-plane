@@ -26,7 +26,7 @@ vi.mock('./_client', async (importOriginal) => {
   return { ...actual, bff: { ...actual.bff, get, post } };
 });
 
-import { fetchComponentDeployment, fetchDeploymentStatus, fetchDeploymentTrackImages, fetchReleaseMgtDeployments, promote, retryProxyReconciliation, toEnvEndpoint } from './deployments';
+import { fetchComponentDeployment, fetchDeploymentStatus, fetchDeploymentTrackImages, fetchReleaseMgtDeployments, promote, fetchProxyReconciliation, retryProxyReconciliation, toEnvEndpoint } from './deployments';
 
 // The two URLs OpenChoreo actually reports in a ReleaseBinding's status: Project reaches the
 // Service directly. Organization has no OpenChoreo-level address of its own — it goes through
@@ -165,6 +165,12 @@ describe('API exposure wire contract', () => {
     post.mockResolvedValue({ message: 'rel-1', proxyReconciliation: { status: 'FAILED', error: 'APIP_SOURCE_BUILD_UNAVAILABLE' } });
     const result = await promote({ componentId: 'orders' } as Parameters<typeof promote>[0]);
     expect(result.proxyReconciliation).toEqual({ status: 'FAILED', error: 'APIP_SOURCE_BUILD_UNAVAILABLE' });
+  });
+
+  it('reads one environment of one track, and no state as none', async () => {
+    get.mockResolvedValue(null);
+    expect(await fetchProxyReconciliation('orders', 'production', 'project-a', 'v1')).toBeNull();
+    expect(get).toHaveBeenCalledWith('/components/orders/environments/production/api-proxy-reconciliation?projectName=project-a&deploymentTrackId=v1');
   });
 
   it('retries one environment of one track', async () => {

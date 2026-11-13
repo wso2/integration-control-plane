@@ -15,7 +15,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { Box, Button, Collapse, Divider, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Collapse, Stack, Typography } from '@wso2/oxygen-ui';
 import { List } from '@wso2/oxygen-ui-icons-react';
 import CommitSummary from './CommitSummary';
 import { CARD_HEADER_TITLE_SX } from '../constants/styles';
@@ -114,8 +114,9 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
       </Stack>
 
       <Collapse in={showLogs} unmountOnExit>
-        <Divider sx={styles.dividerSx} />
-        <BuildLogViewer logs={logs} logsLoading={queryLoading} showLogs live={isBuildLive(status)} />
+        <Box sx={styles.logsSx}>
+          <BuildLogViewer logs={logs} logsLoading={queryLoading} showLogs live={isBuildLive(status)} />
+        </Box>
       </Collapse>
     </Box>
   );

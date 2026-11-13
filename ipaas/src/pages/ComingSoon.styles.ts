@@ -53,6 +53,26 @@ export const artSx = {
   },
 } as const;
 
+/** The no-entry sign draws itself in once, ring first and then the bar, while the dotted frame drifts. */
+export const unavailableArtSx = {
+  ...artSx,
+  '& .na-sign, & .na-slash': {
+    strokeDashoffset: 1,
+    animation: 'naDraw 0.9s ease-out forwards',
+  },
+  '& .na-slash': {
+    animationDelay: '0.6s',
+    animationDuration: '0.5s',
+  },
+  '@keyframes naDraw': {
+    to: { strokeDashoffset: 0 },
+  },
+  '@media (prefers-reduced-motion: reduce)': {
+    '& .cs-ring': { animation: 'none' },
+    '& .na-sign, & .na-slash': { animation: 'none', strokeDashoffset: 0 },
+  },
+} as const;
+
 export const textStackSx = {
   maxWidth: 480,
   textAlign: 'center',

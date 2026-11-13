@@ -116,6 +116,7 @@ import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
+import { rememberLastProject } from '../utils/lastProject';
 import { expandedMenusFrom } from '../utils/sidebar';
 
 // The theme's paper is 78% opaque and relies on a backdrop blur, which the trial usage panel (inside the header's own
@@ -143,7 +144,7 @@ export default function AppLayout(): JSX.Element {
   useSessionAnalytics();
   useMutationErrorTracking();
 
-  const { username, displayName, pictureUrl, logout, userId, orgHandle: sessionOrg } = useAuth();
+  const { username, displayName, pictureUrl, logout, orgHandle: sessionOrg } = useAuth();
   const userName = displayName || username || 'User';
   // Oxygen falls back to one letter when a picture fails, so it only gets the picture once it has loaded.
   const loadedPicture = useLoadedImage(pictureUrl);
@@ -259,12 +260,12 @@ export default function AppLayout(): JSX.Element {
   // to any other org shows "no access" with a way back to the user's own org.
   const orgAccessDenied = !!scope.org && scope.org !== sessionOrg;
 
-  // Persist last visited project so post-login can navigate back to it
+  // Only a project that loaded is remembered, by handle: a URL may name it by id, or name one that doesn't exist.
+  const openProject = hasProject(scope) ? project?.handler : undefined;
   useEffect(() => {
-    if (userId && hasProject(scope) && !orgAccessDenied) {
-      local.set(`last_project:${userId}`, JSON.stringify({ org: scope.org, project: scope.project }));
-    }
-  }, [userId, scope, orgAccessDenied]);
+    if (orgAccessDenied || (hasProject(scope) && !openProject)) return;
+    rememberLastProject(openProject);
+  }, [orgAccessDenied, scope, openProject]);
 
   // Find component UUID for permission checks
   const currentComponent = hasComponent(scope) ? components.find((c) => c.handler === scope.component) : undefined;

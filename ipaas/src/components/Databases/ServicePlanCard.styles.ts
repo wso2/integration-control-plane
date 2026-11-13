@@ -23,8 +23,6 @@ export const cardSx = (selected: boolean, disabled: boolean) =>
     height: '100%',
     borderRadius: '8px',
     borderColor: selected ? 'primary.main' : 'divider',
-    // A tint over Oxygen's own card surface, so both themes keep their card colour.
-    backgroundImage: (theme: Theme) => (selected ? `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.12)}, ${alpha(theme.palette.primary.main, 0.03)})` : 'none'),
     boxShadow: (theme: Theme) => (selected ? `0 0 0 4px ${alpha(theme.palette.primary.main, 0.12)}` : 'none'),
     // Only the hover lift animates; selection repaints at once so a click feels instant.
     transition: 'transform 0.15s',

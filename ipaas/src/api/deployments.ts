@@ -258,6 +258,11 @@ export const triggerBuild = (input: DeployComponentInput): Promise<{ message: st
 
 export const promote = (input: PromoteInput): Promise<PromoteResult> => bff.post<PromoteResult | null>(`/components/${seg(input.componentId)}/deployments/promote`, input).then((r) => r ?? { message: '' });
 
+// One environment's API gateway state. The BFF checks every endpoint on API Platform for it, so it is
+// read on its own rather than with the deployment, whose readers mostly don't need it.
+export const fetchProxyReconciliation = (componentId: string, environmentId: string, projectName: string, versionId: string): Promise<ProxyReconciliationStatus | null> =>
+  bff.get<ProxyReconciliationStatus | null>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/api-proxy-reconciliation${q({ projectName, deploymentTrackId: versionId })}`).then((status) => status ?? null);
+
 // Re-runs the API gateway reconciliation of one environment's release, e.g. after a failure the
 // background retry has given up on.
 export const retryProxyReconciliation = (componentId: string, environmentId: string, projectName: string, versionId: string): Promise<ProxyReconciliationStatus> =>
