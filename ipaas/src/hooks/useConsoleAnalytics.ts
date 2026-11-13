@@ -28,6 +28,7 @@ import { useAuth } from '../auth';
 import { ConsoleAction, flushConsoleActions, trackConsoleAction, type AbandonedEntity, type ConsoleActionDimensions, type ConsoleActionName } from '../services/telemetry/consoleActions';
 import { httpCodeOf, httpStatusOf, isPermissionError, refusedRoute, refusedScope } from '../utils/apiErrors';
 import { entityScopeOf, routeTemplate, type RouteNode } from '../utils/consoleRoute';
+import { local } from '../utils/storage';
 import type { FunnelOperation } from '../types/telemetry';
 
 /** Reports a page view on every navigation, as the route template the path renders. Mount once, in App. */
@@ -45,14 +46,14 @@ export function usePageViewTracking(routes: RouteNode[]): void {
   }, [routes, pathname]);
 }
 
-const SEEN_KEY_PREFIX = 'ipaas.console.seen.';
+const SEEN_KEY_PREFIX = 'console_seen:';
 
 /** Whether this is the user's first console session in this browser, remembering that it no longer is. */
 function isFirstSession(userId: string): boolean {
   try {
     const key = SEEN_KEY_PREFIX + userId;
-    if (window.localStorage.getItem(key) !== null) return false;
-    window.localStorage.setItem(key, '1');
+    if (local.get(key) !== null) return false;
+    local.set(key, '1');
     return true;
   } catch {
     // Blocked storage: a first session on every load would be worse data than none.

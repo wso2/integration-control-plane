@@ -126,6 +126,13 @@ describe('useSessionAnalytics', () => {
     expect(calls(ConsoleAction.SessionStart)).toHaveLength(2);
     expect(calls(ConsoleAction.FirstSession)).toHaveLength(1);
   });
+
+  it("remembers the first session under this console's storage prefix", async () => {
+    resetSessionForTest();
+    await render(<Session />);
+    expect(window.localStorage.getItem('icp:console_seen:user-1')).toBe('1');
+    expect(Object.keys(window.localStorage).filter((key) => !key.startsWith('icp:'))).toEqual([]);
+  });
 });
 
 // The rendered mutation's trigger, for the test to call.
