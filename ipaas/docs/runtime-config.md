@@ -55,6 +55,8 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `AI_COPILOT_URL_SUFFIX`                                                      | Copilot path on the system APIs gateway                                                                                  |
 | `MOESIF_APP_URL`                                                             | API Insights. See below.                                                                                                 |
 | `TRACKING_ENV`                                                               | Analytics tier: `dev`, `stage`, `prod` or `off`. Picks the GTM container and CookiePro script. Defaults to `dev`.        |
+| `GTM_CONTAINER_ID`                                                           | WSO2 Cloud-wide GTM container ID (`GTM-...`), owned by the cloud team. Overrides the `TRACKING_ENV` default. Malformed values are ignored. |
+| `COOKIEPRO_DOMAIN_SCRIPT_ID`                                                 | WSO2 Cloud-wide CookiePro domain script ID (a UUID, `-test` suffix allowed). Overrides the `TRACKING_ENV` default. Malformed values are ignored. |
 | `MOESIF_APP_API_KEY`                                                         | Moesif app key for product-usage events, set per deployment. Not API Insights. Unset disables Moesif tracking.           |
 | `SCOPES_ENFORCED`                                                            | `true` hides what the user's role doesn't allow. Set with ipaas-service's `SCOPES_ENFORCED`.                             |
 

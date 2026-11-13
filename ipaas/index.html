@@ -12,7 +12,8 @@
     <title>WSO2 Integration</title>
   </head>
 
-  <body>
+  <!-- Clarity: mask all page text in session recordings. On <body>, not #root, so MUI portals (dialogs, menus, tooltips) are masked too. Never add data-clarity-unmask over customer data. -->
+  <body data-clarity-mask="true">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

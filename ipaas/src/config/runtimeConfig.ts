@@ -65,6 +65,10 @@ interface RuntimeConfig {
   MOESIF_APP_URL?: string;
   /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
   TRACKING_ENV?: string;
+  /** WSO2 Cloud-wide GTM container ID, e.g. "GTM-XXXXXXX". Overrides the TRACKING_ENV default. */
+  GTM_CONTAINER_ID?: string;
+  /** WSO2 Cloud-wide CookiePro domain script ID. Overrides the TRACKING_ENV default. */
+  COOKIEPRO_DOMAIN_SCRIPT_ID?: string;
   MOESIF_APP_API_KEY?: string;
   SCOPES_ENFORCED?: string | boolean;
 }
@@ -156,6 +160,10 @@ export interface ApiConfig {
   moesifAppUrl?: string;
   /** Which tracking codes (GTM container, CookiePro domain script) to load; 'off' loads none. */
   trackingEnv: 'dev' | 'stage' | 'prod' | 'off';
+  /** Shared WSO2 Cloud GTM container; unset uses the trackingEnv default. */
+  gtmContainerId?: string;
+  /** Shared WSO2 Cloud CookiePro domain script; unset uses the trackingEnv default. */
+  cookieProDomainScriptId?: string;
   /** Moesif app key for product-usage analytics. Separate from the API Insights embed above. Unset disables Moesif tracking. */
   moesifAppApiKey?: string;
   /** Hide actions the user's role doesn't allow. Set from the same deployment variable as ipaas-service's SCOPES_ENFORCED, so the console hides what ipaas-service refuses. */
@@ -181,6 +189,16 @@ function parseTrackingEnv(value: unknown): ApiConfig['trackingEnv'] {
   if (value === 'stage' || value === 'prod' || value === 'off') return value;
   if (typeof value === 'string' && value.trim() !== '' && value !== 'dev') console.warn(`Unrecognized TRACKING_ENV "${value}"; using 'dev'.`);
   return 'dev';
+}
+
+// The IDs go into a script URL and attribute, so only their known shapes are accepted.
+// A malformed value is warned about and dropped, so the trackingEnv default applies instead.
+function parseTrackingId(value: unknown, pattern: RegExp, key: string): string | undefined {
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  const id = value.trim();
+  if (pattern.test(id)) return id;
+  console.warn(`Ignoring malformed ${key} "${id}".`);
+  return undefined;
 }
 
 // Default configuration (used as fallback if config.json fails to load)
@@ -284,6 +302,8 @@ export async function loadConfig(): Promise<void> {
       integrationBuilderCentralGraphqlUrl: config.INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL || 'https://api.dev-central.ballerina.io/2.0/graphql',
       moesifAppUrl: config.MOESIF_APP_URL?.trim() || undefined,
       trackingEnv: parseTrackingEnv(config.TRACKING_ENV),
+      gtmContainerId: parseTrackingId(config.GTM_CONTAINER_ID, /^GTM-[A-Z0-9]+$/, 'GTM_CONTAINER_ID'),
+      cookieProDomainScriptId: parseTrackingId(config.COOKIEPRO_DOMAIN_SCRIPT_ID, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(-test)?$/i, 'COOKIEPRO_DOMAIN_SCRIPT_ID'),
       // config.json is untyped: a non-string value must not throw here and reset the whole config.
       moesifAppApiKey: typeof config.MOESIF_APP_API_KEY === 'string' ? config.MOESIF_APP_API_KEY.trim() || undefined : undefined,
       scopesEnforced: config.SCOPES_ENFORCED === 'true' || config.SCOPES_ENFORCED === true,
