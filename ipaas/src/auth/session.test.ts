@@ -17,7 +17,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { authenticatedFetch, connect, disconnect, getAccessToken, getOrgUuidFromToken, type CloudSession } from './session';
+import { authenticatedFetch, connect, disconnect, getAccessToken, getOrgUuidFromToken, refreshTokenExpiringWithin, type CloudSession } from './session';
 
 const NOW = 1_800_000_000_000;
 const b64url = (value: unknown): string => btoa(JSON.stringify(value)).replace(/=+$/, '');
@@ -228,5 +228,25 @@ describe('getOrgUuidFromToken', () => {
     expect(getOrgUuidFromToken()).toBe('org-uuid');
     disconnect();
     expect(getOrgUuidFromToken()).toBeNull();
+  });
+});
+
+describe('refreshTokenExpiringWithin', () => {
+  const MIN_20 = 20 * 60_000;
+
+  it('refreshes a token expiring within the window, and only then', async () => {
+    const refreshAccessToken = vi.fn(async () => undefined);
+    connect({ session: SESSION, getAccessToken: () => Promise.resolve(jwt({ exp: NOW / 1000 + 19 * 60 })), onExpired, refreshAccessToken });
+    await refreshTokenExpiringWithin(MIN_20);
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+
+    connect({ session: SESSION, getAccessToken: () => Promise.resolve(jwt({ exp: NOW / 1000 + 21 * 60 })), onExpired, refreshAccessToken });
+    await refreshTokenExpiringWithin(MIN_20);
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the current token when the refresh fails', async () => {
+    connect({ session: SESSION, getAccessToken: () => Promise.resolve(EXPIRED), onExpired, refreshAccessToken: () => Promise.reject(new Error('refused')) });
+    await expect(refreshTokenExpiringWithin(MIN_20)).resolves.toBeUndefined();
   });
 });
