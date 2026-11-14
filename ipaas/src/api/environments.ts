@@ -18,7 +18,7 @@
 
 /** Cloud (OpenChoreo) environment / dataplane API. Calls the ipaas-service BFF. */
 
-import type { CloudDataPlane, EnvironmentTemplate, Environment, Logger, UpdateLogLevelInput } from '../types/environment';
+import type { CloudDataPlane, EnvironmentIdentityProvider, EnvironmentTemplate, Environment, Logger, UpdateLogLevelInput } from '../types/environment';
 import { fetchProjectDeploymentPipelines } from './deploymentPipelines';
 import { restrictEnvironmentsToPipeline } from '../utils/environmentOrder';
 import type { DeploymentPipeline } from '../types/deploymentPipeline';
@@ -64,6 +64,9 @@ export const fetchCloudDataPlanes = async (_orgUuid: string): Promise<CloudDataP
     return [DEFAULT_CLOUD_DATAPLANE];
   }
 };
+
+/** The org's identity platform in the environment, where OAuth clients of its integrations' APIs are created. */
+export const fetchEnvironmentIdentityProvider = (environmentName: string): Promise<EnvironmentIdentityProvider> => bff.get<EnvironmentIdentityProvider>(`/environments/${seg(environmentName)}/identity-provider`);
 
 export const fetchLoggers = (environmentId: string, componentId: string): Promise<Logger[]> => bff.get<ListResponse<Logger>>(`/components/${seg(componentId)}/loggers${q({ environment: environmentId })}`).then(items);
 

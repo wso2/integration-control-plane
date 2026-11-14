@@ -21,23 +21,7 @@
  * from the JWT, so no call takes an org parameter.
  */
 
-import type {
-  ApiExposure,
-  ApiKeyAuthOptions,
-  ApiKeyResult,
-  ApiKeySummary,
-  Consumer,
-  ConsumerApplication,
-  CreateApiKeyInput,
-  CreateApplicationInput,
-  CreateConsumerInput,
-  EndpointPolicyConfig,
-  EndpointRef,
-  SecurityConfig,
-  ConsumerCredential,
-} from '../types/consumers';
-import { normalizeConsumerStatus } from '../utils/apiConsumption';
-import { userFacingError } from '../utils/apiSecurity';
+import type { ApiExposure, ApiKeyAuthOptions, ApiKeyResult, ApiKeySummary, CreateApiKeyInput, EndpointPolicyConfig, EndpointRef, SecurityConfig } from '../types/consumers';
 import type { McpTool } from '../types/mcp';
 import { bff, bffAbsoluteUrl, items, q, seg, type ListResponse } from './_client';
 
@@ -48,9 +32,6 @@ const endpointPath = ({ componentName, environmentName, endpointName }: Endpoint
 
 /** `path` under the endpoint, addressed to the API of the ref's deployment track. */
 const endpointUrl = (ref: EndpointRef, path: string): string => `${endpointPath(ref)}${path}${q({ deploymentTrackId: ref.deploymentTrackId })}`;
-
-/** No "get exposure" route exists, so the handle is derived. Prefer `exposeEndpoint`'s when known. */
-const deriveRestApiId = (ref: EndpointRef): string => `${ref.componentName}-${ref.endpointName}`;
 
 // ---------------------------------------------------------------------------
 // Exposure
@@ -123,131 +104,3 @@ export const getEndpointPolicies = (ref: EndpointRef): Promise<EndpointPolicyCon
 
 /** Replaces both policies and redeploys. */
 export const setEndpointPolicies = (ref: EndpointRef, cfg: EndpointPolicyConfig): Promise<EndpointPolicyConfig> => bff.put<EndpointPolicyConfig>(endpointUrl(ref, '/policies'), cfg);
-
-// ---------------------------------------------------------------------------
-// Consumer applications
-// ---------------------------------------------------------------------------
-
-const listApplications = (projectName: string): Promise<ConsumerApplication[]> => bff.get<ConsumerApplication[] | ListResponse<ConsumerApplication>>(`/applications?projectName=${encodeURIComponent(projectName)}`).then(asList);
-
-const createApplication = (input: CreateApplicationInput): Promise<ConsumerApplication> => bff.post<ConsumerApplication>('/applications', input);
-
-const deleteApplication = (applicationId: string): Promise<void> => bff.delete<void>(`/applications/${seg(applicationId)}`);
-
-// ---------------------------------------------------------------------------
-// Consumers — an application (durable identity, tagged with its endpoint in
-// `description`) plus an endpoint api-key; the BFF has no /subscriptions routes.
-// ---------------------------------------------------------------------------
-
-const ENDPOINT_TAG_PREFIX = 'endpoint:';
-
-/** Applications created before tracks carry this tag, with no track in it. */
-const untrackedEndpointTag = (ref: EndpointRef): string => `${ENDPOINT_TAG_PREFIX}${ref.componentName}/${ref.environmentName}/${ref.endpointName}`;
-
-// Each track's API has its own consumers, so the tag names the track.
-const endpointTag = (ref: EndpointRef): string => (ref.deploymentTrackId ? `${untrackedEndpointTag(ref)}@${ref.deploymentTrackId}` : untrackedEndpointTag(ref));
-
-/** Keys minted here carry the application id as `displayName`; older keys group under their own name. */
-function groupKeysByConsumer(keys: ApiKeySummary[]): Map<string, ApiKeySummary[]> {
-  const groups = new Map<string, ApiKeySummary[]>();
-  for (const key of keys) {
-    const consumerId = key.displayName || key.name;
-    const group = groups.get(consumerId);
-    if (group) group.push(key);
-    else groups.set(consumerId, [key]);
-  }
-  return groups;
-}
-
-function toConsumer(row: { id: string; displayName: string; application?: ConsumerApplication }, keys: ApiKeySummary[], restApiId: string): Consumer {
-  // Revoke only flips status; the key stays listed forever. Carrying dead keys
-  // would re-DELETE the whole history on every action.
-  const activeKeys = keys.filter((k) => normalizeConsumerStatus(k.status) === 'active');
-  return {
-    ...row,
-    credential: { id: activeKeys[0]?.name ?? keys[0]?.name ?? row.id, applicationId: row.id, restApiId, createdAt: row.application?.createdAt },
-    status: activeKeys.length > 0 ? 'active' : 'revoked',
-    credentialIds: activeKeys.map((k) => k.name),
-  };
-}
-
-const resultToCredential = (r: ApiKeyResult, restApiId: string, applicationId: string): ConsumerCredential => ({
-  id: r.keyId,
-  applicationId,
-  restApiId,
-  token: r.apiKey,
-});
-
-export async function fetchConsumers(ref: EndpointRef, projectName?: string): Promise<Consumer[]> {
-  const restApiId = deriveRestApiId(ref);
-  // Must propagate: swallowing it drops every row to the key-only path, where
-  // delete skips the application and silently only revokes.
-  const [keys, applications] = await Promise.all([listEndpointApiKeys(ref), projectName ? listApplications(projectName) : Promise.resolve([] as ConsumerApplication[])]);
-
-  const groups = groupKeysByConsumer(keys);
-  const tag = endpointTag(ref);
-  const untrackedTag = untrackedEndpointTag(ref);
-  // An application tagged before tracks belongs to the track whose API holds its keys.
-  const ofThisEndpoint = applications.filter((app) => app.description === tag || (app.description === untrackedTag && groups.has(app.id)));
-
-  const rows = ofThisEndpoint.map((app) => toConsumer({ id: app.id, displayName: app.displayName || app.id, application: app }, groups.get(app.id) ?? [], restApiId));
-  const claimed = new Set(ofThisEndpoint.map((app) => app.id));
-  for (const [consumerId, group] of groups) {
-    if (claimed.has(consumerId)) continue;
-    // Revoked-only groups are already-deleted consumers; listing them would also
-    // resurrect an application-backed row once its application is deleted.
-    if (!group.some((k) => normalizeConsumerStatus(k.status) === 'active')) continue;
-    rows.push(toConsumer({ id: consumerId, displayName: group[0].displayName || consumerId }, group, restApiId));
-  }
-  return rows;
-}
-
-export async function createConsumer(input: CreateConsumerInput): Promise<Consumer> {
-  const { appName, projectName, componentName, environmentName, endpointName, deploymentTrackId } = input;
-  const ref: EndpointRef = { componentName, environmentName, endpointName, deploymentTrackId };
-
-  // Application first so the key can be minted under its id; rolled back on failure.
-  const application = await createApplication({ displayName: appName, projectName, description: endpointTag(ref) });
-
-  let result: ApiKeyResult;
-  try {
-    result = await createEndpointApiKey(ref, { displayName: application.id });
-  } catch (err) {
-    await deleteApplication(application.id).catch(() => undefined);
-    throw err;
-  }
-
-  return {
-    id: application.id,
-    displayName: appName,
-    application,
-    credential: resultToCredential(result, deriveRestApiId(ref), application.id),
-    status: 'active',
-    credentialIds: [result.keyId],
-  };
-}
-
-/** Revoke every key, then mint a fresh one under the same application — never adds a row. */
-export async function regenerateConsumerToken(ref: EndpointRef, consumer: Consumer): Promise<ConsumerCredential> {
-  await revokeConsumerKeys(ref, consumer);
-  try {
-    const result = await createEndpointApiKey(ref, { displayName: consumer.id });
-    return resultToCredential(result, deriveRestApiId(ref), consumer.id);
-  } catch (err) {
-    throw userFacingError(`The old API key was revoked, but a new one could not be issued for “${consumer.displayName}”. Close this dialog and regenerate again.`, err);
-  }
-}
-
-// Empty means nothing left to revoke. Must stay a no-op: `credential.id` falls
-// back to the application id, which is not a key name and would 404.
-async function revokeConsumerKeys(ref: EndpointRef, consumer: Consumer): Promise<void> {
-  await Promise.all(consumer.credentialIds.map((keyName) => revokeEndpointApiKey(ref, keyName)));
-}
-
-export const revokeConsumer = (ref: EndpointRef, consumer: Consumer): Promise<void> => revokeConsumerKeys(ref, consumer);
-
-/** Revoke first — a failed application delete must not leave a live key behind an invisible row. */
-export async function deleteConsumer(ref: EndpointRef, consumer: Consumer): Promise<void> {
-  await revokeConsumerKeys(ref, consumer);
-  if (consumer.application) await deleteApplication(consumer.application.id);
-}

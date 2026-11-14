@@ -26,7 +26,8 @@ import type { EnvCardBodyProps } from '../../../types/integration';
 import type { ProxyReconciliationStatus } from '../../../types/deployment';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
-import ConsumersPanel from './ConsumersPanel';
+import ApiKeysPanel from './ApiKeysPanel';
+import OAuthClientsPanel from './OAuthClientsPanel';
 import SecuritySummary from './SecuritySummary';
 import ServiceInsights from './ServiceInsights';
 import SwaggerOperationsList, { type SwaggerDocument } from './SwaggerOperationsList';
@@ -60,7 +61,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];
   const isGraphql = activeEndpoint?.type === 'GraphQL';
   const gatewayExposure = gatewayExposureState(activeEndpoint?.visibilityStatus);
-  // An UNKNOWN host still means the API is on the gateway, so consumers and security stay available.
+  // An UNKNOWN host still means the API is on the gateway, so API keys and security stay available.
   const gatewayExposureEnabled = gatewayExposure.state === 'enabled' || gatewayExposure.state === 'unknown';
 
   // The API gateway's state for this environment's release; polled while it is being updated.
@@ -81,10 +82,10 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   // of the raw OpenChoreo external route.
   const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id, deploymentTrackId: versionId } : null;
   const { data: apiSecurity, isLoading: loadingSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint && gatewayExposureEnabled);
-  // Consumers hold API keys, which an OAuth-secured API refuses. The keys stay live, though, and work
-  // again if the API goes back to API key, so under OAuth the panel still lists them for revoking.
-  // Waiting for the mode keeps the panel from switching between the two; a failed read, or a mode
-  // that isn't known, counts as API key.
+  // An OAuth-secured API refuses API keys. The keys stay live, though, and work again if the API goes
+  // back to API key, so under OAuth the keys panel still lists them for revoking. Waiting for the mode
+  // keeps the panels from switching between the two; a failed read, or a mode that isn't known, counts
+  // as API key.
   const oauth = apiSecurity?.mode === 'jwt' && !apiSecurity.stateUnknown;
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
@@ -149,7 +150,8 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
       {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && <EnvEmptyNotice icon={Rocket}>This integration has not been deployed to this environment yet.</EnvEmptyNotice>}
 
       {/* Cloud-only in-console API consumption: what this environment's API
-          enforces, and its consumer applications. Keyed by the BFF's
+          enforces, and how callers authenticate to it: the API keys issued for
+          it, or under OAuth, where to create a client. Keyed by the BFF's
           component/environment/endpoint triple and the deployment track, since
           each track has its own API — the component name is the component id
           and the endpoint name is the endpoint id. Security is configured from
@@ -157,16 +159,17 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !!securityRef && gatewayExposureEnabled && (
         <>
           <SecuritySummary endpointRef={securityRef} />
-          {!loadingSecurity && <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} deploymentTrackId={versionId} oauth={oauth} />}
+          {oauth && !!apiSecurity && <OAuthClientsPanel envName={env.id} envLabel={env.name} projectId={projectId} security={apiSecurity} />}
+          {!loadingSecurity && <ApiKeysPanel endpointRef={securityRef} envLabel={env.name} oauth={oauth} />}
         </>
       )}
 
-      {/* A project-only endpoint has no consumers, so only an exposure in flight or failing is reported. */}
+      {/* A project-only endpoint has no API keys, so only an exposure in flight or failing is reported. */}
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (gatewayExposure.state === 'transitioning' || gatewayExposure.state === 'failed') && (
         <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           <Typography variant="body2" color={gatewayExposure.state === 'failed' ? 'error.main' : 'text.secondary'}>
             {gatewayExposure.state === 'transitioning'
-              ? 'API exposure is being updated. Consumer and security settings will be available when the gateway deployment is ready.'
+              ? 'API exposure is being updated. API keys and security settings will be available when the gateway deployment is ready.'
               : gatewayExposure.reason || 'API exposure could not be completed. Retry the visibility update.'}
           </Typography>
         </Box>

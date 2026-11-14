@@ -16,26 +16,62 @@
  * under the License.
  */
 
-import type { Consumer, ConsumerStatus } from '../types/consumers';
+import type { ApiKeyStatus, ApiKeySummary, JwtSecurity } from '../types/consumers';
 import { formatDateTime } from './time';
 
-/** Raw statuses meaning the credential no longer authenticates. */
+/** Raw statuses meaning the key no longer authenticates. */
 const REVOKED_STATUSES = new Set(['revoked', 'inactive', 'expired', 'deleted', 'disabled']);
 
-/** Unknown values read as `active` — a live credential must not look revoked on an unfamiliar label. */
-export function normalizeConsumerStatus(raw?: string): ConsumerStatus {
+/** Unknown values read as `active` — a live key must not look revoked on an unfamiliar label. */
+export function normalizeKeyStatus(raw?: string): ApiKeyStatus {
   return raw && REVOKED_STATUSES.has(raw.trim().toLowerCase()) ? 'revoked' : 'active';
 }
 
-/** Row subtitle. The application's creation time is the only timestamp the platform reports. */
-export function consumerSummary(consumer: Consumer): string {
-  const at = consumer.application?.createdAt ?? consumer.credential.createdAt;
-  const when = at ? formatDateTime(at) : '';
-  return !when || when === '—' ? '' : `Created at ${when}`;
+/** The name a key is listed under: the one it was issued with, else its id. */
+export function apiKeyLabel(key: ApiKeySummary): string {
+  return key.displayName?.trim() || key.name;
+}
+
+/** Row subtitle: the masked key, then when it was issued and when it expires, as far as the platform reports them. */
+export function apiKeySubtitle(key: ApiKeySummary): string {
+  const parts = [key.maskedApiKey];
+  const created = key.createdAt ? formatDateTime(key.createdAt) : '';
+  if (created && created !== '—') parts.push(`Created ${created}`);
+  const expires = key.expiresAt ? formatDateTime(key.expiresAt) : '';
+  if (expires && expires !== '—') parts.push(`Expires ${expires}`);
+  return parts.filter(Boolean).join(' · ');
 }
 
 /** Names are unique per endpoint only, so `existing` is always that one endpoint's list. */
-export function isConsumerNameTaken(name: string, existing: readonly string[]): boolean {
+export function isKeyNameTaken(name: string, existing: readonly string[]): boolean {
   const candidate = name.trim().toLowerCase();
   return candidate !== '' && existing.some((n) => n.trim().toLowerCase() === candidate);
+}
+
+/** Joins a command's parts into a multi-line shell command. */
+const shellLines = (parts: string[]): string => parts.join(' \\\n  ');
+
+/** Every scope any operation of the API asks for, in a stable order: a client's token needs the ones its calls require. */
+export function jwtScopes(jwt: JwtSecurity | undefined): string[] {
+  const scopes = new Set<string>();
+  for (const requirement of Object.values(jwt?.operations ?? {})) {
+    for (const scope of [...(requirement.allOf ?? []), ...(requirement.anyOf ?? [])]) scopes.add(scope);
+  }
+  return [...scopes].sort();
+}
+
+/**
+ * A client credentials token request to the identity platform, with placeholders for the client's own ID and secret.
+ * `resource` names the API (resource server) the token is for: the identity platform issues scopes only for one.
+ */
+export function tokenRequestCurl(tokenEndpoint: string | undefined, scopes: readonly string[] = [], resource?: string): string {
+  const parts = [`curl -X POST '${tokenEndpoint || '<token-endpoint>'}'`, "-u '<client-id>:<client-secret>'", "-d 'grant_type=client_credentials'"];
+  if (resource) parts.push(`-d 'resource=${resource}'`);
+  if (scopes.length) parts.push(`-d 'scope=${scopes.join(' ')}'`);
+  return shellLines(parts);
+}
+
+/** A call to the API with the access token, sent in the header the API reads it from. */
+export function apiCallCurl(publicUrl: string | undefined, tokenHeader: string): string {
+  return shellLines([`curl '${publicUrl || '<api-url>'}'`, `-H '${tokenHeader.replace('<token>', '<access-token>')}'`]);
 }

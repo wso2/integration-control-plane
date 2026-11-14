@@ -16,7 +16,7 @@
  * under the License.
  */
 
-/** Shared styles for the cloud-only API Consumption UI (Consumers subcard, consumer drawer, security drawer). */
+/** Shared styles for the cloud-only API consumption UI (API keys and OAuth subcards, their drawers, the security drawer). */
 
 export const tableHeadCell = {
   color: 'text.secondary',
@@ -42,7 +42,7 @@ export const endpointSelect = {
   minWidth: 200,
 } as const;
 
-/** Read-only look for the consumer name once its credentials exist. */
+/** Read-only look for the key name once the key is issued. */
 export const lockedField = {
   '& .MuiInputBase-input.Mui-disabled': {
     WebkitTextFillColor: 'unset',
@@ -104,20 +104,20 @@ export const panelAlert = {
   mt: 1.5,
 } as const;
 
-export const consumerList = {
+export const keyList = {
   mt: 1.5,
 } as const;
 
-export const consumerRowText = {
+export const keyRowText = {
   flex: 1,
   minWidth: 0,
 } as const;
 
-export const consumerRowSubtitle = {
+export const keyRowSubtitle = {
   display: 'block',
 } as const;
 
-export const consumerRow = {
+export const keyRow = {
   display: 'flex',
   alignItems: 'center',
   gap: 1.5,
@@ -128,18 +128,14 @@ export const consumerRow = {
   bgcolor: 'background.paper',
 } as const;
 
-/** Black circle / white letter in light mode; inverted in dark mode. */
-export const consumerAvatar = {
-  width: 28,
-  height: 28,
-  fontSize: 12,
-  fontWeight: 600,
-  bgcolor: 'text.primary',
-  color: 'background.paper',
+/** The key icon at the start of an API key row. */
+export const keyIcon = {
+  display: 'flex',
+  color: 'text.secondary',
 } as const;
 
-/** Status chip shown inline after the consumer name. */
-export const consumerStatusChip = {
+/** A small status chip shown inline after a name or title. */
+export const statusChip = {
   height: 16,
   fontSize: '0.6rem',
   '& .MuiChip-label': {
@@ -147,8 +143,16 @@ export const consumerStatusChip = {
   },
 } as const;
 
-export const consumerNameRow = {
+export const keyNameRow = {
   minWidth: 0,
+} as const;
+
+/** The text button under the key list that shows or hides revoked keys. */
+export const revokedToggle = {
+  mt: 1,
+  px: 0.75,
+  color: 'text.secondary',
+  textTransform: 'none',
 } as const;
 
 export const emptyState = {
@@ -164,7 +168,7 @@ export const dialogAlert = {
   mb: 2,
 } as const;
 
-export const consumerDeleteButton = {
+export const revokeButton = {
   color: 'error.main',
   '&:hover': {
     bgcolor: 'error.lighter',
@@ -300,4 +304,45 @@ export const securityLink = {
     cursor: 'default',
     textDecoration: 'none',
   },
+} as const;
+
+/** A copyable command, such as the token request a client sends. */
+export const codeBlock = {
+  position: 'relative',
+  m: 0,
+  p: 1.5,
+  pr: 5,
+  borderRadius: 1,
+  border: '1px solid',
+  borderColor: 'divider',
+  bgcolor: 'action.hover',
+  fontFamily: 'monospace',
+  fontSize: 12,
+  lineHeight: 1.6,
+  whiteSpace: 'pre',
+  overflowX: 'auto',
+} as const;
+
+/** The copy button in a code block's top right corner. */
+export const codeBlockCopy = {
+  position: 'absolute',
+  top: 6,
+  right: 6,
+} as const;
+
+/** The numbered steps for creating an OAuth client. */
+export const stepList = {
+  m: 0,
+  pl: 2.5,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0.75,
+} as const;
+
+/** The OAuth subcard's actions under its description. */
+export const oauthActions = {
+  mt: 1.5,
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 1,
 } as const;

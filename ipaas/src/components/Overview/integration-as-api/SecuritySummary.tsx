@@ -124,9 +124,9 @@ export default function SecuritySummary({ endpointRef }: SecuritySummaryProps): 
 
   const readOnlyNotice = readOnlyApiSettingsNotice(security);
   const chip = security.stateUnknown ? (
-    <Chip label="Unknown" size="small" variant="outlined" sx={styles.consumerStatusChip} />
+    <Chip label="Unknown" size="small" variant="outlined" sx={styles.statusChip} />
   ) : (
-    <Chip label={SECURITY_MODE_LABEL[security.mode]} size="small" variant="outlined" color={security.mode === 'none' ? 'warning' : 'success'} sx={styles.consumerStatusChip} />
+    <Chip label={SECURITY_MODE_LABEL[security.mode]} size="small" variant="outlined" color={security.mode === 'none' ? 'warning' : 'success'} sx={styles.statusChip} />
   );
   const toggleLabel = expanded ? 'Hide security settings' : 'Show security settings';
   return (

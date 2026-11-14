@@ -32,7 +32,7 @@ export function envCard(page: Page): Locator {
 
 /** The env card's deployment status, as StatusDot renders it. */
 export function deploymentStatus(page: Page): Locator {
-  // first(): a consumer's own "Active" chip renders lower in the same card, and two matches make textContent() throw.
+  // first(): an API key's own "Active" chip renders lower in the same card, and two matches make textContent() throw.
   return envCard(page)
     .getByText(/^(In progress|Active|Error|Suspended|Not deployed)$/)
     .first();
@@ -245,46 +245,29 @@ export async function gatewayFailure(page: Page): Promise<string | null> {
   return failedAgain ? text() : null;
 }
 
-/** A consumer's row on the env card, found from its name up to the row that carries Manage. */
-export function consumerRow(page: Page, name: string): Locator {
-  return envCard(page).getByText(name, { exact: true }).locator('xpath=ancestor::*[.//button[normalize-space()="Manage"]][1]');
+/**
+ * An API key's row on the env card: the list item that carries its name. A revoked key is listed only
+ * once its keys are shown (showRevokedApiKeys).
+ */
+export function apiKeyRow(page: Page, name: string): Locator {
+  return envCard(page)
+    .getByRole('list', { name: 'API keys' })
+    .getByRole('listitem')
+    .filter({ has: page.getByText(name, { exact: true }) });
 }
 
-/** Opens the create drawer, whose button is named for whether the API has consumers yet. */
-export async function openConsumerDrawer(page: Page): Promise<void> {
-  const create = envCard(page).getByRole('button', { name: /^(Consume API|New consumer)$/ });
+/** Lists the env card's revoked API keys beside its live ones. */
+export async function showRevokedApiKeys(page: Page): Promise<void> {
+  await envCard(page)
+    .getByRole('button', { name: /^Show revoked keys/ })
+    .click();
+}
+
+/** Opens the drawer that issues an API key. */
+export async function openApiKeyDrawer(page: Page): Promise<void> {
+  const create = envCard(page).getByRole('button', { name: 'Generate API key', exact: true });
   await expect(create).toBeVisible({ timeout: 30_000 });
   await create.click();
-}
-
-/** Deletes every consumer, answering with the server's reason when one is refused. */
-export async function deleteAllConsumers(page: Page): Promise<string | null> {
-  for (;;) {
-    const remove = envCard(page)
-      .getByRole('button', { name: /^Delete / })
-      .first();
-    if (!(await remove.isVisible({ timeout: 5_000 }).catch(() => false))) return null;
-    const name = (await remove.getAttribute('aria-label'))?.replace(/^Delete /, '') ?? '';
-    // The list refreshes under the loop, so a row can go before it is clicked; re-read rather than fail.
-    if (
-      !(await remove
-        .click({ timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false))
-    ) {
-      continue;
-    }
-    const dialog = page.getByRole('dialog').filter({ hasText: /^Delete/ });
-    await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
-    // A refused delete leaves the dialog open, so it is dismissed and the reason reported.
-    const failure = dialog.getByRole('alert');
-    if (await failure.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const reason = (await failure.textContent())?.trim() ?? 'no reason given';
-      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-      return `deleting ${name} was refused: ${reason}`;
-    }
-    await expect(envCard(page).getByText(name, { exact: true }), `${name} is still listed after deleting it`).toHaveCount(0, { timeout: 60_000 });
-  }
 }
 
 /** Finished runs only: a synthesised scheduled or queued row renders "--" and offers no View logs. */

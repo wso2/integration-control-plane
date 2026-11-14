@@ -26,7 +26,7 @@ import {
   AGENT_TYPE,
   AUTOMATION,
   CLOUD_SECTIONS,
-  CONSUMER,
+  API_KEY,
   DEPLOY_ACTION_MS,
   DEPLOY_TIMEOUT_MS,
   ENV,
@@ -41,7 +41,6 @@ import {
   MI_AUTOMATION_SUB_PATH,
   MI_DEPLOY_TIMEOUT_MS,
   MI_TECHNOLOGY,
-  NO_CONSUMERS,
   NO_SCHEDULE,
   PROBE_TIMEOUT_MS,
   PROJECT_REMOVAL_TIMEOUT_MS,
@@ -69,20 +68,20 @@ import {
   waitForIntegrationsToLoad,
 } from '../../helpers/journey-integrations.js';
 import {
-  consumerRow,
-  deleteAllConsumers,
+  apiKeyRow,
   dismissStrayDialog,
   deploymentStatus,
   envCard,
   finishedExecutions,
   gatewayFailure,
-  openConsumerDrawer,
+  openApiKeyDrawer,
   probeEndpoint,
   requireActiveDeployment,
   requireAutomationReady,
   requireSampleActive,
   serverResponseCode,
   showAllExecutions,
+  showRevokedApiKeys,
   swaggerOperation,
   waitForConfigureGate,
   waitForDeploymentSettled,
@@ -96,9 +95,9 @@ const GATEWAY_DOWN = 'the environment gateway reports no healthy upstream for an
 // No retries: a retry would replay a stateful journey against state the first pass mutated.
 test.describe.configure({ retries: 0 });
 
-const CONSUMER_BASE = CONSUMER;
 // Set at creation: an undeletable leftover of the same name makes the create form reject it.
-let consumerName = CONSUMER_BASE;
+// Unique per run: revoked keys stay listed, so a reused name would match an earlier run's row.
+const apiKeyName = `${API_KEY}-${Date.now().toString().slice(-6)}`;
 let agentName = '';
 
 // Read in beforeAll, not at module scope: module scope is evaluated when Playwright collects
@@ -338,9 +337,9 @@ test.describe('04 deploy a sample @smoke', () => {
   });
 });
 
-// 04b — the deployed endpoint, then the consumer application lifecycle
+// 04b — the deployed endpoint, then the API key lifecycle
 
-test.describe('04b endpoint and consumers @smoke', () => {
+test.describe('04b endpoint and API keys @smoke', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async () => {
@@ -370,11 +369,11 @@ test.describe('04b endpoint and consumers @smoke', () => {
     await expect(card.getByRole('button', { name: 'View details' }).first(), 'the card lists no resources').toBeVisible();
   });
 
-  test('TC_IP_CONS_001 the consumers section is offered with its security scheme', async () => {
+  test('TC_IP_KEY_001 the API keys section is offered with its security scheme', async () => {
     // Covers gatewayFailure's Retry and its two-minute wait for the alert to clear.
     test.setTimeout(4 * 60_000);
     const card = envCard(page);
-    await expect(card.getByText(/^Consumers\s*\(\d+\)/)).toBeVisible({ timeout: 60_000 });
+    await expect(card.getByText(/^API keys\s*\(\d+\)/)).toBeVisible({ timeout: 60_000 });
     // Fails on the card's own reason, rather than on a missing label, when the API never reached the gateway.
     const failure = await gatewayFailure(page);
     expect(failure, `the API was not provisioned on the gateway: ${failure}`).toBeNull();
@@ -382,53 +381,31 @@ test.describe('04b endpoint and consumers @smoke', () => {
     await expect(card.getByRole('button', { name: /^(Show|Hide) security settings$/ })).toBeVisible();
   });
 
-  // Skipped where deletion is unavailable: creating and revoking are still worth exercising.
-  test('TC_IP_CONS_002 the section starts with no consumers', async () => {
-    const refused = await deleteAllConsumers(page);
-    test.skip(!!refused, `cannot clear existing consumers here — ${refused}`);
-    await expect(envCard(page).getByText(NO_CONSUMERS)).toBeVisible({ timeout: 60_000 });
-  });
-
-  test('TC_IP_CONS_003 a consumer application is created and shows its key once', async () => {
-    const taken = await consumerRow(page, CONSUMER)
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-    consumerName = taken ? `${CONSUMER}-${Date.now().toString().slice(-5)}` : CONSUMER;
-
-    await openConsumerDrawer(page);
+  test('TC_IP_KEY_002 an API key is generated under its name and shown once', async () => {
+    await openApiKeyDrawer(page);
     // By placeholder: the drawer's label is a sibling Typography, so the field has no accessible name.
-    await page.getByPlaceholder('e.g. my-greeting-client').fill(consumerName);
-    await page.getByRole('button', { name: 'Generate credentials' }).click();
+    await page.getByPlaceholder('e.g. billing-service').fill(apiKeyName);
+    await page.getByRole('button', { name: 'Generate', exact: true }).click();
 
-    const drawer = page.getByRole('dialog').filter({ hasText: consumerName });
+    const drawer = page.getByRole('dialog').filter({ hasText: apiKeyName });
     await expect(drawer.getByText('Header', { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(drawer.getByText('API key', { exact: true })).toBeVisible();
     await drawer.getByRole('button', { name: 'Done', exact: true }).click();
   });
 
-  test('TC_IP_CONS_004 the new consumer is listed as Active', async () => {
-    await expect(consumerRow(page, consumerName), `${consumerName} is not listed`).toBeVisible({ timeout: 60_000 });
-    await expect(consumerRow(page, consumerName).getByText('Active', { exact: true })).toBeVisible();
+  test('TC_IP_KEY_003 the new key is listed as Active', async () => {
+    await expect(apiKeyRow(page, apiKeyName), `${apiKeyName} is not listed`).toBeVisible({ timeout: 60_000 });
+    await expect(apiKeyRow(page, apiKeyName).getByText('Active', { exact: true })).toBeVisible();
   });
 
-  test('TC_IP_CONS_005 revoking the key marks the consumer Revoked', async () => {
-    await consumerRow(page, consumerName).getByRole('button', { name: 'Manage', exact: true }).click();
-    const drawer = page.getByRole('dialog').filter({ hasText: consumerName });
-    await drawer.getByRole('button', { name: 'Revoke', exact: true }).click();
-
-    const confirm = page.getByRole('dialog').filter({ hasText: 'Revoke this API key?' });
+  test('TC_IP_KEY_004 revoking the key marks it Revoked', async () => {
+    await apiKeyRow(page, apiKeyName).getByRole('button', { name: `Revoke ${apiKeyName}`, exact: true }).click();
+    const confirm = page.getByRole('dialog').filter({ hasText: `Revoke “${apiKeyName}”?` });
     await confirm.getByRole('button', { name: 'Revoke', exact: true }).click();
-    // The drawer closes itself once the key is revoked, so Done is clicked only if it is still there.
-    const done = drawer.getByRole('button', { name: 'Done', exact: true });
-    if (await done.isVisible({ timeout: 5_000 }).catch(() => false)) await done.click();
-
-    await expect(consumerRow(page, consumerName).getByText('Revoked', { exact: true })).toBeVisible({ timeout: 60_000 });
-  });
-
-  test('TC_IP_CONS_006 deleting the consumer empties the section', async () => {
-    const refused = await deleteAllConsumers(page);
-    expect(refused, `${consumerName} could not be deleted`).toBeNull();
-    await expect(envCard(page).getByText(NO_CONSUMERS)).toBeVisible({ timeout: 60_000 });
+    // Revoked keys wait behind a toggle, so the key leaves the list until they are shown.
+    await expect(apiKeyRow(page, apiKeyName)).toBeHidden({ timeout: 60_000 });
+    await showRevokedApiKeys(page);
+    await expect(apiKeyRow(page, apiKeyName).getByText('Revoked', { exact: true })).toBeVisible();
   });
 });
 

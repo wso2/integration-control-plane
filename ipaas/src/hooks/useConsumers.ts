@@ -17,75 +17,51 @@
  */
 
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, getMcpServerTools, regenerateConsumerToken, revokeConsumer, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
-import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
+import { createEndpointApiKey, createEndpointTestKey, getEndpointPolicies, getEndpointSecurity, getMcpServerTools, listEndpointApiKeys, revokeEndpointApiKey, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
+import type { ApiKeyResult, ApiKeySummary, CreateApiKeyInput, EndpointPolicyConfig, EndpointRef, SecurityConfig } from '../types/consumers';
 import type { McpTool } from '../types/mcp';
 
 /** Endpoint refs are only usable once every segment is known, the track included: one read before its track resolves would read the default track's API. */
 export const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.componentName && !!ref.environmentName && !!ref.endpointName && ref.deploymentTrackId !== undefined;
 
-// Each track's API has its own URL, security and consumers, so the track is part of the key.
+// Each track's API has its own URL, security and keys, so the track is part of the key.
 const refKey = (ref: EndpointRef | null | undefined) => [ref?.componentName ?? '', ref?.environmentName ?? '', ref?.endpointName ?? '', ref?.deploymentTrackId ?? ''] as const;
 
-const consumersKey = (projectName: string | null | undefined, ref: EndpointRef | null | undefined) => ['consumers', projectName ?? '', ...refKey(ref)] as const;
+const apiKeysKey = (ref: EndpointRef | null | undefined) => ['endpoint-api-keys', ...refKey(ref)] as const;
 
 // ---------------------------------------------------------------------------
-// Consumers
+// API keys
 // ---------------------------------------------------------------------------
 
-export function useConsumers(projectName: string | null | undefined, ref: EndpointRef | null | undefined) {
-  return useQuery<Consumer[]>({
-    queryKey: consumersKey(projectName, ref),
-    queryFn: () => fetchConsumers(ref!, projectName ?? undefined),
+/** The API keys issued for an endpoint's API, revoked ones included. */
+export function useEndpointApiKeys(ref: EndpointRef | null | undefined) {
+  return useQuery<ApiKeySummary[]>({
+    queryKey: apiKeysKey(ref),
+    queryFn: () => listEndpointApiKeys(ref!),
     enabled: isCompleteRef(ref),
     staleTime: 30_000,
     retry: false,
   });
 }
 
-/** The plaintext key is returned once. */
-export function useCreateConsumer(projectName: string | null | undefined) {
+/** Issue an API key. The plaintext is returned once. */
+export function useCreateEndpointApiKey(ref: EndpointRef | null | undefined) {
   const qc = useQueryClient();
-  return useMutation<Consumer, Error, CreateConsumerInput>({
-    mutationFn: (input) => createConsumer(input),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: consumersKey(projectName, vars) });
+  return useMutation<ApiKeyResult, Error, CreateApiKeyInput>({
+    mutationFn: (input) => createEndpointApiKey(ref!, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: apiKeysKey(ref) });
     },
   });
 }
 
-/** Re-issue the api-key in place. The new plaintext is returned once. */
-export function useRegenerateConsumerToken(projectName: string | null | undefined, ref: EndpointRef | null | undefined) {
+/** Revoke an API key by its name. The key stays listed as revoked. */
+export function useRevokeEndpointApiKey(ref: EndpointRef | null | undefined) {
   const qc = useQueryClient();
-  return useMutation<ConsumerCredential, Error, Consumer>({
-    mutationFn: (consumer) => regenerateConsumerToken(ref!, consumer),
-    // The revoke lands before the re-mint, so the old key is gone even on failure.
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: consumersKey(projectName, ref) });
-    },
-  });
-}
-
-/** Revoke the api-key, keeping the consumer in the list. */
-export function useRevokeConsumer(projectName: string | null | undefined, ref: EndpointRef | null | undefined) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, Consumer>({
-    mutationFn: (consumer) => revokeConsumer(ref!, consumer),
-    // Keys are revoked in parallel, so a partial failure still changes server state.
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: consumersKey(projectName, ref) });
-    },
-  });
-}
-
-/** Revoke the api-key *and* remove the application. */
-export function useDeleteConsumer(projectName: string | null | undefined, ref: EndpointRef | null | undefined) {
-  const qc = useQueryClient();
-  return useMutation<void, Error, Consumer>({
-    mutationFn: (consumer) => deleteConsumer(ref!, consumer),
-    // A partial failure still changes server state.
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: consumersKey(projectName, ref) });
+  return useMutation<void, Error, string>({
+    mutationFn: (keyName) => revokeEndpointApiKey(ref!, keyName),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: apiKeysKey(ref) });
     },
   });
 }
