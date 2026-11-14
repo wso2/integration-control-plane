@@ -16,18 +16,20 @@
  * under the License.
  */
 
-import { Alert, AlertTitle, Card, CardContent } from '@wso2/oxygen-ui';
-import { useCallback, useEffect, useState } from 'react';
+import { Card, CardContent } from '@wso2/oxygen-ui';
+import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useComponentDeployment } from '../../../hooks/useDeployments';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import type { Component } from '../../../types/component';
 import type { Environment } from '../../../types/environment';
-import type { EnvCardNotification, EnvCardSlotProps, IntegrationModule } from '../../../types/integration';
+import type { EnvCardSlotProps, IntegrationModule } from '../../../types/integration';
 import { deploymentPollIntervalUntil, REQUESTED_POLL_WINDOW_MS } from '../../../utils/deploymentStatus';
 import DeployButton from './DeployButton';
 import EnvCardHeader from './EnvCardHeader';
+import EnvCardNotice from '../../EnvironmentCard/EnvCardNotice';
+import { useEnvCardNotification } from '../../EnvironmentCard/useEnvCardNotification';
 import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 
 interface EnvCardShellProps {
@@ -42,6 +44,9 @@ interface EnvCardShellProps {
   isBuildInProgress?: boolean;
   module: IntegrationModule;
 }
+
+// The card's notice, under its header.
+const noticeSx = { mt: 2 } as const;
 
 // Per-env query keys invalidated by the generic Refresh — the union across
 // every migrated type's data. Invalidating a key a given type doesn't use is
@@ -76,15 +81,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
   const requestPoll = useCallback(() => setPollUntil(Date.now() + REQUESTED_POLL_WINDOW_MS), []);
 
   // Transient success/error feedback raised by slot actions.
-  const [notification, setNotification] = useState<EnvCardNotification | null>(null);
-  useEffect(() => {
-    if (!notification) return;
-    // A two-line notice needs longer to read; errors sit longer than plain confirmations.
-    const timeout = notification.detail ? 10000 : notification.severity === 'error' ? 6000 : 4000;
-    const timer = setTimeout(() => setNotification(null), timeout);
-    return () => clearTimeout(timer);
-  }, [notification]);
-  const onNotify = useCallback((n: EnvCardNotification) => setNotification(n), []);
+  const { notification, onNotify, dismiss } = useEnvCardNotification();
 
   // Optimistic pending-trigger bridge: the actions slot records a trigger, the
   // body slot's executions table shows a queued sentinel until it resolves.
@@ -169,18 +166,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
           />
         )}
 
-        {notification && (
-          <Alert severity={notification.severity} onClose={() => setNotification(null)} sx={{ mt: 2 }}>
-            {notification.detail ? (
-              <>
-                <AlertTitle>{notification.text}</AlertTitle>
-                {notification.detail}
-              </>
-            ) : (
-              notification.text
-            )}
-          </Alert>
-        )}
+        <EnvCardNotice notification={notification} onClose={dismiss} sx={noticeSx} />
 
         {EnvCardBody && <EnvCardBody {...slotProps} pendingTriggerTime={pendingTriggerTime} pendingTriggerArgs={pendingTriggerArgs} onTriggerResolved={onTriggerResolved} />}
 

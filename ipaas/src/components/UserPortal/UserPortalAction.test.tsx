@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import { focusManager } from '@tanstack/react-query';
 import { act } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -85,11 +86,11 @@ const toggle = (container: HTMLElement) => container.querySelector<HTMLInputElem
 const dialogButton = (container: HTMLElement, name: string) => [...(dialog(container)?.querySelectorAll('button') ?? [])].find((b) => b.textContent === name);
 
 describe("the env card's User Portal action", () => {
-  it('says the portal is off, and explains it with a way to turn it on', async () => {
+  it('invites sharing with the User Portal where it is off, and explains it with a way to turn it on', async () => {
     publishability.mockResolvedValue(portalOff);
     const container = await action(PLATFORM_ENGINEER);
     expect(toggle(container)).toBeUndefined();
-    await act(async () => button(container, 'User Portal off')?.click());
+    await act(async () => button(container, 'Share with your users')?.click());
     expect(dialog(container)?.textContent).toContain('Turn it on in Production to publish this integration there.');
     const link = dialog(container)?.querySelector('a');
     expect(link?.textContent).toBe('Enable User Portal');
@@ -99,7 +100,7 @@ describe("the env card's User Portal action", () => {
   it('asks a role that cannot enable the portal to ask an admin', async () => {
     publishability.mockResolvedValue(portalOff);
     const container = await action(DEVELOPER);
-    await act(async () => button(container, 'User Portal off')?.click());
+    await act(async () => button(container, 'Share with your users')?.click());
     expect(dialog(container)?.textContent).toContain('Ask an admin to turn it on.');
     expect(dialog(container)?.querySelector('a')).toBeNull();
   });
@@ -112,12 +113,17 @@ describe("the env card's User Portal action", () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  // As the deploy page and the workflow pages do (usePublishFlow): only a publish that redeploys a workflow asks first.
-  it('publishes what redeploys nothing at once, then reports scopes the portal could not take on the card', async () => {
+  // As every place in the console does (usePublishFlow): every publish asks first, as an unpublish does.
+  it('confirms a publish that redeploys nothing, saying what it does, then reports scopes the portal could not take on the card', async () => {
     publishability.mockResolvedValue(publishable);
     publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: ['bad scope'] });
     const container = await action(DEVELOPER);
     await act(async () => toggle(container)?.click());
+    expect(publish).not.toHaveBeenCalled();
+    expect(dialog(container)?.textContent).toContain('Publish to the User Portal in Production?');
+    expect(dialog(container)?.textContent).toContain("The User Portal's users will see this integration there.");
+    expect(dialog(container)?.textContent).not.toContain('redeployed');
+    await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
     expect(dialog(container)).toBeNull();
     expect(publish).toHaveBeenCalledWith('orders', 'production');
@@ -136,14 +142,19 @@ describe("the env card's User Portal action", () => {
     expect(publish).toHaveBeenCalledWith('orders', 'production');
   });
 
-  it('says why a publish was refused on the switch, worded from its code', async () => {
+  it('keeps the confirm dialog open on a refused publish, worded from its code, and leaves the switch as it was', async () => {
     publishability.mockResolvedValue(publishable);
     publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"the integration is not deployed in this environment; deploy it first"}'));
     const container = await action(DEVELOPER);
     await act(async () => toggle(container)?.click());
+    await act(async () => dialogButton(container, 'Publish')?.click());
     await flush();
-    expect(container.querySelector('label')?.getAttribute('aria-label')).toBe('Deploy it to Production first. The User Portal lists only what runs there.');
+    expect(dialog(container)?.textContent).toContain('Deploy it to Production first. The User Portal lists only what runs there.');
     expect(onNotify).not.toHaveBeenCalled();
+    await act(async () => dialogButton(container, 'Cancel')?.click());
+    await flush();
+    expect(container.querySelector('label')?.getAttribute('aria-label')).toBe('Publish to the User Portal in Production');
+    expect(toggle(container)?.checked).toBe(false);
   });
 
   it('keeps the confirm dialog open on a refused publish of a workflow, worded from its code', async () => {
@@ -242,6 +253,137 @@ describe("the env card's User Portal action", () => {
       expect(dialog(container)?.textContent).toContain(says);
       expect(dialog(container)?.textContent).not.toContain('keeps running');
       unmount();
+    }
+  });
+
+  // A sync publish's scopes come only in its answer; a background one's, in the publishability, which outlives a reload.
+  it('keeps the scopes the portal could not hold in view while published, and only then', async () => {
+    publishability.mockResolvedValue({ ...publishable, published: true, rejectedScopes: ['bad scope'] });
+    let container = await action(DEVELOPER);
+    expect(container.textContent).toContain("The User Portal can't hold this scope, so its users' tokens never carry it: bad scope.");
+    unmount();
+
+    publishability.mockResolvedValue({ ...publishable, rejectedScopes: ['bad scope'] });
+    container = await action(DEVELOPER);
+    expect(container.textContent).not.toContain('bad scope');
+  });
+
+  // The confirmation reads the publishability as it is read again, so a publish that has come to redeploy a workflow,
+  // say after its API security changed in another tab, is never confirmed without the warning.
+  it('warns of a redeploy the publishability comes to report while the confirmation is open', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      // The first read, the one the confirmation makes as it opens, then the one the tab's focus brings.
+      publishability
+        .mockResolvedValueOnce(publishable)
+        .mockResolvedValueOnce(publishable)
+        .mockResolvedValue({ ...publishable, redeploys: true });
+      const container = await action(DEVELOPER, true);
+      await act(async () => toggle(container)?.click());
+      await flush();
+      expect(dialog(container)?.textContent).toContain("The User Portal's users will see this integration there.");
+
+      // Past the read's stale time, the tab comes back into focus and the publishability is read again.
+      vi.setSystemTime(Date.now() + 31_000);
+      await act(async () => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await flush();
+      expect(publishability).toHaveBeenCalledTimes(3);
+      expect(dialog(container)?.textContent).toContain('will be redeployed in Production');
+    } finally {
+      focusManager.setFocused(undefined);
+      vi.useRealTimers();
+    }
+  });
+
+  // The rules last read can be out of date: a redeploy or a security change since can break one.
+  it('reads the rules again as the confirmation opens without holding Publish, and holds it back once they refuse', async () => {
+    let answer: (report: UserPortalPublishability) => void = () => {};
+    publishability.mockResolvedValueOnce(publishable).mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await flush();
+    // The re-read runs every publishing rule, so Publish doesn't wait for it.
+    expect(dialogButton(container, 'Publish')?.disabled).toBe(false);
+
+    await act(async () => answer({ ...publishable, publishable: false, reasons: [{ code: 'USER_PORTAL_NOT_DEPLOYED', message: 'the integration is not deployed in this environment' }] }));
+    await flush();
+    expect(dialog(container)?.textContent).toContain('Deploy it to Production first.');
+    expect(dialogButton(container, 'Publish')?.disabled).toBe(true);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  // A write's answer goes into the publishability as it returns, so neither the dialog nor the switch waits for the
+  // re-read after it, which runs every publishing rule; that re-read never lands here.
+  it('shows a publish done within its request at once, and reports it, before the re-read after it lands', async () => {
+    publishability
+      .mockResolvedValueOnce(publishable)
+      .mockResolvedValueOnce(publishable)
+      .mockReturnValue(new Promise(() => {}));
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await flush();
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    expect(dialog(container)).toBeNull();
+    expect(toggle(container)?.checked).toBe(true);
+    expect(container.querySelector('label')?.textContent).toContain('Published to User Portal');
+    expect(onNotify).toHaveBeenCalledWith(expect.objectContaining({ text: 'Published to the User Portal in Production.', severity: 'success' }));
+  });
+
+  it('shows an unpublish done within its request at once, before the re-read after it lands', async () => {
+    publishability.mockResolvedValueOnce({ ...publishable, published: true }).mockReturnValue(new Promise(() => {}));
+    unpublish.mockResolvedValue({ environment: 'production', published: false, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await act(async () => dialogButton(container, 'Unpublish')?.click());
+    await flush();
+    expect(dialog(container)).toBeNull();
+    expect(toggle(container)?.checked).toBe(false);
+    expect(container.querySelector('label')?.textContent).toBe('Publish to User Portal');
+  });
+
+  // The read the confirmation started as it opened is still out when the publish answers: landing late, it would put
+  // back the state from before the publish.
+  it("keeps a publish's answer over a read that started before it", async () => {
+    let late: (report: UserPortalPublishability) => void = () => {};
+    publishability
+      .mockResolvedValueOnce(publishable)
+      .mockReturnValueOnce(new Promise((resolve) => (late = resolve)))
+      .mockReturnValue(new Promise(() => {}));
+    publish.mockResolvedValue({ environment: 'production', published: true, publishing: false, unpublishing: false, rejectedScopes: [] });
+    const container = await action(DEVELOPER);
+    await act(async () => toggle(container)?.click());
+    await flush();
+    await act(async () => dialogButton(container, 'Publish')?.click());
+    await flush();
+    await act(async () => late(publishable));
+    await flush();
+    expect(toggle(container)?.checked).toBe(true);
+  });
+
+  it('leaves how a background publish ends to the page where the page reports it', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      publishability.mockResolvedValue({ ...publishable, publishing: true });
+      const r = await renderWithScopes(
+        <MemoryRouter>
+          <UserPortalAction orgHandler="acme" projectId="shop" componentId="orders" environment="production" envName="Production" onNotify={onNotify} isWorkflow reportsBackgroundOutcome={false} />
+        </MemoryRouter>,
+        DEVELOPER,
+      );
+      unmount = r.unmount;
+      await flush();
+      publishability.mockResolvedValue({ ...publishable, published: true });
+      await act(async () => void (await vi.advanceTimersByTimeAsync(3_000)));
+      await flush();
+      expect(r.container.querySelector('label')?.textContent).toContain('Published to User Portal');
+      expect(onNotify).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
     }
   });
 

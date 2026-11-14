@@ -16,15 +16,18 @@
  * under the License.
  */
 
-import { Alert, AlertTitle, Box, IconButton, PageContent, PageTitle, Stack, Tooltip } from '@wso2/oxygen-ui';
+import { Alert, AlertTitle, Box, IconButton, PageContent, PageTitle, Snackbar, Stack, Tooltip } from '@wso2/oxygen-ui';
 import { Layers, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import type { JSX, ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import DeploymentTrackBar from '../../DeploymentTrackBar';
 import EmptyListing from '../../EmptyListing';
+import EnvCardNotice from '../../EnvironmentCard/EnvCardNotice';
+import { useEnvCardNotification } from '../../EnvironmentCard/useEnvCardNotification';
 import NotDeployedAlert from '../../NotDeployedAlert';
 import NotFound from '../../NotFound';
+import { publicationNotices } from '../../UserPortal/publicationNotices';
 import UserPortalPrompt from '../../UserPortal/UserPortalPrompt';
 import EnvironmentSelect from '../../common/EnvironmentSelect';
 import { useComponentByHandler } from '../../../hooks/useComponents';
@@ -33,9 +36,11 @@ import { useEnvironments } from '../../../hooks/useEnvironments';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import { useProjectId } from '../../../hooks/useProjects';
 import { useSelectedTrack } from '../../../hooks/useSelectedTrack';
+import { useBackgroundPublishOutcome } from '../../../hooks/useUserPortal';
 import { broaden, overviewUrl, resourceUrl, type ComponentScope } from '../../../nav';
 import type { Component } from '../../../types/component';
 import type { Environment } from '../../../types/environment';
+import type { EnvCardNotification } from '../../../types/integration';
 import type { NotDeployedPurpose } from '../../../utils/deploymentNotice';
 import { isNotFoundError } from '../../../utils/apiErrors';
 import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
@@ -48,6 +53,8 @@ import TestKeyNotice from './TestKeyNotice';
 import { WorkflowContentSkeleton, WorkflowPageSkeleton } from './WorkflowPageSkeleton';
 import * as styles from './WorkflowPageShell.styles';
 
+const TOAST_ANCHOR = { vertical: 'bottom', horizontal: 'right' } as const;
+
 /** What a workflow page's placeholder gets: the integration and the environment shown. */
 export interface WorkflowPagePlaceholderProps {
   scope: ComponentScope;
@@ -55,6 +62,11 @@ export interface WorkflowPagePlaceholderProps {
   /** The environment shown; its id is what `?env=` links carry. */
   environment: Environment;
   environments: Environment[];
+  /**
+   * Shows a notice over the page, such as how a User Portal publish went. It outlives the content, which a publish
+   * replaces (once published, the management API answers only User Portal sign-ins), and shows over a drawer.
+   */
+  onNotify: (notification: EnvCardNotification) => void;
 }
 
 /** What a workflow page's content gets once the management API answers. */
@@ -151,6 +163,7 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
   const { data: component, isLoading: loadingComponent, error: componentError, refetch: refetchComponent } = useComponentByHandler(projectId, scope.component);
   const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError, refetch: refetchEnvironments } = useEnvironments(orgUuid, projectId);
   const { trackId } = useSelectedTrack(component);
+  const { notification, onNotify, dismiss } = useEnvCardNotification();
 
   const [params, setParams] = useSearchParams();
   const linkedEnvId = params.get(WORKFLOW_ENV_PARAM);
@@ -170,6 +183,7 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
   const reads = !!component && !placeholder;
   const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(reads ? scope.org : '', reads ? orgUuid : '', componentId, trackId, environment?.id ?? '');
   const api = useWorkflowApi({ componentId, environmentId: environment?.id ?? '', trackId, deployment: placeholder ? null : deployment, isDeploymentLoading: !placeholder && loadingDeployment });
+  useBackgroundPublishOutcome(componentId, environment?.id ?? '', publicationNotices(environment?.name ?? '', onNotify).background, { onceRead: true });
 
   if (loadingProject || loadingComponent || loadingEnvironments) return <WorkflowPageSkeleton title={title} />;
   // A failed read is not a missing integration; only a 404 says it does not exist.
@@ -200,11 +214,11 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
   } else if (!environment) {
     body = <EmptyListing icon={<Layers size={48} />} title="No environments" description="This project has no environments yet, so there is nowhere this integration runs." />;
   } else if (placeholder) {
-    body = placeholder({ scope, component, environment, environments });
+    body = placeholder({ scope, component, environment, environments, onNotify });
   } else {
     body = (
-      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt componentId={component.id} environment={environment} />}>
-        {(ready) => children({ scope, component, environment, environments, api: ready })}
+      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt orgHandler={scope.org} projectId={component.projectId} componentId={component.id} environment={environment} onNotify={onNotify} />}>
+        {(ready) => children({ scope, component, environment, environments, onNotify, api: ready })}
       </ConnectionBody>
     );
   }
@@ -222,6 +236,11 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
           {api.client && <RefreshControls scopeId={api.connection.scopeId} />}
         </Stack>
         {body}
+        <Snackbar open={notification !== null} anchorOrigin={TOAST_ANCHOR}>
+          <Box>
+            <EnvCardNotice notification={notification} onClose={dismiss} variant="filled" />
+          </Box>
+        </Snackbar>
       </PageContent>
     </Box>
   );

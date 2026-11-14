@@ -18,8 +18,8 @@
 
 import { useState, type ReactNode } from 'react';
 import { usePublishToUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
-import { publishingText, refusalText, unpublishingText, userPortalErrorText } from '../../utils/userPortal';
-import PublishWorkflowDialog from './PublishWorkflowDialog';
+import { publishingText, refusalText, shownRefusals, unpublishingText, userPortalErrorText } from '../../utils/userPortal';
+import PublishDialog from './PublishDialog';
 
 interface PublishFlowOptions {
   componentId: string;
@@ -30,18 +30,20 @@ interface PublishFlowOptions {
   isWorkflow?: boolean;
   /** Runs as a publish is asked for, before it is confirmed, so what the last one left on screen goes. */
   onStart?: () => void;
-  /** Runs when a publish is done within its request, with the scopes the User Portal couldn't hold. */
+  /**
+   * Runs when a publish is done within its request, with the scopes the User Portal couldn't hold.
+   */
   onPublished?: (rejectedScopes: string[]) => void;
 }
 
 export interface PublishFlow {
-  /** Publishes, or first asks to confirm a publish that redeploys a workflow (its publishability's `redeploys`). */
-  request: (redeploys: boolean) => void;
-  /** The confirmation, while it is open; render it beside the button. */
+  /** Asks to confirm a publish, then publishes. */
+  request: () => void;
+  /** The confirmation, while it is open; render it beside the control that asks for it. */
   dialog: ReactNode;
   /**
-   * Why the last publish failed, worded for the reader: a refused one, or a background one the publishability still
-   * reports. A confirmed publish shows its refusal in the dialog instead.
+   * Why the last publish failed in the background, worded for the reader, while the publishability still reports it. A
+   * refused publish shows its refusal in the confirmation, which stays open on it.
    */
   error: string | null;
   /**
@@ -58,16 +60,16 @@ export interface PublishFlow {
 }
 
 /**
- * Publishing an integration to an environment's User Portal, as every place in the console offers it. A publish that
- * redeploys a workflow so its Workflow Management API takes only User Portal sign-ins turns the console's workflow
- * management off in the environment, so it is confirmed first (`PublishWorkflowDialog`); any other publish goes
- * straight ahead. An AI agent's or a workflow's publish finishes in the background after it is accepted, as bringing
- * the User Portal's scopes in step can take a while: the flow stays pending, and the publishability, which survives a
- * page reload, says when it ends and how.
+ * Publishing an integration to an environment's User Portal, as every place in the console offers it. Every publish is
+ * confirmed first, as an unpublish is (`PublishDialog`). One that redeploys a workflow so its Workflow Management API
+ * takes only User Portal sign-ins turns the console's workflow management off in the environment, which its
+ * confirmation warns of while the publishability says so. An AI agent's or a workflow's publish finishes in the
+ * background after it is accepted, as bringing the User Portal's scopes in step can take a while: the flow stays
+ * pending, and the publishability, which survives a page reload, says when it ends and how.
  */
 export function usePublishFlow({ componentId, environment, envName, isWorkflow = false, onStart, onPublished }: PublishFlowOptions): PublishFlow {
-  const publish = usePublishToUserPortal();
-  const { data: report } = useUserPortalPublishability(componentId, environment);
+  const publish = usePublishToUserPortal({ onPublished });
+  const { data: report, refetch } = useUserPortalPublishability(componentId, environment);
   const publishing = !!report?.publishing;
   const [confirming, setConfirming] = useState(false);
   const [rejectedScopes, setRejectedScopes] = useState<string[]>([]);
@@ -79,20 +81,16 @@ export function usePublishFlow({ componentId, environment, envName, isWorkflow =
         onSuccess: (out) => {
           setConfirming(false);
           setRejectedScopes(out.rejectedScopes);
-          if (!out.publishing) onPublished?.(out.rejectedScopes);
         },
       },
     );
   };
-  const request = (redeploys: boolean) => {
+  const request = () => {
     onStart?.();
-    setRejectedScopes([]);
-    if (!redeploys) {
-      start();
-      return;
-    }
     publish.reset();
+    setRejectedScopes([]);
     setConfirming(true);
+    void refetch();
   };
   const backgroundError = report && !report.publishing && !report.published && report.publishError ? refusalText(report.publishError, envName) : null;
   const close = () => {
@@ -102,8 +100,21 @@ export function usePublishFlow({ componentId, environment, envName, isWorkflow =
 
   return {
     request,
-    dialog: confirming ? <PublishWorkflowDialog envName={envName} onConfirm={start} onClose={close} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} /> : null,
-    error: publish.isError && !confirming ? userPortalErrorText(publish.error, envName) : publish.isPending ? null : backgroundError,
+    // The confirmation follows the publishability as it is read again while it is open, so a publish that has come to
+    // redeploy a workflow is never confirmed without the warning, and one the rules now refuse isn't offered.
+    dialog:
+      confirming && report ? (
+        <PublishDialog
+          envName={envName}
+          redeploys={report.redeploys}
+          refusals={report.publishable ? [] : shownRefusals(report.reasons)}
+          onConfirm={start}
+          onClose={close}
+          isPending={publish.isPending}
+          error={publish.isError ? userPortalErrorText(publish.error, envName) : null}
+        />
+      ) : null,
+    error: publish.isPending ? null : backgroundError,
     progress: publishing ? publishingText(envName, isWorkflow) : report?.unpublishing ? unpublishingText(envName, isWorkflow) : null,
     // The sync answer's scopes, or those of the background publish the report carries, only while it is published.
     rejectedScopes: rejectedScopes.length > 0 ? rejectedScopes : report?.published ? report.rejectedScopes : [],

@@ -74,7 +74,7 @@ export interface DeployEnvironmentCardProps {
   isWorkflow?: boolean;
   /** An MCP server: the AI gateway may front its endpoints, which are then public only. */
   isMcpServer?: boolean;
-  /** An AI agent, automation or workflow: shows whether it is published to the environment's User Portal, with Publish or Unpublish. */
+  /** An AI agent, automation or workflow: the card ends in the User Portal switch, as the Overview card does. */
   publishesToUserPortal?: boolean;
   /** Which limits a schedule set here is held to; an automation's unless set. */
   scheduleKind?: ScheduleKind;

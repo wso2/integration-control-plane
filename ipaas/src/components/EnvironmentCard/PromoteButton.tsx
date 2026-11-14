@@ -150,8 +150,7 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
           ))}
           {confirming?.portal === 'carried' && (
             <Typography variant="body2">
-              This workflow is published to the User Portal in {sourceEnvId}, so its Workflow Management API takes only User Portal sign-ins there, and promoting carries that to {targetEnvId}. Until it&apos;s published to the User Portal in {targetEnvId} too,
-              the console&apos;s workflow views won&apos;t work there.
+              {`This workflow is published to the User Portal in ${sourceEnvId}, so its Workflow Management API takes only User Portal sign-ins there, and promoting carries that to ${targetEnvId}. Until it's published to the User Portal in ${targetEnvId} too, the console's workflow views won't work there.`}
             </Typography>
           )}
           {confirming?.portal === 'unchecked' && <Typography variant="body2">Couldn&apos;t check where this workflow is published to the User Portal.</Typography>}

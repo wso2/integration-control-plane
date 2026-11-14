@@ -23,14 +23,14 @@ import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
 import { useEnableUserPortal, useUserPortalEnvironments, useUserPortalPublishability, useUserPortals } from '../../hooks/useUserPortal';
 import type { Environment } from '../../types/environment';
+import type { EnvCardNotification } from '../../types/integration';
 import type { UserPortal, UserPortalPublishability, UserPortalState } from '../../types/userPortal';
 import { apiErrorMessage, isUserPortalUnavailable } from '../../utils/apiErrors';
-import { shownRefusals, unpublishingText, USER_PORTAL_NOT_ENABLED } from '../../utils/userPortal';
+import { USER_PORTAL_NOT_ENABLED } from '../../utils/userPortal';
 import EnableUserPortalDialog from './EnableUserPortalDialog';
-import PublishButton from './PublishButton';
 import PublishRefusals from './PublishRefusals';
-import RejectedScopes from './RejectedScopes';
-import { usePublishFlow } from './usePublishFlow';
+import UserPortalAction from './UserPortalAction';
+import UserPortalActionSkeleton from './UserPortalActionSkeleton';
 
 const ENABLE_REFUSAL = "Your role can't enable the User Portal.";
 
@@ -42,21 +42,29 @@ const NOT_A_PORTAL_ENVIRONMENT = { code: 'USER_PORTAL_INVALID_ENVIRONMENT', mess
 const PROVISIONED: ReadonlySet<UserPortalState> = new Set(['starting', 'active', 'unhealthy']);
 
 interface UserPortalPromptProps {
+  orgHandler: string;
+  projectId: string;
   componentId: string;
   environment: Environment;
+  /**
+   * Reports a publish or unpublish, as the env cards do. The page shows it, and reports how a background one ends
+   * itself, because a publish replaces the content the prompt is part of.
+   */
+  onNotify: (notification: EnvCardNotification) => void;
 }
 
 /**
  * The next step towards seeing a workflow in the User Portal, which serves views the console doesn't yet: enable the
- * User Portal in the environment, publish the workflow to it, or open it once the workflow is published there. A
- * publish follows the console's publishing rules, and is confirmed first when it redeploys the workflow.
+ * User Portal in the environment, publish the workflow to it, or open it once the workflow is published there. Once a
+ * portal is provisioned, publishing and unpublishing are the env cards' switch (`UserPortalAction`), reported through
+ * `onNotify` as the cards report them.
  */
 export default function UserPortalPrompt(props: UserPortalPromptProps): JSX.Element {
   // What an enable or a publish left on screen belongs to the environment it was made in.
   return <EnvironmentPrompt key={props.environment.id} {...props} />;
 }
 
-function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps): JSX.Element | null {
+function EnvironmentPrompt({ orgHandler, projectId, componentId, environment, onNotify }: UserPortalPromptProps): JSX.Element | null {
   const [portalQuery] = useUserPortals([environment.id]);
   // The environments a User Portal can run in. Where the read fails, Enable is still offered, and refused with the reason.
   const portalEnvironments = useUserPortalEnvironments();
@@ -66,7 +74,6 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
   const can = useCan();
   const enable = useEnableUserPortal();
   const [enableOpen, setEnableOpen] = useState(false);
-  const publish = usePublishFlow({ componentId, environment: environment.id, envName: environment.name, isWorkflow: true });
 
   const portal = portalQuery.data;
   const report = publishability.data;
@@ -160,43 +167,17 @@ function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps):
       break;
   }
 
-  if (report.published) {
-    return (
-      <Stack alignItems="center" gap={1}>
-        <OpenUserPortal portal={portal} />
-        <RejectedScopes scopes={publish.rejectedScopes} />
-      </Stack>
-    );
-  }
-
-  // While a stale report is read again, the portal it says isn't enabled is not listed.
-  const reasons = shownRefusals(report.reasons).filter((r) => !staleReport || r.code !== USER_PORTAL_NOT_ENABLED);
+  // The switch publishes and unpublishes as on the env cards. A published workflow opens from the button above it, as
+  // from its Overview card's notice, so the switch offers no link of its own.
   return (
     <Stack alignItems="center" gap={1}>
-      <PublishButton
-        flow={publish}
-        publishable={report.publishable}
-        redeploys={report.redeploys}
-        busy={publishability.isFetching}
-        holdReason={report.unpublishing ? unpublishingText(environment.name, true) : undefined}
-        label="Publish to User Portal"
-        variant="contained"
-        size="medium"
-      />
-      {publish.progress && (
-        <Typography variant="caption" color="text.secondary" textAlign="center">
-          {publish.progress}
-        </Typography>
+      {report.published && <OpenUserPortal portal={portal} />}
+      {/* A stale report would turn the switch into "Share with your users" until it is read again, so its placeholder waits. */}
+      {staleReport ? (
+        <UserPortalActionSkeleton />
+      ) : (
+        <UserPortalAction orgHandler={orgHandler} projectId={projectId} componentId={componentId} environment={environment.id} envName={environment.name} onNotify={onNotify} isWorkflow showPortalLink={false} reportsBackgroundOutcome={false} />
       )}
-      {/* A running publish is switching the workflow, so the rules read mid-switch aren't shown until it ends. */}
-      {!report.publishing && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={environment.name} />}
-      {publish.error && (
-        <Typography variant="caption" color="error">
-          {publish.error}
-        </Typography>
-      )}
-      <RejectedScopes scopes={publish.rejectedScopes} />
-      {publish.dialog}
     </Stack>
   );
 }
