@@ -92,6 +92,12 @@ export interface ChunkingConfig {
   maxOverlapSize: number;
 }
 
+/** How a knowledge base reads its files, sent as ENABLE_OCR. */
+export interface ParsingConfig {
+  /** OCR every PDF page, for scanned PDFs. */
+  ocrEnabled: boolean;
+}
+
 // ── Step 4: automation (the component to create) ────────────────────────────
 
 export interface AutomationConfig {

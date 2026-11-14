@@ -27,9 +27,11 @@ import {
   isEditedSettingsValid,
   isManualSchedule,
   isNameValid,
+  isOcrUnset,
   knowledgeBaseNameError,
   knowledgeBaseNameFrom,
   knowledgeBaseSummary,
+  parsingFromConfig,
   secretsForUpdate,
   retrievalAccessReason,
   knowledgeBaseWriteBlockedReason,
@@ -41,10 +43,11 @@ import type { EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
 const pinecone: VectorStoreConfig = { provider: 'pinecone', apiKey: 'pc-key', indexName: 'docs' };
 const openai: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'oa-key', azureApiVersion: '', azureBaseUrl: '' };
 const chunking = { strategy: 'sentence' as const, maxSegmentSize: 800, maxOverlapSize: 100 };
+const noOcr = { ocrEnabled: false };
 
 describe('buildKnowledgeBaseSettings', () => {
-  it('splits secrets from plain settings and carries chunking', () => {
-    expect(buildKnowledgeBaseSettings(pinecone, openai, chunking)).toEqual({
+  it('splits secrets from plain settings and carries chunking and parsing', () => {
+    expect(buildKnowledgeBaseSettings(pinecone, openai, chunking, noOcr)).toEqual({
       config: {
         VECTORDB_PROVIDER: 'pinecone',
         COLLECTION_NAME: 'docs',
@@ -53,9 +56,34 @@ describe('buildKnowledgeBaseSettings', () => {
         CHUNKING_STRATEGY: 'sentence',
         MAX_SEGMENT_SIZE: '800',
         MAX_OVERLAP_SIZE: '100',
+        ENABLE_OCR: 'false',
       },
       secrets: { PINECONE_APIKEY: 'pc-key', EMBEDDING_MODEL_APIKEY: 'oa-key' },
     });
+  });
+
+  it('sends ENABLE_OCR as "true" when OCR is on', () => {
+    expect(buildKnowledgeBaseSettings(pinecone, openai, chunking, { ocrEnabled: true }).config.ENABLE_OCR).toBe('true');
+  });
+});
+
+describe('parsingFromConfig', () => {
+  it('reads ENABLE_OCR as the services do: trimmed, any case, only "true" is on', () => {
+    expect(parsingFromConfig({ ENABLE_OCR: 'true' })).toEqual({ ocrEnabled: true });
+    expect(parsingFromConfig({ ENABLE_OCR: ' TRUE ' })).toEqual({ ocrEnabled: true });
+    expect(parsingFromConfig({ ENABLE_OCR: 'false' })).toEqual({ ocrEnabled: false });
+    expect(parsingFromConfig({ ENABLE_OCR: 'yes' })).toEqual({ ocrEnabled: false });
+    expect(parsingFromConfig({})).toEqual({ ocrEnabled: false });
+  });
+
+  it('round-trips through the settings', () => {
+    expect(parsingFromConfig(buildKnowledgeBaseSettings(pinecone, openai, chunking, { ocrEnabled: true }).config)).toEqual({ ocrEnabled: true });
+  });
+
+  it('tells a knowledge base that never set OCR from one that turned it off', () => {
+    expect(isOcrUnset({})).toBe(true);
+    expect(isOcrUnset({ ENABLE_OCR: ' ' })).toBe(true);
+    expect(isOcrUnset({ ENABLE_OCR: 'false' })).toBe(false);
   });
 });
 
@@ -75,7 +103,7 @@ describe('buildDataSourceSettings', () => {
 });
 
 describe('reading settings back', () => {
-  const { config } = buildKnowledgeBaseSettings(pinecone, openai, chunking);
+  const { config } = buildKnowledgeBaseSettings(pinecone, openai, chunking, noOcr);
 
   it('round-trips everything but the secrets', () => {
     expect(vectorStoreFromConfig(config)).toEqual({ ...pinecone, apiKey: '' });
@@ -149,11 +177,12 @@ describe('dataSourceNameFor', () => {
 
 describe('display', () => {
   it('summarises the stored settings', () => {
-    expect(knowledgeBaseSummary(buildKnowledgeBaseSettings(pinecone, openai, chunking).config)).toEqual({
+    expect(knowledgeBaseSummary(buildKnowledgeBaseSettings(pinecone, openai, chunking, noOcr).config)).toEqual({
       vectorStore: 'Pinecone',
       collection: 'docs',
       embedding: 'Open AI · text-embedding-3-small',
       chunking: 'Sentence · 800 / 100',
+      ocr: 'Off',
     });
     expect(dataSourceLabel({ DATASOURCE: 'gdrive' })).toBe('Google Drive');
   });

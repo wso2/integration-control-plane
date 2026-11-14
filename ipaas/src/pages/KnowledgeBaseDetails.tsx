@@ -66,14 +66,16 @@ import {
   embeddingFromConfig,
   isEditedSettingsValid,
   isManualSchedule,
+  isOcrUnset,
   knowledgeBaseSummary,
   knowledgeBaseWriteBlockedReason,
+  parsingFromConfig,
   secretsForUpdate,
   vectorStoreFromConfig,
 } from '../utils/knowledgeBase';
 import { isChunkingValid, vectorStoreEnvVars } from '../utils/ragIngestion';
 import type { KnowledgeBase, KnowledgeBaseDataSource } from '../types/knowledgeBase';
-import type { ChunkingConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
+import type { ChunkingConfig, EmbeddingConfig, ParsingConfig, VectorStoreConfig } from '../types/ragIngestion';
 import { isNotFoundError } from '../utils/apiErrors';
 import PageNotFound from './PageNotFound';
 import PillTabs from '../components/PillTabs';
@@ -207,6 +209,7 @@ function OverviewTab({ scope, kb, onConnect }: { scope: OrgScope; kb: KnowledgeB
             <OverviewItem label="Collection / table" value={summary.collection} />
             <OverviewItem label="Embedding provider" value={summary.embedding} />
             <OverviewItem label="Chunking" value={summary.chunking} />
+            <OverviewItem label="Scanned PDFs (OCR)" value={summary.ocr} />
           </Box>
           <Box sx={{ ...overviewItemSx, mt: 3 }}>
             <Typography variant="caption" color="text.secondary">
@@ -656,6 +659,8 @@ function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: Knowledg
   const [vectorStore, setVectorStore] = useState<VectorStoreConfig | null>(() => vectorStoreFromConfig(kb.config));
   const [embedding, setEmbedding] = useState<EmbeddingConfig | null>(() => embeddingFromConfig(kb.config));
   const [chunking, setChunking] = useState<ChunkingConfig>(() => chunkingFromConfig(kb.config));
+  const [parsing, setParsing] = useState<ParsingConfig>(() => parsingFromConfig(kb.config));
+  const changesParsing = parsing.ocrEnabled !== parsingFromConfig(kb.config).ocrEnabled;
 
   // A stored secret only stands in for the same provider's field: an empty key after a
   // provider switch must be filled in, not resolved to the old provider's key.
@@ -670,7 +675,7 @@ function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: Knowledg
 
   const save = () => {
     if (!vectorStore || !embedding) return;
-    const settings = buildKnowledgeBaseSettings(vectorStore, embedding, chunking);
+    const settings = buildKnowledgeBaseSettings(vectorStore, embedding, chunking, parsing);
     setSaved(false);
     update.mutate({ displayName: displayName.trim(), description: description.trim(), config: settings.config, secrets: secretsForUpdate(settings, reusableSecrets) }, { onSuccess: () => setSaved(true) });
   };
@@ -699,8 +704,9 @@ function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: Knowledg
         <EmbeddingModelStep value={embedding} onChange={setEmbedding} apiKeyStored={embeddingKeyStored} />
       </Box>
       <Box>
-        <ChunkingStep value={chunking} onChange={setChunking} />
+        <ChunkingStep value={chunking} onChange={setChunking} parsing={parsing} onParsingChange={setParsing} ocrUnset={isOcrUnset(kb.config)} />
       </Box>
+      {changesParsing && !changesVectors && <Alert severity="info">Files already ingested keep the text they were read with. Run each data source again after saving so they are read with the new OCR setting.</Alert>}
       {changesVectors && <Alert severity="warning">Documents already ingested were embedded with the current settings. Run each data source again after saving so retrieval finds them.</Alert>}
       {canManage && saveBlocked && <Alert severity="info">{saveBlocked}</Alert>}
       {canManage && (
