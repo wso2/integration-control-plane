@@ -22,7 +22,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { projectNameFor } from './helpers/journey-project.js';
 import { fillSecret, readSecret } from './helpers/secrets.js';
-import { parkSessionStorage, rejectCookieBanner } from './helpers/session-storage.js';
+import { blockCookieBanner, parkSessionStorage } from './helpers/session-storage.js';
 import { msUntilNextWindow, totpCode } from './helpers/totp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -177,7 +177,7 @@ setup('authenticate cloud', async ({ page }) => {
     throw new Error('Set E2E_GITHUB_TOTP_SECRET, or the GMAIL_* credentials for the emailed code — see tests/e2e/README.md');
   }
   // The console's OneTrust banner can cover the onboarding and terms dialogs this setup clicks through.
-  await rejectCookieBanner(page);
+  await blockCookieBanner(page.context());
 
   // Only read verification mail that arrives after this point.
   const startedAt = Date.now();
