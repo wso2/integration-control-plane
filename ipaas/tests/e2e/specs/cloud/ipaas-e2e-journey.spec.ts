@@ -13,7 +13,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { AUTH_STATE_PATH, getAuthContext } from '../../helpers/auth-context.js';
 import { expectPageRendered } from '../../helpers/cloud-fixtures.js';
-import { newConsoleContext, rejectCookieBanner } from '../../helpers/session-storage.js';
+import { newConsoleContext } from '../../helpers/session-storage.js';
 import { BUILD_TIMEOUT_MS, waitForBuildToSettle } from '../../helpers/build.js';
 import { cardFor, expandSidebar, expectNavItems, openIntegration, openNavGroup, openProject } from '../../helpers/console-nav.js';
 import { fillSecret, readSecret } from '../../helpers/secrets.js';
@@ -117,8 +117,6 @@ test.beforeAll(async ({ browser }, testInfo) => {
   // The consent prompt is a modal on every page until the e2e user answers; 07b checks it on its own.
   await keepConsentPromptAway(context);
   page = await context.newPage();
-  // Awaited for the journey's own page, so its first navigation is covered; the context listener covers pages it did not open.
-  await rejectCookieBanner(page);
 });
 
 test.afterAll(async () => {
