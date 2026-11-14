@@ -99,7 +99,25 @@ import { isWorkflowIntegration } from '../utils/workflowIntegration';
 import { hasIntegrationTraces } from '../utils/integrationTraces';
 import { useAuth } from '../auth';
 import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
-import { useScope, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, settingsCrossScopeUrl, resolveActiveNavId, parentGroupId, navUrl, overviewUrl, navScopeSwitchUrl, resolveResourceKey, componentKeepsPage, type Scope } from '../nav';
+import {
+  useScope,
+  broaden,
+  narrow,
+  newProjectUrl,
+  newComponentUrl,
+  hasProject,
+  hasComponent,
+  settingsCrossScopeUrl,
+  resolveActiveNavId,
+  parentGroupId,
+  navUrl,
+  overviewUrl,
+  navScopeSwitchUrl,
+  orgSwitchUrl,
+  resolveResourceKey,
+  componentKeepsPage,
+  type Scope,
+} from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { trackEvent } from '../services/tracking/tracking';
 import { cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, projectsRedirectUrl, termsOfUseUrl } from '../paths';
@@ -316,7 +334,7 @@ export default function AppLayout(): JSX.Element {
             </Header.BrandLogo>
           </Header.Brand>
           <Header.Switchers showDivider={false}>
-            <OrganizationSwitcher ref={orgCardRef} org={scope.org} name={orgDisplayName} onHome={() => navigateTo(orgHomeUrl(scope.org))} />
+            <OrganizationSwitcher ref={orgCardRef} org={scope.org} name={orgDisplayName} onHome={() => navigateTo(orgHomeUrl(scope.org))} switchUrl={(org) => orgSwitchUrl(pathname, scope, org)} />
             {!hasProject(scope) && !projectMenuAnchor && (
               <Tooltip title="Select project">
                 <IconButton

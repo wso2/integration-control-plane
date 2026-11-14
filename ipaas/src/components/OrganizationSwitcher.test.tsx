@@ -51,7 +51,7 @@ function listing(patch: Partial<OrganizationSwitchState> = {}): void {
 }
 
 async function render(org = 'acme'): Promise<HTMLElement> {
-  const rendered = await renderWithScopes(<OrganizationSwitcher org={org} name="Acme" onHome={onHome} />, []);
+  const rendered = await renderWithScopes(<OrganizationSwitcher org={org} name="Acme" onHome={onHome} switchUrl={(handle) => `/organizations/${handle}/logs`} />, []);
   unmount = rendered.unmount;
   return rendered.container;
 }
@@ -90,7 +90,7 @@ describe('OrganizationSwitcher', () => {
     expect(options().map((o) => o.textContent)).toEqual(['Acme Corpacme', 'Globexglobex']);
     pick('Globex');
 
-    expect(onSwitch).toHaveBeenCalledWith(GLOBEX, ACME.id);
+    expect(onSwitch).toHaveBeenCalledWith(GLOBEX, ACME.id, '/organizations/globex/logs');
     expect(onHome).not.toHaveBeenCalled();
   });
 
@@ -114,7 +114,7 @@ describe('OrganizationSwitcher', () => {
     expect(document.querySelector('[role="tooltip"]')?.textContent ?? '').not.toContain('Try again');
     pick('Globex');
 
-    expect(onSwitch).toHaveBeenCalledWith(GLOBEX, ACME.id);
+    expect(onSwitch).toHaveBeenCalledWith(GLOBEX, ACME.id, '/organizations/globex/logs');
     expect(document.querySelector('[role="tooltip"]')?.textContent).toContain("Couldn't switch to Globex. Try again.");
   });
 

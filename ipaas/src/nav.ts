@@ -465,6 +465,17 @@ export function navScopeSwitchUrl(pathname: string, currentScope: Scope, targetS
   return target ? buildUrl(targetScope, target.segment) : overviewUrl(targetScope);
 }
 
+/**
+ * Where an organization switch lands: the same page in `org`, else its Overview. A Settings page keeps its
+ * section; the new organization's permissions are not known before the switch, so its settings page applies
+ * them after the reload. A page inside a project or integration keeps its resource at org level (a project's
+ * logs become the organization's logs), since the project belongs to the previous organization.
+ */
+export function orgSwitchUrl(pathname: string, currentScope: Scope, org: string): string {
+  const target: Scope = { level: 'organizations', org };
+  return settingsCrossScopeUrl(pathname, currentScope, target, () => true) ?? navScopeSwitchUrl(pathname, currentScope, target);
+}
+
 // ---------------------------------------------------------------------------
 // React context & ScopeResolver
 // ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { componentHumanTasksUrl, componentKeepsPage, componentWorkflowsUrl, navScopeSwitchUrl, navUrl, parentGroupId, resolveActiveNavId, resolveResourceKey, type ComponentScope } from './nav';
+import { componentHumanTasksUrl, componentKeepsPage, componentWorkflowsUrl, navScopeSwitchUrl, navUrl, orgSwitchUrl, parentGroupId, resolveActiveNavId, resolveResourceKey, type ComponentScope, type Scope } from './nav';
 
 const ORDERS: ComponentScope = { level: 'components', org: 'acme', project: 'default', component: 'orders' };
 const BILLING: ComponentScope = { ...ORDERS, component: 'billing' };
@@ -69,5 +69,29 @@ describe('componentKeepsPage', () => {
   it('keeps every other page', () => {
     expect(componentKeepsPage('runtime', automation)).toBe(true);
     expect(componentKeepsPage('overview', workflow)).toBe(true);
+  });
+});
+
+describe('orgSwitchUrl', () => {
+  const ORG: Scope = { level: 'organizations', org: 'acme' };
+  const PROJECT: Scope = { level: 'projects', org: 'acme', project: 'default' };
+
+  it('keeps an organization page', () => {
+    expect(orgSwitchUrl('/organizations/acme/logs', ORG, 'globex')).toBe('/organizations/globex/logs');
+    expect(orgSwitchUrl('/organizations/acme/admin/cd-pipelines', ORG, 'globex')).toBe('/organizations/globex/admin/cd-pipelines');
+  });
+
+  // The project belongs to the previous organization, so its page is kept at organization level.
+  it('takes a project or integration page to the same page of the organization', () => {
+    expect(orgSwitchUrl('/organizations/acme/projects/default/observe/runtimelogs', PROJECT, 'globex')).toBe('/organizations/globex/logs');
+    expect(orgSwitchUrl(`${BASE}/metrics`, ORDERS, 'globex')).toBe('/organizations/globex/metrics');
+  });
+
+  it('opens the overview when the organization has no such page', () => {
+    expect(orgSwitchUrl(`${BASE}/traces`, ORDERS, 'globex')).toBe('/organizations/globex/overview');
+  });
+
+  it('keeps a settings section', () => {
+    expect(orgSwitchUrl('/organizations/acme/settings/package-registries', ORG, 'globex')).toBe('/organizations/globex/settings/package-registries');
   });
 });
