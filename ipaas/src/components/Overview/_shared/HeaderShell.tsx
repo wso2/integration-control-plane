@@ -26,6 +26,7 @@ import type { Repository, Commit } from '../../../types/repository';
 import { useUpdateComponent } from '../../../hooks/useComponents';
 import { useChoreoSampleImages } from '../../../hooks/useRepository';
 import LabelDialog from '../../LabelDialog';
+import { componentLabels } from '../../../utils/componentLabels';
 import { formatDateTime, formatDistanceToNow } from '../../../utils/time';
 import { getGitProviderIcon } from '../../../utils/build';
 import { buildRepoBrowseUrl } from '../../../utils/gitProviderUrl';
@@ -431,8 +432,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
             </Stack>
           )}
           {(() => {
-            const raw = component.labels;
-            const labelList: string[] = Array.isArray(raw) ? raw : raw ? raw.split(',').filter(Boolean) : [];
+            // As the label dialog reads them: locked labels too, even when not stored.
+            const labelList = componentLabels(component);
             return (
               <>
                 {/* Mounted only while open — the dialog fetches label suggestions on mount. */}

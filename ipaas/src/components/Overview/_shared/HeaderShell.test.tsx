@@ -76,3 +76,13 @@ describe('Open in Cloud Editor', () => {
     expect((await openInCloudEditor(DEVELOPER))?.disabled).toBe(false);
   });
 });
+
+describe('Labels', () => {
+  it("shows a KB Service's locked label though it is not stored, as the label dialog does", async () => {
+    const kbService = { ...component, id: 'docs-kb', handler: 'docs-kb', lockedLabels: ['knowledge-base-as-service'] } as ComponentDetail;
+    const r = await renderWithScopes(<HeaderShell component={kbService} repository={null} latestCommit={null} orgHandler="acme" projectId="ai-services" environments={[]} versionId="v1" />, DEVELOPER);
+    unmount = r.unmount;
+    expect(r.container.textContent).toContain('knowledge-base-as-service');
+    expect(r.container.textContent).not.toContain('Add labels');
+  });
+});
