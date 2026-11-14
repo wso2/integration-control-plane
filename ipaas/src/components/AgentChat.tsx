@@ -24,6 +24,7 @@ import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import ApiKeyAuthOffer from './ApiKeyAuthOffer';
 import { generateUUID } from '../utils/string';
 import { agentChatEndpoint } from '../utils/voiceAgent';
+import { chatRequestFailure, chatResponseFailure } from '../utils/agentChat';
 import type { AgentConnectionStatus, ChatMessage } from '../types/agentChat';
 import type { EndpointRef } from '../types/consumers';
 
@@ -150,7 +151,7 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
         }
       }
       if (!response.ok) {
-        setChatError(`HTTP ${response.status} ${response.statusText}`);
+        setChatError(chatResponseFailure(response.status, response.statusText));
         return;
       }
 
@@ -163,8 +164,7 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
       }
       pushMessage('assistant', assistant);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setChatError(msg.includes('Failed to fetch') ? 'Agent is inactive. Please try again.' : `Failed to connect: ${msg}`);
+      setChatError(chatRequestFailure(err));
     } finally {
       setIsSending(false);
     }
