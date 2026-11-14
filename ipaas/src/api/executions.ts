@@ -81,8 +81,6 @@ export function toTaskExecution(e: BffExecution): TaskExecution {
 // environment. Mapped onto ExecutionConfigs so the schedule UI (button state,
 // next-run countdown, dialog prefill) reads it unchanged.
 //
-// Previously we used to send `projectName` param, now removed because it's not used in ipaas-service.
-//
 // An empty cronExpression means no schedule: the BFF owns the never-fires expression in both directions.
 // releaseId names the deployment track: the schedule read is that of the track the release is deployed on.
 export const fetchExecutionConfigs = (componentId: string, releaseId: string, envId = ''): Promise<ExecutionConfigs | null> => {
@@ -104,7 +102,7 @@ export const fetchExecutionConfigs = (componentId: string, releaseId: string, en
 };
 
 // GET /components/{name}/environments/{envId}/executions/history — the CronJob's
-// job runs (newest-first), keyed by component + env (+ project).
+// job runs (newest-first), keyed by component + env.
 //
 // Reconstructed from OpenChoreo Observer Kubernetes event logs (~30 days),
 // replacing the resource-tree source which only saw the Jobs still live
@@ -122,7 +120,7 @@ interface BffExecutionHistoryPage {
 }
 
 // A release belongs to one deployment track, so reading by release lists that track's runs only.
-export const fetchTaskExecutions = async (releaseId: string, componentId = '', envId = '', projectId = ''): Promise<TaskExecution[]> => {
+export const fetchTaskExecutions = async (releaseId: string, componentId = '', envId = '', _projectId = ''): Promise<TaskExecution[]> => {
   if (!componentId || !envId) return [];
   const base = releaseId ? `/releases/${seg(releaseId)}/executions/history` : `/components/${seg(componentId)}/environments/${seg(envId)}/executions/history`;
 
@@ -130,7 +128,7 @@ export const fetchTaskExecutions = async (releaseId: string, componentId = '', e
   let before: string | undefined;
   try {
     for (let page = 0; page < HISTORY_MAX_PAGES; page++) {
-      const res = await bff.get<BffExecutionHistoryPage>(`${base}${q({ projectName: projectId, limit: HISTORY_PAGE_LIMIT, before })}`);
+      const res = await bff.get<BffExecutionHistoryPage>(`${base}${q({ limit: HISTORY_PAGE_LIMIT, before })}`);
       all.push(...(res?.items ?? []).map(toTaskExecution));
       before = res?.nextCursor || undefined;
       if (!before) break;

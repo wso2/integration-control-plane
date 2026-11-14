@@ -36,11 +36,7 @@
  *     generate-release and binds it; OpenChoreo can only release the latest
  *     Workload, so the most recent successful build is what deploys.
  *
- * Write-path note: several POST/PUT handlers in the BFF accept `?projectName=…`.
- * The writes here omit it because the devant-typed input shapes do not carry
- * projectId. The BFF service today resolves the project from componentName;
- * if that tightens, the right fix is to widen the devant input types (separate
- * workstream) rather than adding a query here.
+ * Requests carry no `?projectName=`: the BFF resolves the project from the component.
  */
 
 import type { ComponentDeployment, BuildRun, ReleaseMgtDeployment, DeploymentTrackImage, DeployDeploymentTrackInput, PromoteInput, PromoteResult, ProxyReconciliationStatus, StopDeploymentInput, DeployPrebuiltImageInput, ByoiImage } from '../types/deployment';
@@ -265,8 +261,8 @@ export const fetchProxyReconciliation = (componentId: string, environmentId: str
 
 // Re-runs the API gateway reconciliation of one environment's release, e.g. after a failure the
 // background retry has given up on.
-export const retryProxyReconciliation = (componentId: string, environmentId: string, projectName: string, versionId: string): Promise<ProxyReconciliationStatus> =>
-  bff.post<ProxyReconciliationStatus>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/api-proxy-reconciliation/retry${q({ projectName, deploymentTrackId: versionId })}`);
+export const retryProxyReconciliation = (componentId: string, environmentId: string, _projectName: string, versionId: string): Promise<ProxyReconciliationStatus> =>
+  bff.post<ProxyReconciliationStatus>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/api-proxy-reconciliation/retry${q({ deploymentTrackId: versionId })}`);
 
 export const stopDeployment = (input: StopDeploymentInput): Promise<string> => bff.put<MessageResponse>(`/components/${seg(input.componentId)}/deployments/stop`, input).then((r) => r?.message ?? '');
 
