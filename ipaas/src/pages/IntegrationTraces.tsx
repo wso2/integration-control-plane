@@ -23,9 +23,9 @@ import { useOrgs } from '../hooks/useOrg';
 import { useProjects } from '../hooks/useProjects';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useAllEnvironments, useEnvironments } from '../hooks/useEnvironments';
-import { useComponentTraces, useSampledTraceSpans, useTracesFetching, type SampledSpans } from '../hooks/useIntegrationTraces';
+import { useComponentTraces, useTraceSpans, useTracesFetching, type TraceSpans } from '../hooks/useIntegrationTraces';
 import { spanSeriesByService, summarizeServiceTraces, traceStats } from '../utils/integrationTraces';
-import type { ComponentTracesRequest, TraceRow } from '../types/integrationTraces';
+import type { ComponentTracesRequest, TracePage } from '../types/integrationTraces';
 import EmptyListing from '../components/EmptyListing';
 import NotFound from '../components/NotFound';
 import TracesError from '../components/IntegrationTraces/TracesError';
@@ -40,24 +40,25 @@ import { broaden, resourceUrl, type ComponentScope } from '../nav';
 const DEFAULT_RANGE_HOURS = 24;
 const HOUR_MS = 3_600_000;
 
-function sampleNote(sampled: number, listed: number, failed: number): string {
-  const base = sampled < listed ? `From the spans of the newest ${sampled} of ${listed.toLocaleString()} traces` : `From the spans of all ${listed.toLocaleString()} traces`;
+function spansNote(page: TracePage, failed: number): string {
+  const base = page.truncated ? `From the spans of the newest ${page.traces.length.toLocaleString()} traces` : `From the spans of all ${page.traces.length.toLocaleString()} traces`;
   return failed > 0 ? `${base}; ${failed} could not be read` : base;
 }
 
-/** The per-service chart and trace view, built from the sampled spans. */
-function ServiceSections({ sampled, traces, request }: { sampled: SampledSpans; traces: TraceRow[]; request: ComponentTracesRequest }): JSX.Element {
+/** The per-service chart and trace view, built from the spans of every listed trace. */
+function ServiceSections({ read, page, request }: { read: TraceSpans; page: TracePage; request: ComponentTracesRequest }): JSX.Element {
   const startMs = Date.parse(request.startTime);
   const endMs = Date.parse(request.endTime);
-  const series = useMemo(() => spanSeriesByService(sampled.spans, startMs, endMs), [sampled.spans, startMs, endMs]);
-  const summaries = useMemo(() => summarizeServiceTraces(traces, sampled.spans), [traces, sampled.spans]);
+  const traces = page.traces;
+  const series = useMemo(() => spanSeriesByService(read.spans, startMs, endMs), [read.spans, startMs, endMs]);
+  const summaries = useMemo(() => summarizeServiceTraces(traces, read.spans), [traces, read.spans]);
   return (
     <>
-      <TraceSection title="Spans per service" subtitle={`${sampleNote(sampled.sampled, traces.length, sampled.failed)}. Tick the services to plot.`}>
+      <TraceSection title="Spans per service" subtitle={`${spansNote(page, read.failed)}. Tick the services to plot.`}>
         <ServiceSpanChart data={series} />
       </TraceSection>
       <TraceSection title="Traces by service" subtitle="Select a service to see the traces it took part in; expand a trace to see its spans, and select a span to see its attributes.">
-        <ServiceTraces summaries={summaries} traces={traces} spans={sampled.spans} />
+        <ServiceTraces summaries={summaries} traces={traces} spans={read.spans} />
       </TraceSection>
     </>
   );
@@ -66,9 +67,9 @@ function ServiceSections({ sampled, traces, request }: { sampled: SampledSpans; 
 /** Everything under the toolbar, for one environment and window. */
 function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.Element {
   const traces = useComponentTraces(request);
-  const sampled = useSampledTraceSpans(request, traces.data?.traces);
-  // Counted from the sampled spans, so it shows once they arrive.
-  const services = useMemo(() => (sampled.data ? new Set(sampled.data.spans.map((s) => s.serviceName)).size : undefined), [sampled.data]);
+  const spans = useTraceSpans(request, traces.data?.traces);
+  // Counted from the spans, so it shows once they arrive.
+  const services = useMemo(() => (spans.data ? new Set(spans.data.spans.map((s) => s.serviceName)).size : undefined), [spans.data]);
 
   if (traces.isPending) {
     return (
@@ -91,13 +92,7 @@ function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.El
     );
   }
 
-  const sections = sampled.isPending ? (
-    <TraceSectionsSkeleton />
-  ) : sampled.isError ? (
-    <TracesError title="Couldn't load the spans of these traces" onRetry={() => void sampled.refetch()} />
-  ) : (
-    <ServiceSections sampled={sampled.data} traces={traces.data.traces} request={request} />
-  );
+  const sections = spans.isPending ? <TraceSectionsSkeleton /> : spans.isError ? <TracesError title="Couldn't load the spans of these traces" onRetry={() => void spans.refetch()} /> : <ServiceSections read={spans.data} page={traces.data} request={request} />;
 
   return (
     <>

@@ -18,7 +18,7 @@
 
 import { skipToken, useIsFetching, useQuery } from '@tanstack/react-query';
 import { fetchComponentTraces, fetchTraceSpans } from '../api/integrationTraces';
-import { SPAN_FETCH_CONCURRENCY, SPAN_SAMPLE_TRACES } from '../constants/integrationTraces';
+import { SPAN_FETCH_CONCURRENCY } from '../constants/integrationTraces';
 import { mapWithConcurrency } from '../utils/integrationTraces';
 import type { ComponentTracesRequest, SpanRow, TracePage, TraceRow } from '../types/integrationTraces';
 
@@ -48,36 +48,34 @@ export function useComponentTraces(req: ComponentTracesRequest | null) {
 /** True while any trace or span query is in flight, for a refresh indicator outside the components that run them. */
 export const useTracesFetching = (): boolean => useIsFetching({ queryKey: [ROOT_KEY] }) > 0;
 
-export interface SampledSpans {
+export interface TraceSpans {
   spans: SpanRow[];
-  /** Traces whose spans were read. */
-  sampled: number;
-  /** Sampled traces whose span query failed; their spans are missing from `spans`. */
+  /** Traces whose span query failed; their spans are missing from `spans`. */
   failed: number;
 }
 
 /**
- * Spans of the newest SPAN_SAMPLE_TRACES traces. The observer lists traces without
- * the services they passed through, so the per-service views are built from these.
+ * Spans of every listed trace. The observer lists traces without the services they
+ * passed through, so the per-service counts need each trace's spans, one query each.
  * Fails only when every span query does; otherwise the gap is reported in `failed`.
  */
-export function useSampledTraceSpans(req: ComponentTracesRequest | null, traces: TraceRow[] | undefined) {
-  const traceIds = (traces ?? []).slice(0, SPAN_SAMPLE_TRACES).map((t) => t.traceId);
+export function useTraceSpans(req: ComponentTracesRequest | null, traces: TraceRow[] | undefined) {
+  const traceIds = (traces ?? []).map((t) => t.traceId);
   return useQuery({
-    queryKey: [ROOT_KEY, 'sampled-spans', req, traceIds],
+    queryKey: [ROOT_KEY, 'spans', req, traceIds],
     queryFn:
       req && traceIds.length > 0
-        ? async (): Promise<SampledSpans> => {
+        ? async (): Promise<TraceSpans> => {
             const results = await mapWithConcurrency(traceIds, SPAN_FETCH_CONCURRENCY, (id) => fetchTraceSpans(req, id));
             const spans = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
             const failed = results.filter((r) => r.status === 'rejected').length;
             if (failed === results.length) {
               throw results.find((r): r is PromiseRejectedResult => r.status === 'rejected')?.reason ?? new Error('Could not read any trace spans.');
             }
-            return { spans, sampled: traceIds.length, failed };
+            return { spans, failed };
           }
         : skipToken,
     retry: false,
-    placeholderData: sameScope<SampledSpans>(req),
+    placeholderData: sameScope<TraceSpans>(req),
   });
 }
