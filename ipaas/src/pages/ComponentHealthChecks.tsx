@@ -134,6 +134,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
             icon={<Activity size={48} />}
             title="No health checks have been configured in this environment."
             description="Configuring health checks will allow unhealthy replicas to self-heal and also ensures increased availability for your services."
+            report={{ resource: 'health-checks', state: 'no-data' }}
           />
         ) : (
           healthChecks.map((hc) => {

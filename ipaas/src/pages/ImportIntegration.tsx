@@ -24,6 +24,7 @@ import { MENU_SEARCH_THRESHOLD } from '../components/MenuSearchField';
 import { useState, useEffect, useRef, type JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useFormAbandonment } from '../hooks/useConsoleAnalytics';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateComponent } from '../hooks/useComponents';
 import { isQuotaError } from '../utils/apiErrors';
@@ -83,6 +84,7 @@ const INTEGRATION_TYPE_TRACK_EVENT: Partial<Record<IntegrationType, string>> = {
 };
 
 export default function ImportIntegration(scope: ProjectScope): JSX.Element {
+  useFormAbandonment('integration', 'create-integration');
   const canCreate = useCan()(Scopes.INTEGRATION_CREATE);
   const navigate = useAppNavigate();
   const location = useLocation();

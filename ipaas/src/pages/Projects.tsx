@@ -144,6 +144,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
           icon={<Folder size={48} />}
           title="No projects found"
           description={query ? 'Try adjusting your search' : canCreateProject ? 'Create your first project to get started' : 'Ask your administrator for access'}
+          report={{ resource: 'projects', state: query ? 'no-results' : 'no-data' }}
           showAction={!query && canCreateProject}
           actionLabel="Create project"
           onAction={() => navigate(newProjectUrl(scope))}

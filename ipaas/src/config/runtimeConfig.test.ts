@@ -61,3 +61,20 @@ describe('loadConfig: organization switcher', () => {
     expect(window.API_CONFIG.organizationSwitcher).toBe(false);
   });
 });
+
+describe('loadConfig: console analytics', () => {
+  it.each([
+    ['true', true],
+    [true, true],
+    ['false', false],
+    ['yes', false],
+  ] as const)('reads CONSOLE_ANALYTICS_ENABLED %j as %s', async (value, expected) => {
+    await load({ CONSOLE_ANALYTICS_ENABLED: value } as unknown as Record<string, string>);
+    expect(window.API_CONFIG.consoleAnalyticsEnabled).toBe(expected);
+  });
+
+  it('is off when unset', async () => {
+    await load({});
+    expect(window.API_CONFIG.consoleAnalyticsEnabled).toBe(false);
+  });
+});

@@ -85,6 +85,7 @@ export function useProjectHandlerAvailability(candidate: string, enabled: boolea
 export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { operation: 'create-project' },
     mutationFn: (input: CreateProjectInput) => {
       trackEvent('project-create-start');
       return createProject(input);
@@ -124,6 +125,7 @@ export function useDeleteProject() {
 export function useCreateMonoRepoProject() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { operation: 'create-project' },
     mutationFn: (input: CreateMonoRepoProjectInput) => {
       trackEvent('project-create-start');
       return createMonoRepoProject(input);

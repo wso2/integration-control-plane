@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { BffError } from '../api/_client';
-import { apiErrorMessage, httpStatusOf, isApiKeyAuthNotEnforced, isApiKeyAuthRequired, isNotFoundError, isPermissionError, isQuotaError, isUnsupportedError, isUserPortalUnavailable } from './apiErrors';
+import { apiErrorMessage, httpStatusOf, isApiKeyAuthNotEnforced, isApiKeyAuthRequired, isNotFoundError, isPermissionError, isQuotaError, isUnsupportedError, isUserPortalUnavailable, refusedRoute } from './apiErrors';
 
 describe('httpStatusOf', () => {
   it('prefers a structured status field over the message', () => {
@@ -173,6 +173,22 @@ describe('isPermissionError', () => {
 
   it('is not another status', () => {
     expect(isPermissionError(refusal(400, '{"code":"INSUFFICIENT_SCOPE"}'))).toBe(false);
+  });
+});
+
+describe('refusedRoute', () => {
+  const refusal = (status: number, body: string) => Object.assign(new Error('refused'), { status, body });
+
+  it('is the route pattern a scope refusal names', () => {
+    expect(refusedRoute(refusal(403, '{"code":"INSUFFICIENT_SCOPE","scope":"ipaas:integration:create","route":"POST /projects/{projectId}/components"}'))).toBe('POST /projects/{projectId}/components');
+  });
+
+  it('is undefined when an older ipaas-service sends no route', () => {
+    expect(refusedRoute(refusal(403, '{"code":"INSUFFICIENT_SCOPE","scope":"ipaas:integration:create"}'))).toBeUndefined();
+  });
+
+  it('is undefined for any other refusal', () => {
+    expect(refusedRoute(refusal(403, '{"code":"SUBSCRIPTION_SUSPENDED","route":"POST /projects"}'))).toBeUndefined();
   });
 });
 

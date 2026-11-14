@@ -27,6 +27,7 @@ import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateMonoRepoProject } from '../hooks/useProjects';
+import { useFormAbandonment } from '../hooks/useConsoleAnalytics';
 import { useCreateComponent } from '../hooks/useComponents';
 import { useOrgs, useOrgComponentLimits, useOrgSubscriptions } from '../hooks/useOrg';
 import type { Project } from '../types/project';
@@ -44,6 +45,7 @@ import { GitProvider as CredGitProvider } from '../types/credentials';
 import { useGitRepoSource } from '../hooks/useGitRepoSource';
 
 export default function ImportProject(scope: OrgScope): JSX.Element {
+  useFormAbandonment('project', 'create-project');
   const navigate = useAppNavigate();
 
   const [displayName, setDisplayName] = useState('');

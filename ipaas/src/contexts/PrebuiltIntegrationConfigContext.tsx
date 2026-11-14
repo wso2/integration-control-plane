@@ -19,6 +19,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { PrebuiltIntegration } from '../types/prebuilt';
 import type { SchemaConfigItem } from '../types/configuration';
+import { useFormAbandonment } from '../hooks/useConsoleAnalytics';
 
 interface PrebuiltIntegrationConfigContextValue {
   integration: PrebuiltIntegration | undefined;
@@ -37,6 +38,8 @@ const PrebuiltIntegrationConfigContext = createContext<PrebuiltIntegrationConfig
 });
 
 export function PrebuiltIntegrationConfigProvider({ children }: { children: React.ReactNode }) {
+  // The provider spans the setup and deploy pages, so moving from one to the other is not an abandonment.
+  useFormAbandonment('prebuilt-integration', 'create-integration');
   const [integration, setIntegration] = useState<PrebuiltIntegration | undefined>(undefined);
   const [configValues, setConfigValues] = useState<SchemaConfigItem[]>([]);
 

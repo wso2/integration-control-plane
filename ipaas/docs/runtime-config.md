@@ -57,6 +57,7 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `TRACKING_ENV`                                                               | Analytics tier: `dev`, `stage`, `prod` or `off`. Picks the GTM container and CookiePro script. Defaults to `dev`.        |
 | `MOESIF_APP_API_KEY`                                                         | Moesif app key for product-usage events, set per deployment. Not API Insights. Unset disables Moesif tracking.           |
 | `SCOPES_ENFORCED`                                                            | `true` hides what the user's role doesn't allow. Set with ipaas-service's `SCOPES_ENFORCED`.                             |
+| `CONSOLE_ANALYTICS_ENABLED`                                                  | `true` reports console actions to ipaas-service (`POST /telemetry/console-actions`), which forwards them to Moesif. Set with ipaas-service's `CONSOLE_ANALYTICS_ENABLED`. Defaults to off. See [console analytics](console-analytics.md). |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
 

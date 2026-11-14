@@ -86,6 +86,7 @@ export function useComponentEndpoints(componentId: string, versionId: string) {
 export function useCreateComponent() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { operation: 'create-integration' },
     mutationFn: (input: CreateComponentInput) => {
       trackEvent('component-create-start');
       return createComponent(input);

@@ -211,6 +211,7 @@ export function useRefreshEnvironmentArtifacts() {
 export function useDeployDeploymentTrack() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { operation: 'deploy-integration' },
     mutationFn: (input: DeployDeploymentTrackInput) => deployDeploymentTrack(input),
     onSuccess: (_data, input) => {
       trackEvent('component-deploy');
@@ -224,6 +225,7 @@ export function useDeployDeploymentTrack() {
 export function useTriggerBuild() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { operation: 'build-integration' },
     mutationFn: (input: DeployComponentInput) => triggerBuild(input),
     onSuccess: (_data, input) => {
       trackEvent('component-build');
@@ -236,6 +238,7 @@ export function usePromote() {
   const qc = useQueryClient();
   return useMutation({
     mutationKey: ['promote'],
+    meta: { operation: 'promote-integration' },
     mutationFn: (input: PromoteInput) => promote(input),
     onSuccess: (_data, input) => {
       trackEvent('component-promote');
@@ -285,6 +288,7 @@ export function useRedeployDeployment() {
 
 export function useDeployPrebuiltImage() {
   return useMutation({
+    meta: { operation: 'deploy-integration' },
     mutationFn: (input: DeployPrebuiltImageInput) => deployPrebuiltImage(input),
     // This resolver occasionally times out upstream (504) under load. A couple of
     // quick retries clear most of these without forcing the user to redo the whole
