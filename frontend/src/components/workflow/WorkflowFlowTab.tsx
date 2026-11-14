@@ -37,6 +37,7 @@ export default function WorkflowFlowTab({
   events,
   info,
   onOpenHistory,
+  onOpenReview,
   environmentId,
 }: {
   instanceGraph: InstanceGraph | undefined;
@@ -44,6 +45,7 @@ export default function WorkflowFlowTab({
   events: Array<Record<string, unknown>>;
   info: WorkflowInstance | undefined;
   onOpenHistory?: () => void;
+  onOpenReview?: (taskId: string) => void;
   environmentId?: string;
 }) {
   // The rail's selection is the filter; the right pane's selection reports back into the rail.
@@ -235,7 +237,7 @@ export default function WorkflowFlowTab({
                   <AgentStarRail data={instanceGraph!} selectedStepId={modelStepActivity(selectedStepId ?? railHighlight ?? '') !== null ? 'model' : (selectedStepId ?? railHighlight)} onSelect={selectStep} />
                 )
               ) : (
-                <FlowRail data={instanceGraph!} selectedStepId={selectedStepId ?? railHighlight} currentStepId={currentStepId} onSelect={selectStep} variant={railVariant} />
+                <FlowRail data={instanceGraph!} selectedStepId={selectedStepId ?? railHighlight} currentStepId={currentStepId} onSelect={selectStep} onOpenReview={onOpenReview} variant={railVariant} />
               )}
             </>
           )}

@@ -17,11 +17,12 @@
  */
 
 import { Box, Stack, Tooltip, Typography, useTheme } from '@wso2/oxygen-ui';
-import { ChevronDown, ChevronRight, Diamond, GitBranch, Info, RefreshCw, Repeat, Shield } from '@wso2/oxygen-ui-icons-react';
+import { BadgeCheck, ChevronDown, ChevronRight, Diamond, GitBranch, Info, RefreshCw, Repeat, Shield, User, Wrench } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactElement, type ReactNode } from 'react';
-import type { InstanceGraph, ModelGraphNode, StepExecution } from '../../api/workflows';
+import type { InstanceGraph, ModelGraphNode, StepExecution, StepReview } from '../../api/workflows';
 import { diagramColors, iconForType, paletteColor, softPrimary, statusColorName } from './graphVisuals';
-import { isContainer, layoutFloorPlan, type PlacedArm, type PlacedNode } from './floorPlan';
+import { gateTooltip, isReviewPending, reviewsByTrigger, reviewToOpen, stepText, type GateKind } from './helpers';
+import { isContainer, layoutFloorPlan, sequenceNodes, SIDE_GAP, SIDE_R, sideNodesOf, STEP_W, type PlacedArm, type PlacedNode, type StepSides } from './floorPlan';
 
 interface TreeNode {
   node: ModelGraphNode;
@@ -131,6 +132,72 @@ function KeywordRow({
   );
 }
 
+// Enter or Space opens a gate, as on any button; Space would otherwise scroll the rail.
+function activateOnKey(e: { key: string; preventDefault: () => void }, open: (() => void) | undefined): void {
+  if (!open || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  open();
+}
+
+// Both gates are a person's decision, marked by what it decides: a seal for an approval, a wrench for a failed step's retry.
+const GATE_MARKS: Record<GateKind, ComponentType<{ size?: number; x?: number; y?: number; color?: string; strokeWidth?: number }>> = { approval: BadgeCheck, review: Wrench };
+
+function GateGlyph({ kind }: { kind: GateKind }): ReactElement {
+  const Mark = GATE_MARKS[kind];
+  return (
+    <Box sx={{ position: 'relative', display: 'flex' }}>
+      <User size={13} />
+      <Box sx={{ position: 'absolute', right: -5, bottom: -4, display: 'flex', p: '1px', borderRadius: '50%', bgcolor: 'background.paper' }}>
+        <Mark size={8} />
+      </Box>
+    </Box>
+  );
+}
+
+// A gate on a step, as a circle beside it: faded until it is raised in this run, clickable once it has been.
+function GateNode({ kind, reviews, onOpenReview }: { kind: GateKind; reviews: StepReview[]; onOpenReview?: (taskId: string) => void }): ReactElement {
+  const ran = reviews.length > 0;
+  const pending = reviews.some(isReviewPending);
+  const target = reviewToOpen(reviews);
+  const open = target?.taskId && onOpenReview ? () => onOpenReview(target.taskId as string) : undefined;
+  const color = pending ? 'warning.main' : ran ? 'text.secondary' : 'text.disabled';
+  return (
+    <Stack direction="row" alignItems="center" sx={{ flexShrink: 0 }}>
+      <Box sx={{ width: 10, borderTop: '1px dashed', borderColor: 'divider' }} />
+      <Tooltip title={gateTooltip(kind, reviews, open !== undefined)}>
+        <Box
+          role={open ? 'button' : undefined}
+          tabIndex={open ? 0 : undefined}
+          aria-label={kind}
+          onClick={open}
+          onKeyDown={(e) => activateOnKey(e, open)}
+          sx={{
+            position: 'relative',
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: ran ? '1.5px solid' : '1px dashed',
+            borderColor: pending ? 'warning.main' : ran ? 'text.secondary' : 'divider',
+            bgcolor: 'background.paper',
+            color,
+            cursor: open ? 'pointer' : 'default',
+            '&:hover': open ? { bgcolor: (t) => softPrimary(t, 0.08) } : undefined,
+          }}>
+          <GateGlyph kind={kind} />
+          {reviews.length > 1 && (
+            <Typography variant="caption" sx={{ position: 'absolute', top: -7, right: -9, fontWeight: 700, fontSize: 9.5, lineHeight: 1, px: 0.4, py: 0.2, borderRadius: 1, bgcolor: 'background.paper', color }}>
+              {reviews.length}
+            </Typography>
+          )}
+        </Box>
+      </Tooltip>
+    </Stack>
+  );
+}
+
 function StepRow({
   node,
   exec,
@@ -155,7 +222,7 @@ function StepRow({
   const ran = exec !== undefined;
   const statusColor = ran ? paletteColor(theme, statusColorName(exec.status)) : c.textDisabled;
   const Icon = iconForType(node.kind);
-  const title = node.target ?? node.stepId;
+  const title = stepText(node);
   // Failed at some point but the latest execution succeeded — a retry or a review decision.
   const recovered = ran && exec.failure !== undefined && (exec.status ?? '').toUpperCase() === 'COMPLETED';
   return (
@@ -229,17 +296,20 @@ export default function FlowRail({
   selectedStepId,
   currentStepId,
   onSelect,
+  onOpenReview,
   variant = 'chart',
 }: {
   data: InstanceGraph;
   selectedStepId: string | null;
   currentStepId: string | null;
   onSelect: (stepId: string | null) => void;
+  onOpenReview?: (taskId: string) => void;
   variant?: 'chart' | 'uml';
 }): ReactElement | null {
   const theme = useTheme();
   const graph = data.graph;
-  const tree = useMemo(() => (graph && graph.nodes ? buildTree(graph.nodes) : []), [graph]);
+  const tree = useMemo(() => (graph && graph.nodes ? buildTree(sequenceNodes(graph)) : []), [graph]);
+  const sides = useMemo(() => (graph ? sideNodesOf(graph) : new Map<string, StepSides>()), [graph]);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const chart = true; // rows are always boxed now; 'uml' swaps the whole renderer below
@@ -291,7 +361,22 @@ export default function FlowRail({
     );
   };
 
-  const renderStep = (t: TreeNode, depth: number): ReactNode => (
+  // Rows are indented by depth, so here both gates follow the step, in the order they happen.
+  const renderStep = (t: TreeNode, depth: number): ReactNode => {
+    const row = renderStepRow(t, depth);
+    const gates = sides.get(t.node.stepId);
+    if (!gates) return row;
+    const { approvals, failures } = reviewsByTrigger(steps[t.node.stepId]?.reviews ?? []);
+    return (
+      <Stack key={t.node.stepId} direction="row" alignItems="center" sx={{ minWidth: 0 }}>
+        {row}
+        {gates.approval && <GateNode kind="approval" reviews={approvals} onOpenReview={onOpenReview} />}
+        {gates.review && <GateNode kind="review" reviews={failures} onOpenReview={onOpenReview} />}
+      </Stack>
+    );
+  };
+
+  const renderStepRow = (t: TreeNode, depth: number): ReactNode => (
     <StepRow
       key={t.node.stepId}
       node={t.node}
@@ -396,7 +481,7 @@ export default function FlowRail({
   if (variant === 'uml') {
     return (
       <Box sx={{ overflow: 'auto', height: '100%', py: 1, px: 0.5 }}>
-        <UmlActivityDiagram data={data} steps={steps} selectedStepId={selectedStepId} currentStepId={currentStepId} onSelect={onSelect} />
+        <UmlActivityDiagram data={data} steps={steps} selectedStepId={selectedStepId} currentStepId={currentStepId} onSelect={onSelect} onOpenReview={onOpenReview} />
       </Box>
     );
   }
@@ -428,12 +513,14 @@ function UmlActivityDiagram({
   selectedStepId,
   currentStepId,
   onSelect,
+  onOpenReview,
 }: {
   data: InstanceGraph;
   steps: Record<string, StepExecution>;
   selectedStepId: string | null;
   currentStepId: string | null;
   onSelect: (stepId: string | null) => void;
+  onOpenReview?: (taskId: string) => void;
 }): ReactElement | null {
   const theme = useTheme();
   const c = diagramColors(theme);
@@ -447,8 +534,9 @@ function UmlActivityDiagram({
   const wires: ReactNode[] = [];
   let wireKey = 0;
 
-  const elbow = (x1: number, y1: number, x2: number, y2: number, guard?: string, dashed?: boolean) => {
-    const midY = y1 + Math.max(5, (y2 - y1) / 2);
+  // A merge bends just above its target, so it runs down its own arm's column rather than past the steps of another arm.
+  const elbow = (x1: number, y1: number, x2: number, y2: number, guard?: string, dashed?: boolean, merge?: boolean) => {
+    const midY = merge ? Math.max(y1 + 5, y2 - 6) : y1 + Math.max(5, (y2 - y1) / 2);
     wires.push(
       <g key={`w${wireKey++}`}>
         <path d={x1 === x2 ? `M ${x1} ${y1} L ${x2} ${y2}` : `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`} fill="none" stroke={line} strokeWidth={1} strokeDasharray={dashed ? '3 3' : undefined} markerEnd="url(#uml2-arrow)" />
@@ -458,6 +546,33 @@ function UmlActivityDiagram({
           </text>
         )}
       </g>,
+    );
+  };
+
+  // A gate on a step, as a circle joined to the step's edge by a dashed line: an approval left of it, a review right of it.
+  const umlGate = (kind: GateKind, stepId: string, reviews: StepReview[], edgeX: number, y: number): ReactNode => {
+    const dir = kind === 'approval' ? -1 : 1;
+    const ran = reviews.length > 0;
+    const color = reviews.some(isReviewPending) ? paletteColor(theme, 'warning') : ran ? c.textSecondary : c.textDisabled;
+    const target = reviewToOpen(reviews);
+    const open = target?.taskId && onOpenReview ? () => onOpenReview(target.taskId as string) : undefined;
+    const sx = edgeX + dir * (SIDE_GAP + SIDE_R);
+    const Mark = GATE_MARKS[kind];
+    return (
+      <g key={`${stepId}#${kind}`} role={open ? 'button' : undefined} tabIndex={open ? 0 : undefined} aria-label={kind} onClick={open} onKeyDown={(e) => activateOnKey(e, open)} style={{ cursor: open ? 'pointer' : 'default' }}>
+        <title>{gateTooltip(kind, reviews, open !== undefined)}</title>
+        <line x1={edgeX} y1={y} x2={sx - dir * SIDE_R} y2={y} stroke={line} strokeWidth={1} strokeDasharray="3 3" />
+        <circle cx={sx} cy={y} r={SIDE_R + 4} fill="transparent" />
+        <circle cx={sx} cy={y} r={SIDE_R} fill={c.paper} stroke={ran ? color : c.divider} strokeWidth={ran ? 1.5 : 1} strokeDasharray={ran ? undefined : '3 2'} />
+        <User x={sx - 6} y={y - 6.5} size={12} color={color} />
+        <circle cx={sx + 4.5} cy={y + 4} r={4} fill={c.paper} />
+        <Mark x={sx + 1.5} y={y + 1} size={6.5} color={color} strokeWidth={2.5} />
+        {reviews.length > 1 && (
+          <text x={sx + SIDE_R - 1} y={y - SIDE_R + 1} fill={color} stroke={c.paper} strokeWidth={3} paintOrder="stroke" fontSize={9} fontWeight={700}>
+            {reviews.length}
+          </text>
+        )}
+      </g>
     );
   };
 
@@ -484,7 +599,9 @@ function UmlActivityDiagram({
         return { x: cx, flows: false };
       }
       const dashed = kind === 'CODE';
-      const text = dashed ? 'data processing' : (node.target ?? node.stepId);
+      const text = dashed ? 'data processing' : stepText(node);
+      const stepX = cx - STEP_W / 2;
+      const maxChars = Math.floor((STEP_W - 20) / 6);
       const selected = selectedStepId === node.stepId;
       const isCurrent = currentStepId === node.stepId;
       const clickable = !dashed;
@@ -498,9 +615,9 @@ function UmlActivityDiagram({
           style={{ cursor: clickable ? 'pointer' : 'default' }}>
           <title>{dashed ? (node.label ?? 'data processing') : `${text} · ${node.stepId}${ran ? ` · ${exec.status ?? ''}` : ' · not executed'}`}</title>
           <rect
-            x={box.x + 4}
+            x={stepX + 4}
             y={box.y + 6}
-            width={box.w - 8}
+            width={STEP_W - 8}
             height={box.h - 12}
             rx={(box.h - 12) / 2}
             fill={selected ? softPrimary(theme, 0.12) : c.paper}
@@ -508,17 +625,23 @@ function UmlActivityDiagram({
             strokeWidth={selected ? 1.75 : ran ? 1.5 : 1}
             strokeDasharray={dashed ? '3 3' : ran ? undefined : '4 3'}
           />
-          {isCurrent && <circle cx={box.x + box.w - 14} cy={box.y + box.h / 2} r={3} fill={statusColor} />}
+          {isCurrent && <circle cx={stepX + STEP_W - 14} cy={box.y + box.h / 2} r={3} fill={statusColor} />}
           <text x={cx} y={box.y + box.h / 2 + 3.5} fill={ran ? c.textPrimary : c.textDisabled} fontSize={10.5} fontWeight={ran ? 600 : 400} fontStyle={dashed ? 'italic' : undefined} textAnchor="middle">
-            {text.length > Math.floor((box.w - 20) / 6) ? `${text.slice(0, Math.floor((box.w - 20) / 6) - 1)}…` : text}
+            {text.length > maxChars ? `${text.slice(0, maxChars - 1)}…` : text}
           </text>
           {exec && exec.count > 1 && (
-            <text x={box.x + box.w - 10} y={box.y + 14} fill={statusColor} fontSize={8.5} fontWeight={700} textAnchor="end">
+            <text x={stepX + STEP_W - 10} y={box.y + 14} fill={statusColor} fontSize={8.5} fontWeight={700} textAnchor="end">
               ×{exec.count}
             </text>
           )}
         </g>,
       );
+      if (box.sides) {
+        const { approvals, failures } = reviewsByTrigger(exec?.reviews ?? []);
+        const midY = box.y + box.h / 2;
+        if (box.sides.approval) shapes.push(umlGate('approval', node.stepId, approvals, stepX + 4, midY));
+        if (box.sides.review) shapes.push(umlGate('review', node.stepId, failures, stepX + STEP_W - 4, midY));
+      }
       return { x: cx, flows: true };
     }
 
@@ -573,7 +696,7 @@ function UmlActivityDiagram({
           wires.push(
             <path
               key={`w${wireKey++}`}
-              d={`M ${prev.x - (prevBox.w - 8) / 2} ${prevBox.y + prevBox.h / 2} L ${gx} ${prevBox.y + prevBox.h / 2} L ${gx} ${dy} L ${cx - 9} ${dy}`}
+              d={`M ${prev.x - ((isContainer(prevBox.node.kind) ? prevBox.w : STEP_W) - 8) / 2} ${prevBox.y + prevBox.h / 2} L ${gx} ${prevBox.y + prevBox.h / 2} L ${gx} ${dy} L ${cx - 9} ${dy}`}
               fill="none"
               stroke={line}
               strokeWidth={1}
@@ -582,7 +705,7 @@ function UmlActivityDiagram({
             />,
           );
         } else {
-          elbow(prev.x, prevBox.y + prevBox.h - 6, cx, mergeY);
+          elbow(prev.x, prevBox.y + prevBox.h - 6, cx, mergeY, undefined, undefined, true);
           anyFlow = true;
         }
       }

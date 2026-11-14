@@ -19,7 +19,7 @@
 // Pure helpers for the workflow feature. Kept separate from the component module
 // (shared.tsx) so React Fast Refresh works and concerns stay separated.
 
-import { targetForTaskQueue, type InstanceGraph, type WorkflowTarget } from '../../api/workflows';
+import { targetForTaskQueue, type InstanceGraph, type ModelGraphNode, type StepReview, type WorkflowTarget } from '../../api/workflows';
 import { formatDateTime } from '../../utils/time';
 
 // ── Portal scope ──
@@ -966,4 +966,56 @@ export function flowUnavailable(data: InstanceGraph | undefined): string | null 
     return 'This run could not be placed on the workflow’s structure, so it is shown as its history. Its steps carry no step ids — typically an integration built against an older workflow module.';
   }
   return null;
+}
+
+// A step's box text: its display name, else what it calls; a step that calls nothing reads as what it does, not its id.
+export function stepText(node: ModelGraphNode): string {
+  if (node.label) return node.label;
+  switch (node.kind.toUpperCase()) {
+    case 'SLEEP':
+      return 'sleep';
+    case 'EVENT_WAIT':
+      return node.target ? `wait ${node.target.split('|').join(' | ')}` : 'wait';
+    case 'AWAIT_RESULT':
+      return 'await result';
+    default:
+      return node.target ?? node.stepId;
+  }
+}
+
+// A review still running is waiting on a person; a decided one has completed or failed.
+export const isReviewPending = (review: StepReview): boolean => (review.status ?? '').toUpperCase() === 'RUNNING';
+
+// A review whose own run ended without anyone deciding it: it failed, timed out, or was terminated or cancelled.
+const UNDECIDED_REVIEW_STATUSES = new Set(['FAILED', 'TIMED_OUT', 'TERMINATED', 'CANCELED']);
+const isReviewUndecided = (review: StepReview): boolean => UNDECIDED_REVIEW_STATUSES.has((review.status ?? '').toUpperCase());
+
+// An approval is given before its step runs; a review is raised when its step fails.
+export type GateKind = 'approval' | 'review';
+
+// `openable` is whether the gate can actually open a review here, which decides the click prompt.
+export function gateTooltip(kind: GateKind, reviews: StepReview[], openable: boolean): string {
+  const name = kind === 'approval' ? 'Approval' : 'Review';
+  if (reviews.length === 0) {
+    return `${name} — ${kind === 'approval' ? 'a person approves this step before it runs' : 'a person decides if this step fails'}. Not raised in this run.`;
+  }
+  const pending = reviews.filter(isReviewPending).length;
+  const undecided = reviews.filter(isReviewUndecided).length;
+  const decided = reviews.filter((r) => (r.status ?? '').toUpperCase() === 'COMPLETED').length;
+  const unknown = reviews.length - pending - undecided - decided;
+  const raised = reviews.length === 1 ? 'once' : `${reviews.length} times`;
+  const outcomes = [pending > 0 ? `${pending} waiting for a decision` : '', decided > 0 ? `${decided} decided` : '', undecided > 0 ? `${undecided} ended without a decision` : '', unknown > 0 ? `${unknown} with no reported status` : ''].filter(Boolean);
+  return `${name} — raised ${raised}: ${outcomes.join(', ')}${openable ? '. Click to open.' : ''}`;
+}
+
+// A step's reviews split by when they ran. A review with no trigger comes from a runtime that only had failure reviews.
+export function reviewsByTrigger(reviews: StepReview[]): { approvals: StepReview[]; failures: StepReview[] } {
+  const isApproval = (r: StepReview) => (r.trigger ?? '').toUpperCase() === 'PRE_RUN';
+  return { approvals: reviews.filter(isApproval), failures: reviews.filter((r) => !isApproval(r)) };
+}
+
+// The review a gate opens: a pending one first, since that is what someone has to act on, else the latest.
+export function reviewToOpen(reviews: StepReview[]): StepReview | undefined {
+  const openable = reviews.filter((r) => r.taskId);
+  return openable.find(isReviewPending) ?? openable[openable.length - 1];
 }
