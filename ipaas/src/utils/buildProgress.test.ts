@@ -145,6 +145,14 @@ describe('failedStepPhrase', () => {
     expect(failedStepPhrase(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), named([{ name: 'build-image', conclusion: 'failure' }]), stage(null)))).toBe('building the image');
   });
 
+  it('names a build the image scan blocked', () => {
+    const scanBlocked = named([
+      { name: 'build-image', conclusion: 'success' },
+      { name: 'scan-image', conclusion: 'failure' },
+    ]);
+    expect(failedStepPhrase(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), scanBlocked, stage(null)))).toBe('scanning the image for vulnerabilities');
+  });
+
   it('reports the earliest failure when several steps fail', () => {
     const failed = logs(named([{ name: 'checkout-source', conclusion: 'failure' }]), named([{ name: 'build-image', conclusion: 'failure' }]), stage(null));
     expect(failedStepPhrase(failed)).toBe('checking out the source');
