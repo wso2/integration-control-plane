@@ -150,6 +150,7 @@ export function logsBehindBuild(status: string | undefined, conclusion: string |
 const BUILD_STEP_PHRASES: Record<string, string> = {
   'checkout-source': 'checking out the source',
   'build-image': 'building the image',
+  'scan-image': 'scanning the image for vulnerabilities',
   'convert-component-descriptor': 'converting the component descriptor',
   'generate-workload-cr': 'generating the workload resource',
   'publish-build-artifacts': 'publishing build artifacts',
