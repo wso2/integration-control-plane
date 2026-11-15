@@ -25,6 +25,7 @@ import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
+import { useStagedEngineSources } from '../hooks/stagedEngineSources';
 import { engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
@@ -33,7 +34,6 @@ import NotFound from '../components/NotFound';
 import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
-import SetupStatusAlert from '../components/ContextEngine/detail/SetupStatusAlert';
 import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
 import GraphTab from '../components/ContextEngine/detail/GraphTab';
 import ApiTab from '../components/ContextEngine/detail/ApiTab';
@@ -41,7 +41,7 @@ import McpTab from '../components/ContextEngine/detail/McpTab';
 import ApiMockTab from '../components/ContextEngine/detail/mock/ApiMockTab';
 import McpMockTab from '../components/ContextEngine/detail/mock/McpMockTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
-import type { ContextEngineState, ContextEngineTabKey } from '../types/contextEngine';
+import type { ContextEngineSetup, ContextEngineState, ContextEngineTabKey } from '../types/contextEngine';
 import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
@@ -57,11 +57,23 @@ const TABS: { value: ContextEngineTabKey; label: string }[] = [
   // { value: 'access', label: 'Access' },
 ];
 
-/** Why an engine that is not running shows only its overview. */
-function EngineNotRunning({ state, reason }: { state: ContextEngineState; reason?: string }): JSX.Element {
+const alertSx = { mb: 3 } as const;
+const listSx = { m: 0, mt: 1, pl: 2.5 } as const;
+
+interface EngineStatusAlertProps {
+  engineId: string;
+  state: ContextEngineState;
+  reason?: string;
+  setup?: ContextEngineSetup;
+}
+
+/** Why an engine that is not running shows only its overview, then where adding its sources stands: the BFF's connector sources, and the File Upload sources this tab holds. */
+function EngineStatusAlert({ engineId, state, reason, setup }: EngineStatusAlertProps): JSX.Element | null {
+  const staged = useStagedEngineSources(engineId);
+  const [dismissed, setDismissed] = useState(false);
   if (state === 'failed') {
     return (
-      <Alert severity="error" variant="outlined" sx={{ mb: 3 }}>
+      <Alert severity="error" variant="outlined" sx={alertSx}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
           This engine failed to start
         </Typography>
@@ -71,7 +83,7 @@ function EngineNotRunning({ state, reason }: { state: ContextEngineState; reason
   }
   if (state === 'unknown') {
     return (
-      <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+      <Alert severity="warning" variant="outlined" sx={alertSx}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
           Status unavailable
         </Typography>
@@ -79,12 +91,51 @@ function EngineNotRunning({ state, reason }: { state: ContextEngineState; reason
       </Alert>
     );
   }
+  if (state !== 'ready') {
+    return (
+      <Alert severity="info" variant="outlined" icon={<CircularProgress size={18} />} sx={alertSx}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          This engine is starting
+        </Typography>
+        {reason ? `${reason.replace(/\.$/, '')}. ` : ''}Its sources, playground and endpoints open once it is running. This usually takes about a minute.
+        {staged.waiting > 0 && ' Keep this tab open until then: your files are uploaded from it.'}
+      </Alert>
+    );
+  }
+  if (setup?.status === 'pending' || staged.waiting > 0) {
+    return (
+      <Alert severity="info" variant="outlined" icon={<CircularProgress size={18} />} sx={alertSx}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          Adding your sources
+        </Typography>
+        {staged.waiting > 0 ? 'The engine is running. Your sources are being added; keep this tab open: your files are uploaded from it.' : 'The engine is running. Your sources are being added; you can leave this page.'}
+      </Alert>
+    );
+  }
+  if (dismissed) return null;
+  if (setup?.status === 'interrupted') {
+    return (
+      <Alert severity="warning" variant="outlined" onClose={() => setDismissed(true)} sx={alertSx}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          Setup didn&apos;t finish
+        </Typography>
+        Some sources may be missing. Check the list and add any that aren&apos;t there.
+      </Alert>
+    );
+  }
+  const warnings = [...(setup?.status === 'failed' ? setup.warnings : []), ...staged.failures];
+  if (warnings.length === 0) return null;
   return (
-    <Alert severity="info" variant="outlined" icon={<CircularProgress size={18} />} sx={{ mb: 3 }}>
+    <Alert severity="warning" variant="outlined" onClose={() => setDismissed(true)} sx={alertSx}>
       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-        This engine is starting
+        Some sources weren&apos;t added
       </Typography>
-      {reason ? `${reason}. ` : ''}Its sources, playground and endpoints open once it is running. This usually takes about a minute.
+      Add them again from this page.
+      <Box component="ul" sx={listSx}>
+        {warnings.map((w) => (
+          <li key={w}>{w}</li>
+        ))}
+      </Box>
     </Alert>
   );
 }
@@ -199,9 +250,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
           Questions, uploads and changes are paused, and its API and MCP endpoints have stopped answering. It disappears from your list once it is gone.
         </Alert>
       )}
-      {!running && !deleting && <EngineNotRunning state={engine.state} reason={engine.statusReason} />}
-
-      {!deleting && <SetupStatusAlert engineId={engine.id} setup={engine.setup} />}
+      {!deleting && <EngineStatusAlert engineId={engine.id} state={engine.state} reason={engine.statusReason} setup={engine.setup} />}
 
       {deleteError && !confirmDelete && (
         <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 3 }}>
