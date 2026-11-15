@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Checkbox, FormControlLabel, Link, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Box, Checkbox, FormControlLabel, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX, type ReactNode } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { isCustomModel } from '../../../utils/contextEngine';
@@ -128,11 +128,13 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
       {showProviders && value && (
         <Stack gap={2}>
           {!typed ? (
-            <Select
-              size="small"
-              fullWidth
-              displayEmpty
+            <TextField
+              labelPlacement="top"
+              select
+              label="Model"
               required
+              fullWidth
+              size="small"
               value={value.model}
               onChange={(e) => {
                 if (e.target.value === OTHER_MODEL) {
@@ -141,28 +143,30 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
                 } else onChange({ ...value, model: e.target.value });
               }}
               inputProps={{ 'aria-label': modelLabel }}
-              renderValue={(selected) =>
-                selected ? (
-                  String(selected)
-                ) : (
-                  <Typography component="span" color="text.secondary">
-                    Model{' '}
-                    <Typography component="span" sx={{ color: 'error.main' }}>
-                      *
-                    </Typography>
-                  </Typography>
-                )
-              }>
+              sx={REQUIRED_FIELD_SX}
+              slotProps={{
+                select: {
+                  displayEmpty: true,
+                  renderValue: (selected) =>
+                    selected ? (
+                      String(selected)
+                    ) : (
+                      <Typography component="span" color="text.secondary">
+                        Choose a model
+                      </Typography>
+                    ),
+                },
+              }}>
               {models.map((m) => (
                 <MenuItem key={m} value={m}>
                   {m}
                 </MenuItem>
               ))}
               <MenuItem value={OTHER_MODEL}>Other model…</MenuItem>
-            </Select>
+            </TextField>
           ) : (
             <Box>
-              <TextField label="Model id" required fullWidth size="small" value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              <TextField labelPlacement="top" label="Model id" required fullWidth size="small" value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
               {models.length > 0 && (
                 <Link
                   component="button"

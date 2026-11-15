@@ -17,12 +17,11 @@
  */
 
 import { Alert, Box, Button, Chip, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
+import { Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { useEngineManagedServer } from '../../../hooks/useContextEngine';
 import { answerChoice, modelProviderName, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
-import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import SectionCard from '../SectionCard';
 import { mutedSx, reviewDetailGridSx, wrapSx, stepHeadingSx, stepHintSx, summaryDescriptionSx, summaryRowSx } from '../styles';
@@ -39,8 +38,6 @@ interface ReviewStepProps {
   everyone: string[];
   /** The creator's groups, to warn about content they will not see themselves. */
   myGroups: string[];
-  /** When the draft was last written to session storage, if at all. */
-  draftSavedAt: string | null;
   onEdit: (step: EditableStep) => void;
 }
 
@@ -81,7 +78,7 @@ function SummaryCard({ title, editLabel, onEdit, children }: { title: string; ed
 }
 
 /** The last step: confirm what will be created; every card jumps back to its step. */
-export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, onEdit }: ReviewStepProps): JSX.Element {
+export default function ReviewStep({ form, roleNames, everyone, myGroups, onEdit }: ReviewStepProps): JSX.Element {
   const managedServer = useEngineManagedServer();
   // Query access and visibility are set in different steps; say where they disagree before anything is created.
   const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
@@ -101,7 +98,6 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
             Check the setup.
           </Typography>
         </Box>
-        {draftSavedAt && <Chip size="small" variant="outlined" icon={<Check size={14} />} label={`Draft saved · ${formatDistanceToNow(draftSavedAt).toLowerCase()}`} sx={{ flexShrink: 0 }} />}
       </Stack>
 
       {(mismatch.seeNothing.length > 0 || mismatch.cannotQuery.length > 0 || mismatch.hiddenFromMe.length > 0) && (

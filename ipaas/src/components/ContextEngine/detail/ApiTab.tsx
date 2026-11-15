@@ -70,7 +70,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
       </Typography>
       {endpoints.map((e) => (
         <Box key={e.label} sx={endpointRowSx}>
-          <TextField size="small" label={e.label} value={e.url} disabled={e.off} helperText={e.off ? 'Answers are turned off for this engine.' : undefined} slotProps={{ input: { readOnly: true } }} sx={endpointFieldSx} />
+          <TextField labelPlacement="top" size="small" label={e.label} value={e.url} disabled={e.off} helperText={e.off ? 'Answers are turned off for this engine.' : undefined} slotProps={{ input: { readOnly: true } }} sx={endpointFieldSx} />
         </Box>
       ))}
 

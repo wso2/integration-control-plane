@@ -707,25 +707,17 @@ export const storageCardSx = {
   rowGap: 1.5,
 } as const;
 
-export const storageRadioGroupSx = { width: '100%', minWidth: 0, display: 'grid', gridRow: 'span 2', gridTemplateRows: 'subgrid', rowGap: 1 } as const;
+export const storageRadioGroupSx = { width: '100%', minWidth: 0, display: 'grid', gridRow: 'span 2', gridTemplateRows: 'subgrid', rowGap: 1.5 } as const;
 
-/** One placement option inside a storage card; highlighted when selected. */
-export const storageOptionSx = (selected: boolean) =>
-  ({
-    p: 1.25,
-    width: '100%',
-    minWidth: 0,
-    boxSizing: 'border-box',
-    border: '1px solid',
-    borderColor: selected ? 'primary.main' : 'divider',
-    borderRadius: 1,
-    '& .MuiFormControlLabel-root': { alignItems: 'flex-start', m: 0, width: '100%' },
-    '& .MuiFormControlLabel-label': { minWidth: 0, flex: 1 },
-    '& .MuiRadio-root': { pt: 0.25 },
-  }) as const;
+/** One placement option inside a storage card: a plain radio, as in the app's other radio groups. */
+export const storageOptionSx = {
+  minWidth: 0,
+  '& .MuiFormControlLabel-root': { alignItems: 'flex-start', m: 0 },
+  '& .MuiRadio-root': { pt: 0.25, pb: 0 },
+} as const;
 
 /** The fields under a selected option: full card width, no indent, so pickers and buttons have room. */
-export const storageOptionBodySx = { mt: 1.5, minWidth: 0 } as const;
+export const storageOptionBodySx = { mt: 1, minWidth: 0 } as const;
 
 export const storageEmptySx = {
   p: 1.75,

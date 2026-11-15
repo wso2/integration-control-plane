@@ -836,8 +836,6 @@ export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
 
 // ── Local persistence keys ──────────────────────────────────────────────────
 
-/** Session-storage key prefix for the create-wizard draft, suffixed by org handle. */
-export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
 /** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
 export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
 /** Set once the user has opened the API or MCP tab of an engine: the closest signal the console has that they connected an agent. */

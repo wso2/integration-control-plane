@@ -45,7 +45,7 @@ export default function NameStep({ name, description, onNameChange, onDescriptio
       </Typography>
 
       <Stack sx={fieldStackSx}>
-        <TextField
+        <TextField labelPlacement="top"
           label="Name"
           required
           fullWidth
@@ -58,7 +58,7 @@ export default function NameStep({ name, description, onNameChange, onDescriptio
           sx={REQUIRED_FIELD_SX}
           inputProps={{ 'aria-label': 'Engine name' }}
         />
-        <TextField
+        <TextField labelPlacement="top"
           label="Description"
           fullWidth
           multiline

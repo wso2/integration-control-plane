@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Grid, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Grid, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { blankLlm, contextLogoUrl, LLM_PROVIDERS } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
@@ -55,40 +55,44 @@ export default function LlmModelStep({ value, onChange }: LlmModelStepProps): JS
       {value && (
         <Stack sx={fieldStackSx}>
           {models.length > 0 ? (
-            <Select
-              size="small"
-              fullWidth
-              displayEmpty
+            <TextField
+              labelPlacement="top"
+              select
+              label="Model"
               required
+              fullWidth
+              size="small"
               value={value.model}
               onChange={(e) => onChange({ ...value, model: e.target.value })}
               inputProps={{ 'aria-label': 'Language model' }}
-              renderValue={(selected) =>
-                selected ? (
-                  String(selected)
-                ) : (
-                  <Typography component="span" color="text.secondary">
-                    Model{' '}
-                    <Typography component="span" sx={{ color: 'error.main' }}>
-                      *
-                    </Typography>
-                  </Typography>
-                )
-              }>
+              sx={REQUIRED_FIELD_SX}
+              slotProps={{
+                select: {
+                  displayEmpty: true,
+                  renderValue: (selected) =>
+                    selected ? (
+                      String(selected)
+                    ) : (
+                      <Typography component="span" color="text.secondary">
+                        Choose a model
+                      </Typography>
+                    ),
+                },
+              }}>
               {models.map((m) => (
                 <MenuItem key={m} value={m}>
                   {m}
                 </MenuItem>
               ))}
-            </Select>
+            </TextField>
           ) : (
-            <TextField label="Deployment Id" required fullWidth size="small" value={value.model} placeholder="Enter the deployment/model id" onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
+            <TextField labelPlacement="top" label="Deployment Id" required fullWidth size="small" value={value.model} placeholder="Enter the deployment/model id" onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
           )}
 
           {value.provider === 'azure_openai' && (
             <>
-              <TextField label="Base URL" required fullWidth size="small" value={value.azureBaseUrl} placeholder="https://<resource>.openai.azure.com" onChange={(e) => onChange({ ...value, azureBaseUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
-              <TextField label="API Version" required fullWidth size="small" value={value.azureApiVersion} onChange={(e) => onChange({ ...value, azureApiVersion: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              <TextField labelPlacement="top" label="Base URL" required fullWidth size="small" value={value.azureBaseUrl} placeholder="https://<resource>.openai.azure.com" onChange={(e) => onChange({ ...value, azureBaseUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              <TextField labelPlacement="top" label="API Version" required fullWidth size="small" value={value.azureApiVersion} onChange={(e) => onChange({ ...value, azureApiVersion: e.target.value })} sx={REQUIRED_FIELD_SX} />
             </>
           )}
 

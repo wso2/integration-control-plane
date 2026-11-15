@@ -108,7 +108,7 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
         </Box>
 
         <Stack sx={fieldStackSx}>
-          <TextField label="Source Name" required fullWidth size="small" value={name} error={!!nameError && name.trim() !== ''} helperText={(name.trim() !== '' && nameError) || undefined} onChange={(e) => setName(e.target.value)} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Source Name" required fullWidth size="small" value={name} error={!!nameError && name.trim() !== ''} helperText={(name.trim() !== '' && nameError) || undefined} onChange={(e) => setName(e.target.value)} sx={REQUIRED_FIELD_SX} />
         </Stack>
 
         {!ROLE_VISIBILITY_ENABLED ? (

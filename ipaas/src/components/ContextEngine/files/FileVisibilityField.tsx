@@ -76,7 +76,7 @@ export default function FileVisibilityField({ id, label, hint, orgHandle, value,
 
       {value.kind === 'roles' &&
         (rolesFailed ? (
-          <TextField
+          <TextField labelPlacement="top"
             id={`${id}-roles`}
             size="small"
             fullWidth
@@ -112,7 +112,7 @@ export default function FileVisibilityField({ id, label, hint, orgHandle, value,
                 return <Chip key={key} label={roleNames[roleId] ?? roleId} size="small" {...tagProps} />;
               })
             }
-            renderInput={(params) => <TextField {...params} size="small" label="Roles" placeholder={chosen.length ? '' : 'Choose roles'} error={!!error} helperText={error || 'Members of these roles who can query this engine can find the files.'} />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} size="small" label="Roles" placeholder={chosen.length ? '' : 'Choose roles'} error={!!error} helperText={error || 'Members of these roles who can query this engine can find the files.'} />}
             sx={{ mt: 1, pl: 3.5 }}
           />
         ))}

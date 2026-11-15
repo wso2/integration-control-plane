@@ -51,7 +51,6 @@ import {
 import {
   CONTEXT_ENGINE_ASKED_KEY_PREFIX,
   CONTEXT_ENGINE_CONNECT_KEY_PREFIX,
-  CONTEXT_ENGINE_DRAFT_KEY_PREFIX,
   CONTEXT_OWNER_ACTIONS,
   DELETION_POLL_MS,
   ENGINE_STATUS_POLL_MS,
@@ -59,10 +58,10 @@ import {
   PROGRESS_POLL_IDLE_MS,
   SUMMARY_CONCURRENCY,
 } from '../constants/contextEngine';
-import { everyoneRoles, fromDraft, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, toDraft, withLastKnownFacets } from '../utils/contextEngine';
+import { everyoneRoles, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { clearQuestions } from './contextQuestions';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -438,13 +437,8 @@ export function useUploadAudience(orgHandle: string, queryRoles: string[], engin
   return { roles: roles.data ?? [], rolesLoading: roles.isLoading, rolesFailed: roles.isError, roleNames, myGroups, everyone };
 }
 
-// ── Local state that outlives a page: wizard draft, first-run flags ──
+// ── Local state that outlives a page: first-run flags ──
 
-/**
- * The create-wizard draft for an org, kept in session storage with secrets
- * stripped. `restore()` is meant for a reducer initializer; `save` and `clear`
- * are stable so a sync effect can depend on them.
- */
 // Web storage can be unavailable (private mode, blocked site data, a sandboxed frame), and then
 // even reading it throws. The wizard and the engine page must still render, so these never throw.
 
@@ -465,27 +459,7 @@ function writeStorage(storage: () => Storage, key: string, value: string | null)
   }
 }
 
-const session = () => sessionStorage;
 const local = () => localStorage;
-
-export function useContextEngineDraft(orgHandle: string) {
-  const key = `${CONTEXT_ENGINE_DRAFT_KEY_PREFIX}${orgHandle}`;
-  const [savedAt, setSavedAt] = useState<string | null>(() => fromDraft(readStorage(session, key))?.savedAt ?? null);
-  const restore = useCallback((): ContextEngineForm | null => fromDraft(readStorage(session, key))?.form ?? null, [key]);
-  const save = useCallback(
-    (form: ContextEngineForm) => {
-      const now = new Date().toISOString();
-      writeStorage(session, key, JSON.stringify(toDraft(form, now)));
-      setSavedAt(now);
-    },
-    [key],
-  );
-  const clear = useCallback(() => {
-    writeStorage(session, key, null);
-    setSavedAt(null);
-  }, [key]);
-  return { savedAt, restore, save, clear };
-}
 
 /** Whether this user has asked the engine anything yet — drives the "Ask it something" checklist step. */
 /**

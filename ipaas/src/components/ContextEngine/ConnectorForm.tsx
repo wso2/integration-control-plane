@@ -117,7 +117,7 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
   const select = def.kind === 'select';
   const multiline = def.kind === 'urls' || def.kind === 'multiline';
   return (
-    <TextField
+    <TextField labelPlacement="top"
       label={def.label}
       required={def.required}
       select={select}
@@ -185,7 +185,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
       </Box>
 
       <Stack sx={connectorFieldStackSx}>
-        <TextField
+        <TextField labelPlacement="top"
           label="Source Name"
           required
           fullWidth

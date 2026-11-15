@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Play, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, IconButton, ListingTable, PageContent, PageTitle, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Play, Plus, Trash2, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX, type MouseEvent } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -32,14 +32,14 @@ import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import SearchField from '../components/SearchField';
 import ExposurePills from '../components/ContextEngine/ExposurePills';
 import SourceMark from '../components/ContextEngine/SourceMark';
-import { listMarksSx, listProgressTextSx, wrapSx } from '../components/ContextEngine/styles';
+import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
 import { engineMessage, progressListingLine } from '../utils/contextEngine';
-import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
+import EmptyListing from '../components/EmptyListing';
 import type { ContextEngine, ContextEngineAccess, ContextEngineSummary } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
-const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
 const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' } as const;
+const toolbarSx = { mb: 3 } as const;
 
 /** At most this many connector marks per row; the count covers the rest. */
 const MAX_MARKS = 4;
@@ -213,9 +213,12 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     if (!canRead) return <Alert severity="info">Your role can&apos;t view context engines.</Alert>;
     if (isLoading) {
       return (
-        <Box sx={centeredSx}>
-          <CircularProgress />
-        </Box>
+        <Stack gap={1.5}>
+          <Skeleton variant="rounded" height={40} />
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} variant="rounded" height={48} />
+          ))}
+        </Stack>
       );
     }
     if (isError) {
@@ -231,7 +234,18 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
         </Alert>
       );
     }
-    if (!engines?.length) return <NoContextEnginesBanner onCreate={canManage ? goCreate : undefined} />;
+    if (!engines?.length) {
+      return (
+        <EmptyListing
+          icon={<Waypoints size={48} />}
+          title="No context engines"
+          description="Create a context engine to give your integrations and agents grounded answers from your sources."
+          showAction={canManage}
+          actionLabel="Create Context Engine"
+          onAction={goCreate}
+        />
+      );
+    }
     return (
       <ListingTable.Container elevation={0} sx={tableContainerSx}>
         <ListingTable size="small">
@@ -262,24 +276,22 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent sx={wrapSx}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2} sx={{ mb: 3 }}>
-        <PageTitle>
-          <PageTitle.Header>Context Engines</PageTitle.Header>
-        </PageTitle>
-        <Stack direction="row" alignItems="center" gap={1.5}>
-          {!!engines?.length && (
-            <>
-              <SearchField value={search} onChange={setSearch} placeholder="Search engines..." sx={{ minWidth: 220 }} />
-              {canManage && (
-                <Button variant="contained" startIcon={<Plus size={20} />} onClick={goCreate} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                  Create
-                </Button>
-              )}
-            </>
+    <PageContent fullWidth>
+      <PageTitle>
+        <PageTitle.Header>Context Engines</PageTitle.Header>
+        <PageTitle.SubHeader>Knowledge graphs built from your sources, for integrations and agents to query over API or MCP.</PageTitle.SubHeader>
+      </PageTitle>
+
+      {!!engines?.length && (
+        <Stack direction="row" gap={1} alignItems="center" sx={toolbarSx}>
+          <SearchField value={search} onChange={setSearch} placeholder="Search context engines..." fullWidth />
+          {canManage && (
+            <Button variant="contained" startIcon={<Plus size={16} />} onClick={goCreate} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+              Create Context Engine
+            </Button>
           )}
         </Stack>
-      </Stack>
+      )}
 
       {alert && (
         <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 2 }}>

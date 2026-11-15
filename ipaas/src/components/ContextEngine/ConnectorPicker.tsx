@@ -128,7 +128,7 @@ export default function ConnectorPicker({ addedCounts, onPick }: ConnectorPicker
           {available.length > 0 && (
             <Box component="section" aria-labelledby="available-connectors">
               <Typography id="available-connectors" component="h3" sx={{ ...catalogSectionSx, ...connectorSectionHeaderSx }}>
-                Available now · {available.length}
+                Available now
               </Typography>
               <Box sx={connectorGridSx}>
                 {available.map((c) => (
@@ -141,7 +141,7 @@ export default function ConnectorPicker({ addedCounts, onPick }: ConnectorPicker
           {upcoming.length > 0 && (
             <Box component="section" aria-labelledby="upcoming-connectors">
               <Typography id="upcoming-connectors" component="h3" sx={{ ...catalogSectionSx, ...connectorSectionHeaderSx }}>
-                Coming soon · {upcoming.length}
+                Coming soon
               </Typography>
               <Box sx={connectorGridSx}>
                 {upcomingShown.map((c) => (
@@ -150,7 +150,7 @@ export default function ConnectorPicker({ addedCounts, onPick }: ConnectorPicker
               </Box>
               {!filtering && (upcomingHidden > 0 || showAllUpcoming) && (
                 <Button size="small" onClick={() => setShowAllUpcoming((v) => !v)} aria-expanded={showAllUpcoming} sx={{ mt: 1.5, ml: '-5px' }}>
-                  {showAllUpcoming ? 'Show fewer' : `Show all ${upcoming.length}`}
+                  {showAllUpcoming ? 'Show fewer' : 'Show all'}
                 </Button>
               )}
             </Box>
