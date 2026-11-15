@@ -3,9 +3,10 @@
 import { expect, type Page } from '@playwright/test';
 import { reseedSessionToken } from './cloud-fixtures.js';
 
-// describeBuildStatus (utils/buildProgress.ts). 'Failed' also reads 'Failed while <phrase>', and a running
-// build's name goes on to its stage ('In progress: Build source & test, stage 2 of 3'), hence prefix matches.
-export const TERMINAL_STATUS = /^(Completed|Failed|Cancelled|Timed Out)/;
+// describeBuildStatus (utils/buildProgress.ts). 'Failed' also reads 'Failed while <phrase>' or 'Vulnerability scan
+// failed', and a running build's name goes on to its stage ('In progress: Build source & test, stage 2 of 3'),
+// hence prefix matches.
+export const TERMINAL_STATUS = /^(Completed|Failed|Vulnerability scan failed|Cancelled|Timed Out)/;
 export const STARTING_STATUS = /^(Queued|In progress)\b/;
 
 /** A dev build can sit in the queue for a long while before it starts moving. */
@@ -16,7 +17,7 @@ export const BUILD_TIMEOUT_MS = 30 * 60_000;
  * visible text names the running stage instead, so the name, not the text, is what is matched.
  */
 export function buildStatus(page: Page) {
-  return page.getByRole('img', { name: /^(Queued|In progress|Completed|Failed|Cancelled|Timed Out)/ }).first();
+  return page.getByRole('img', { name: /^(Queued|In progress|Completed|Failed|Vulnerability scan failed|Cancelled|Timed Out)/ }).first();
 }
 
 /** The status the build reads now, from its accessible name. */

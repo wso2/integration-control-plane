@@ -143,25 +143,25 @@ export function logsBehindBuild(status: string | undefined, conclusion: string |
 }
 
 /**
- * Build-step name → what the build was doing, for a "Failed while …" label.
+ * Build-step name → how a build that broke there reads, such as "Failed while building the image".
  * The names are the OpenChoreo workflow tasks the BFF passes through. An
  * unmapped name just yields a plain "Failed".
  */
-const BUILD_STEP_PHRASES: Record<string, string> = {
-  'checkout-source': 'checking out the source',
-  'build-image': 'building the image',
-  'scan-image': 'scanning the image for vulnerabilities',
-  'convert-component-descriptor': 'converting the component descriptor',
-  'generate-workload-cr': 'generating the workload resource',
-  'publish-build-artifacts': 'publishing build artifacts',
+const BUILD_STEP_FAILED_LABELS: Record<string, string> = {
+  'checkout-source': 'Failed while checking out the source',
+  'build-image': 'Failed while building the image',
+  'scan-image': 'Vulnerability scan failed',
+  'convert-component-descriptor': 'Failed while converting the component descriptor',
+  'generate-workload-cr': 'Failed while generating the workload resource',
+  'publish-build-artifacts': 'Failed while publishing build artifacts',
 };
 
-/** What the build was doing when it broke, or `undefined` if the step is unknown. */
-export function failedStepPhrase(logs: BuildRunLogs | null | undefined): string | undefined {
+/** How the build reads after the step that broke, or `undefined` if the step is unknown. */
+export function failedStepLabel(logs: BuildRunLogs | null | undefined): string | undefined {
   if (!logs) return undefined;
   for (const { key } of BUILD_STAGES) {
     const failed = stageSteps(logs, key).find((s) => isFailedConclusion(s.conclusion));
-    if (failed) return BUILD_STEP_PHRASES[failed.name];
+    if (failed) return BUILD_STEP_FAILED_LABELS[failed.name];
   }
   return undefined;
 }
