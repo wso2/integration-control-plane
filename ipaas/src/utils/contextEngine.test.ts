@@ -926,6 +926,14 @@ describe('own database', () => {
     expect(Object.keys(databaseFieldErrors(blank))).toEqual(['host', 'port', 'database', 'username', 'password', 'caCertificate']);
     expect(databaseStepBlocker(blank)).toBe('Enter the host');
     expect(databaseFieldErrors(ownDatabase({ host: 'postgres://db' })).host).toMatch(/without a scheme/);
+  });
+
+  it.each(['db.example.com:5432', 'engine@db.example.com', 'db/x', 'db?x', 'db#x', '[::1]', 'db example.com', '1.2.3.4:5432', ':5432'])('rejects the host %j', (host) => {
+    expect(databaseFieldErrors(ownDatabase({ host })).host).toBe('Enter a host name or IP address, without a scheme, port or user');
+  });
+
+  it.each(['db.example.com', '10.0.0.5', '::1', '2001:db8::1', '::ffff:10.0.0.5', 'localhost'])('accepts the host %j', (host) => {
+    expect(databaseFieldErrors(ownDatabase({ host })).host).toBeUndefined();
     expect(databaseFieldErrors(ownDatabase({ database: '  ' })).database).toBe('Enter the database name');
   });
 

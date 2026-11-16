@@ -66,8 +66,8 @@ export interface ContextEngine {
   startedAt?: string;
   /** When the engine was last asked to restart; a running pod that started before it is still restarting. */
   restartedAt?: string;
-  /** Where the engine keeps its data: a PostgreSQL server WSO2 Cloud manages for it, or the user's own. */
-  database: EngineDatabaseKind;
+  /** Where the engine keeps its data: a PostgreSQL server WSO2 Cloud manages for it, the user's own, or its own pod. */
+  database: EngineDataLocation;
 }
 
 export interface ContextEngineAccess {
@@ -553,6 +553,9 @@ export type EngineManagedServer = 'embedded' | 'postgres';
 
 /** Where an engine keeps its data: a server WSO2 Cloud manages for it, or the user's own PostgreSQL. */
 export type EngineDatabaseKind = 'managed' | 'external';
+
+/** Where an existing engine keeps its data: one of the database kinds, or 'engine' for stores in its own pod, as engines created before managed servers do. */
+export type EngineDataLocation = EngineDatabaseKind | 'engine';
 
 /** How strictly the engine checks the server's TLS certificate. verify-ca and verify-full need the CA certificate. */
 export type DatabaseSslMode = 'require' | 'verify-ca' | 'verify-full';

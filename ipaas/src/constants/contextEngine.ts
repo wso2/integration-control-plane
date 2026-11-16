@@ -19,7 +19,7 @@
 import type {
   DatabaseChoice,
   DatabaseSslMode,
-  EngineDatabaseKind,
+  EngineDataLocation,
   ContextEngineStorage,
   ContextQueryMode,
   ContextSourceConfig,
@@ -1014,7 +1014,7 @@ export function defaultDatabaseChoice(): DatabaseChoice {
 }
 
 /** Where an engine's data lives, as the wizard and the overview name it. */
-export const ENGINE_DATABASE_LABEL: Record<EngineDatabaseKind, string> = { managed: 'Managed by WSO2 Cloud', external: 'Your own PostgreSQL' };
+export const ENGINE_DATABASE_LABEL: Record<EngineDataLocation, string> = { managed: 'Managed by WSO2 Cloud', external: 'Your own PostgreSQL', engine: 'Inside the engine' };
 
 /** The TLS modes the engine accepts for the user's own server, strictest last. */
 export const DATABASE_SSL_MODES: { value: DatabaseSslMode; label: string; hint: string }[] = [

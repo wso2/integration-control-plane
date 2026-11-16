@@ -66,9 +66,20 @@ describe('engines', () => {
     expect(bff.get).toHaveBeenCalledWith('/context-engines');
     expect(engines[0]).toMatchObject({ id: ENGINE, handle: 'docs', name: 'Docs', state: 'ready', publicApiUrl: 'https://gw/p' });
     expect(engines[1]).toMatchObject({ id: 'hr', name: 'hr', state: 'unknown', statusReason: 'could not read', description: '' });
-    // Engines from before users could bring their own database say nothing: WSO2 Cloud manages theirs.
-    expect(engines.map((e) => e.database)).toEqual(['managed', 'managed']);
+    // An engine whose BFF names no database keeps its stores in its own pod, not on a managed server.
+    expect(engines.map((e) => e.database)).toEqual(['engine', 'engine']);
     expect(engineRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['managed', 'managed'],
+    ['external', 'external'],
+    ['', 'engine'],
+    [undefined, 'engine'],
+  ] as const)('reads the database %j as %s', async (database, want) => {
+    bff.get.mockResolvedValueOnce({ items: [{ ...bffEngine, database }] });
+    const [engine] = await listContextEngines();
+    expect(engine.database).toBe(want);
   });
 
   it("takes API and MCP access from the BFF, not from the engine's own configuration", async () => {

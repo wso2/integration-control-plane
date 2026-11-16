@@ -756,6 +756,13 @@ export function isPemCertificate(value: string): boolean {
   return pem.startsWith('-----BEGIN CERTIFICATE-----') && pem.includes('-----END CERTIFICATE-----');
 }
 
+/** A bare host name or IP address, as the BFF takes it: no spaces, scheme, path, user or port. A colon is allowed only in an IPv6 address. */
+export function isHostName(host: string): boolean {
+  if (/[\s/?#@[\]]/.test(host)) return false;
+  if (!host.includes(':')) return true;
+  return (host.match(/:/g) ?? []).length >= 2 && /^[0-9a-fA-F:.]+$/.test(host);
+}
+
 /** The CA certificate is needed only when the engine checks who signed the server's certificate. */
 export const needsCaCertificate = (choice: Pick<DatabaseChoice, 'sslMode'>): boolean => choice.sslMode !== 'require';
 
@@ -765,7 +772,7 @@ export function databaseFieldErrors(choice: DatabaseChoice): Partial<Record<Data
   const errors: Partial<Record<DatabaseField, string>> = {};
   const host = choice.host.trim();
   if (!host) errors.host = 'Enter the host';
-  else if (/\s|:\/\//.test(host)) errors.host = 'Enter a host name or IP address, without a scheme';
+  else if (!isHostName(host)) errors.host = 'Enter a host name or IP address, without a scheme, port or user';
   const port = choice.port.trim();
   if (!port) errors.port = 'Enter the port';
   else if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) errors.port = 'Enter a port from 1 to 65535';

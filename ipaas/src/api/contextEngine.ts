@@ -81,7 +81,7 @@ import type {
   SourceIndexingState,
   SourceProgress,
   SourceReadingState,
-  EngineDatabaseKind,
+  EngineDataLocation,
   EngineManagedServer,
   StorageKind,
   StorageSummary,
@@ -245,7 +245,7 @@ interface BffEngine {
   startedAt?: string;
   restartedAt?: string;
   answerOwnKey?: boolean;
-  /** Absent on engines created before users could bring their own database. */
+  /** managed or external; empty or absent for an engine that keeps its stores in its pod, and from a BFF older than databases. */
   database?: string;
 }
 
@@ -317,6 +317,9 @@ interface RawEngineProgress {
 
 const ENGINE_STATES: Record<string, ContextEngineState> = { provisioning: 'provisioning', starting: 'starting', running: 'ready', failed: 'failed', deleting: 'deleting' };
 
+/** Where the BFF says an engine keeps its stores; anything else keeps them in its pod. */
+const toDataLocation = (raw: string | undefined): EngineDataLocation => (raw === 'managed' || raw === 'external' ? raw : 'engine');
+
 const toEngine = (raw: BffEngine): ContextEngine => ({
   id: raw.name,
   handle: raw.name,
@@ -329,7 +332,7 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
   ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
   ...(raw.restartedAt ? { restartedAt: raw.restartedAt } : {}),
-  database: raw.database === 'external' ? 'external' : 'managed',
+  database: toDataLocation(raw.database),
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -421,7 +424,7 @@ const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = 
 const POSTGRES_PROVIDERS = new Set(['pgvector', 'postgres']);
 
 /** Per-store placement as the engine reports it; null until it reports any. */
-const toStorage = (raw: RawEngineConfig | null, database: EngineDatabaseKind): Record<StorageKind, StorageSummary> | null => {
+const toStorage = (raw: RawEngineConfig | null, database: EngineDataLocation): Record<StorageKind, StorageSummary> | null => {
   const st = raw?.storage;
   if (!st) return null;
   const one = (kind: StorageKind): StorageSummary => {
