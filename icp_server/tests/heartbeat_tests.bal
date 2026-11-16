@@ -43,6 +43,7 @@ const string HB_SECOND_NAME = "hb-restart-test-second-runtime";
 // Service-listener binding test: dedicated ID cleaned up via an AfterGroups
 // teardown so rows never leak when an assertion aborts the test.
 const string HB_SERVICE_LISTENER_ID = "aa000001-test-test-test-000000000010";
+const string HB_CAPP_VERSIONS_ID = "aa000001-test-test-test-000000000011";
 
 // =============================================================================
 // Helpers
@@ -69,15 +70,49 @@ function buildMIHeartbeat(string runtimeId) returns types:Heartbeat {
     types:Heartbeat heartbeat = buildHeartbeat(runtimeId, ());
     heartbeat.runtimeType = "MI";
     heartbeat.nodeInfo.platformName = "wso2-mi";
-    heartbeat.artifacts.inboundEndpoints = [{
-        name: "CustomInboundEP",
-        protocol: (),
-        sequence: "main",
-        state: "enabled",
-        tracing: "disabled"
-    }];
+    heartbeat.artifacts.inboundEndpoints = [
+        {
+            name: "CustomInboundEP",
+            protocol: (),
+            sequence: "main",
+            state: "enabled",
+            tracing: "disabled"
+        }
+    ];
     heartbeat.runtimeHash = "test-hash-mi-" + runtimeId;
     return heartbeat;
+}
+
+function buildCompositeAppHeartbeat() returns types:Heartbeat {
+    return {
+        runtimeId: HB_CAPP_VERSIONS_ID,
+        runtime: "hb-capp-versions-runtime",
+        runtimeType: "MI",
+        status: "RUNNING",
+        environment: HB_ENV_ID,
+        project: HB_PROJECT_ID,
+        component: HB_COMPONENT_ID,
+        version: "4.6.0",
+        nodeInfo: {platformName: "wso2-mi"},
+        artifacts: {
+            carbonApps: [
+                {name: "EnterpriseServiceBus", version: "1.0.0-SNAPSHOT"},
+                {name: "EnterpriseServiceBus", version: "2.0.0-SNAPSHOT"},
+                {name: "LegacyUnversionedApp"}
+            ]
+        },
+        runtimeHash: "test-hash-capp-versions",
+        timestamp: time:utcNow()
+    };
+}
+
+function containsCompositeApp(types:CompositeApp[] apps, string name, string? version) returns boolean {
+    foreach types:CompositeApp app in apps {
+        if app.name == name && app.version == version {
+            return true;
+        }
+    }
+    return false;
 }
 
 function cleanupRuntime(string runtimeId) {
@@ -482,4 +517,35 @@ function testMIInboundEndpointAcceptsNullProtocol() returns error? {
     test:assertEquals(inboundEndpoints[0].protocol, (), "Custom inbound endpoint protocol should remain null");
 
     cleanupRuntime(runtimeId);
+}
+
+// =============================================================================
+// Test 4: same-name Composite Apps with different versions must coexist
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "composite-app"]
+}
+function testCompositeAppsWithSameNameAndDifferentVersions() returns error? {
+    cleanupRuntime(HB_CAPP_VERSIONS_ID);
+
+    types:HeartbeatResponse response = check storage:processHeartbeat(
+            buildCompositeAppHeartbeat(), preResolved = true);
+    test:assertTrue(response.acknowledged,
+            "Heartbeat containing same-name Composite Apps with different versions should be acknowledged");
+
+    types:CompositeApp[] runtimeApps = check storage:getCompositeAppsForRuntime(HB_CAPP_VERSIONS_ID);
+    test:assertEquals(runtimeApps.length(), 3, "All Composite App versions should be stored");
+    test:assertTrue(containsCompositeApp(runtimeApps, "EnterpriseServiceBus", "1.0.0-SNAPSHOT"));
+    test:assertTrue(containsCompositeApp(runtimeApps, "EnterpriseServiceBus", "2.0.0-SNAPSHOT"));
+    test:assertTrue(containsCompositeApp(runtimeApps, "LegacyUnversionedApp", ()),
+            "The internal unversioned sentinel must not leak through the storage API");
+
+    types:CompositeApp[] componentApps = check storage:getCompositeAppsByEnvironmentAndComponent(
+            HB_ENV_ID, HB_COMPONENT_ID);
+    test:assertTrue(containsCompositeApp(componentApps, "EnterpriseServiceBus", "1.0.0-SNAPSHOT"),
+            "Component query should include the first version");
+    test:assertTrue(containsCompositeApp(componentApps, "EnterpriseServiceBus", "2.0.0-SNAPSHOT"),
+            "Component query should not collapse a second version with the same name");
+
+    cleanupRuntime(HB_CAPP_VERSIONS_ID);
 }
