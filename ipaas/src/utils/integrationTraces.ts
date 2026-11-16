@@ -142,11 +142,28 @@ function serviceTraces(traces: TraceRow[], byTrace: Map<string, SpanRow[]>, serv
     .sort((a, b) => Date.parse(b.trace.startTime) - Date.parse(a.trace.startTime));
 }
 
+/** The services a trace entered, as entrySpan finds them, in one pass over its spans. */
+function servicesEntered(traceSpans: SpanRow[]): Set<string> {
+  const serviceOf = new Map(traceSpans.map((s) => [s.spanId, s.serviceName]));
+  return new Set(traceSpans.filter((s) => !s.parentSpanId || serviceOf.get(s.parentSpanId) !== s.serviceName).map((s) => s.serviceName));
+}
+
 /** Per service: the traces it took part in, how many had an error, and their duration. */
 export function summarizeServiceTraces(traces: TraceRow[], spans: SpanRow[]): ServiceTraceSummary[] {
   const byTrace = spansByTrace(spans);
+  // One pass over the traces: it runs again each time more traces' spans arrive.
+  const tracesOf = new Map<string, TraceRow[]>();
+  for (const trace of traces) {
+    const traceSpans = byTrace.get(trace.traceId);
+    if (!traceSpans) continue;
+    for (const service of servicesEntered(traceSpans)) {
+      const own = tracesOf.get(service);
+      if (own) own.push(trace);
+      else tracesOf.set(service, [trace]);
+    }
+  }
   return servicesBySpanCount(spans).map((service) => {
-    const own = serviceTraces(traces, byTrace, service).map((t) => t.trace);
+    const own = tracesOf.get(service) ?? [];
     const durations = own.map((t) => t.durationMs).sort((a, b) => a - b);
     return {
       service,
