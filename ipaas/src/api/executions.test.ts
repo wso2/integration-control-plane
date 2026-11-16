@@ -273,6 +273,11 @@ describe('toTaskExecution', () => {
     // The backend omits it for a run whose name says neither, and older backends never send it.
     expect(toTaskExecution({ jobId: 'job-1', status: 'Succeeded' }).trigger).toBeUndefined();
   });
+
+  it('treats a trigger it does not know as unknown', () => {
+    expect(toTaskExecution({ jobId: 'job-1', status: 'Succeeded', trigger: 'Webhook' }).trigger).toBeUndefined();
+    expect(toTaskExecution({ jobId: 'job-1', status: 'Succeeded', trigger: 'manual' }).trigger).toBeUndefined();
+  });
 });
 
 // Each deployment track has its own schedule and runs. The console addresses a
