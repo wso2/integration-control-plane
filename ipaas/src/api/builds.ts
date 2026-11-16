@@ -55,6 +55,7 @@ type StageKey = 'init' | 'build' | 'deploy';
 const TASK_STAGE: Record<string, StageKey> = {
   'checkout-source': 'init',
   'build-image': 'build',
+  'scan-image': 'deploy',
   'publish-image': 'deploy',
   'convert-component-descriptor': 'deploy',
   'generate-workload-cr': 'deploy',
