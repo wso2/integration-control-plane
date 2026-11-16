@@ -36,7 +36,7 @@ vi.mock('@wso2/oxygen-ui', () => {
 // The icon package ships a stylesheet Node cannot import; the source mark pulls in dozens of icons, so it is stubbed whole.
 vi.mock('@wso2/oxygen-ui-icons-react', () => {
   const icon = () => null;
-  return { ArrowRight: icon, Check: icon, ChevronDown: icon, ChevronRight: icon, ExternalLink: icon, History: icon, Info: icon, Link: icon, Waypoints: icon };
+  return { ArrowRight: icon, Check: icon, ChevronDown: icon, ChevronRight: icon, ExternalLink: icon, History: icon, Info: icon, Link: icon, Waypoints: icon, X: icon };
 });
 vi.mock('../SourceMark', () => ({ default: () => null }));
 

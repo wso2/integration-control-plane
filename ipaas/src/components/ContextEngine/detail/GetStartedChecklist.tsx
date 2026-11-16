@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Paper, Typography } from '@wso2/oxygen-ui';
 import { Check } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { checklistDotSx, checklistSx, checklistStepSx, mutedSx } from '../styles';
@@ -32,7 +32,7 @@ const ACTION_LABEL: Record<GetStartedStepId, string> = { index: 'View progress',
 /** Four first-run steps in a row; the current one carries its action. */
 export default function GetStartedChecklist({ steps, onAction }: GetStartedChecklistProps): JSX.Element {
   return (
-    <Box sx={checklistSx} role="list" aria-label="Get started">
+    <Paper variant="outlined" sx={checklistSx} role="list" aria-label="Get started">
       {steps.map((step, i) => (
         <Box key={step.id} sx={{ ...checklistStepSx, opacity: step.state === 'todo' ? 0.7 : 1 }} role="listitem">
           <Box sx={checklistDotSx(step.state)} aria-hidden="true">
@@ -55,6 +55,6 @@ export default function GetStartedChecklist({ steps, onAction }: GetStartedCheck
           </Box>
         </Box>
       ))}
-    </Box>
+    </Paper>
   );
 }

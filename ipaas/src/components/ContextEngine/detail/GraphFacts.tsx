@@ -18,6 +18,7 @@
 
 import { Box, ButtonBase, Stack, Typography } from '@wso2/oxygen-ui';
 import { type JSX } from 'react';
+import { restoreCase } from '../../../utils/contextEngine';
 import { derivationSummary } from '../../../utils/contextGraph';
 import { citationMarkSx, mutedSx } from '../styles';
 import type { ContextEvidence, ContextFact } from '../../../types/contextEngine';
@@ -44,14 +45,15 @@ const count = (n: number, one: string, many: string): string => `${n} ${n === 1 
  */
 export default function GraphFacts({ facts, evidence, active, pinned, onHover, onPin }: GraphFactsProps): JSX.Element {
   const numberOf = new Map(evidence.map((e, i) => [e.id, i + 1]));
+  const passages = evidence.map((e) => e.passage);
   const { entities } = derivationSummary({ evidence, facts });
   return (
     <Box>
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-        Evidence
+        Facts
       </Typography>
       <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1.25 }}>
-        {count(facts.length, 'relationship', 'relationships')} naming {count(entities, 'entity', 'entities')}, each marked with the passages it stands on. They were written while indexing; cite the passages.
+        {count(facts.length, 'fact', 'facts')} about {count(entities, 'thing', 'things')} found in your sources. Each links to the passages it comes from.
       </Typography>
       <Stack component="ul" gap={0.75} sx={{ listStyle: 'none', m: 0, p: 0 }}>
         {facts.map((fact, i) => {
@@ -59,13 +61,13 @@ export default function GraphFacts({ facts, evidence, active, pinned, onHover, o
           return (
             <Box component="li" key={`${fact.subject}|${fact.relation}|${fact.object}|${i}`} sx={{ fontSize: 13, lineHeight: 1.5 }}>
               <Box component="span" sx={{ fontWeight: 600 }}>
-                {fact.subject}
+                {restoreCase(fact.subject, passages)}
               </Box>{' '}
               <Box component="span" sx={mutedSx}>
                 {fact.relation}
               </Box>{' '}
               <Box component="span" sx={{ fontWeight: 600 }}>
-                {fact.object}
+                {restoreCase(fact.object, passages)}
               </Box>
               {numbers.map((n) => (
                 <ButtonBase

@@ -57,7 +57,7 @@ export default function AudienceRulesEditor({ orgHandle, connectorName, rules, o
   const roleField = (rule: AudienceRule, i: number) => {
     if (roles.isError) {
       return (
-        <TextField
+        <TextField labelPlacement="top"
           label="Visible to role"
           size="small"
           fullWidth
@@ -71,7 +71,7 @@ export default function AudienceRulesEditor({ orgHandle, connectorName, rules, o
     const options = roles.data ?? [];
     const known = options.some((r) => r.roleId === rule.role);
     return (
-      <TextField
+      <TextField labelPlacement="top"
         select
         label="Visible to role"
         size="small"
@@ -102,7 +102,7 @@ export default function AudienceRulesEditor({ orgHandle, connectorName, rules, o
       <Stack sx={fieldStackSx}>
         {rows.map((rule, i) => (
           <Box key={i} sx={audienceRowSx}>
-            <TextField label={`${connectorName} group`} size="small" fullWidth value={rule.group} placeholder="e.g. engineering" onChange={(e) => setRow(i, { group: e.target.value })} />
+            <TextField labelPlacement="top" label={`${connectorName} group`} size="small" fullWidth value={rule.group} placeholder="e.g. engineering" onChange={(e) => setRow(i, { group: e.target.value })} />
             {roleField(rule, i)}
             <Tooltip title="Remove rule">
               <span>

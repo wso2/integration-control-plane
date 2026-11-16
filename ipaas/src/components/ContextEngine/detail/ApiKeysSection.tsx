@@ -119,7 +119,7 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
       </Typography>
       {canManage && (
         <Stack direction="row" gap={1.5} alignItems="center" sx={createRowSx}>
-          <TextField size="small" label="Key name" placeholder="e.g. support-bot" value={name} onChange={(e) => setName(e.target.value)} sx={nameFieldSx} />
+          <TextField labelPlacement="top" size="small" label="Key name" placeholder="e.g. support-bot" value={name} onChange={(e) => setName(e.target.value)} sx={nameFieldSx} />
           <Button variant="outlined" startIcon={create.isPending ? <CircularProgress size={14} color="inherit" /> : <Plus size={16} />} disabled={create.isPending} onClick={submit}>
             Create key
           </Button>

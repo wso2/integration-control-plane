@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { CircleAlert, Database, ExternalLink, Plus, RefreshCw, Waypoints } from '@wso2/oxygen-ui-icons-react';
+import { ChartScatter, CircleAlert, Database, ExternalLink, Network, Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { useServerDatabases } from '../../../hooks/usePlatformServices';
 import { STORAGE_DEFAULT_DATABASE, type StorageBackendInfo } from '../../../constants/contextEngine';
@@ -48,7 +48,8 @@ interface StorageBackendCardProps {
   createUrl?: string;
 }
 
-const KIND_ICON: Record<StorageBackendInfo['kind'], ReactNode> = { vector: <Waypoints size={20} />, relational: <Database size={20} />, graph: <Waypoints size={20} /> };
+// Waypoints stays with Context Engines in the menu; each store gets its own picture.
+const KIND_ICON: Record<StorageBackendInfo['kind'], ReactNode> = { vector: <ChartScatter size={20} />, relational: <Database size={20} />, graph: <Network size={20} /> };
 
 const serverSubtitle = (s: DatabaseServer): string =>
   [s.type === 'postgres' ? 'PostgreSQL' : s.type, s.is_vector_enabled ? 'pgvector' : null, `${s.cloud_provider.toUpperCase()} ${s.cloud_region.toUpperCase()}`, s.status === 'ACTIVE' ? 'Active' : s.status.toLowerCase()].filter(Boolean).join(' · ');
@@ -59,7 +60,7 @@ function DatabaseField({ kind, value, onChange }: { kind: StorageBackendInfo['ki
   const names = (dbs.data ?? []).map((d) => d.name);
   if (names.length > 0) {
     return (
-      <TextField
+      <TextField labelPlacement="top"
         select
         label="Database"
         required
@@ -78,7 +79,7 @@ function DatabaseField({ kind, value, onChange }: { kind: StorageBackendInfo['ki
     );
   }
   return (
-    <TextField
+    <TextField labelPlacement="top"
       label="Database"
       required
       fullWidth
@@ -110,18 +111,12 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
   const uriError = external && external.uri && !isGraphUri(external.uri) ? 'Enter a bolt://, neo4j:// or http(s):// URI' : '';
 
   const infraBody = (): ReactNode => {
-    if (!infrastructureAvailable)
-      return (
-        <Alert severity="info" variant="outlined">
-          Managed databases are not enabled for this deployment.
-        </Alert>
-      );
+    if (!infrastructureAvailable) return <Alert severity="info">Managed databases are not enabled for this deployment.</Alert>;
     if (serversLoading) return <CircularProgress size={20} />;
     if (serversError) {
       return (
         <Alert
           severity="error"
-          variant="outlined"
           action={
             <Button color="inherit" size="small" onClick={onRefresh}>
               Retry
@@ -166,7 +161,7 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
     if (value.mode !== 'infrastructure') return null;
     return (
       <Stack gap={2}>
-        <TextField
+        <TextField labelPlacement="top"
           select
           label={`${info.title} server`}
           required
@@ -209,7 +204,7 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
   const externalBody = (): ReactNode =>
     external ? (
       <Stack gap={2}>
-        <TextField
+        <TextField labelPlacement="top"
           label="Connection URI"
           required
           fullWidth
@@ -221,8 +216,8 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
           onChange={(e) => setExternal({ uri: e.target.value })}
           sx={REQUIRED_FIELD_SX}
         />
-        <TextField label="Database" required fullWidth size="small" value={external.database} onChange={(e) => setExternal({ database: e.target.value })} sx={REQUIRED_FIELD_SX} />
-        <TextField label="User" required fullWidth size="small" value={external.user} onChange={(e) => setExternal({ user: e.target.value })} sx={REQUIRED_FIELD_SX} />
+        <TextField labelPlacement="top" label="Database" required fullWidth size="small" value={external.database} onChange={(e) => setExternal({ database: e.target.value })} sx={REQUIRED_FIELD_SX} />
+        <TextField labelPlacement="top" label="User" required fullWidth size="small" value={external.user} onChange={(e) => setExternal({ user: e.target.value })} sx={REQUIRED_FIELD_SX} />
         <SecretField label="Password" required value={external.password} onChange={(v) => setExternal({ password: v })} />
       </Stack>
     ) : null;
@@ -242,33 +237,31 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
       </Stack>
 
       <RadioGroup value={value.mode} onChange={(_e, mode) => chooseMode(mode)} aria-label={`${info.title} placement`} sx={storageRadioGroupSx}>
-        <Box sx={storageOptionSx(value.mode === 'managed')}>
+        <Box sx={storageOptionSx}>
           <FormControlLabel
             value="managed"
             control={<Radio size="small" />}
             label={
               managedServer ? (
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Engine managed · {managedStore(info.kind, managedServer).name}
-                </Typography>
+                `Engine managed · ${managedStore(info.kind, managedServer).name}`
               ) : (
                 <Skeleton variant="text" width={180} />
               )
             }
           />
         </Box>
-        <Box sx={storageOptionSx(value.mode !== 'managed')}>
+        <Box sx={storageOptionSx}>
           <FormControlLabel
             value={alternativeMode}
             control={<Radio size="small" />}
             disabled={alternativeUnavailable || (alternativeMode === 'infrastructure' && !infrastructureAvailable)}
             label={
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <Stack direction="row" alignItems="center" flexWrap="wrap" columnGap={1} rowGap={0.5}>
+                <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
                   Bring your own database
-                </Typography>
-                {alternativeUnavailable && <Chip label="Coming soon" size="small" sx={{ mt: 0.5 }} />}
-              </Box>
+                </Box>
+                {alternativeUnavailable && <Chip label="Coming soon" size="small" />}
+              </Stack>
             }
           />
           {value.mode !== 'managed' && <Box sx={storageOptionBodySx}>{alternativeMode === 'infrastructure' ? infraBody() : externalBody()}</Box>}

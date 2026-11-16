@@ -53,7 +53,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, 
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingAloneSx}>
-        Configure Models
+        Configure models
       </Typography>
 
       <Box sx={modelColumnsSx}>
@@ -68,7 +68,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, 
         />
         <ModelProviderColumn<LlmConfig>
           title="Ingestion language model"
-          purpose={answerChoice === 'same' ? 'Builds the graph and writes answers.' : 'Builds the graph.'}
+          purpose="Builds the graph."
           providers={LLM_OPTIONS}
           value={llm}
           onChange={onLlmChange}

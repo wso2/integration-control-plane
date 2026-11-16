@@ -16,12 +16,10 @@
  * under the License.
  */
 
-import { Box, /* Button, */ Typography } from '@wso2/oxygen-ui';
-import { /* ArrowRight, */ Waypoints } from '@wso2/oxygen-ui-icons-react';
+import { Box } from '@wso2/oxygen-ui';
 import { useEffect, useState, type JSX } from 'react';
 // import { Link as RouterLink } from 'react-router';
 import { citedNumbers } from '../../../utils/contextEngine';
-import { derivationSummary } from '../../../utils/contextGraph';
 import CitedAnswer, { type CitationFocus } from './CitedAnswer';
 import EvidenceRail from './EvidenceRail';
 import type { ContextEvidence, ContextFact, ContextSource } from '../../../types/contextEngine';
@@ -37,6 +35,8 @@ interface AnsweredTurnProps {
   onOpen: (evidence: ContextEvidence) => void;
   /** The Graph tab URL that shows how the answer was derived; with a passage, that passage opens chosen. */
   derivationHref?: (evidence?: ContextEvidence) => string;
+  /** The question asked, for the excerpts. */
+  question?: string;
 }
 
 /**
@@ -45,7 +45,7 @@ interface AnsweredTurnProps {
  * until it is clicked again or Esc is pressed. On narrow screens the rail
  * follows the answer instead of sitting beside it.
  */
-export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, derivationHref }: AnsweredTurnProps): JSX.Element {
+export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, derivationHref, question }: AnsweredTurnProps): JSX.Element {
   const [active, setActive] = useState<CitationFocus | null>(null);
   const [pinned, setPinned] = useState<CitationFocus | null>(null);
   const cited = citedNumbers(answer, evidence.length);
@@ -68,9 +68,17 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
       <Box sx={{ minWidth: 0 }}>
         <CitedAnswer answer={answer} passages={evidence.length} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
-        {derivationHref && <DerivationLine answer={answer} evidence={evidence} facts={facts} href={derivationHref()} />}
+        {/* How this answer was derived: hidden by the team for now (4ed1e9b2c). To bring it back, render this under the answer
+            (with Button from oxygen-ui, ArrowRight from oxygen-ui-icons-react and Link as RouterLink from react-router):
+        {derivationHref && (
+          <Button size="small" variant="text" component={RouterLink} to={derivationHref()} endIcon={<ArrowRight size={14} />} sx={{ mt: 2, fontWeight: 600, px: 0.5 }}>
+            How this answer was derived
+          </Button>
+        )}
+        */}
       </Box>
       <EvidenceRail
+        question={question}
         evidence={evidence}
         sources={sources}
         cited={cited}
@@ -82,27 +90,6 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
         onOpen={onOpen}
         graphHrefFor={graphHrefFor}
       />
-    </Box>
-  );
-}
-
-const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
-
-/** Under an answer: what it was built from, and a link to its derivation in the Graph tab. */
-function DerivationLine({ answer, evidence, facts /* , href */ }: { answer: string; evidence: ContextEvidence[]; facts: ContextFact[]; href: string }): JSX.Element {
-  const s = derivationSummary({ answer, evidence, facts });
-  const parts = [count(s.sentences, 'sentence', 'sentences'), count(s.passages, 'passage', 'passages'), ...(s.entities ? [count(s.entities, 'entity', 'entities')] : [])];
-  return (
-    <Box sx={{ mt: 2.5, pt: 1.5, borderTop: '1px dashed', borderColor: 'divider', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.25 }}>
-      <Waypoints size={16} aria-hidden />
-      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 12.5 }}>
-        {parts.join(', ')}.
-      </Typography>
-      {/* How this answer was derived, hidden for now.
-      <Button size="small" variant="text" component={RouterLink} to={href} endIcon={<ArrowRight size={14} />} sx={{ fontWeight: 600, px: 0.5 }}>
-        How this answer was derived
-      </Button>
-      */}
     </Box>
   );
 }

@@ -34,7 +34,7 @@ interface StorageStepProps {
 }
 
 const MANAGED_HINT: Record<EngineManagedServer, string> = {
-  embedded: 'Engine managed stores are embedded and need no setup.',
+  embedded: 'The defaults are built in and need no setup.',
   postgres: 'Engine managed stores run on the engine’s own PostgreSQL server, created and deleted with it, and need no setup.',
 };
 
@@ -55,7 +55,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
-        Configure Storage
+        Configure storage
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
         Where the engine keeps its data.{managedServer.data ? ` ${MANAGED_HINT[managedServer.data]}` : ''}

@@ -16,14 +16,15 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useContextEngine, useContextEngineDraft, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, useContextEngine, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import { answerChoice, checkStagedFile, effectiveVisibility, engineMessage, isFormDirty, modelsStepBlocker, nameStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
@@ -44,10 +45,10 @@ import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
-const STEP_LABELS = ['Name', 'Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Review & Create'];
+const STEP_LABELS = ['Define engine', 'Choose sources', /* 'Grant access', */ 'Configure models', 'Configure storage', 'Review & create'];
 const LAST_STEP = STEP_LABELS.length - 1;
-const MODELS_STEP = STEP_LABELS.indexOf('Configure Models');
-const STORAGE_STEP = STEP_LABELS.indexOf('Configure Storage');
+const MODELS_STEP = STEP_LABELS.indexOf('Configure models');
+const STORAGE_STEP = STEP_LABELS.indexOf('Configure storage');
 
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
 export interface CreateContextEngineLocationState {
@@ -72,16 +73,11 @@ interface SetupResult {
 export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
   const canManage = useCan()(Scopes.CONFIG_MANAGE);
-  const draft = useContextEngineDraft(scope.org);
-  const { save: saveDraft, clear: clearDraft } = draft;
-  // Restore a draft from this session, if there is one; secrets were never stored and must be re-entered.
-  const [restored] = useState(() => draft.restore() !== null);
-  const [form, dispatch] = useReducer(contextEngineFormReducer, undefined, () => draft.restore() ?? initialContextEngineForm);
+  const [form, dispatch] = useReducer(contextEngineFormReducer, initialContextEngineForm);
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedEngine | null>(null);
   const [result, setResult] = useState<SetupResult | null>(null);
-  const [showRestored, setShowRestored] = useState(restored);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const create = useCreateContextEngine();
   const setUp = useSetUpContextEngine();
@@ -93,15 +89,21 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const { everyone, myGroups } = useUploadAudience(scope.org, form.roles, null);
   const base = contextEnginesUrl(scope.org);
   const dirty = isFormDirty(form);
+  // Like the app's other create wizards, ask before leaving a filled-in form; nothing is kept once it is left.
+  const allowLeave = useUnsavedChanges(dirty && !create.isSuccess);
+  // Staged files live outside the form, so they are released when the wizard is left before creating.
+  const formRef = useRef(form);
+  formRef.current = form;
+  const createdRef = useRef(false);
+  createdRef.current = create.isSuccess;
+  useEffect(
+    () => () => {
+      if (!createdRef.current) formRef.current.sources.forEach((s) => (s.staged ?? []).forEach((m) => dropStagedFile(m.id)));
+    },
+    [],
+  );
   const engineState = live.data?.state;
   const phase: SetupPhase = result ? 'done' : engineState === 'failed' ? 'failed' : engineState === 'ready' ? 'setting-up' : 'starting';
-
-  // Mirror the form into session storage so leaving the wizard loses nothing but secrets.
-  useEffect(() => {
-    if (create.isSuccess) return;
-    if (dirty) saveDraft(form);
-    else clearDraft();
-  }, [form, dirty, create.isSuccess, saveDraft, clearDraft]);
 
   // The sources, roles and staged files live only in this page until the engine runs.
   const settingUp = !!created && !result && phase !== 'failed';
@@ -154,7 +156,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
   }
 
-  // Why each step's Next is disabled — shown beside the button so the user never guesses.
+  // What still blocks each step; a step's Next is enabled once its entry is null.
   const setupBlockers: (string | null)[] = [
     nameStepBlocker(form.name, form.description),
     sourcesStepBlocker(form.sources),
@@ -167,12 +169,6 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const stepValid = stepBlocker.map((b) => b === null);
   const canCreate = stepValid.every(Boolean);
 
-  const leave = (discard: boolean) => {
-    if (discard) draft.clear();
-    setLeaveOpen(false);
-    navigate(base);
-  };
-
   const submit = () => {
     if (!canCreate || create.isPending) return;
     setError(null);
@@ -180,7 +176,6 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     const withRules = withSourceVisibilityRules(form.sources, everyone);
     create.mutate(toCreateInput({ ...form, sources: withRules }), {
       onSuccess: (engine) => {
-        draft.clear();
         setCreated({ id: engine.id, name: engine.name, sources: withRules, roles: form.roles });
       },
       onError: (e) => {
@@ -195,7 +190,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent sx={wrapSx}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (settingUp || (dirty && !created) ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} disabled={create.isPending} onClick={() => (settingUp ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
       <PageTitle>
@@ -226,14 +221,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
           </Box>
           <Box sx={{ flex: 1, maxWidth: activeStep === MODELS_STEP || activeStep === STORAGE_STEP ? 1080 : 960, mt: 2 }}>
-            {showRestored && (
-              <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
-                Draft restored. Re-enter API keys and tokens.
-              </Alert>
-            )}
-
             {error && (
-              <Alert severity="error" variant="outlined" onClose={() => setError(null)} sx={{ mb: 3 }}>
+              <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
                 {error}
               </Alert>
             )}
@@ -266,10 +255,17 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
               />
             )}
             {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
-            {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} draftSavedAt={draft.savedAt} onEdit={setActiveStep} />}
+            {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} onEdit={setActiveStep} />}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
-              <Button variant="outlined" disabled={create.isPending} onClick={activeStep === 0 ? () => (dirty ? setLeaveOpen(true) : navigate(base)) : () => setActiveStep((s) => Math.max(0, s - 1))}>
+              <Button variant="outlined" disabled={create.isPending} onClick={
+                  activeStep === 0
+                    ? () => {
+                        allowLeave();
+                        navigate(base);
+                      }
+                    : () => setActiveStep((s) => Math.max(0, s - 1))
+                }>
                 {activeStep === 0 ? 'Cancel' : 'Back'}
               </Button>
               {activeStep < LAST_STEP ? (
@@ -281,16 +277,12 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                   {create.isPending ? 'Creating…' : 'Create Context Engine'}
                 </Button>
               )}
-              {stepBlocker[activeStep] && (
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                  {stepBlocker[activeStep]}
-                </Typography>
-              )}
             </Stack>
           </Box>
         </Stack>
       )}
 
+      {/* A half set-up engine asks before leaving: the engine exists, but its sources and access are not added yet. */}
       <Dialog open={leaveOpen && settingUp} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Leave before setup finishes?</DialogTitle>
         <DialogContent>
@@ -298,23 +290,14 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setLeaveOpen(false)}>Stay</Button>
-          <Button variant="contained" color="error" onClick={() => leave(false)}>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              setLeaveOpen(false);
+              navigate(base);
+            }}>
             Leave
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={leaveOpen && !settingUp} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Leave without creating?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Your draft is kept for this tab. API keys and tokens are not.</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLeaveOpen(false)}>Stay</Button>
-          <Button color="error" onClick={() => leave(true)}>
-            Discard draft
-          </Button>
-          <Button variant="contained" onClick={() => leave(false)}>
-            Keep draft and leave
           </Button>
         </DialogActions>
       </Dialog>

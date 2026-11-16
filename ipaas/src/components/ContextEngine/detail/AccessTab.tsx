@@ -117,13 +117,13 @@ export default function AccessTab({ engine, orgHandle }: AccessTabProps): JSX.El
       </Typography>
 
       {error && (
-        <Alert severity="error" variant="outlined" onClose={() => setError(null)} sx={{ mb: 2 }}>
+        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
       {orgRoles.length === 0 ? (
-        <Alert severity="info" variant="outlined" sx={{ mb: 3 }}>
+        <Alert severity="info" sx={{ mb: 3 }}>
           This organization has no roles yet.
         </Alert>
       ) : (
