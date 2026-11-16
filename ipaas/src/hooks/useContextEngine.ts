@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import {
   addContextSource,
@@ -292,14 +292,17 @@ export function useAddContextSource(engineId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (source: ContextSourceConfig) => addContextSource(engineId, source),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'summary', engineId] });
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'integrations', engineId] });
-      // The new source has no progress row until the next poll; fetch it now so the card never says "hidden".
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'progress', engineId] });
-    },
+    onSuccess: () => refreshEngineSources(qc, engineId),
   });
+}
+
+/** Refetch what lists an engine's sources after one is added. */
+export function refreshEngineSources(qc: QueryClient, engineId: string): void {
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'summary', engineId] });
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'integrations', engineId] });
+  // The new source has no progress row until the next poll; fetch it now so the card never says "hidden".
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'progress', engineId] });
 }
 
 export function useUpdateContextSource(engineId: string) {

@@ -123,19 +123,22 @@ function EngineStatusAlert({ engineId, state, reason, setup }: EngineStatusAlert
       </Alert>
     );
   }
-  const warnings = [...(setup?.status === 'failed' ? setup.warnings : []), ...staged.failures];
-  if (warnings.length === 0) return null;
+  const setupFailed = setup?.status === 'failed';
+  const warnings = [...(setupFailed ? setup.warnings : []), ...staged.failures];
+  if (!setupFailed && warnings.length === 0) return null;
   return (
     <Alert severity="warning" variant="outlined" onClose={() => setDismissed(true)} sx={alertSx}>
       <Typography variant="body2" sx={{ fontWeight: 600 }}>
         Some sources weren&apos;t added
       </Typography>
       Add them again from this page.
-      <Box component="ul" sx={listSx}>
-        {warnings.map((w) => (
-          <li key={w}>{w}</li>
-        ))}
-      </Box>
+      {warnings.length > 0 && (
+        <Box component="ul" sx={listSx}>
+          {warnings.map((w) => (
+            <li key={w}>{w}</li>
+          ))}
+        </Box>
+      )}
     </Alert>
   );
 }
@@ -250,7 +253,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
           Questions, uploads and changes are paused, and its API and MCP endpoints have stopped answering. It disappears from your list once it is gone.
         </Alert>
       )}
-      {!deleting && <EngineStatusAlert engineId={engine.id} state={engine.state} reason={engine.statusReason} setup={engine.setup} />}
+      {!deleting && <EngineStatusAlert key={engine.id} engineId={engine.id} state={engine.state} reason={engine.statusReason} setup={engine.setup} />}
 
       {deleteError && !confirmDelete && (
         <Alert severity="error" onClose={() => setDeleteError(null)} sx={{ mb: 3 }}>

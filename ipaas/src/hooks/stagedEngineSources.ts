@@ -91,18 +91,20 @@ async function engineRuns(engineId: string): Promise<boolean> {
 }
 
 /** Hold the sources until the engine runs, then register them and send their files. */
-export function stageEngineSources(engineId: string, sources: StagedEngineSource[]): void {
+export function stageEngineSources(engineId: string, sources: StagedEngineSource[], onAdded: () => void): void {
   if (sources.length === 0) return;
   holding.set(engineId, sources);
   set(engineId, { waiting: sources.length, failures: [] });
   void (async () => {
     const failures: string[] = [];
+    let added = false;
     if (!(await engineRuns(engineId))) {
       failures.push(...sources.map(({ source }) => `“${source.name.trim()}” wasn't added: the engine didn't start in time. Add it again from this page.`));
     } else {
       for (const { source, files, visibility, audience } of sources) {
         try {
           const created = await addContextSource(engineId, source);
+          added = true;
           rememberSourceRules(created.id, source.audience ?? []);
           if (files.length > 0) startUploads(engineId, created.id, files, visibility, audience);
         } catch (err) {
@@ -111,6 +113,7 @@ export function stageEngineSources(engineId: string, sources: StagedEngineSource
       }
     }
     holding.delete(engineId);
+    if (added) onAdded();
     set(engineId, { waiting: 0, failures });
   })();
 }

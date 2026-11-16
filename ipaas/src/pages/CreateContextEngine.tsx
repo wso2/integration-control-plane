@@ -18,13 +18,14 @@
 
 import { Alert, Box, Button, CircularProgress, PageContent, PageTitle, Stack } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, refreshEngineSources, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import {
   answerChoice,
   checkStagedFile,
@@ -86,6 +87,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const create = useCreateContextEngine();
+  const qc = useQueryClient();
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   // The roles "everyone who can query" stands for when files are shared; the creator's groups are unknown until the engine runs.
@@ -130,7 +132,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     const withRules = withSourceVisibilityRules(form.sources, everyone);
     create.mutate(toCreateInput({ ...form, sources: withRules }), {
       onSuccess: (engine) => {
-        stageEngineSources(engine.id, stagedEngineSources(withRules, everyone));
+        stageEngineSources(engine.id, stagedEngineSources(withRules, everyone), () => refreshEngineSources(qc, engine.id));
         allowLeave();
         navigate(contextEngineUrl(scope.org, engine.id));
       },
