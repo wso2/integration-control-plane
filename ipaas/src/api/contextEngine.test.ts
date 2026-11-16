@@ -150,7 +150,7 @@ describe('engines', () => {
     const engine = await getContextEngine(ENGINE);
 
     expect(engine.database).toBe('external');
-    expect(engine.storage).toMatchObject({ vector: { label: 'PostgreSQL + pgvector', detail: 'Your own PostgreSQL' }, relational: { detail: 'Your own PostgreSQL' }, graph: { detail: 'Engine managed · embedded' } });
+    expect(engine.storage).toMatchObject({ vector: { label: 'PostgreSQL + pgvector', detail: 'Your own PostgreSQL' }, relational: { detail: 'Your own PostgreSQL' }, graph: { detail: 'Engine managed · built in' } });
   });
 
   it('sends the own database with the create request', async () => {

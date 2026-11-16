@@ -19,6 +19,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
+  restoreCase,
   audienceMappingFromRules,
   sourceAsConfig,
   checkStagedFile,
@@ -102,6 +103,7 @@ import {
   nameStepBlocker,
   sanitizeStorage,
   storageSelectionError,
+  storageAndDatabaseBlocker,
   storageStepBlocker,
   summarizeStorage,
   toStoragePayload,
@@ -952,6 +954,15 @@ describe('own database', () => {
     expect(toBffCreateRequest(toCreateInput(completeForm()))).not.toHaveProperty('database');
     expect(toBffCreateRequest(toCreateInput({ ...completeForm(), database: ownDatabase() })).database).toEqual(toExternalDatabase(ownDatabase()));
   });
+
+  it('ignores the per-store choices, hidden for the own server, in the blocker and the request', () => {
+    const hidden = { ...defaultStorage(), graph: { mode: 'external' as const, uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } };
+    expect(storageStepBlocker(hidden)).not.toBeNull();
+    expect(storageAndDatabaseBlocker({ storage: hidden, database: ownDatabase() })).toBeNull();
+    expect(storageAndDatabaseBlocker({ storage: hidden, database: { ...ownDatabase(), mode: 'managed' } })).toBe(storageStepBlocker(hidden));
+    expect(isFormComplete({ ...completeForm(), storage: hidden, database: ownDatabase() })).toBe(true);
+    expect(toCreateInput({ ...completeForm(), storage: hidden, database: ownDatabase() }).storage).toEqual(defaultStorage());
+  });
 });
 
 function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDetail {
@@ -1005,10 +1016,11 @@ describe('first run', () => {
     expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent' });
   });
 
-  it('leaves the connect step done unless access is known to be off', () => {
-    expect(getStartedSteps(engineDetail({ access: undefined }), false)[2].state).toBe('done');
-    expect(getStartedSteps(engineDetail(), false)[2].state).toBe('todo');
-    expect(getStartedSteps(engineDetail({ access: { api: false, mcp: true } }), false)[2].state).toBe('done');
+  it('marks the connect step done once the API or MCP tab was opened, unless access is known to be off', () => {
+    expect(getStartedSteps(engineDetail({ access: undefined }), false, null, false, true)[2].state).toBe('done');
+    expect(getStartedSteps(engineDetail(), false, null, false, true)[2].state).toBe('todo');
+    expect(getStartedSteps(engineDetail({ access: { api: false, mcp: true } }), false, null, false, true)[2].state).toBe('done');
+    expect(getStartedSteps(engineDetail({ access: { api: true, mcp: true } }), false)[2].state).not.toBe('done');
   });
 });
 
@@ -1092,15 +1104,15 @@ describe('storage', () => {
   });
 
   it('summarizes each mode in two lines', () => {
-    expect(summarizeStorage('graph', { mode: 'managed' }, 'embedded')).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · embedded' });
+    expect(summarizeStorage('graph', { mode: 'managed' }, 'embedded')).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · built in' });
     expect(summarizeStorage('vector', { mode: 'infrastructure', serverId: 's1', serverName: 'support-vectors', database: 'context_vectors' }, 'embedded')).toEqual({ primary: 'support-vectors', secondary: 'pgvector · context_vectors' });
     expect(summarizeStorage('graph', { mode: 'external', uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'u', password: 'p' }, 'embedded')).toEqual({ primary: 'Neo4j', secondary: 'graph.internal:7687 · neo4j' });
   });
 
   it.each([
-    ['vector', 'embedded', 'LanceDB · embedded'],
-    ['relational', 'embedded', 'SQLite · embedded'],
-    ['graph', 'embedded', 'Kuzu · embedded'],
+    ['vector', 'embedded', 'LanceDB · built in'],
+    ['relational', 'embedded', 'SQLite · built in'],
+    ['graph', 'embedded', 'Kuzu · built in'],
     ['vector', 'postgres', 'PostgreSQL + pgvector · own server'],
     ['relational', 'postgres', 'PostgreSQL · own server'],
     ['graph', 'postgres', 'PostgreSQL · own server'],
@@ -1709,5 +1721,20 @@ describe('uploadSourceTitle', () => {
   it('says how many failed once nothing is running', () => {
     expect(uploadSourceTitle(of('searchable', 'failed'), 'Docs')).toBe('2 files uploaded to “Docs” · 1 failed');
     expect(uploadSourceTitle(of('searchable'), 'Docs')).toBe('1 file uploaded to “Docs”');
+  });
+});
+
+describe('restoreCase', () => {
+  it('takes the spelling from inside a sentence', () => {
+    expect(restoreCase('seeing ai', ['Apps such as Seeing AI describe scenes.'])).toBe('Seeing AI');
+  });
+
+  it('does not keep a capital that only opens a sentence', () => {
+    expect(restoreCase('vista spaces', ['Vista spaces are wide views.'])).toBe('vista spaces');
+    expect(restoreCase('vista spaces', ['Vista spaces are wide. We study vista spaces here.'])).toBe('vista spaces');
+  });
+
+  it('keeps a capital beyond the first letter even at a sentence start', () => {
+    expect(restoreCase('scene2audio', ['Scene2Audio converts images.'])).toBe('Scene2Audio');
   });
 });

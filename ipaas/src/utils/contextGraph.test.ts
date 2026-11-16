@@ -54,6 +54,7 @@ import {
   relationLink,
   relationOf,
   relationSentence,
+  mergeRelationTags,
   relationTags,
   ordinal,
   queryConflictLink,
@@ -121,6 +122,12 @@ describe('exploreModel', () => {
     const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all', sourceId: 'src_a' });
     expect(m.nodes.map((n) => n.label).sort()).toEqual(['failover.txt', 'gateway 7', 'kandy', 'pay.txt']);
     expect(m.links.map((l) => l.label).filter(Boolean)).toEqual(['fails over to']);
+  });
+
+  it('draws only the entity kinds the type filter keeps', () => {
+    const m = exploreModel(GRAPH, { records: false, entities: true, detail: 'all', includeKind: (kind) => kind === 'system' });
+    expect(m.nodes.map((n) => n.label)).toEqual(['gateway 7']);
+    expect(m.links).toHaveLength(0);
   });
 
   it('draws no link to a kind that is hidden', () => {
@@ -391,7 +398,12 @@ describe('links as selections', () => {
     expect(linkIndex(m, key)).toBe(relates);
     const conflict = m.links.findIndex((l) => l.kind === 'conflicts');
     expect(linkIndex(m, linkKey(m, conflict) as string)).toBe(conflict);
-    expect(linkKey(m, m.links.findIndex((l) => l.kind === 'mentions'))).toBeUndefined();
+    expect(
+      linkKey(
+        m,
+        m.links.findIndex((l) => l.kind === 'mentions'),
+      ),
+    ).toBeUndefined();
     // A node's key, and a link whose end is not drawn, name no link.
     expect(linkIndex(m, 'ent_g')).toBeUndefined();
     expect(linkIndex(m, 'link:relates\u001fnobody\u001fent_k\u001ffails over to')).toBeUndefined();
@@ -405,7 +417,13 @@ describe('links as selections', () => {
     expect(s.links).toEqual([link]);
     expect(s.tags).toEqual([{ link, text: 'fails over to', detail: 'Gateway 7 fails over to Kandy when it is down.', lit: true }]);
     expect(relationOf(m, GRAPH, link)).toBe(GRAPH.relations[0]);
-    expect(relationOf(m, GRAPH, m.links.findIndex((l) => l.kind === 'mentions'))).toBeUndefined();
+    expect(
+      relationOf(
+        m,
+        GRAPH,
+        m.links.findIndex((l) => l.kind === 'mentions'),
+      ),
+    ).toBeUndefined();
     expect(relationLink(m, { subjectId: 'ent_g', relation: 'owns', objectId: 'ent_k', recordNodeIds: [] })).toBeUndefined();
   });
 
@@ -631,5 +649,36 @@ describe('facts on the graph', () => {
     };
     expect(derivationSummary(result)).toEqual({ sentences: 2, passages: 2, entities: 3 });
     expect(derivationSummary({ evidence: result.evidence, facts: [] })).toEqual({ sentences: 0, passages: 3, entities: 0 });
+  });
+});
+
+describe('mergeRelationTags', () => {
+  const three: ContextGraph = {
+    ...GRAPH,
+    entities: [...GRAPH.entities.map((e) => ({ ...e })), { id: 'ent_app', name: 'seeing ai', kind: 'app', mentions: 1 }],
+    relations: ['ent_g', 'ent_k', 'ent_v'].map((id) => ({ subjectId: id, relation: 'knows app', objectId: 'ent_app', recordNodeIds: ['rec_ops'] })),
+  };
+
+  it('folds the links that carry one relationship into the selected node into one counted tag', () => {
+    const m = exploreModel(three, { records: false, entities: true, detail: 'all' });
+    const focus = m.index.get('ent_app') as number;
+    const tags = m.links.map((_, link) => ({ link, text: 'knows app' }));
+    const merged = mergeRelationTags(m, tags, focus);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].text).toBe('knows app · 3');
+  });
+
+  it('keeps a lone relationship and conflict tags as they are', () => {
+    const m = exploreModel(three, { records: false, entities: true, detail: 'all' });
+    const focus = m.index.get('ent_app') as number;
+    const merged = mergeRelationTags(
+      m,
+      [
+        { link: 0, text: 'knows app' },
+        { link: 1, text: 'contradicts', tone: 'conflict' },
+      ],
+      focus,
+    );
+    expect(merged.map((t) => t.text).sort()).toEqual(['contradicts', 'knows app']);
   });
 });

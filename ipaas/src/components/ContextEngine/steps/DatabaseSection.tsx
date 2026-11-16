@@ -67,7 +67,7 @@ export default function DatabaseSection({ value, onChange, managedHint }: Databa
 
   return (
     <RadioGroup value={value.mode} onChange={(_e, mode) => update({ mode: mode as EngineDatabaseKind })} aria-label="Database" sx={databaseChoiceSx}>
-      <Box sx={storageOptionSx(value.mode === 'managed')}>
+      <Box sx={storageOptionSx}>
         <FormControlLabel
           value="managed"
           control={<Radio size="small" />}
@@ -85,7 +85,7 @@ export default function DatabaseSection({ value, onChange, managedHint }: Databa
           }
         />
       </Box>
-      <Box sx={storageOptionSx(value.mode === 'external')}>
+      <Box sx={storageOptionSx}>
         <FormControlLabel
           value="external"
           control={<Radio size="small" />}

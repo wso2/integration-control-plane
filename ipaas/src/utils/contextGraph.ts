@@ -107,6 +107,8 @@ export interface ExploreFilter {
   keepNames?: Set<string>;
   /** Only records of this source, and what they name; absent for every source. */
   sourceId?: string;
+  /** Draw only the entities whose kind passes, as the type filter picks them; absent draws every kind. */
+  includeKind?: (kind: string | undefined) => boolean;
 }
 
 /** Key entities, the default view: named in more than one chunk, or in at least `KEY_DEGREE` relationships. Most entities are named once and linked once, and drawing them all hides the rest. */
@@ -161,6 +163,7 @@ export function exploreModel(graph: ContextGraph, filter: ExploreFilter, recordL
   if (filter.entities) {
     for (const entity of graph.entities) {
       if (filter.sourceId && !named.has(entity.id)) continue;
+      if (filter.includeKind && !filter.includeKind(entity.kind)) continue;
       if (filter.detail === 'key' && !isKeyEntity(entity.mentions, degree.get(entity.id) ?? 0) && !filter.keepNames?.has(entity.name.toLowerCase())) continue;
       const group = home(entity.id);
       addNode(m, {
@@ -688,6 +691,29 @@ export function linkTag(m: GraphModel, link: number, lit = false): LinkTag {
 /** The relationship text for each lit relationship link, so a selected node's relationships read off the canvas. Document lines have no text. */
 export function relationTags(m: GraphModel, selection: Selection): LinkTag[] {
   return selection.links.filter((i) => (m.links[i].kind === 'relates' || m.links[i].kind === 'conflicts') && !!m.links[i].label).map((i) => linkTag(m, i));
+}
+
+/**
+ * A selected node's tags with the repeats folded: the links that carry the same
+ * relationship into the node, or out of it, share one tag with their count, so
+ * three people who "knows app" it read "knows app · 3" once. Conflict tags and
+ * links that do not touch the node stay one each.
+ */
+export function mergeRelationTags(m: GraphModel, tags: LinkTag[], focus: number): LinkTag[] {
+  const groups = new Map<string, LinkTag[]>();
+  const rest: LinkTag[] = [];
+  for (const tag of tags) {
+    const link = m.links[tag.link];
+    const side = link?.target === focus ? 'in' : link?.source === focus ? 'out' : undefined;
+    if (tag.tone === 'conflict' || !side) {
+      rest.push(tag);
+      continue;
+    }
+    const key = `${side}\u0000${tag.text}`;
+    groups.set(key, [...(groups.get(key) ?? []), tag]);
+  }
+  const folded = [...groups.values()].map((group) => (group.length === 1 ? group[0] : { link: group[0].link, text: `${group[0].text} · ${group.length}`, ...(group[0].lit ? { lit: true } : {}) }));
+  return [...rest, ...folded];
 }
 
 // ── Links as selections ─────────────────────────────────────────────────────

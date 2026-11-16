@@ -481,7 +481,7 @@ export function isNameStepValid(name: string, description: string): boolean {
 }
 
 export function isFormComplete(form: ContextEngineForm): boolean {
-  return isNameStepValid(form.name, form.description) && isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null && databaseStepBlocker(form.database) === null;
+  return isNameStepValid(form.name, form.description) && isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageAndDatabaseBlocker(form) === null;
 }
 
 /** Providers the engine cannot be configured with yet: offered, but disabled, in the wizard. */
@@ -496,7 +496,9 @@ export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput
   if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer language model configuration is incomplete.');
   const answers = { enabled: form.answersEnabled, model: form.answersEnabled ? form.answerLlm : null };
   const database = form.database.mode === 'external' ? toExternalDatabase(form.database) : undefined;
-  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage, ...(database ? { database } : {}) };
+  // On the user's own server every store lives there, so the per-store choices hidden for it are not sent.
+  const storage = database ? defaultStorage() : form.storage;
+  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage, ...(database ? { database } : {}) };
 }
 
 /** Whether the wizard holds anything worth keeping. */
@@ -652,7 +654,8 @@ export function sourceTypeName(type: string): string {
 }
 
 /** One-line description of where a source points, for the review step and overview. */
-export function summarizeSource(source: ContextSourceConfig): string {
+/** One line describing a source's key settings. `labelled` prefixes each value with its field label, e.g. "Folder ID: 1_KOR…". */
+export function summarizeSource(source: ContextSourceConfig, { labelled = false }: { labelled?: boolean } = {}): string {
   const connector = connectorFor(source.type);
   if (!connector) return 'Unknown connector';
   if (connector.id === 'upload') {
@@ -670,7 +673,7 @@ export function summarizeSource(source: ContextSourceConfig): string {
         const n = splitUrls(value).length;
         return `${n} URL${n === 1 ? '' : 's'}`;
       }
-      return value;
+      return labelled && def ? `${def.label}: ${value}` : value;
     })
     .filter(Boolean);
   return parts.length ? parts.join(' · ') : 'Not configured yet';
@@ -782,6 +785,11 @@ export function databaseStepBlocker(choice: DatabaseChoice): string | null {
   return Object.values(databaseFieldErrors(choice))[0] ?? null;
 }
 
+/** What blocks the Storage step: the own-server details on the user's own server, where the per-store choices are hidden and every store lives, or else the per-store choices. */
+export function storageAndDatabaseBlocker(form: Pick<ContextEngineForm, 'storage' | 'database'>): string | null {
+  return form.database.mode === 'external' ? databaseStepBlocker(form.database) : storageStepBlocker(form.storage);
+}
+
 /** The own-server details as the BFF takes them. Call after {@link databaseStepBlocker} returns null. */
 export function toExternalDatabase(choice: DatabaseChoice): ExternalDatabase {
   return {
@@ -816,7 +824,7 @@ export function sanitizeDatabaseChoice(raw: unknown): DatabaseChoice {
 /** The engine managed store of one kind: embedded in the engine, or on the engine's own PostgreSQL server. */
 export function managedStore(kind: StorageKind, server: EngineManagedServer): { name: string; placement: string } {
   const info = STORAGE_BACKEND_BY_KIND[kind];
-  return server === 'postgres' ? { name: info.serverName, placement: 'own server' } : { name: info.managedName, placement: 'embedded' };
+  return server === 'postgres' ? { name: info.serverName, placement: 'own server' } : { name: info.managedName, placement: 'built in' };
 }
 
 /** Two lines describing where a store lives, for the review step and overview. */
@@ -1470,11 +1478,12 @@ export function unchangedDelivery(previous: Pick<UploadEntry, 'contentHash' | 'a
  * Indexing happens as connectors deliver, so the first step completes from
  * source progress.
  */
-export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, progress: ContextEngineProgressSummary | null = null, uploadFirst = false): GetStartedStep[] {
+export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, progress: ContextEngineProgressSummary | null = null, uploadFirst = false, connectViewed = false): GetStartedStep[] {
   const done: Record<GetStartedStep['id'], boolean> = {
     index: !!progress && progress.processed > 0 && progress.active === 0,
     ask: asked,
-    publish: !engine.access || engine.access.api || engine.access.mcp,
+    // REST and MCP are on from the start, so that alone says nothing; done once the user has opened the API or MCP tab.
+    publish: connectViewed && (!engine.access || engine.access.api || engine.access.mcp),
     grant: engine.queryRoles.length > 0,
   };
   const n = engine.sources.length;
@@ -1486,7 +1495,15 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
       : {
           id: 'index',
           title: 'Index your sources',
-          description: uploadOnly ? (progress ? `${progressHeadline(progress)}.` : 'Files become searchable after upload.') : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
+          // Once done, the step only needs the result; the explanation is for while it is still running.
+          description:
+            done.index && progress
+              ? `${plural(progress.processed, 'source')} processed.`
+              : uploadOnly
+                ? progress
+                  ? `${progressHeadline(progress)}.`
+                  : 'Files become searchable after upload.'
+                : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
         },
     { id: 'ask', title: 'Ask it something', description: 'Try a question in the Playground.' },
     { id: 'publish', title: 'Connect an agent', description: 'Call it from agents over REST or MCP.' },
@@ -2067,4 +2084,116 @@ export function buildMcpClientConfigs(baseUrl: string, engineName: string): McpC
     ...c,
     json: JSON.stringify(c.id === 'vscode' ? { servers: { [key]: { type: 'http', ...server } } } : { mcpServers: { [key]: server } }, null, 2),
   }));
+}
+
+// ── Passage display ─────────────────────────────────────────────────────────
+
+/** A record id that names nothing a person would recognise, e.g. a Drive file id, rather than a file name. */
+export function isOpaqueRecordId(recordId: string): boolean {
+  const last = recordId.split('/').pop() ?? recordId;
+  return /^[A-Za-z0-9_-]{20,}$/.test(last);
+}
+
+/** Undo PDF line-break hyphenation for display: "Condi- tion" reads "Condition". Real hyphens ("open-ear") have no space after them. */
+export function tidyPassage(text: string): string {
+  return text.replace(/(\p{Ll})[-\u00AD\u2010\u2011]\s+(\p{Ll})/gu, '$1$2');
+}
+
+/**
+ * An entity name as the source writes it. The graph stores names lower-cased ("scene2audio"); a
+ * case-insensitive match in the passages gives back the source's own spelling ("Scene2Audio").
+ * A match that opens a sentence only says the sentence starts there, so one inside a sentence wins;
+ * when the name only ever opens sentences, a capital first letter alone is not kept ("Vista spaces"
+ * stays "vista spaces"), but any other capital is ("Seeing AI").
+ */
+export function restoreCase(name: string, passages: string[]): string {
+  if (!name || name !== name.toLowerCase()) return name;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'giu');
+  let opening: string | undefined;
+  for (const text of passages) {
+    for (const m of text.matchAll(re)) {
+      const before = text.slice(0, m.index).trimEnd();
+      if (before === '' || /[.!?:;•]$/.test(before)) opening ??= m[0];
+      else return m[0];
+    }
+  }
+  if (opening === undefined) return name;
+  return opening.slice(1) === name.slice(1) ? name : opening;
+}
+
+const QUERY_STOPWORDS = new Set([
+  'what',
+  'which',
+  'when',
+  'where',
+  'who',
+  'whom',
+  'whose',
+  'why',
+  'how',
+  'does',
+  'did',
+  'do',
+  'is',
+  'are',
+  'was',
+  'were',
+  'the',
+  'this',
+  'that',
+  'these',
+  'those',
+  'they',
+  'them',
+  'their',
+  'about',
+  'with',
+  'from',
+  'into',
+  'have',
+  'has',
+  'had',
+  'for',
+  'and',
+  'any',
+  'can',
+  'could',
+  'would',
+  'should',
+  'there',
+  'many',
+  'much',
+]);
+
+/** The words of a question worth finding in a passage: four letters or more, not question words. */
+export function queryTerms(question: string): string[] {
+  const words = question.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? [];
+  return [...new Set(words.filter((w) => !QUERY_STOPWORDS.has(w)))];
+}
+
+/**
+ * The part of a passage worth showing first: from the sentence holding the first word of the question, so a
+ * clamped excerpt shows the match rather than the chunk's opening lines. Starts with an ellipsis when it skips text.
+ */
+export function passageExcerpt(passage: string, terms: string[]): string {
+  const text = tidyPassage(passage);
+  if (!terms.length) return text;
+  const lower = text.toLowerCase();
+  const hits = terms.map((t) => lower.indexOf(t)).filter((i) => i >= 0);
+  if (!hits.length) return text;
+  const first = Math.min(...hits);
+  if (first < 120) return text;
+  const period = text.lastIndexOf('. ', first);
+  const newline = text.lastIndexOf('\n', first);
+  // The character after the boundary: two past a full stop and its space, one past a line break.
+  const stop = Math.max(period >= 0 ? period + 2 : -1, newline >= 0 ? newline + 1 : -1);
+  const near = stop > 0 && first - stop < 200;
+  // From the sentence start when it is near; otherwise a little before the match, moved to a word boundary.
+  let start = near ? stop : Math.max(0, first - 60);
+  if (!near) {
+    const space = text.indexOf(' ', start);
+    if (space >= 0 && space < first) start = space + 1;
+  }
+  return `…${text.slice(start).trimStart()}`;
 }

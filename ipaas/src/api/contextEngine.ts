@@ -408,9 +408,9 @@ const toExposure = (raw: RawEngineConfig | null, access: ContextEngineAccess | u
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
-  lancedb: { label: 'LanceDB', detail: 'Engine managed · embedded' },
-  sqlite: { label: 'SQLite', detail: 'Engine managed · embedded' },
-  kuzu: { label: 'Kuzu', detail: 'Engine managed · embedded' },
+  lancedb: { label: 'LanceDB', detail: 'Engine managed · built in' },
+  sqlite: { label: 'SQLite', detail: 'Engine managed · built in' },
+  kuzu: { label: 'Kuzu', detail: 'Engine managed · built in' },
   // PostgreSQL is the engine's own server, which the BFF creates with it, unless the user brought one (see toStorage).
   pgvector: { label: 'PostgreSQL + pgvector', detail: 'Engine managed · own server' },
   postgres: { label: 'PostgreSQL', detail: 'Engine managed · own server' },

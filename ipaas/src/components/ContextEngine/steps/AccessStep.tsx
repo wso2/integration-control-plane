@@ -69,9 +69,7 @@ export default function AccessStep({ orgHandle, roles, onChange }: AccessStepPro
           Failed to load organization roles.
         </Alert>
       ) : all.length === 0 ? (
-        <Alert severity="info" variant="outlined">
-          This organization has no roles yet. You can continue and grant access later from the engine's Access tab.
-        </Alert>
+        <Alert severity="info">This organization has no roles yet. You can continue and grant access later from the engine's Access tab.</Alert>
       ) : (
         <>
           <ListingTable.Container elevation={0} sx={tableSx}>

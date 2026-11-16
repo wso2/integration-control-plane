@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography, Paper } from '@wso2/oxygen-ui';
 import { EyeOff, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
+import { useAddContextSource, useAskedFlag, useConnectViewedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { useCan } from '../../../hooks/useCan';
 import { Scopes } from '../../../constants/permissions';
@@ -30,12 +30,13 @@ import { HttpError } from '../../../types/http';
 import GetStartedChecklist from './GetStartedChecklist';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourcesProgressCard from './SourcesProgressCard';
+import SectionCard from '../SectionCard';
 import FilesDrawer from '../files/FilesDrawer';
 import EditSourceDrawer from './EditSourceDrawer';
 import EditModelsDrawer from './EditModelsDrawer';
 import AccessSwitch from './AccessSwitch';
 import SourceDrawer from '../SourceDrawer';
-import { deleteCardSx, mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
+import { deleteCardSx, exposureButtonSx, mutedSx, summaryRowSx } from '../styles';
 import type { ContextEngineAccess, ContextEngineDetail, ContextEngineTabKey, ContextModelSummary, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
@@ -54,15 +55,9 @@ interface OverviewTabProps {
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }): JSX.Element {
   return (
-    <Box sx={summaryCardSx}>
-      <Box sx={summaryCardHeaderSx}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {title}
-        </Typography>
-        {action}
-      </Box>
+    <SectionCard title={title} action={action} fill>
       {children}
-    </Box>
+    </SectionCard>
   );
 }
 
@@ -94,7 +89,8 @@ function ModelRow({ label, model, locked, action }: { label: string; model: stri
   );
 }
 
-const modelText = (kind: 'embedding' | 'llm', m: ContextModelSummary | null | undefined, fallback: string): string => (m ? `${modelProviderName(kind, m.provider)} · ${m.model}` : fallback);
+// The provider leads the line, so "openai/gpt-5-mini" shows as "gpt-5-mini".
+const modelText = (kind: 'embedding' | 'llm', m: ContextModelSummary | null | undefined, fallback: string): string => (m ? `${modelProviderName(kind, m.provider)} · ${m.model.replace(/^[^/]+\//, '')}` : fallback);
 
 function ModelAction({ label, onClick }: { label: string; onClick: () => void }): JSX.Element {
   return (
@@ -108,9 +104,9 @@ function ModelAction({ label, onClick }: { label: string; onClick: () => void })
 function ExposureRow({ engine, surface, label, disabledReason, onOpen }: { engine: ContextEngineDetail; surface: keyof ContextEngineAccess; label: string; disabledReason?: string; onOpen: () => void }): JSX.Element {
   return (
     <Box sx={summaryRowSx}>
-      <Link component="button" type="button" variant="body2" onClick={onOpen}>
+      <Button size="small" variant="text" onClick={onOpen} sx={exposureButtonSx}>
         {label}
-      </Link>
+      </Button>
       {engine.access ? (
         <AccessSwitch engineId={engine.id} access={engine.access} surface={surface} disabledReason={disabledReason} />
       ) : (
@@ -137,13 +133,14 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   };
   const can = useCan();
   const canManage = !readOnly && can(Scopes.CONFIG_MANAGE);
-  const { asked } = useAskedFlag(engine.id);
+  const { asked } = useAskedFlag(engine.id, engine.createdAt);
+  const { connectViewed } = useConnectViewedFlag(engine.id, engine.createdAt);
   const progress = useContextEngineProgress(readOnly ? '' : engine.id);
   // Adding a source reuses the wizard's drawer; the session key remounts it fresh each time.
   const [addSession, setAddSession] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [editSource, setEditSource] = useState<ContextSource | null>(null);
-  const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
+  const [sourceNotice, setSourceNotice] = useState<{ severity: 'success' | 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
   const permissions = useContextPermissions(readOnly ? '' : engine.id);
   const llmModels = engine.models.llm ? { ...engine.models, llm: engine.models.llm } : null;
@@ -180,6 +177,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
           startUploads(engine.id, created.id, files, visibility, visibilityTags(visibility, everyone));
           openFiles(created);
         }
+        setSourceNotice({ severity: 'success', message: `Source '${created.name}' added successfully.` });
       },
       onError: (e) => {
         const forbidden = e instanceof HttpError && e.status === 403;
@@ -198,7 +196,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const uploadSources = engine.sources.filter((s) => s.type === 'upload');
   const uploadFirst = uploadSources.length > 0 && uploadSources.length === engine.sources.length && (!progressSummary || (progressSummary.processed === 0 && progressSummary.active === 0));
   // 'Grant access' step hidden along with the Access tab: roles can't be granted from the UI, so it would never complete.
-  const steps = getStartedSteps(engine, asked, progressSummary, uploadFirst).filter((s) => s.id !== 'grant');
+  const steps = getStartedSteps(engine, asked, progressSummary, uploadFirst, connectViewed).filter((s) => s.id !== 'grant');
   const allDone = steps.every((s) => s.state === 'done');
 
   const onChecklistAction = (id: GetStartedStepId) => {
@@ -214,12 +212,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
       {!allDone && !readOnly && <GetStartedChecklist steps={steps} onAction={onChecklistAction} />}
 
       {sourceNotice && (
-        <Alert
-          severity={sourceNotice.severity}
-          variant="outlined"
-          onClose={() => setSourceNotice(null)}
-          action={sourceNotice.forbidden && sourceNotice.retry ? <OwnerAccessButton engineId={engine.id} onGranted={sourceNotice.retry} /> : undefined}
-          sx={{ mb: 2 }}>
+        <Alert severity={sourceNotice.severity} onClose={() => setSourceNotice(null)} action={sourceNotice.forbidden && sourceNotice.retry ? <OwnerAccessButton engineId={engine.id} onGranted={sourceNotice.retry} /> : undefined} sx={{ mb: 2 }}>
           {sourceNotice.message}
         </Alert>
       )}
@@ -330,17 +323,23 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             <ExposureRow engine={engine} surface="api" label="REST API" disabledReason={accessDisabledReason} onOpen={() => onGoTab('api')} />
             <ExposureRow engine={engine} surface="mcp" label="MCP server" disabledReason={accessDisabledReason} onOpen={() => onGoTab('mcp')} />
             <Box sx={summaryRowSx}>
-              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('playground')}>
+              <Button size="small" variant="text" onClick={() => onGoTab('playground')} sx={exposureButtonSx}>
                 Test playground
-              </Link>
+              </Button>
               <Chip size="small" variant="outlined" label="Always on" />
             </Box>
+            {(engine.exposure.api || engine.exposure.mcp) && (
+              // Both are on from the start, so say who can reach the content rather than leave it implied by a chip.
+              <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1.5 }}>
+                {engine.exposure.api && engine.exposure.mcp ? 'REST API and MCP server are on.' : engine.exposure.api ? 'REST API is on.' : 'MCP server is on.'} Anyone with access can query this engine.
+              </Typography>
+            )}
           </Card>
         </Grid>
 
         {onRequestDelete && (
           <Grid size={{ xs: 12 }}>
-            <Box sx={deleteCardSx}>
+            <Paper variant="outlined" sx={deleteCardSx}>
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                   Delete engine
@@ -352,7 +351,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
               <Button variant="outlined" color="error" onClick={onRequestDelete} sx={{ flexShrink: 0 }}>
                 Delete engine
               </Button>
-            </Box>
+            </Paper>
           </Grid>
         )}
       </Grid>
@@ -370,6 +369,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
           queryRoles={engine.queryRoles}
           open
           onClose={() => setEditSource(null)}
+          onSaved={(name) => setSourceNotice({ severity: 'success', message: `Source '${name}' updated successfully.` })}
         />
       )}
     </>

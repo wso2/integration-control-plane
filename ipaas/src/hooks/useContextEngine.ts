@@ -49,10 +49,20 @@ import {
   updateContextModels,
   updateContextSource,
 } from '../api/contextEngine';
-import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
-import { everyoneRoles, fromDraft, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, toDraft, withLastKnownFacets } from '../utils/contextEngine';
+import {
+  CONTEXT_ENGINE_ASKED_KEY_PREFIX,
+  CONTEXT_ENGINE_CONNECT_KEY_PREFIX,
+  CONTEXT_OWNER_ACTIONS,
+  DELETION_POLL_MS,
+  ENGINE_STATUS_POLL_MS,
+  PROGRESS_POLL_ACTIVE_MS,
+  PROGRESS_POLL_IDLE_MS,
+  SUMMARY_CONCURRENCY,
+} from '../constants/contextEngine';
+import { everyoneRoles, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import { clearQuestions } from './contextQuestions';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -289,6 +299,7 @@ export function useDeleteContextEngine() {
   return useMutation({
     mutationFn: (engineId: string) => deleteContextEngine(engineId),
     onSuccess: (_result, engineId) => {
+      forgetEngineBrowserState(engineId);
       qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
       qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
     },
@@ -432,13 +443,8 @@ export function useUploadAudience(orgHandle: string, queryRoles: string[], engin
   return { roles: roles.data ?? [], rolesLoading: roles.isLoading, rolesFailed: roles.isError, roleNames, myGroups, everyone };
 }
 
-// ── Local state that outlives a page: wizard draft, first-run flags ──
+// ── Local state that outlives a page: first-run flags ──
 
-/**
- * The create-wizard draft for an org, kept in session storage with secrets
- * stripped. `restore()` is meant for a reducer initializer; `save` and `clear`
- * are stable so a sync effect can depend on them.
- */
 // Web storage can be unavailable (private mode, blocked site data, a sandboxed frame), and then
 // even reading it throws. The wizard and the engine page must still render, so these never throw.
 
@@ -459,37 +465,51 @@ function writeStorage(storage: () => Storage, key: string, value: string | null)
   }
 }
 
-const session = () => sessionStorage;
 const local = () => localStorage;
 
-export function useContextEngineDraft(orgHandle: string) {
-  const key = `${CONTEXT_ENGINE_DRAFT_KEY_PREFIX}${orgHandle}`;
-  const [savedAt, setSavedAt] = useState<string | null>(() => fromDraft(readStorage(session, key))?.savedAt ?? null);
-  const restore = useCallback((): ContextEngineForm | null => fromDraft(readStorage(session, key))?.form ?? null, [key]);
-  const save = useCallback(
-    (form: ContextEngineForm) => {
-      const now = new Date().toISOString();
-      writeStorage(session, key, JSON.stringify(toDraft(form, now)));
-      setSavedAt(now);
-    },
-    [key],
-  );
-  const clear = useCallback(() => {
-    writeStorage(session, key, null);
-    setSavedAt(null);
+/** Whether this user has asked the engine anything yet — drives the "Ask it something" checklist step. */
+/**
+ * A per-engine flag kept in this browser. Keyed by the engine's id and its creation time: the console runs one
+ * engine instance with a fixed id, so without the time a flag set on a deleted engine would carry over to the next.
+ */
+function useEngineFlag(prefix: string, engineId: string, createdAt = '') {
+  const key = `${prefix}${engineId}${createdAt ? `:${createdAt}` : ''}`;
+  // Held with its key, so a new key (another engine, or one created again) reads its own flag, not the last one's.
+  const [held, setHeld] = useState(() => ({ key, value: readStorage(local, key) === 'true' }));
+  const value = held.key === key ? held.value : readStorage(local, key) === 'true';
+  const mark = useCallback(() => {
+    writeStorage(local, key, 'true');
+    setHeld({ key, value: true });
   }, [key]);
-  return { savedAt, restore, save, clear };
+  return [value, mark] as const;
 }
 
-/** Whether this user has asked the engine anything yet — drives the "Ask it something" checklist step. */
-export function useAskedFlag(engineId: string) {
-  const key = `${CONTEXT_ENGINE_ASKED_KEY_PREFIX}${engineId}`;
-  const [asked, setAsked] = useState(() => readStorage(local, key) === 'true');
-  const markAsked = useCallback(() => {
-    writeStorage(local, key, 'true');
-    setAsked(true);
-  }, [key]);
+/**
+ * Drop what this browser kept about a deleted engine: its recent questions and its getting-started flags.
+ * The flags are keyed by the engine's id and creation time, so every key under the id is removed.
+ */
+function forgetEngineBrowserState(engineId: string): void {
+  clearQuestions(engineId);
+  try {
+    const prefixes = [CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX].map((p) => `${p}${engineId}`);
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (k && prefixes.some((p) => k === p || k.startsWith(`${p}:`))) localStorage.removeItem(k);
+    }
+  } catch {
+    // Storage unavailable: nothing was kept to clear.
+  }
+}
+
+export function useAskedFlag(engineId: string, createdAt?: string) {
+  const [asked, markAsked] = useEngineFlag(CONTEXT_ENGINE_ASKED_KEY_PREFIX, engineId, createdAt);
   return { asked, markAsked };
+}
+
+/** Whether the user has opened this engine's API or MCP tab, for the Connect an agent step. */
+export function useConnectViewedFlag(engineId: string, createdAt?: string) {
+  const [connectViewed, markConnectViewed] = useEngineFlag(CONTEXT_ENGINE_CONNECT_KEY_PREFIX, engineId, createdAt);
+  return { connectViewed, markConnectViewed };
 }
 
 // ── Integrations and API keys ──

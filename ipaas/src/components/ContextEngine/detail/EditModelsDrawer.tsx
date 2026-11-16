@@ -172,7 +172,7 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
 
       <Box component="footer" sx={footerSx}>
         {failure && (
-          <Alert severity="error" variant="outlined">
+          <Alert severity="error">
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {failure.title}
             </Typography>

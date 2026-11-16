@@ -38,14 +38,14 @@ export default function NameStep({ name, description, onNameChange, onDescriptio
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
-        Name
+        Define engine
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
         Give the engine a name your team will recognise.
       </Typography>
 
       <Stack sx={fieldStackSx}>
-        <TextField
+        <TextField labelPlacement="top"
           label="Name"
           required
           fullWidth
@@ -58,7 +58,7 @@ export default function NameStep({ name, description, onNameChange, onDescriptio
           sx={REQUIRED_FIELD_SX}
           inputProps={{ 'aria-label': 'Engine name' }}
         />
-        <TextField
+        <TextField labelPlacement="top"
           label="Description"
           fullWidth
           multiline
