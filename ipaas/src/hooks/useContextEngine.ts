@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import {
   addContextSource,
@@ -44,7 +44,6 @@ import {
   queryContextEngine,
   revokeContextApiKey,
   setContextEngineAccess,
-  setUpContextEngine,
   updateContextModels,
   updateContextSource,
 } from '../api/contextEngine';
@@ -61,7 +60,7 @@ import {
 import { everyoneRoles, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { clearQuestions } from './contextQuestions';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -153,7 +152,7 @@ export function useSeenOnScreen<T extends Element>(): [(el: T | null) => void, b
 /** Shown while an engine restarts onto new models and its old pod still runs. */
 export const ENGINE_RESTARTING_REASON = 'Restarting with the new models';
 
-/** One engine; checked again while it starts, restarts or is being deleted. A restart shows the engine as starting until a pod that started after it runs. */
+/** One engine; checked again while it starts, restarts, is being set up or is being deleted. A restart shows the engine as starting until a pod that started after it runs. */
 export function useContextEngine(engineId: string, { pollOnError = false }: { pollOnError?: boolean } = {}) {
   const qc = useQueryClient();
   return useQuery({
@@ -167,7 +166,7 @@ export function useContextEngine(engineId: string, { pollOnError = false }: { po
       const engine = query.state.data;
       if (engine?.state === 'deleting') return DELETION_POLL_MS;
       if (engine?.state === 'ready' && isRestartPending(engine.startedAt, engine.restartedAt)) return ENGINE_STATUS_POLL_MS;
-      return engine && TRANSIENT_STATES.has(engine.state) ? ENGINE_STATUS_POLL_MS : false;
+      return engine && (TRANSIENT_STATES.has(engine.state) || engine.setup?.status === 'pending') ? ENGINE_STATUS_POLL_MS : false;
     },
   });
 }
@@ -275,18 +274,6 @@ export function useCreateContextEngine() {
   });
 }
 
-/** Set up an engine the wizard created, once it runs: grants and sources. */
-export function useSetUpContextEngine() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ engineId, input }: { engineId: string; input: ContextEngineSetupInput }) => setUpContextEngine(engineId, input),
-    onSuccess: (_result, { engineId }) => {
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'summary', engineId] });
-    },
-  });
-}
-
 /** Delete an engine; the list and page show it as deleting until it is gone. */
 export function useDeleteContextEngine() {
   const qc = useQueryClient();
@@ -305,14 +292,17 @@ export function useAddContextSource(engineId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (source: ContextSourceConfig) => addContextSource(engineId, source),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'summary', engineId] });
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'integrations', engineId] });
-      // The new source has no progress row until the next poll; fetch it now so the card never says "hidden".
-      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'progress', engineId] });
-    },
+    onSuccess: () => refreshEngineSources(qc, engineId),
   });
+}
+
+/** Refetch what lists an engine's sources after one is added. */
+export function refreshEngineSources(qc: QueryClient, engineId: string): void {
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'summary', engineId] });
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'integrations', engineId] });
+  // The new source has no progress row until the next poll; fetch it now so the card never says "hidden".
+  qc.invalidateQueries({ queryKey: [ROOT_KEY, 'progress', engineId] });
 }
 
 export function useUpdateContextSource(engineId: string) {

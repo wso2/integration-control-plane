@@ -48,7 +48,7 @@ interface ConnectorFormProps {
 }
 
 /** A field whose value is the text contents of an uploaded file (e.g. an RML mapping). The file name is kept only for display this session; a restored draft still has the contents. */
-function FileField({ def, value, onChange }: { def: SourceFieldDef; value: string; onChange: (value: string) => void }): JSX.Element {
+function FileField({ def, value, onChange, error }: { def: SourceFieldDef; value: string; onChange: (value: string) => void; error?: string }): JSX.Element {
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   // The reader for the latest pick; a superseded read's result or error is ignored.
@@ -98,9 +98,9 @@ function FileField({ def, value, onChange }: { def: SourceFieldDef; value: strin
         </Button>
         {value && <Chip label={name || 'File uploaded'} size="small" onDelete={clear} />}
       </Stack>
-      {def.helper && (
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-          {def.helper}
+      {(error || def.helper) && (
+        <Typography variant="caption" color={error ? 'error' : 'text.secondary'} sx={{ display: 'block', mt: 0.75 }}>
+          {error || def.helper}
         </Typography>
       )}
     </Box>
@@ -113,7 +113,7 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
   if (def.kind === 'secret') return <SecretField label={def.label} required={def.required} value={value} onChange={onChange} error={error || undefined} />;
   if (def.kind === 'tables') return <TablesField value={value} onChange={onChange} />;
   if (def.kind === 'objects') return <ObjectsField value={value} onChange={onChange} />;
-  if (def.kind === 'file') return <FileField def={def} value={value} onChange={onChange} />;
+  if (def.kind === 'file') return <FileField def={def} value={value} onChange={onChange} error={error || undefined} />;
   const select = def.kind === 'select';
   const multiline = def.kind === 'urls' || def.kind === 'multiline';
   return (

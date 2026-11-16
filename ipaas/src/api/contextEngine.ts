@@ -27,21 +27,9 @@
  * Reads that hit a missing route degrade to an empty section so the detail page still renders.
  */
 
-import { CONTEXT_ENGINE_ID, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../constants/contextEngine';
-import {
-  audienceMappingFromRules,
-  deliveryIdentity,
-  engineMessage,
-  integrationTypeFor,
-  isRestartPending,
-  ownerGrantId,
-  roleGrantId,
-  rolesFromGrants,
-  summarizeEngineProgress,
-  toBffCreateRequest,
-  toIntegrationRequest,
-  toSourceRegistration,
-} from '../utils/contextEngine';
+import { CONTEXT_ENGINE_ID, CREATE_TOKEN_MIN_VALIDITY_MS } from '../constants/contextEngine';
+import { refreshTokenExpiringWithin } from '../auth';
+import { audienceMappingFromRules, deliveryIdentity, integrationTypeFor, isRestartPending, rolesFromGrants, summarizeEngineProgress, toBffCreateRequest, toIntegrationRequest, toSourceRegistration } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
 import { bff, items, seg, type ListResponse } from './_client';
 import { asHttpError, enginePath, engineRequest, engineUpload, forgetConsoleAccess } from './_contextEngineAccess';
@@ -54,8 +42,7 @@ import type {
   ContextEngineModels,
   ContextModelSummary,
   ContextEngineProgress,
-  ContextEngineSetupInput,
-  ContextEngineSetupResult,
+  ContextEngineSetup,
   ContextEngineState,
   ContextEngineSummary,
   ContextEvidence,
@@ -242,6 +229,7 @@ interface BffEngine {
   startedAt?: string;
   restartedAt?: string;
   answerOwnKey?: boolean;
+  setup?: { status: string; warnings?: string[] };
 }
 
 interface BffIntegration {
@@ -310,6 +298,8 @@ interface RawEngineProgress {
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
+const SETUP_STATUSES: ReadonlySet<string> = new Set(['pending', 'done', 'failed', 'interrupted']);
+
 const ENGINE_STATES: Record<string, ContextEngineState> = { provisioning: 'provisioning', starting: 'starting', running: 'ready', failed: 'failed', deleting: 'deleting' };
 
 const toEngine = (raw: BffEngine): ContextEngine => ({
@@ -324,6 +314,7 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
   ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
   ...(raw.restartedAt ? { restartedAt: raw.restartedAt } : {}),
+  ...(raw.setup && SETUP_STATUSES.has(raw.setup.status) ? { setup: { status: raw.setup.status as ContextEngineSetup['status'], warnings: raw.setup.warnings ?? [] } } : {}),
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -556,7 +547,6 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
   };
 }
 
-/** Ask the BFF for a new engine. It starts provisioning; {@link setUpContextEngine} runs once it is ready. */
 interface BffManagedStorage {
   server?: string;
 }
@@ -569,8 +559,11 @@ export async function getEngineManagedServer(): Promise<EngineManagedServer> {
   return toEngineManagedServer(await viaBff(() => bff.get<BffManagedStorage>('/context-engine-storage')));
 }
 
+/** Ask the BFF for a new engine. It starts provisioning, and the BFF adds the request's connector sources once it runs. */
 export async function createContextEngine(input: CreateContextEngineInput): Promise<ContextEngine> {
-  return toEngine(await viaBff(() => bff.post<BffEngine>('/context-engines', toBffCreateRequest(input))));
+  const request = toBffCreateRequest(input);
+  if (request.setup) await refreshTokenExpiringWithin(CREATE_TOKEN_MIN_VALIDITY_MS);
+  return toEngine(await viaBff(() => bff.post<BffEngine>('/context-engines', request)));
 }
 
 /** Register a source: on the engine for one the browser feeds, through the BFF for one an integration runs. */
@@ -581,37 +574,6 @@ async function registerSource(engineId: string, source: ContextSourceConfig): Pr
   const raw = await viaBff(() => bff.post<BffIntegration>(`${enginePath(engineId)}/integrations`, request));
   if (!raw.sourceId) throw new Error('The integration was added, but its source is not registered yet.');
   return { id: raw.sourceId, name: request.name, type: raw.type, state: 'ready' };
-}
-
-/**
- * Set up a running engine: grant its creator query and upload access, register the sources with
- * their visibility rules, and grant the chosen roles. A step the engine refuses is reported rather
- * than undone: what succeeded is already usable.
- */
-export async function setUpContextEngine(engineId: string, input: ContextEngineSetupInput): Promise<ContextEngineSetupResult> {
-  const warnings: string[] = [];
-  const sources: Record<string, string> = {};
-  const attempt = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
-    try {
-      await fn();
-    } catch (err) {
-      warnings.push(`${label}: ${engineMessage(err, 'the engine refused it')}`);
-    }
-  };
-  await attempt('Give you query and upload access', async () => {
-    const me = await getContextPrincipal(engineId);
-    await contextEngineClient.put(engineId, `${grantsPath()}/${encodeURIComponent(ownerGrantId(me.id))}`, { principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
-  });
-  for (const source of input.sources) {
-    await attempt(`Register source “${source.name}”`, async () => {
-      const created = await registerSource(engineId, source);
-      sources[source.name.trim()] = created.id;
-    });
-  }
-  for (const role of input.roles) {
-    await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(engineId, `${grantsPath()}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
-  }
-  return { sources, warnings };
 }
 
 /** Delete the engine, its integrations and its data. The BFF lists it as deleting until it is gone. */
