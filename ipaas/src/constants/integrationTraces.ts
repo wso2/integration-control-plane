@@ -25,5 +25,5 @@ export const UNKNOWN_SERVICE = 'unknown_service';
 /** The newest traces a service's trace list shows; its counts still cover every trace. */
 export const SERVICE_TRACE_LIST_LIMIT = 100;
 
-/** Span queries in flight at once while reading the sample. */
+/** Span queries in flight at once, shared by every caller. */
 export const SPAN_FETCH_CONCURRENCY = 6;

@@ -148,4 +148,14 @@ describe('fetchTraceSpans', () => {
 
     expect(span).toMatchObject({ serviceName: 'unknown_service', status: 'unset', durationMs: 0, attributes: {} });
   });
+
+  it('passes the abort signal to the request', async () => {
+    get.mockResolvedValue({ items: [{ projectName: 'shop' }] });
+    post.mockResolvedValue({ spans: [] });
+    const { signal } = new AbortController();
+
+    await fetchTraceSpans(request(), 't1', signal);
+
+    expect(post.mock.calls[0]?.[2]).toBe(signal);
+  });
 });

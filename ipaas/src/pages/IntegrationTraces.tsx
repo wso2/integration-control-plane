@@ -40,25 +40,28 @@ import { broaden, resourceUrl, type ComponentScope } from '../nav';
 const DEFAULT_RANGE_HOURS = 24;
 const HOUR_MS = 3_600_000;
 
-function spansNote(page: TracePage, failed: number): string {
-  const base = page.truncated ? `From the spans of the newest ${page.traces.length.toLocaleString()} traces` : `From the spans of all ${page.traces.length.toLocaleString()} traces`;
-  return failed > 0 ? `${base}; ${failed} could not be read` : base;
+function spansNote(page: TracePage, spans: TraceSpans): string {
+  const listed = page.traces.length.toLocaleString();
+  const base = spans.pending > 0 ? `From the spans of ${spans.read.toLocaleString()} of ${listed} traces so far` : page.truncated ? `From the spans of the newest ${listed} traces` : `From the spans of all ${listed} traces`;
+  return spans.failed > 0 ? `${base}; ${spans.failed.toLocaleString()} could not be read` : base;
 }
 
 /** The per-service chart and trace view, built from the spans of every listed trace. */
-function ServiceSections({ read, page, request }: { read: TraceSpans; page: TracePage; request: ComponentTracesRequest }): JSX.Element {
+function ServiceSections({ traceSpans, page, request }: { traceSpans: TraceSpans; page: TracePage; request: ComponentTracesRequest }): JSX.Element {
   const startMs = Date.parse(request.startTime);
   const endMs = Date.parse(request.endTime);
   const traces = page.traces;
-  const series = useMemo(() => spanSeriesByService(read.spans, startMs, endMs), [read.spans, startMs, endMs]);
-  const summaries = useMemo(() => summarizeServiceTraces(traces, read.spans), [traces, read.spans]);
+  const { spans } = traceSpans;
+  const series = useMemo(() => spanSeriesByService(spans, startMs, endMs), [spans, startMs, endMs]);
+  const summaries = useMemo(() => summarizeServiceTraces(traces, spans), [traces, spans]);
+  const note = spansNote(page, traceSpans);
   return (
     <>
-      <TraceSection title="Spans per service" subtitle={`${spansNote(page, read.failed)}. Tick the services to plot.`}>
+      <TraceSection title="Spans per service" subtitle={`${note}. Tick the services to plot.`}>
         <ServiceSpanChart data={series} />
       </TraceSection>
-      <TraceSection title="Traces by service" subtitle="Select a service to see the traces it took part in; expand a trace to see its spans, and select a span to see its attributes.">
-        <ServiceTraces summaries={summaries} traces={traces} spans={read.spans} />
+      <TraceSection title="Traces by service" subtitle={`${note}. Select a service to see the traces it took part in; expand a trace to see its spans, and select a span to see its attributes.`}>
+        <ServiceTraces summaries={summaries} traces={traces} spans={spans} />
       </TraceSection>
     </>
   );
@@ -68,8 +71,8 @@ function ServiceSections({ read, page, request }: { read: TraceSpans; page: Trac
 function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.Element {
   const traces = useComponentTraces(request);
   const spans = useTraceSpans(request, traces.data?.traces);
-  // Counted from the spans, so it shows once they arrive.
-  const services = useMemo(() => (spans.data ? new Set(spans.data.spans.map((s) => s.serviceName)).size : undefined), [spans.data]);
+  // Counted from the spans read so far, so it shows once the first trace's arrive.
+  const services = useMemo(() => (spans.read > 0 ? new Set(spans.spans.map((s) => s.serviceName)).size : undefined), [spans.read, spans.spans]);
 
   if (traces.isPending) {
     return (
@@ -92,11 +95,20 @@ function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.El
     );
   }
 
-  const sections = spans.isPending ? <TraceSectionsSkeleton /> : spans.isError ? <TracesError title="Couldn't load the spans of these traces" onRetry={() => void spans.refetch()} /> : <ServiceSections read={spans.data} page={traces.data} request={request} />;
+  const sections =
+    spans.read === 0 && spans.pending > 0 ? (
+      <TraceSectionsSkeleton />
+    ) : spans.read === 0 ? (
+      <TracesError title="Couldn't load the spans of these traces" onRetry={spans.retryFailed} />
+    ) : (
+      <ServiceSections traceSpans={spans} page={traces.data} request={request} />
+    );
+  // Not every trace's services are known while spans load, after some fail, or past the list's limit.
+  const servicesLowerBound = spans.pending > 0 || spans.failed > 0 || traces.data.truncated;
 
   return (
     <>
-      <TraceStatCards stats={traceStats(traces.data)} services={services} />
+      <TraceStatCards stats={traceStats(traces.data)} services={services} servicesLowerBound={servicesLowerBound} />
       {sections}
     </>
   );

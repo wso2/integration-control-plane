@@ -95,13 +95,14 @@ export const bff = {
 // deployment that URL points at the wso2cloud observability proxy, which logs
 // and metrics are queried from directly rather than through the BFF. Errors
 // carry the raw status and body, since the proxy has no BFF envelope.
-async function obsPost<T>(path: string, body: unknown): Promise<T> {
+async function obsPost<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const base = window.API_CONFIG?.observabilityUrl;
   if (!base) throw new Error('Observability URL is not configured');
   const res = await authenticatedFetch(`${base}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
   });
   const text = await res.text().catch(() => '');
   if (!res.ok) throw new HttpError(res.status, `HTTP ${res.status}: ${text || res.statusText}`);

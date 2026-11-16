@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
-import { bucketSizeMs, hasIntegrationTraces, formatCount, formatDuration, mapWithConcurrency, spanSeriesByService, summarizeServiceTraces, traceStats, traceWaterfall, tracesOfService } from './integrationTraces';
+import { describe, expect, it, vi } from 'vitest';
+import { bucketSizeMs, hasIntegrationTraces, formatCount, formatDuration, concurrencyLimit, spanSeriesByService, summarizeServiceTraces, traceStats, traceWaterfall, tracesOfService } from './integrationTraces';
 import type { SpanRow, TraceRow } from '../types/integrationTraces';
 
 const trace = (overrides: Partial<TraceRow> = {}): TraceRow => ({
@@ -191,24 +191,52 @@ describe('traceWaterfall', () => {
   });
 });
 
-describe('mapWithConcurrency', () => {
-  it('keeps order, reports failures per item, and never exceeds the limit', async () => {
+describe('concurrencyLimit', () => {
+  const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 5));
+
+  it('keeps at most the limit in flight and runs every call', async () => {
+    const run = concurrencyLimit(2);
     let inFlight = 0;
     let peak = 0;
-    const results = await mapWithConcurrency([1, 2, 3, 4, 5], 2, async (n) => {
-      inFlight++;
-      peak = Math.max(peak, inFlight);
-      await new Promise((r) => setTimeout(r, 5));
-      inFlight--;
-      if (n === 3) throw new Error('three');
-      return n * 10;
-    });
+    const results = await Promise.allSettled(
+      [1, 2, 3, 4, 5].map((n) =>
+        run(async () => {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          await tick();
+          inFlight--;
+          if (n === 3) throw new Error('three');
+          return n * 10;
+        }),
+      ),
+    );
 
     expect(peak).toBe(2);
     expect(results.map((r) => (r.status === 'fulfilled' ? r.value : 'failed'))).toEqual([10, 20, 'failed', 40, 50]);
   });
 
-  it('returns nothing for no items', async () => {
-    expect(await mapWithConcurrency([], 4, async () => 1)).toEqual([]);
+  it('never starts a queued call whose signal aborts, and the queue still drains', async () => {
+    const run = concurrencyLimit(1);
+    const started: string[] = [];
+    const job = (name: string) => async (): Promise<string> => {
+      started.push(name);
+      await tick();
+      return name;
+    };
+    const aborted = new AbortController();
+    const first = run(job('first'));
+    const skipped = run(job('skipped'), aborted.signal);
+    const last = run(job('last'));
+    aborted.abort(new Error('left the page'));
+
+    await expect(skipped).rejects.toThrow('left the page');
+    await expect(Promise.all([first, last])).resolves.toEqual(['first', 'last']);
+    expect(started).toEqual(['first', 'last']);
+  });
+
+  it('rejects at once when the signal has already aborted', async () => {
+    const fn = vi.fn(async () => 1);
+    await expect(concurrencyLimit(2)(fn, AbortSignal.abort(new Error('gone')))).rejects.toThrow('gone');
+    expect(fn).not.toHaveBeenCalled();
   });
 });

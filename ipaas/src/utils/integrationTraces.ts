@@ -188,20 +188,32 @@ export function traceWaterfall(spans: SpanRow[]): WaterfallRow[] {
   return rows;
 }
 
-/** Runs fn over items with at most `limit` calls in flight, keeping input order in the result. */
-export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
-  const results: PromiseSettledResult<R>[] = new Array(items.length);
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    while (next < items.length) {
-      const index = next++;
-      try {
-        results[index] = { status: 'fulfilled', value: await fn(items[index] as T) };
-      } catch (reason) {
-        results[index] = { status: 'rejected', reason };
-      }
+/** A runner that keeps at most `limit` calls in flight; a queued call whose signal aborts leaves the queue without running. */
+export function concurrencyLimit(limit: number): <T>(fn: () => Promise<T>, signal?: AbortSignal) => Promise<T> {
+  let inFlight = 0;
+  const waiting: (() => void)[] = [];
+  const turn = (signal?: AbortSignal): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const onAbort = (): void => {
+        waiting.splice(waiting.indexOf(wake), 1);
+        reject(signal?.reason);
+      };
+      const wake = (): void => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      waiting.push(wake);
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  return async (fn, signal) => {
+    signal?.throwIfAborted();
+    while (inFlight >= Math.max(limit, 1)) await turn(signal);
+    inFlight++;
+    try {
+      return await fn();
+    } finally {
+      inFlight--;
+      waiting.shift()?.();
     }
   };
-  await Promise.all(Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, worker));
-  return results;
 }

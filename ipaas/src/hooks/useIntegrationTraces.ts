@@ -16,10 +16,8 @@
  * under the License.
  */
 
-import { skipToken, useIsFetching, useQuery } from '@tanstack/react-query';
+import { skipToken, useIsFetching, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { fetchComponentTraces, fetchTraceSpans } from '../api/integrationTraces';
-import { SPAN_FETCH_CONCURRENCY } from '../constants/integrationTraces';
-import { mapWithConcurrency } from '../utils/integrationTraces';
 import type { ComponentTracesRequest, SpanRow, TracePage, TraceRow } from '../types/integrationTraces';
 
 const ROOT_KEY = 'integration-traces';
@@ -27,7 +25,7 @@ const ROOT_KEY = 'integration-traces';
 /**
  * Keeps the shown data while the same integration and environment refresh. Another
  * integration's or environment's traces would read as this one's, so a switch shows
- * the skeleton instead. Both query keys carry the request third.
+ * the skeleton instead. The list's query key carries the request third.
  */
 function sameScope<T>(req: ComponentTracesRequest | null) {
   return (prev: T | undefined, prevQuery?: { queryKey: readonly unknown[] }): T | undefined => {
@@ -50,32 +48,45 @@ export const useTracesFetching = (): boolean => useIsFetching({ queryKey: [ROOT_
 
 export interface TraceSpans {
   spans: SpanRow[];
+  /** Traces whose spans have been read. */
+  read: number;
   /** Traces whose span query failed; their spans are missing from `spans`. */
   failed: number;
+  /** Traces whose spans are still loading. */
+  pending: number;
+  /** Retries the span queries that failed. */
+  retryFailed: () => void;
+}
+
+// Module scope keeps it stable, so useQueries returns the same object until a span query changes.
+export function combineTraceSpans(results: UseQueryResult<SpanRow[]>[]): TraceSpans {
+  const failedQueries = results.filter((r) => r.isError);
+  return {
+    spans: results.flatMap((r) => r.data ?? []),
+    read: results.filter((r) => r.isSuccess).length,
+    failed: failedQueries.length,
+    pending: results.filter((r) => r.isPending).length,
+    retryFailed: () => failedQueries.forEach((r) => void r.refetch()),
+  };
 }
 
 /**
- * Spans of every listed trace. The observer lists traces without the services they
- * passed through, so the per-service counts need each trace's spans, one query each.
- * Fails only when every span query does; otherwise the gap is reported in `failed`.
+ * Spans of every listed trace, one query per trace. The observer lists traces without the
+ * services they passed through, so the per-service counts need each trace's spans.
+ * - The key leaves out the time window, so a Refresh reads only new traces, and those whose
+ *   span count grew since they were read.
+ * - A query that leaves the list (a new window, environment or page) aborts its request.
  */
-export function useTraceSpans(req: ComponentTracesRequest | null, traces: TraceRow[] | undefined) {
-  const traceIds = (traces ?? []).map((t) => t.traceId);
-  return useQuery({
-    queryKey: [ROOT_KEY, 'spans', req, traceIds],
-    queryFn:
-      req && traceIds.length > 0
-        ? async (): Promise<TraceSpans> => {
-            const results = await mapWithConcurrency(traceIds, SPAN_FETCH_CONCURRENCY, (id) => fetchTraceSpans(req, id));
-            const spans = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
-            const failed = results.filter((r) => r.status === 'rejected').length;
-            if (failed === results.length) {
-              throw results.find((r): r is PromiseRejectedResult => r.status === 'rejected')?.reason ?? new Error('Could not read any trace spans.');
-            }
-            return { spans, failed };
-          }
-        : skipToken,
-    retry: false,
-    placeholderData: sameScope<TraceSpans>(req),
+export function useTraceSpans(req: ComponentTracesRequest | null, traces: TraceRow[] | undefined): TraceSpans {
+  return useQueries({
+    queries: req
+      ? (traces ?? []).map((t) => ({
+          queryKey: [ROOT_KEY, 'spans', req.componentId, req.environmentId, t.traceId, t.spanCount],
+          queryFn: ({ signal }: { signal: AbortSignal }) => fetchTraceSpans(req, t.traceId, signal),
+          staleTime: Infinity,
+          retry: 1,
+        }))
+      : [],
+    combine: combineTraceSpans,
   });
 }
