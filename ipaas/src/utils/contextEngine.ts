@@ -35,6 +35,7 @@ import {
   LLM_PROVIDERS,
   MCP_CLIENTS,
   RML_MAPPING,
+  RML_MAPPING_KEY,
   PLAYGROUND_SUGGESTIONS,
   PROGRESS_POLL_ACTIVE_MS,
   RETIRED_MODEL_PROVIDER_NAMES,
@@ -1756,20 +1757,30 @@ export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEn
  * `POST …/integrations`: every field the connector shows, secrets included, typed and placed as the
  * integration's settings say. The BFF names the integration and its source with a DNS label. With
  * visibility rules, the integration labels every record with each rule's group; without, the BFF
- * lets every console user see them.
+ * lets every console user see them. A structured connector's mapping file travels as `mapping`,
+ * which the BFF registers as the source's mapping; without one, the engine writes its own.
  */
-export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> } } {
+export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> }; mapping?: string } {
   const audienceMapping = audienceMappingFromRules(source.audience);
   const audience = Object.keys(audienceMapping);
+  const mapping = sourceMapping(source);
   return {
     name: engineHandleFrom(source.name),
     type,
     settings: integrationSettings(source),
     ...(audience.length ? { source: { audience, audienceMapping } } : {}),
+    ...(mapping ? { mapping } : {}),
   };
 }
 
-/** The integration's settings from the fields that apply; blank fields and files are left out. */
+/** The RML or R2RML file a structured connector's source was given, as uploaded; empty when none. */
+function sourceMapping(source: ContextSourceConfig): string {
+  if (!connectorFor(source.type)?.isStructuredData) return '';
+  const mapping = source.values[RML_MAPPING_KEY] ?? '';
+  return mapping.trim() ? mapping : '';
+}
+
+/** The integration's settings from the fields that apply; blank fields and files are left out (a mapping file travels as the request's `mapping`). */
 function integrationSettings(source: ContextSourceConfig): Record<string, unknown> {
   const connector = connectorFor(source.type);
   const settings: Record<string, unknown> = {};

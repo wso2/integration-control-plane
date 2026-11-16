@@ -694,6 +694,23 @@ describe('wire payloads', () => {
     expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pageSize: 250 });
   });
 
+  it('sends a structured source\'s mapping file as the request\'s mapping, never as a setting', () => {
+    const r2rml = '<#Emp> rr:logicalTable [ rr:tableName "EMP" ] ;\n  rr:subjectMap [ rr:template "http://e/emp/{ID}" ] .\n';
+    const db = { host: 'db', database: 'hr', username: 'u', password: 'p', tables: serializeTables([{ tableName: 'EMP', primaryKey: 'ID', columns: '', updatedAtColumn: '' }]) };
+
+    // The uploaded file is the source's mapping, sent as it was read.
+    const mapped = toIntegrationRequest(withValues('mysql', { ...db, rmlMapping: r2rml }), 'mysql');
+    expect(mapped.mapping).toBe(r2rml);
+    expect(mapped.settings).not.toHaveProperty('rmlMapping');
+
+    // Without a file there is no mapping, so the engine writes its own.
+    expect(toIntegrationRequest(withValues('mysql', db), 'mysql')).not.toHaveProperty('mapping');
+    expect(toIntegrationRequest(withValues('mysql', { ...db, rmlMapping: '  \n' }), 'mysql')).not.toHaveProperty('mapping');
+
+    // A connector of documents offers no mapping, so a stray value is not sent.
+    expect(toIntegrationRequest(withValues('gdrive', { folderId: 'f', rmlMapping: r2rml }), 'google_drive')).not.toHaveProperty('mapping');
+  });
+
   it('summarizes sources for review', () => {
     expect(summarizeSource(withValues('amazons3', { bucketName: 'docs', prefix: 'kb/' }))).toBe('docs · kb/');
     expect(summarizeSource(withValues('website', { urls: 'https://a.com\nhttps://b.com' }))).toBe('2 URLs');

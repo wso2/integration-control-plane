@@ -71,6 +71,9 @@ const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'au
 
 /** Connection fields shared by the Google connectors, mirroring the Ballerina `google_auth` module's GoogleAuth: one of three OAuth2 flows, chosen by authType. */
 
+/** The value key of the optional RML mapping field: the uploaded file's text. */
+export const RML_MAPPING_KEY = 'rmlMapping';
+
 /**
  * Optional RML mapping section, appended to connectors whose `isStructuredData` is
  * set. A provided .rml.ttl is used to generate the context graph from the source's
@@ -78,7 +81,7 @@ const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'au
  */
 export const RML_MAPPING = G(
   { label: 'RML Mapping', collapsed: true },
-  O('rmlMapping', 'Mapping file', 'file', {
+  O(RML_MAPPING_KEY, 'Mapping file', 'file', {
     accept: '.rml.ttl,.ttl',
     helper: 'Optional. Leave empty to let AI build the graph.',
   }),
