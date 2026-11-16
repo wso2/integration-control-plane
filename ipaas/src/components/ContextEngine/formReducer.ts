@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { defaultStorage } from '../../constants/contextEngine';
+import { defaultDatabaseChoice, defaultStorage } from '../../constants/contextEngine';
 import { applyAnswerChoice, type AnswerChoice } from '../../utils/contextEngine';
-import type { ContextEngineForm, ContextSourceConfig, LlmConfig, StorageKind, StorageSelection } from '../../types/contextEngine';
+import type { ContextEngineForm, ContextSourceConfig, DatabaseChoice, LlmConfig, StorageKind, StorageSelection } from '../../types/contextEngine';
 import type { EmbeddingConfig } from '../../types/ragIngestion';
 
 export const initialContextEngineForm: ContextEngineForm = {
@@ -30,6 +30,7 @@ export const initialContextEngineForm: ContextEngineForm = {
   answersEnabled: true,
   answerLlm: null,
   storage: defaultStorage(),
+  database: defaultDatabaseChoice(),
   name: '',
   description: '',
 };
@@ -45,6 +46,7 @@ export type ContextEngineFormAction =
   | { type: 'answerLlm'; value: LlmConfig | null }
   | { type: 'answerChoice'; value: AnswerChoice }
   | { type: 'storage'; kind: StorageKind; value: StorageSelection }
+  | { type: 'database'; value: DatabaseChoice }
   | { type: 'name'; value: string }
   | { type: 'description'; value: string };
 
@@ -70,6 +72,8 @@ export function contextEngineFormReducer(state: ContextEngineForm, action: Conte
       return { ...state, ...applyAnswerChoice(action.value, state) };
     case 'storage':
       return { ...state, storage: { ...state.storage, [action.kind]: action.value } };
+    case 'database':
+      return { ...state, database: action.value };
     case 'name':
       return { ...state, name: action.value };
     case 'description':

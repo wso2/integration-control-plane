@@ -87,7 +87,11 @@ import {
   connectorCountsByCategory,
   defaultQueryMode,
   effectiveLlm,
+  databaseFieldErrors,
+  databaseStepBlocker,
   fromDraft,
+  isPemCertificate,
+  toExternalDatabase,
   effectiveVisibility,
   summarizeSourceVisibility,
   getStartedSteps,
@@ -141,9 +145,21 @@ import {
   uploadSourceTitle,
   uploadIsSlow,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_EMBEDDING_PROVIDERS, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_MODES, defaultStorage, isConnectorEnabled, LLM_PROVIDERS, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import {
+  blankLlm,
+  blankSource,
+  CONTEXT_EMBEDDING_PROVIDERS,
+  CONTEXT_ENGINE_DESCRIPTION_MAX,
+  CONTEXT_ENGINE_NAME_MAX,
+  CONTEXT_QUERY_MODES,
+  defaultDatabaseChoice,
+  defaultStorage,
+  isConnectorEnabled,
+  LLM_PROVIDERS,
+  SOURCE_CONNECTORS,
+} from '../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
-import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress, UploadFileStatus } from '../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineForm, DatabaseChoice, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress, UploadFileStatus } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
 import type { EmbeddingConfig } from '../types/ragIngestion';
@@ -191,6 +207,7 @@ function completeForm(): ContextEngineForm {
     answersEnabled: true,
     answerLlm: null,
     storage: defaultStorage(),
+    database: defaultDatabaseChoice(),
     name: 'Support knowledge',
     description: 'Runbooks and docs',
   };
@@ -416,8 +433,21 @@ describe('source validation', () => {
     expect(sourceIncompleteReason(withValues('salesforce', conn))).toBe('Objects missing');
     expect(isSourceValid(sf({ name: 'Account', fields: 'Name' }, { name: 'Contact', fields: 'FirstName, LastName' }))).toBe(true);
     // Every object needs fields, and names are unique ignoring case.
-    expect(sourceFieldError(objectsDef, serializeObjects([{ name: 'Account', fields: 'Name' }, { name: 'Contact', fields: ' , ' }]))).toBe('Object 2: Fields is required.');
-    expect(objectErrors([{ name: 'Account', fields: 'Name' }, { name: ' account ', fields: 'Name' }])[1].name).toBe('Another object has this name.');
+    expect(
+      sourceFieldError(
+        objectsDef,
+        serializeObjects([
+          { name: 'Account', fields: 'Name' },
+          { name: 'Contact', fields: ' , ' },
+        ]),
+      ),
+    ).toBe('Object 2: Fields is required.');
+    expect(
+      objectErrors([
+        { name: 'Account', fields: 'Name' },
+        { name: ' account ', fields: 'Name' },
+      ])[1].name,
+    ).toBe('Another object has this name.');
   });
 
   it('moves a restored Salesforce draft from before multiple objects into the objects field', () => {
@@ -851,11 +881,76 @@ describe('drafts', () => {
   });
 
   it('knows when there is nothing worth keeping', () => {
-    const empty = { sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, answersEnabled: true, answerLlm: null };
+    const empty = { sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, answersEnabled: true, answerLlm: null, database: defaultDatabaseChoice() };
     expect(isFormDirty({ ...empty, storage: defaultStorage(), name: '', description: '  ' })).toBe(false);
     expect(isFormDirty({ ...empty, answersEnabled: false, storage: defaultStorage(), name: '', description: '' })).toBe(true);
     expect(isFormDirty({ ...empty, storage: { ...defaultStorage(), vector: { mode: 'infrastructure', serverId: 's1', serverName: 'v', database: 'd' } }, name: '', description: '' })).toBe(true);
     expect(isFormDirty({ ...completeForm(), sources: [], roles: [], embedding: null, llm: null, description: '' })).toBe(true); // name
+    expect(isFormDirty({ ...empty, storage: defaultStorage(), database: { ...defaultDatabaseChoice(), mode: 'external' }, name: '', description: '' })).toBe(true);
+  });
+
+  it("keeps the own database's details but not its password, and restores old drafts to the managed one", () => {
+    const form = { ...completeForm(), database: ownDatabase() };
+    const draft = toDraft(form, 'x');
+    expect(draft.form.database.password).toBe('');
+    expect(fromDraft(JSON.stringify(draft))!.form.database).toEqual({ ...ownDatabase(), password: '' });
+    const { database: _dropped, ...old } = draft.form;
+    expect(fromDraft(JSON.stringify({ ...draft, form: old }))!.form.database).toEqual(defaultDatabaseChoice());
+    expect(fromDraft(JSON.stringify({ ...draft, form: { ...old, database: { mode: 'external', port: 5432, sslMode: 'disable' } } }))!.form.database).toEqual({ ...defaultDatabaseChoice(), mode: 'external' });
+  });
+});
+
+const PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+
+function ownDatabase(over: Partial<DatabaseChoice> = {}): DatabaseChoice {
+  return { mode: 'external', host: ' db.example.com ', port: '5433', database: 'context', username: 'engine', password: ' s3cret ', sslMode: 'verify-full', caCertificate: `${PEM}\n`, ...over };
+}
+
+describe('own database', () => {
+  it('asks nothing of the managed database', () => {
+    expect(databaseFieldErrors(defaultDatabaseChoice())).toEqual({});
+    expect(databaseStepBlocker({ ...defaultDatabaseChoice(), host: 'bad host' })).toBeNull();
+  });
+
+  it('accepts complete details', () => {
+    expect(databaseFieldErrors(ownDatabase())).toEqual({});
+    expect(databaseStepBlocker(ownDatabase())).toBeNull();
+    expect(isFormComplete({ ...completeForm(), database: ownDatabase() })).toBe(true);
+    expect(isFormComplete({ ...completeForm(), database: ownDatabase({ host: '' }) })).toBe(false);
+  });
+
+  it('checks each field and reports the first problem as the blocker', () => {
+    const blank = { ...defaultDatabaseChoice(), mode: 'external' as const, port: '' };
+    expect(Object.keys(databaseFieldErrors(blank))).toEqual(['host', 'port', 'database', 'username', 'password', 'caCertificate']);
+    expect(databaseStepBlocker(blank)).toBe('Enter the host');
+    expect(databaseFieldErrors(ownDatabase({ host: 'postgres://db' })).host).toMatch(/without a scheme/);
+    expect(databaseFieldErrors(ownDatabase({ database: '  ' })).database).toBe('Enter the database name');
+  });
+
+  it.each(['0', '65536', '54a', '-1', '5.5'])('rejects port %s', (port) => {
+    expect(databaseFieldErrors(ownDatabase({ port })).port).toBe('Enter a port from 1 to 65535');
+  });
+
+  it.each(['1', '5432', '65535'])('accepts port %s', (port) => {
+    expect(databaseFieldErrors(ownDatabase({ port })).port).toBeUndefined();
+  });
+
+  it('needs a PEM CA certificate for verify-ca and verify-full only', () => {
+    expect(databaseFieldErrors(ownDatabase({ sslMode: 'verify-ca', caCertificate: '' })).caCertificate).toMatch(/verify-ca needs it/);
+    expect(databaseFieldErrors(ownDatabase({ caCertificate: 'MIIB' })).caCertificate).toMatch(/BEGIN CERTIFICATE/);
+    expect(databaseFieldErrors(ownDatabase({ sslMode: 'require', caCertificate: '' }))).toEqual({});
+    expect(isPemCertificate(`  ${PEM}  `)).toBe(true);
+    expect(isPemCertificate('-----BEGIN CERTIFICATE-----')).toBe(false);
+  });
+
+  it('maps to the BFF shape: trimmed, numeric port, the password as typed, the CA only when used', () => {
+    expect(toExternalDatabase(ownDatabase())).toEqual({ host: 'db.example.com', port: 5433, database: 'context', username: 'engine', password: ' s3cret ', sslMode: 'verify-full', caCertificate: PEM });
+    expect(toExternalDatabase(ownDatabase({ sslMode: 'require' }))).not.toHaveProperty('caCertificate');
+  });
+
+  it('sends the own database on create, and nothing for the managed one', () => {
+    expect(toBffCreateRequest(toCreateInput(completeForm()))).not.toHaveProperty('database');
+    expect(toBffCreateRequest(toCreateInput({ ...completeForm(), database: ownDatabase() })).database).toEqual(toExternalDatabase(ownDatabase()));
   });
 });
 
@@ -876,6 +971,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     queryRoles: [],
     exposure: { api: false, mcp: false, answers: true },
     storage: null,
+    database: 'managed',
     ...over,
   };
 }

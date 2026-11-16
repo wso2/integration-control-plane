@@ -24,7 +24,21 @@ import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useContextEngineDraft, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
-import { answerChoice, checkStagedFile, effectiveVisibility, engineMessage, isFormDirty, modelsStepBlocker, nameStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
+import {
+  answerChoice,
+  checkStagedFile,
+  databaseStepBlocker,
+  effectiveVisibility,
+  engineMessage,
+  isFormDirty,
+  modelsStepBlocker,
+  nameStepBlocker,
+  sourcesStepBlocker,
+  storageStepBlocker,
+  toCreateInput,
+  visibilityTags,
+  withSourceVisibilityRules,
+} from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -160,7 +174,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     sourcesStepBlocker(form.sources),
     // null, — 'Grant Access' step hidden
     modelsStepBlocker(form),
-    storageStepBlocker(form.storage),
+    storageStepBlocker(form.storage) ?? databaseStepBlocker(form.database),
   ];
   // The review step itself asks for nothing, so Create shows the first step still incomplete.
   const stepBlocker = [...setupBlockers, setupBlockers.find((b) => b !== null) ?? null];
@@ -265,7 +279,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 onAnswerLlmChange={(value) => dispatch({ type: 'answerLlm', value })}
               />
             )}
-            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
+            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} database={form.database} onDatabaseChange={(value) => dispatch({ type: 'database', value })} />}
             {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} draftSavedAt={draft.savedAt} onEdit={setActiveStep} />}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>

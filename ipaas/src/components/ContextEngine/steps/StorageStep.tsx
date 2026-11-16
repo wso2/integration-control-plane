@@ -23,14 +23,17 @@ import { useEngineManagedServer } from '../../../hooks/useContextEngine';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { newOrgDatabaseUrl, newOrgVectorDatabaseUrl, orgDatabasesUrl, orgVectorDatabasesUrl } from '../../../paths';
 import StorageBackendCard from './StorageBackendCard';
+import DatabaseSection from './DatabaseSection';
 import { stepHeadingSx, stepHintSx, storageGridSx } from '../styles';
-import type { ContextEngineStorage, EngineManagedServer, StorageKind, StorageSelection } from '../../../types/contextEngine';
+import type { ContextEngineStorage, DatabaseChoice, EngineManagedServer, StorageKind, StorageSelection } from '../../../types/contextEngine';
 import type { DatabaseServer } from '../../../types/platformServices';
 
 interface StorageStepProps {
   orgHandle: string;
   storage: ContextEngineStorage;
   onChange: (kind: StorageKind, value: StorageSelection) => void;
+  database: DatabaseChoice;
+  onDatabaseChange: (value: DatabaseChoice) => void;
 }
 
 const MANAGED_HINT: Record<EngineManagedServer, string> = {
@@ -45,8 +48,8 @@ function serversFor(kind: StorageKind, servers: DatabaseServer[]): DatabaseServe
   return [];
 }
 
-/** Step 4 — where the engine keeps vectors, records and the graph: embedded, or imported from Infrastructure. */
-export default function StorageStep({ orgHandle, storage, onChange }: StorageStepProps): JSX.Element {
+/** Step 4 — where the engine keeps its data: a database WSO2 Cloud manages, with its per-store placement, or the user's own PostgreSQL. */
+export default function StorageStep({ orgHandle, storage, onChange, database, onDatabaseChange }: StorageStepProps): JSX.Element {
   const infrastructureAvailable = isPlatformServicesEnabled();
   const servers = useDatabaseServers();
   const all = useMemo(() => servers.data ?? [], [servers.data]);
@@ -58,28 +61,33 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
         Configure Storage
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        Where the engine keeps its data.{managedServer.data ? ` ${MANAGED_HINT[managedServer.data]}` : ''}
+        Where the engine keeps its data.
       </Typography>
 
-      <Box sx={storageGridSx}>
-        {STORAGE_BACKENDS.map((info) => (
-          <StorageBackendCard
-            key={info.kind}
-            info={info}
-            managedServer={managedServer.data}
-            value={storage[info.kind]}
-            onChange={(value) => onChange(info.kind, value)}
-            servers={serversFor(info.kind, all)}
-            serversLoading={infrastructureAvailable && servers.isLoading}
-            serversError={infrastructureAvailable && servers.isError}
-            onRefresh={() => servers.refetch()}
-            infrastructureAvailable={infrastructureAvailable}
-            alternativeUnavailable
-            listUrl={info.infraSegment === 'vector-databases' ? orgVectorDatabasesUrl(orgHandle) : info.infraSegment === 'databases' ? orgDatabasesUrl(orgHandle) : undefined}
-            createUrl={info.infraSegment === 'vector-databases' ? newOrgVectorDatabaseUrl(orgHandle) : info.infraSegment === 'databases' ? newOrgDatabaseUrl(orgHandle) : undefined}
-          />
-        ))}
-      </Box>
+      <DatabaseSection value={database} onChange={onDatabaseChange} managedHint={managedServer.data ? MANAGED_HINT[managedServer.data] : undefined} />
+
+      {/* Every store lives on the user's own server when they bring one, so the per-store placement applies only to the managed database. */}
+      {database.mode === 'managed' && (
+        <Box sx={storageGridSx}>
+          {STORAGE_BACKENDS.map((info) => (
+            <StorageBackendCard
+              key={info.kind}
+              info={info}
+              managedServer={managedServer.data}
+              value={storage[info.kind]}
+              onChange={(value) => onChange(info.kind, value)}
+              servers={serversFor(info.kind, all)}
+              serversLoading={infrastructureAvailable && servers.isLoading}
+              serversError={infrastructureAvailable && servers.isError}
+              onRefresh={() => servers.refetch()}
+              infrastructureAvailable={infrastructureAvailable}
+              alternativeUnavailable
+              listUrl={info.infraSegment === 'vector-databases' ? orgVectorDatabasesUrl(orgHandle) : info.infraSegment === 'databases' ? orgDatabasesUrl(orgHandle) : undefined}
+              createUrl={info.infraSegment === 'vector-databases' ? newOrgVectorDatabaseUrl(orgHandle) : info.infraSegment === 'databases' ? newOrgDatabaseUrl(orgHandle) : undefined}
+            />
+          ))}
+        </Box>
+      )}
     </>
   );
 }

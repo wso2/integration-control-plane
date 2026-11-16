@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Chip, Grid, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
-import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { ENGINE_DATABASE_LABEL, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { useEngineManagedServer } from '../../../hooks/useContextEngine';
 import { answerChoice, modelProviderName, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
@@ -213,34 +213,45 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(3)}>
-            <Stack direction="row" gap={3} flexWrap="wrap">
-              {STORAGE_BACKENDS.map((b) => {
-                // An engine managed store depends on the deployment, which the BFF reports.
-                const sum = managedServer.data ? summarizeStorage(b.kind, form.storage[b.kind], managedServer.data) : null;
-                return (
-                  <Box key={b.kind} sx={{ minWidth: 120 }}>
-                    <Typography variant="caption" sx={mutedSx}>
-                      {b.title.replace(' database', '')}
-                    </Typography>
-                    {sum ? (
-                      <>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {sum.primary}
-                        </Typography>
-                        <Typography variant="caption" sx={mutedSx}>
-                          {sum.secondary}
-                        </Typography>
-                      </>
-                    ) : (
-                      <>
-                        <Skeleton variant="text" width={110} />
-                        <Skeleton variant="text" width={140} />
-                      </>
-                    )}
-                  </Box>
-                );
-              })}
-            </Stack>
+            {form.database.mode === 'external' ? (
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {ENGINE_DATABASE_LABEL.external}
+                </Typography>
+                <Typography variant="caption" sx={mutedSx}>
+                  {form.database.host.trim()}:{form.database.port.trim()} · {form.database.database.trim()} · {form.database.sslMode}
+                </Typography>
+              </Box>
+            ) : (
+              <Stack direction="row" gap={3} flexWrap="wrap">
+                {STORAGE_BACKENDS.map((b) => {
+                  // An engine managed store depends on the deployment, which the BFF reports.
+                  const sum = managedServer.data ? summarizeStorage(b.kind, form.storage[b.kind], managedServer.data) : null;
+                  return (
+                    <Box key={b.kind} sx={{ minWidth: 120 }}>
+                      <Typography variant="caption" sx={mutedSx}>
+                        {b.title.replace(' database', '')}
+                      </Typography>
+                      {sum ? (
+                        <>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {sum.primary}
+                          </Typography>
+                          <Typography variant="caption" sx={mutedSx}>
+                            {sum.secondary}
+                          </Typography>
+                        </>
+                      ) : (
+                        <>
+                          <Skeleton variant="text" width={110} />
+                          <Skeleton variant="text" width={140} />
+                        </>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
           </SummaryCard>
         </Grid>
       </Grid>

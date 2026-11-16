@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import {
   addContextSource,
+  checkContextEngineDatabase,
   createContextApiKey,
   createContextEngine,
   deleteContextEngine,
@@ -51,7 +52,7 @@ import {
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
 import { everyoneRoles, fromDraft, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, toDraft, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -263,6 +264,11 @@ export function useCreateContextEngine() {
       return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
     },
   });
+}
+
+/** Try the user's own PostgreSQL before creating an engine on it. Nothing is cached: each check connects again. */
+export function useCheckContextEngineDatabase() {
+  return useMutation({ mutationFn: (database: ExternalDatabase) => checkContextEngineDatabase(database) });
 }
 
 /** Set up an engine the wizard created, once it runs: grants and sources. */

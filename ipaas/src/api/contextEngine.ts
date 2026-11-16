@@ -27,7 +27,7 @@
  * Reads that hit a missing route degrade to an empty section so the detail page still renders.
  */
 
-import { CONTEXT_ENGINE_ID, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../constants/contextEngine';
+import { CONTEXT_ENGINE_ID, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS, ENGINE_DATABASE_LABEL } from '../constants/contextEngine';
 import {
   audienceMappingFromRules,
   deliveryIdentity,
@@ -70,6 +70,8 @@ import type {
   ContextSource,
   CreateContextEngineInput,
   CreatedContextApiKey,
+  DatabaseCheckResult,
+  ExternalDatabase,
   IngestFileInput,
   ContextSourceConfig,
   UpdateContextSourceInput,
@@ -79,6 +81,7 @@ import type {
   SourceIndexingState,
   SourceProgress,
   SourceReadingState,
+  EngineDatabaseKind,
   EngineManagedServer,
   StorageKind,
   StorageSummary,
@@ -242,6 +245,8 @@ interface BffEngine {
   startedAt?: string;
   restartedAt?: string;
   answerOwnKey?: boolean;
+  /** Absent on engines created before users could bring their own database. */
+  database?: string;
 }
 
 interface BffIntegration {
@@ -324,6 +329,7 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
   ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
   ...(raw.restartedAt ? { restartedAt: raw.restartedAt } : {}),
+  database: raw.database === 'external' ? 'external' : 'managed',
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -405,20 +411,24 @@ const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = 
   lancedb: { label: 'LanceDB', detail: 'Engine managed · embedded' },
   sqlite: { label: 'SQLite', detail: 'Engine managed · embedded' },
   kuzu: { label: 'Kuzu', detail: 'Engine managed · embedded' },
-  // The console offers PostgreSQL only as the engine's own server, which the BFF creates with it.
+  // PostgreSQL is the engine's own server, which the BFF creates with it, unless the user brought one (see toStorage).
   pgvector: { label: 'PostgreSQL + pgvector', detail: 'Engine managed · own server' },
   postgres: { label: 'PostgreSQL', detail: 'Engine managed · own server' },
   neo4j: { label: 'Neo4j', detail: 'External' },
 };
 
+/** The PostgreSQL stores, which live on the user's own server when they brought one. */
+const POSTGRES_PROVIDERS = new Set(['pgvector', 'postgres']);
+
 /** Per-store placement as the engine reports it; null until it reports any. */
-const toStorage = (raw: RawEngineConfig | null): Record<StorageKind, StorageSummary> | null => {
+const toStorage = (raw: RawEngineConfig | null, database: EngineDatabaseKind): Record<StorageKind, StorageSummary> | null => {
   const st = raw?.storage;
   if (!st) return null;
   const one = (kind: StorageKind): StorageSummary => {
     const s = st[kind];
     const known = s?.provider ? STORE_PROVIDER_LABEL[s.provider] : undefined;
-    return { provider: s?.provider ?? 'unknown', label: known?.label ?? (s?.provider ? s.provider : 'Not reported'), detail: known?.detail };
+    const detail = database === 'external' && s?.provider && POSTGRES_PROVIDERS.has(s.provider) ? ENGINE_DATABASE_LABEL.external : known?.detail;
+    return { provider: s?.provider ?? 'unknown', label: known?.label ?? (s?.provider ? s.provider : 'Not reported'), detail };
   };
   return { vector: one('vector'), relational: one('relational'), graph: one('graph') };
 };
@@ -552,7 +562,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     models: { ...toModels(config), ...(typeof raw.answerOwnKey === 'boolean' ? { answerOwnKey: raw.answerOwnKey } : {}) },
     queryRoles: rolesFromGrants(grants.map(toGrant)),
     exposure: toExposure(config, engine.access),
-    storage: toStorage(config),
+    storage: toStorage(config, engine.database),
   };
 }
 
@@ -571,6 +581,12 @@ export async function getEngineManagedServer(): Promise<EngineManagedServer> {
 
 export async function createContextEngine(input: CreateContextEngineInput): Promise<ContextEngine> {
   return toEngine(await viaBff(() => bff.post<BffEngine>('/context-engines', toBffCreateRequest(input))));
+}
+
+/** POST /context-engine-database-checks: the BFF connects to the user's own server; a 400 carries why it is not usable. */
+export async function checkContextEngineDatabase(database: ExternalDatabase): Promise<DatabaseCheckResult> {
+  const raw = await viaBff(() => bff.post<{ ok: true; serverVersion: string; pgvectorVersion: string }>('/context-engine-database-checks', database));
+  return { serverVersion: raw.serverVersion, pgvectorVersion: raw.pgvectorVersion };
 }
 
 /** Register a source: on the engine for one the browser feeds, through the BFF for one an integration runs. */

@@ -31,6 +31,7 @@ import {
   ROLE_VISIBILITY_ENABLED,
   OWNER_GRANT_PREFIX,
   UNAVAILABLE_MODEL_PROVIDERS,
+  defaultDatabaseChoice,
   defaultStorage,
   LLM_PROVIDERS,
   MCP_CLIENTS,
@@ -66,7 +67,10 @@ import type {
   ContextSource,
   ContextSourceConfig,
   CreateContextEngineInput,
+  DatabaseChoice,
+  DatabaseField,
   EngineManagedServer,
+  ExternalDatabase,
   AskedQuestion,
   ContextEngineSummary,
   ContextEngineTabKey,
@@ -477,7 +481,7 @@ export function isNameStepValid(name: string, description: string): boolean {
 }
 
 export function isFormComplete(form: ContextEngineForm): boolean {
-  return isNameStepValid(form.name, form.description) && isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null;
+  return isNameStepValid(form.name, form.description) && isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null && databaseStepBlocker(form.database) === null;
 }
 
 /** Providers the engine cannot be configured with yet: offered, but disabled, in the wizard. */
@@ -491,12 +495,24 @@ export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput
   if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
   if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer language model configuration is incomplete.');
   const answers = { enabled: form.answersEnabled, model: form.answersEnabled ? form.answerLlm : null };
-  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
+  const database = form.database.mode === 'external' ? toExternalDatabase(form.database) : undefined;
+  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage, ...(database ? { database } : {}) };
 }
 
 /** Whether the wizard holds anything worth keeping. */
 export function isFormDirty(form: ContextEngineForm): boolean {
-  return form.sources.length > 0 || form.roles.length > 0 || form.embedding !== null || form.llm !== null || !form.answersEnabled || form.answerLlm !== null || !isStorageAllManaged(form.storage) || form.name.trim() !== '' || form.description.trim() !== '';
+  return (
+    form.sources.length > 0 ||
+    form.roles.length > 0 ||
+    form.embedding !== null ||
+    form.llm !== null ||
+    !form.answersEnabled ||
+    form.answerLlm !== null ||
+    !isStorageAllManaged(form.storage) ||
+    form.database.mode !== 'managed' ||
+    form.name.trim() !== '' ||
+    form.description.trim() !== ''
+  );
 }
 
 // ── Drafts ──────────────────────────────────────────────────────────────────
@@ -512,7 +528,15 @@ export function toDraft(form: ContextEngineForm, savedAt: string): ContextEngine
   return {
     v: 1,
     savedAt,
-    form: { ...form, sources, storage, embedding: form.embedding ? { ...form.embedding, apiKey: '' } : null, llm: form.llm ? { ...form.llm, apiKey: '' } : null, answerLlm: form.answerLlm ? { ...form.answerLlm, apiKey: '' } : null },
+    form: {
+      ...form,
+      sources,
+      storage,
+      database: { ...form.database, password: '' },
+      embedding: form.embedding ? { ...form.embedding, apiKey: '' } : null,
+      llm: form.llm ? { ...form.llm, apiKey: '' } : null,
+      answerLlm: form.answerLlm ? { ...form.answerLlm, apiKey: '' } : null,
+    },
   };
 }
 
@@ -588,6 +612,8 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
         // A separate answer model on a provider no longer offered stays separate, with a model to choose.
         answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS) ?? (f.answerLlm ? blankLlm(LLM_PROVIDERS[0].id) : null),
         storage: sanitizeStorage(f.storage),
+        // Drafts saved before the database choice existed used the managed one.
+        database: sanitizeDatabaseChoice(f.database),
         name: f.name,
         description: typeof f.description === 'string' ? f.description : '',
       },
@@ -717,6 +743,74 @@ export function storageStepBlocker(storage: ContextEngineStorage): string | null
     if (err) return err;
   }
   return null;
+}
+
+// ── Database ────────────────────────────────────────────────────────────────
+
+/** Text that looks like a PEM certificate: a BEGIN CERTIFICATE line, then an END one. */
+export function isPemCertificate(value: string): boolean {
+  const pem = value.trim();
+  return pem.startsWith('-----BEGIN CERTIFICATE-----') && pem.includes('-----END CERTIFICATE-----');
+}
+
+/** The CA certificate is needed only when the engine checks who signed the server's certificate. */
+export const needsCaCertificate = (choice: Pick<DatabaseChoice, 'sslMode'>): boolean => choice.sslMode !== 'require';
+
+/** What is wrong with each own-server field, in form order; empty for the managed database. */
+export function databaseFieldErrors(choice: DatabaseChoice): Partial<Record<DatabaseField, string>> {
+  if (choice.mode === 'managed') return {};
+  const errors: Partial<Record<DatabaseField, string>> = {};
+  const host = choice.host.trim();
+  if (!host) errors.host = 'Enter the host';
+  else if (/\s|:\/\//.test(host)) errors.host = 'Enter a host name or IP address, without a scheme';
+  const port = choice.port.trim();
+  if (!port) errors.port = 'Enter the port';
+  else if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) errors.port = 'Enter a port from 1 to 65535';
+  if (!nonEmpty(choice.database)) errors.database = 'Enter the database name';
+  if (!nonEmpty(choice.username)) errors.username = 'Enter the username';
+  // The password goes as typed, so only an empty one is missing.
+  if (choice.password === '') errors.password = 'Enter the password';
+  if (needsCaCertificate(choice)) {
+    if (!nonEmpty(choice.caCertificate)) errors.caCertificate = `Paste the CA certificate; ${choice.sslMode} needs it`;
+    else if (!isPemCertificate(choice.caCertificate)) errors.caCertificate = 'Paste a PEM certificate that starts with -----BEGIN CERTIFICATE-----';
+  }
+  return errors;
+}
+
+/** Why the own-server details are not usable yet, or null when they are (or the managed database is chosen). */
+export function databaseStepBlocker(choice: DatabaseChoice): string | null {
+  return Object.values(databaseFieldErrors(choice))[0] ?? null;
+}
+
+/** The own-server details as the BFF takes them. Call after {@link databaseStepBlocker} returns null. */
+export function toExternalDatabase(choice: DatabaseChoice): ExternalDatabase {
+  return {
+    host: choice.host.trim(),
+    port: Number(choice.port.trim()),
+    database: choice.database.trim(),
+    username: choice.username.trim(),
+    password: choice.password,
+    sslMode: choice.sslMode,
+    ...(needsCaCertificate(choice) ? { caCertificate: choice.caCertificate.trim() } : {}),
+  };
+}
+
+/** A database choice restored from storage, every field coerced; anything unreadable is the managed default. */
+export function sanitizeDatabaseChoice(raw: unknown): DatabaseChoice {
+  const base = defaultDatabaseChoice();
+  if (!raw || typeof raw !== 'object') return base;
+  const r = raw as Partial<Record<keyof DatabaseChoice, unknown>>;
+  const str = (v: unknown, fallback: string): string => (typeof v === 'string' ? v : fallback);
+  return {
+    mode: r.mode === 'external' ? 'external' : 'managed',
+    host: str(r.host, base.host),
+    port: str(r.port, base.port),
+    database: str(r.database, base.database),
+    username: str(r.username, base.username),
+    password: str(r.password, base.password),
+    sslMode: r.sslMode === 'require' || r.sslMode === 'verify-ca' ? r.sslMode : base.sslMode,
+    caCertificate: str(r.caCertificate, base.caCertificate),
+  };
 }
 
 /** The engine managed store of one kind: embedded in the engine, or on the engine's own PostgreSQL server. */
@@ -1738,6 +1832,8 @@ export interface BffCreateEngineRequest {
   displayName: string;
   description?: string;
   models: { llm: BffEngineModel; embedding: BffEngineModel; answer?: BffEngineModel; answersEnabled: boolean };
+  /** The user's own PostgreSQL; absent, WSO2 Cloud manages one for the engine. */
+  database?: ExternalDatabase;
 }
 
 /** `POST /context-engines`. A separate answer model reuses the language model's key when it has none of its own. */
@@ -1749,6 +1845,7 @@ export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEn
     displayName: input.name.trim(),
     ...(input.description.trim() ? { description: input.description.trim() } : {}),
     models: { llm: model(input.llm), embedding: model(input.embedding), ...(answer ? { answer } : {}), answersEnabled: input.answers.enabled },
+    ...(input.database ? { database: input.database } : {}),
   };
 }
 

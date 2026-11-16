@@ -717,6 +717,15 @@ export const storageOptionSx = (selected: boolean) =>
 /** The fields under a selected option: full card width, no indent, so pickers and buttons have room. */
 export const storageOptionBodySx = { mt: 1.5, minWidth: 0 } as const;
 
+/** The database choice: two stacked options above the per-store cards. */
+export const databaseChoiceSx = { display: 'grid', gap: 1.5, mb: 3, maxWidth: 720 } as const;
+
+/** Host and port share a row; the port stays narrow. */
+export const databaseHostRowSx = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 140px' }, gap: 2 } as const;
+
+/** A pasted PEM keeps its line breaks readable. */
+export const pemFieldSx = { '& textarea': { fontFamily: 'monospace', fontSize: 13 } } as const;
+
 export const storageEmptySx = {
   p: 1.75,
   border: '1px dashed',

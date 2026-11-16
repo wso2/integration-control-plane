@@ -17,6 +17,9 @@
  */
 
 import type {
+  DatabaseChoice,
+  DatabaseSslMode,
+  EngineDatabaseKind,
   ContextEngineStorage,
   ContextQueryMode,
   ContextSourceConfig,
@@ -910,6 +913,21 @@ export const STORAGE_BACKEND_BY_KIND: Record<StorageKind, StorageBackendInfo> = 
 export function defaultStorage(): ContextEngineStorage {
   return { vector: { mode: 'managed' }, relational: { mode: 'managed' }, graph: { mode: 'managed' } };
 }
+
+/** WSO2 Cloud manages the engine's database until the user brings their own. */
+export function defaultDatabaseChoice(): DatabaseChoice {
+  return { mode: 'managed', host: '', port: '5432', database: '', username: '', password: '', sslMode: 'verify-full', caCertificate: '' };
+}
+
+/** Where an engine's data lives, as the wizard and the overview name it. */
+export const ENGINE_DATABASE_LABEL: Record<EngineDatabaseKind, string> = { managed: 'Managed by WSO2 Cloud', external: 'Your own PostgreSQL' };
+
+/** The TLS modes the engine accepts for the user's own server, strictest last. */
+export const DATABASE_SSL_MODES: { value: DatabaseSslMode; label: string; hint: string }[] = [
+  { value: 'require', label: 'require', hint: 'Encrypts the connection without checking the server certificate.' },
+  { value: 'verify-ca', label: 'verify-ca', hint: 'Checks that a trusted CA signed the server certificate.' },
+  { value: 'verify-full', label: 'verify-full', hint: 'Checks the CA and that the certificate matches the host.' },
+];
 
 /** Default logical database name suggested for an Infrastructure server. */
 export const STORAGE_DEFAULT_DATABASE: Record<StorageKind, string> = { vector: 'context_vectors', relational: 'context_engine', graph: 'neo4j' };

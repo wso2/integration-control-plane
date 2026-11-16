@@ -66,6 +66,8 @@ export interface ContextEngine {
   startedAt?: string;
   /** When the engine was last asked to restart; a running pod that started before it is still restarting. */
   restartedAt?: string;
+  /** Where the engine keeps its data: a PostgreSQL server WSO2 Cloud manages for it, or the user's own. */
+  database: EngineDatabaseKind;
 }
 
 export interface ContextEngineAccess {
@@ -525,6 +527,45 @@ export type ContextEngineStorage = Record<StorageKind, StorageSelection>;
 /** What a new engine's engine managed stores are: files in its volume, or a PostgreSQL server of its own. */
 export type EngineManagedServer = 'embedded' | 'postgres';
 
+/** Where an engine keeps its data: a server WSO2 Cloud manages for it, or the user's own PostgreSQL. */
+export type EngineDatabaseKind = 'managed' | 'external';
+
+/** How strictly the engine checks the server's TLS certificate. verify-ca and verify-full need the CA certificate. */
+export type DatabaseSslMode = 'require' | 'verify-ca' | 'verify-full';
+
+/** The user's own PostgreSQL server, as the BFF takes it on create and on a connection check. */
+export interface ExternalDatabase {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  sslMode: DatabaseSslMode;
+  /** PEM; set only for verify-ca and verify-full. */
+  caCertificate?: string;
+}
+
+/** The wizard's database choice. The own-server fields stay as typed (port included) while the user switches back and forth. */
+export interface DatabaseChoice {
+  mode: EngineDatabaseKind;
+  host: string;
+  port: string;
+  database: string;
+  username: string;
+  password: string;
+  sslMode: DatabaseSslMode;
+  caCertificate: string;
+}
+
+/** The own-server fields the wizard checks one by one. */
+export type DatabaseField = 'host' | 'port' | 'database' | 'username' | 'password' | 'caCertificate';
+
+/** A successful connection check: the server is reachable and has pgvector. */
+export interface DatabaseCheckResult {
+  serverVersion: string;
+  pgvectorVersion: string;
+}
+
 /** How the engine reports one store back, without credentials. */
 export interface StorageSummary {
   provider: string;
@@ -549,6 +590,7 @@ export interface ContextEngineForm {
   /** A separate model for writing answers; null uses the language model. */
   answerLlm: LlmConfig | null;
   storage: ContextEngineStorage;
+  database: DatabaseChoice;
   name: string;
   description: string;
 }
@@ -570,6 +612,8 @@ export interface CreateContextEngineInput {
   /** Whether the engine offers answers, and the model that writes them; a null model is the language model. */
   answers: { enabled: boolean; model: LlmConfig | null };
   storage: ContextEngineStorage;
+  /** The user's own server; absent, WSO2 Cloud manages one for the engine. */
+  database?: ExternalDatabase;
 }
 
 /** What is set up on an engine once it runs: the creator's grant, the sources and the query roles. */
