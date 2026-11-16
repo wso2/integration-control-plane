@@ -18,7 +18,7 @@
 
 import { Box, ButtonBase, Chip, Collapse, IconButton, Table, TableBody, TableCell, TableHead, TablePagination, TableRow, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronRight } from '@wso2/oxygen-ui-icons-react';
-import { Fragment, useMemo, useState, type JSX } from 'react';
+import { Fragment, memo, useMemo, useState, type JSX } from 'react';
 import { SERVICE_TRACE_LIST_LIMIT } from '../../constants/integrationTraces';
 import { formatDuration, traceWaterfall, tracesOfService } from '../../utils/integrationTraces';
 import { formatDateTime } from '../../utils/time';
@@ -213,7 +213,7 @@ function TraceTable({ rows }: { rows: ServiceTrace[] }): JSX.Element {
 }
 
 /** Services found in the spans, and the newest traces of the one selected. */
-export default function ServiceTraces({ summaries, traces, spans }: ServiceTracesProps): JSX.Element {
+function ServiceTraces({ summaries, traces, spans }: ServiceTracesProps): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   // A refresh can drop the selected service, so fall back to the busiest one rather than show nothing.
   const active = summaries.find((s) => s.service === selected) ?? summaries[0];
@@ -233,3 +233,6 @@ export default function ServiceTraces({ summaries, traces, spans }: ServiceTrace
     </>
   );
 }
+
+// Its props change only when the deferred spans do, not on every span batch.
+export default memo(ServiceTraces);

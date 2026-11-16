@@ -18,7 +18,7 @@
 
 import { PageContent, Typography } from '@wso2/oxygen-ui';
 import { Waypoints } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type JSX } from 'react';
+import { useDeferredValue, useMemo, useState, type JSX } from 'react';
 import { useOrgs } from '../hooks/useOrg';
 import { useProjects } from '../hooks/useProjects';
 import { useComponentByHandler } from '../hooks/useComponents';
@@ -70,7 +70,11 @@ function ServiceSections({ traceSpans, page, request }: { traceSpans: TraceSpans
 /** Everything under the toolbar, for one environment and window. */
 function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.Element {
   const traces = useComponentTraces(request);
-  const spans = useTraceSpans(request, traces.data?.traces);
+  const live = useTraceSpans(request, traces.data?.traces);
+  // Every span batch is a new result; deferring it lets React skip intermediate ones while spans stream in.
+  // With nothing read yet, the deferred value could still be another environment's, so the live one is shown.
+  const deferred = useDeferredValue(live);
+  const spans = live.read === 0 ? live : deferred;
   // Counted from the spans read so far, so it shows once the first trace's arrive.
   const services = useMemo(() => (spans.read > 0 ? new Set(spans.spans.map((s) => s.serviceName)).size : undefined), [spans.read, spans.spans]);
 
@@ -96,13 +100,7 @@ function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.El
   }
 
   const sections =
-    spans.read === 0 && spans.pending > 0 ? (
-      <TraceSectionsSkeleton />
-    ) : spans.read === 0 ? (
-      <TracesError title="Couldn't load the spans of these traces" onRetry={spans.retryFailed} />
-    ) : (
-      <ServiceSections traceSpans={spans} page={traces.data} request={request} />
-    );
+    spans.read === 0 && spans.pending > 0 ? <TraceSectionsSkeleton /> : spans.read === 0 ? <TracesError title="Couldn't load the spans of these traces" onRetry={live.retryFailed} /> : <ServiceSections traceSpans={spans} page={traces.data} request={request} />;
   // Not every trace's services are known while spans load, after some fail, or past the list's limit.
   const servicesLowerBound = spans.pending > 0 || spans.failed > 0 || traces.data.truncated;
 
