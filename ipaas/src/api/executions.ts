@@ -26,7 +26,7 @@
 
 import { bff, q, seg } from './_client';
 import { queryObsLogEntries, resolveComponentProject, type ObsLogEntry } from './logs';
-import type { StopScheduleInput, ExecutionConfigs, TaskExecution, ExecutionLogEntry, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, TriggerRunResult, RuntimeArgument } from '../types/executions';
+import type { StopScheduleInput, ExecutionConfigs, ExecutionTrigger, TaskExecution, ExecutionLogEntry, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, TriggerRunResult, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
 import { HttpError } from '../types/http';
 
@@ -43,6 +43,7 @@ interface BffExecution {
   completionTime?: string;
   revisionId?: string;
   failedReason?: string;
+  trigger?: ExecutionTrigger;
 }
 
 // BFF Schedule (CronJob spec) from GET /components/{name}/schedules/{envId}.
@@ -73,6 +74,7 @@ export function toTaskExecution(e: BffExecution): TaskExecution {
     revisionId: e.revisionId ?? '',
     failedReason: e.failedReason ?? '',
     status: e.status ?? '',
+    trigger: e.trigger,
     arguments: null,
   };
 }

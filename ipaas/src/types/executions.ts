@@ -24,6 +24,9 @@ export interface ExecutionConfigs {
   retryCount?: number;
 }
 
+/** How a run started. */
+export type ExecutionTrigger = 'Manual' | 'Scheduled';
+
 export interface TaskExecution {
   id: string;
   startTime: string;
@@ -32,6 +35,8 @@ export interface TaskExecution {
   revisionId: string;
   failedReason: string;
   status: string;
+  /** Absent when the backend cannot tell how the run started. */
+  trigger?: ExecutionTrigger;
   arguments?: string | null;
 }
 
