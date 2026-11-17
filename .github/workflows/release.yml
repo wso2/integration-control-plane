@@ -200,26 +200,29 @@ jobs:
 
       # Commit the version edits so the tag created below points at source that says the released
       # version. The commit is only reachable through the tag; the branch itself is not pushed, so
-      # this works on protected branches. The build runs from this commit's tree.
+      # this works on protected branches. The build runs from this commit's tree, while HEAD stays
+      # on the run's commit, which is the one GitHub knows (code scanning reports against HEAD).
       - name: Commit release version
         if: ${{ github.event_name == 'workflow_dispatch' }}
         id: release_commit
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_AUTHOR_NAME="github-actions[bot]" GIT_COMMITTER_NAME="github-actions[bot]"
+          export GIT_AUTHOR_EMAIL="41898282+github-actions[bot]@users.noreply.github.com" GIT_COMMITTER_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
           git add gradle.properties icp_server/config.bal frontend/public/config.json icp_server/Ballerina.toml icp_server/Dependencies.toml
-          if git diff --cached --quiet; then
+          if git diff --cached --quiet HEAD; then
             echo "Source already at ${VERSION}; tagging the checked-out commit as is."
+            SHA=$(git rev-parse HEAD)
           else
-            git commit -m "Release v${VERSION}"
+            SHA=$(git commit-tree "$(git write-tree)" -p HEAD -m "Release v${VERSION}")
+            echo "Created release commit ${SHA}"
           fi
-          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-            echo "ERROR: unexpected uncommitted changes; the built tree would not match the tagged commit."
-            git status --short
+          if ! git diff --quiet "$SHA"; then
+            echo "ERROR: the working tree differs from the release commit; the built tree would not match the tagged commit."
+            git diff --stat "$SHA"
             exit 1
           fi
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
 
       # Only packages the distribution (frontend + backend build), skipping the unit/E2E test
       # suite — those already gate every PR into main via pr-check.yml, so re-running them here
@@ -268,8 +271,6 @@ jobs:
         if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
         with:
           sarif_file: "trivy-results.sarif"
-          ref: ${{ github.ref }}
-          sha: ${{ github.sha }}
 
       - name: Trivy security gate (block on HIGH/CRITICAL)
         uses: aquasecurity/trivy-action@0.35.0
