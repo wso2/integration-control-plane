@@ -22,7 +22,7 @@
  * once the SDK has settled — before any child renders, so before any request.
  */
 
-import { isExpired } from './jwt';
+import { decodeJwtPayload, isExpired } from './jwt';
 
 export interface CloudUser {
   userId: string;
@@ -49,6 +49,8 @@ interface Connection {
   getAccessToken: () => Promise<string>;
   /** Ends the session locally once the token has expired anyway. */
   onExpired: () => void;
+  /** Swaps the access token for a new one now. Unset on the gateway, which holds the token. */
+  refreshAccessToken?: () => Promise<void>;
   checkSession?: () => Promise<boolean>;
   observabilityToken?: () => Promise<string>;
 }
@@ -66,6 +68,28 @@ export function disconnect(): void {
 export async function getAccessToken(): Promise<string | null> {
   if (!connection) return null;
   return (await connection.getAccessToken()) || null;
+}
+
+/**
+ * Refreshes the access token when it expires within `ms`, before a request whose token the BFF
+ * keeps using after it has answered. The SDK refreshes on its own only seconds before expiry. A
+ * refresh that fails leaves the current token, and a gateway session is left alone.
+ */
+export async function refreshTokenExpiringWithin(ms: number): Promise<void> {
+  const refresh = connection?.refreshAccessToken;
+  if (!refresh) return;
+  const token = await getAccessToken();
+  if (!token || expiresAfter(token, Date.now() + ms)) return;
+  await refresh().catch(() => undefined);
+}
+
+function expiresAfter(token: string, time: number): boolean {
+  try {
+    const exp = decodeJwtPayload(token).exp;
+    return typeof exp === 'number' && exp * 1000 > time;
+  } catch {
+    return false;
+  }
 }
 
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {

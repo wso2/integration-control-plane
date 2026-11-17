@@ -68,6 +68,17 @@ export interface ContextEngine {
   restartedAt?: string;
   /** Where the engine keeps its data: a PostgreSQL server WSO2 Cloud manages for it, the user's own, or its own pod. */
   database: EngineDataLocation;
+  /** Adding the sources it was created with, which the BFF does once it runs; unset when it was created with none. */
+  setup?: ContextEngineSetup;
+}
+
+/** Interrupted is a setup still pending long after it began, which nothing is finishing. */
+export type ContextEngineSetupStatus = 'pending' | 'done' | 'failed' | 'interrupted';
+
+export interface ContextEngineSetup {
+  status: ContextEngineSetupStatus;
+  /** The steps that failed. */
+  warnings: string[];
 }
 
 export interface ContextEngineAccess {
@@ -209,6 +220,8 @@ export interface SourceFieldDef {
   verbatim?: boolean;
   /** Accepted file types for a `file` field, as an input `accept` string (e.g. ".rml.ttl,.ttl"). */
   accept?: string;
+  /** The most characters the value may have. */
+  maxLength?: number;
   /** Render this field only when its condition is met; always shown when absent. */
   showWhen?: SourceFieldCondition;
   /**
@@ -641,19 +654,6 @@ export interface CreateContextEngineInput {
   storage: ContextEngineStorage;
   /** The user's own server; absent, WSO2 Cloud manages one for the engine. */
   database?: ExternalDatabase;
-}
-
-/** What is set up on an engine once it runs: the creator's grant, the sources and the query roles. */
-export interface ContextEngineSetupInput {
-  sources: ContextSourceConfig[];
-  roles: string[];
-}
-
-export interface ContextEngineSetupResult {
-  /** Engine ids of the registered sources, by the name the wizard gave them. */
-  sources: Record<string, string>;
-  /** Steps the engine refused; what succeeded is kept. */
-  warnings: string[];
 }
 
 /** A source run by an integration the BFF deploys next to the engine. Settings never come back. */
