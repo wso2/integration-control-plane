@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Chip, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
-import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { ENGINE_DATABASE_LABEL, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { useEngineManagedServer } from '../../../hooks/useContextEngine';
 import { answerChoice, modelProviderName, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import SourceMark from '../SourceMark';
@@ -191,22 +191,26 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, onEdit
 
         <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(3)}>
           <Box sx={reviewDetailGridSx}>
-            {STORAGE_BACKENDS.map((b) => {
-              const label = b.title.replace(' database', '');
-              // An engine managed store depends on the deployment, which the BFF reports.
-              const sum = managedServer.data ? summarizeStorage(b.kind, form.storage[b.kind], managedServer.data) : null;
-              return sum ? (
-                <Detail key={b.kind} label={label} value={sum.primary} secondary={sum.secondary} />
-              ) : (
-                <Box key={b.kind} sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" sx={mutedSx}>
-                    {label}
-                  </Typography>
-                  <Skeleton variant="text" width={110} />
-                  <Skeleton variant="text" width={140} />
-                </Box>
-              );
-            })}
+            {form.database.mode === 'external' ? (
+              <Detail label="Database" value={ENGINE_DATABASE_LABEL.external} secondary={`${form.database.host.trim()}:${form.database.port.trim()} · ${form.database.database.trim()} · ${form.database.sslMode}`} />
+            ) : (
+              STORAGE_BACKENDS.map((b) => {
+                const label = b.title.replace(' database', '');
+                // An engine managed store depends on the deployment, which the BFF reports.
+                const sum = managedServer.data ? summarizeStorage(b.kind, form.storage[b.kind], managedServer.data) : null;
+                return sum ? (
+                  <Detail key={b.kind} label={label} value={sum.primary} secondary={sum.secondary} />
+                ) : (
+                  <Box key={b.kind} sx={{ minWidth: 0 }}>
+                    <Typography variant="caption" sx={mutedSx}>
+                      {label}
+                    </Typography>
+                    <Skeleton variant="text" width={110} />
+                    <Skeleton variant="text" width={140} />
+                  </Box>
+                );
+              })
+            )}
           </Box>
         </SummaryCard>
       </Stack>

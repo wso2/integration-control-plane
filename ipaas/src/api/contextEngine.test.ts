@@ -32,10 +32,11 @@ vi.mock('./_client', async (importOriginal) => ({ ...(await importOriginal<typeo
 vi.mock('./_contextEngineAccess', async (importOriginal) => ({ ...(await importOriginal<typeof import('./_contextEngineAccess')>()), engineRequest }));
 
 import { BffError } from './_client';
-import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, toEngineManagedServer, updateContextModels } from './contextEngine';
-import type { ContextSourceConfig, CreateContextEngineInput } from '../types/contextEngine';
+import { checkContextEngineDatabase, createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, toEngineManagedServer, updateContextModels } from './contextEngine';
+import type { ContextSourceConfig, CreateContextEngineInput, ExternalDatabase } from '../types/contextEngine';
 
 const ENGINE = 'docs';
+const ownDb: ExternalDatabase = { host: 'db.example.com', port: 5432, database: 'context', username: 'engine', password: 'p', sslMode: 'require' };
 const bffEngine = { name: 'docs', displayName: 'Docs', description: 'Product docs', status: 'running', createdAt: '2026-10-29T00:00:00Z', consoleApiUrl: 'https://gw/c', publicApiUrl: 'https://gw/p/' };
 
 beforeEach(() => {
@@ -65,7 +66,20 @@ describe('engines', () => {
     expect(bff.get).toHaveBeenCalledWith('/context-engines');
     expect(engines[0]).toMatchObject({ id: ENGINE, handle: 'docs', name: 'Docs', state: 'ready', publicApiUrl: 'https://gw/p' });
     expect(engines[1]).toMatchObject({ id: 'hr', name: 'hr', state: 'unknown', statusReason: 'could not read', description: '' });
+    // An engine whose BFF names no database keeps its stores in its own pod, not on a managed server.
+    expect(engines.map((e) => e.database)).toEqual(['engine', 'engine']);
     expect(engineRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['managed', 'managed'],
+    ['external', 'external'],
+    ['', 'engine'],
+    [undefined, 'engine'],
+  ] as const)('reads the database %j as %s', async (database, want) => {
+    bff.get.mockResolvedValueOnce({ items: [{ ...bffEngine, database }] });
+    const [engine] = await listContextEngines();
+    expect(engine.database).toBe(want);
   });
 
   it("takes API and MCP access from the BFF, not from the engine's own configuration", async () => {
@@ -138,6 +152,47 @@ describe('engines', () => {
         answersEnabled: true,
       },
     });
+  });
+
+  it("reads where an engine keeps its data, and names the user's own server on its PostgreSQL stores", async () => {
+    bff.get.mockResolvedValueOnce({ ...bffEngine, database: 'external' });
+    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { storage: { vector: { provider: 'pgvector' }, relational: { provider: 'postgres' }, graph: { provider: 'kuzu' } } } : []));
+
+    const engine = await getContextEngine(ENGINE);
+
+    expect(engine.database).toBe('external');
+    expect(engine.storage).toMatchObject({ vector: { label: 'PostgreSQL + pgvector', detail: 'Your own PostgreSQL' }, relational: { detail: 'Your own PostgreSQL' }, graph: { detail: 'Engine managed · built in' } });
+  });
+
+  it('sends the own database with the create request', async () => {
+    bff.post.mockResolvedValueOnce({ ...bffEngine, status: 'provisioning', database: 'external' });
+    const model = { provider: 'openai', model: 'm', apiKey: 'k', azureBaseUrl: '', azureApiVersion: '' } as const;
+    const input: CreateContextEngineInput = {
+      name: 'Docs',
+      description: '',
+      sources: [],
+      roles: [],
+      embedding: model,
+      llm: model,
+      answers: { enabled: false, model: null },
+      storage: { vector: { mode: 'managed' }, relational: { mode: 'managed' }, graph: { mode: 'managed' } },
+      database: ownDb,
+    };
+
+    await expect(createContextEngine(input)).resolves.toMatchObject({ database: 'external' });
+    expect(bff.post).toHaveBeenCalledWith('/context-engines', expect.objectContaining({ database: ownDb }));
+  });
+
+  it("surfaces the BFF's reason when it cannot use the own database", async () => {
+    bff.post.mockRejectedValueOnce(new BffError(400, JSON.stringify({ error: 'database_unusable', message: 'The database has no pgvector extension.' })));
+    await expect(checkContextEngineDatabase(ownDb)).rejects.toMatchObject({ status: 400, message: 'The database has no pgvector extension.' });
+  });
+
+  it('checks the own database with the bare details and returns the versions', async () => {
+    bff.post.mockResolvedValueOnce({ ok: true, serverVersion: '17.2', pgvectorVersion: '0.8.0' });
+
+    await expect(checkContextEngineDatabase(ownDb)).resolves.toEqual({ serverVersion: '17.2', pgvectorVersion: '0.8.0' });
+    expect(bff.post).toHaveBeenCalledWith('/context-engine-database-checks', ownDb);
   });
 
   it('turns a BFF refusal into an HttpError with its status', async () => {

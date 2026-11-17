@@ -36,7 +36,7 @@ import {
   modelsStepBlocker,
   nameStepBlocker,
   sourcesStepBlocker,
-  storageStepBlocker,
+  storageAndDatabaseBlocker,
   toCreateInput,
   visibilityTags,
   withSourceVisibilityRules,
@@ -118,7 +118,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     sourcesStepBlocker(form.sources),
     // null, — 'Grant Access' step hidden
     modelsStepBlocker(form),
-    storageStepBlocker(form.storage),
+    storageAndDatabaseBlocker(form),
   ];
   // The review step itself asks for nothing, so Create shows the first step still incomplete.
   const stepBlocker = [...setupBlockers, setupBlockers.find((b) => b !== null) ?? null];
@@ -198,7 +198,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 onAnswerLlmChange={(value) => dispatch({ type: 'answerLlm', value })}
               />
             )}
-            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
+            {activeStep === 3 && <StorageStep database={form.database} onDatabaseChange={(value) => dispatch({ type: 'database', value })} />}
             {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} onEdit={setActiveStep} />}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>

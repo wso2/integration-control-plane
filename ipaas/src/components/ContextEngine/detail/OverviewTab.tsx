@@ -23,7 +23,7 @@ import { useAddContextSource, useAskedFlag, useConnectViewedFlag, useContextEngi
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { useCan } from '../../../hooks/useCan';
 import { Scopes } from '../../../constants/permissions';
-import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { ENGINE_DATABASE_LABEL, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { answersFromIngestion, checkStagedFile, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
@@ -288,6 +288,14 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
 
         <Grid size={{ xs: 12, md: 4 }}>
           <Card title="Storage" action={<LockedChip title="Storage is fixed once the engine is created." />}>
+            <Box sx={summaryRowSx}>
+              <Typography variant="body2" sx={mutedSx}>
+                Data
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>
+                {ENGINE_DATABASE_LABEL[engine.database]}
+              </Typography>
+            </Box>
             {STORAGE_BACKENDS.map((b) => {
               const sum = engine.storage?.[b.kind];
               return (

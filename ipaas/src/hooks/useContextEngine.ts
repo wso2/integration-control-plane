@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { useParams } from 'react-router';
 import {
   addContextSource,
+  checkContextEngineDatabase,
   createContextApiKey,
   createContextEngine,
   deleteContextEngine,
@@ -60,7 +61,7 @@ import {
 import { everyoneRoles, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { clearQuestions } from './contextQuestions';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -272,6 +273,11 @@ export function useCreateContextEngine() {
       return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
     },
   });
+}
+
+/** Try the user's own PostgreSQL before creating an engine on it. Nothing is cached: each check connects again. */
+export function useCheckContextEngineDatabase() {
+  return useMutation({ mutationFn: (database: ExternalDatabase) => checkContextEngineDatabase(database) });
 }
 
 /** Delete an engine; the list and page show it as deleting until it is gone. */

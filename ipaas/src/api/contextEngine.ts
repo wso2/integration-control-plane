@@ -27,7 +27,7 @@
  * Reads that hit a missing route degrade to an empty section so the detail page still renders.
  */
 
-import { CONTEXT_ENGINE_ID, CREATE_TOKEN_MIN_VALIDITY_MS } from '../constants/contextEngine';
+import { CONTEXT_ENGINE_ID, CREATE_TOKEN_MIN_VALIDITY_MS, ENGINE_DATABASE_LABEL } from '../constants/contextEngine';
 import { refreshTokenExpiringWithin } from '../auth';
 import { audienceMappingFromRules, deliveryIdentity, integrationTypeFor, isRestartPending, rolesFromGrants, summarizeEngineProgress, toBffCreateRequest, toIntegrationRequest, toSourceRegistration } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
@@ -57,6 +57,8 @@ import type {
   ContextSource,
   CreateContextEngineInput,
   CreatedContextApiKey,
+  DatabaseCheckResult,
+  ExternalDatabase,
   IngestFileInput,
   ContextSourceConfig,
   UpdateContextSourceInput,
@@ -66,6 +68,7 @@ import type {
   SourceIndexingState,
   SourceProgress,
   SourceReadingState,
+  EngineDataLocation,
   EngineManagedServer,
   StorageKind,
   StorageSummary,
@@ -229,6 +232,8 @@ interface BffEngine {
   startedAt?: string;
   restartedAt?: string;
   answerOwnKey?: boolean;
+  /** managed or external; empty or absent for an engine that keeps its stores in its pod, and from a BFF older than databases. */
+  database?: string;
   setup?: { status: string; warnings?: string[] };
 }
 
@@ -302,6 +307,9 @@ const SETUP_STATUSES: ReadonlySet<string> = new Set(['pending', 'done', 'failed'
 
 const ENGINE_STATES: Record<string, ContextEngineState> = { provisioning: 'provisioning', starting: 'starting', running: 'ready', failed: 'failed', deleting: 'deleting' };
 
+/** Where the BFF says an engine keeps its stores; anything else keeps them in its pod. */
+const toDataLocation = (raw: string | undefined): EngineDataLocation => (raw === 'managed' || raw === 'external' ? raw : 'engine');
+
 const toEngine = (raw: BffEngine): ContextEngine => ({
   id: raw.name,
   handle: raw.name,
@@ -314,6 +322,7 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
   ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
   ...(raw.restartedAt ? { restartedAt: raw.restartedAt } : {}),
+  database: toDataLocation(raw.database),
   ...(raw.setup && SETUP_STATUSES.has(raw.setup.status) ? { setup: { status: raw.setup.status as ContextEngineSetup['status'], warnings: raw.setup.warnings ?? [] } } : {}),
 });
 
@@ -396,20 +405,24 @@ const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = 
   lancedb: { label: 'LanceDB', detail: 'Engine managed · built in' },
   sqlite: { label: 'SQLite', detail: 'Engine managed · built in' },
   kuzu: { label: 'Kuzu', detail: 'Engine managed · built in' },
-  // The console offers PostgreSQL only as the engine's own server, which the BFF creates with it.
+  // PostgreSQL is the engine's own server, which the BFF creates with it, unless the user brought one (see toStorage).
   pgvector: { label: 'PostgreSQL + pgvector', detail: 'Engine managed · own server' },
   postgres: { label: 'PostgreSQL', detail: 'Engine managed · own server' },
   neo4j: { label: 'Neo4j', detail: 'External' },
 };
 
+/** The PostgreSQL stores, which live on the user's own server when they brought one. */
+const POSTGRES_PROVIDERS = new Set(['pgvector', 'postgres']);
+
 /** Per-store placement as the engine reports it; null until it reports any. */
-const toStorage = (raw: RawEngineConfig | null): Record<StorageKind, StorageSummary> | null => {
+const toStorage = (raw: RawEngineConfig | null, database: EngineDataLocation): Record<StorageKind, StorageSummary> | null => {
   const st = raw?.storage;
   if (!st) return null;
   const one = (kind: StorageKind): StorageSummary => {
     const s = st[kind];
     const known = s?.provider ? STORE_PROVIDER_LABEL[s.provider] : undefined;
-    return { provider: s?.provider ?? 'unknown', label: known?.label ?? (s?.provider ? s.provider : 'Not reported'), detail: known?.detail };
+    const detail = database === 'external' && s?.provider && POSTGRES_PROVIDERS.has(s.provider) ? ENGINE_DATABASE_LABEL.external : known?.detail;
+    return { provider: s?.provider ?? 'unknown', label: known?.label ?? (s?.provider ? s.provider : 'Not reported'), detail };
   };
   return { vector: one('vector'), relational: one('relational'), graph: one('graph') };
 };
@@ -543,7 +556,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     models: { ...toModels(config), ...(typeof raw.answerOwnKey === 'boolean' ? { answerOwnKey: raw.answerOwnKey } : {}) },
     queryRoles: rolesFromGrants(grants.map(toGrant)),
     exposure: toExposure(config, engine.access),
-    storage: toStorage(config),
+    storage: toStorage(config, engine.database),
   };
 }
 
@@ -564,6 +577,12 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
   const request = toBffCreateRequest(input);
   if (request.setup) await refreshTokenExpiringWithin(CREATE_TOKEN_MIN_VALIDITY_MS);
   return toEngine(await viaBff(() => bff.post<BffEngine>('/context-engines', request)));
+}
+
+/** POST /context-engine-database-checks: the BFF connects to the user's own server; a 400 carries why it is not usable. */
+export async function checkContextEngineDatabase(database: ExternalDatabase): Promise<DatabaseCheckResult> {
+  const raw = await viaBff(() => bff.post<{ ok: true; serverVersion: string; pgvectorVersion: string }>('/context-engine-database-checks', database));
+  return { serverVersion: raw.serverVersion, pgvectorVersion: raw.pgvectorVersion };
 }
 
 /** Register a source: on the engine for one the browser feeds, through the BFF for one an integration runs. */
