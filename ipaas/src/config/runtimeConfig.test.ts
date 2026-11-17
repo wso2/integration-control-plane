@@ -78,3 +78,25 @@ describe('loadConfig: console analytics', () => {
     expect(window.API_CONFIG.consoleAnalyticsEnabled).toBe(false);
   });
 });
+
+describe('loadConfig: tracking tier', () => {
+  it.each(['dev', 'stage', 'prod', 'off'] as const)('reads TRACKING_ENV %s', async (value) => {
+    await load({ TRACKING_ENV: value });
+    expect(window.API_CONFIG.trackingEnv).toBe(value);
+  });
+
+  it('is off when unset or empty', async () => {
+    await load({});
+    expect(window.API_CONFIG.trackingEnv).toBe('off');
+    await load({ TRACKING_ENV: '' });
+    expect(window.API_CONFIG.trackingEnv).toBe('off');
+  });
+
+  it('is off, with a warning, for an unrecognized value', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await load({ TRACKING_ENV: 'production' });
+    expect(window.API_CONFIG.trackingEnv).toBe('off');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('TRACKING_ENV "production"'));
+    warn.mockRestore();
+  });
+});
