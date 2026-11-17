@@ -43,6 +43,10 @@ on:
         description: "Product Integrator branch to update"
         required: false
         type: string
+      next_version:
+        description: "Next development version for the post-release bump PR (default: next patch, e.g. 2.1.1-SNAPSHOT)"
+        required: false
+        type: string
 
 concurrency:
   group: release-${{ inputs.version || github.ref_name }}
@@ -54,6 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
       security-events: write
 
     steps:
@@ -137,6 +142,20 @@ jobs:
             }
             core.setFailed(`Release ${tag} already exists; refusing to modify it.`);
 
+      # A pushed tag already points at a commit we can't change, so the source it tags must
+      # already carry the release version. (A manual run commits the version itself; see
+      # "Commit release version" below.)
+      - name: Check tagged source version
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CURRENT=$(grep '^project\.version=' gradle.properties | cut -d= -f2)
+          if [ "$CURRENT" != "$VERSION" ]; then
+            echo "ERROR: tag v${VERSION} points at a commit whose gradle.properties has project.version=${CURRENT}."
+            echo "Delete the tag and run this workflow manually with version=${VERSION}; it commits the version and tags that commit."
+            exit 1
+          fi
+
       - name: Update version in gradle.properties
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -165,11 +184,42 @@ jobs:
           # Update VITE_ICP_VERSION in frontend source config
           jq --arg v "$VERSION" '.VITE_ICP_VERSION = $v' frontend/public/config.json > /tmp/config.json && mv /tmp/config.json frontend/public/config.json
 
+          # Update the Ballerina package version so the module version baked into icp-server.jar matches the release
+          sed -i "0,/^version = \".*\"/s//version = \"${ESCAPED_VERSION}\"/" icp_server/Ballerina.toml
+          sed -i "/^name = \"icp_server\"$/{n;s/^version = \".*\"/version = \"${ESCAPED_VERSION}\"/}" icp_server/Dependencies.toml
+
           # Verify changes
           echo "=== icp_server/config.bal ==="
           grep icpVersion icp_server/config.bal
           echo "=== frontend/public/config.json ==="
           jq .VITE_ICP_VERSION frontend/public/config.json
+          echo "=== icp_server/Ballerina.toml ==="
+          sed -n '1,5p' icp_server/Ballerina.toml
+          echo "=== icp_server/Dependencies.toml ==="
+          grep -A1 '^name = "icp_server"$' icp_server/Dependencies.toml
+
+      # Commit the version edits so the tag created below points at source that says the released
+      # version. The commit is only reachable through the tag; the branch itself is not pushed, so
+      # this works on protected branches. The build runs from this commit's tree.
+      - name: Commit release version
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        id: release_commit
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gradle.properties icp_server/config.bal frontend/public/config.json icp_server/Ballerina.toml icp_server/Dependencies.toml
+          if git diff --cached --quiet; then
+            echo "Source already at ${VERSION}; tagging the checked-out commit as is."
+          else
+            git commit -m "Release v${VERSION}"
+          fi
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            echo "ERROR: unexpected uncommitted changes; the built tree would not match the tagged commit."
+            git status --short
+            exit 1
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # Only packages the distribution (frontend + backend build), skipping the unit/E2E test
       # suite — those already gate every PR into main via pr-check.yml, so re-running them here
@@ -339,6 +389,17 @@ jobs:
             build/distribution/wso2-integration-control-plane-${{ steps.version.outputs.version }}.zip.md5
           retention-days: 30
 
+      - name: Push release tag
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.dry_run }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null; then
+            echo "ERROR: tag ${TAG} already exists on origin; refusing to move it."
+            exit 1
+          fi
+          git tag -a "${TAG}" -m "WSO2 Integration Control Plane ${TAG}" "${{ steps.release_commit.outputs.sha }}"
+          git push origin "refs/tags/${TAG}"
+
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
         id: create_release
@@ -356,6 +417,81 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # After a stable release, open a PR that moves the branch the release was cut from to the
+      # next development version, so gradle.properties never lags behind a released version.
+      - name: Compute next development version
+        if: ${{ !inputs.dry_run && !inputs.prerelease && steps.version.outputs.is_prerelease == 'false' }}
+        id: next_version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NEXT="${{ inputs.next_version }}"
+          if [ -z "$NEXT" ]; then
+            CORE="${VERSION%%+*}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CORE"
+            NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
+          fi
+
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            BASE="${{ github.ref_name }}"
+          else
+            BASE="${{ github.event.repository.default_branch }}"
+          fi
+
+          echo "next=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "base=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "Next development version: ${NEXT} (base branch: ${BASE})"
+
+      - name: Checkout base branch for version bump
+        if: ${{ steps.next_version.outputs.next != '' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.next_version.outputs.base }}
+          path: version-bump
+          persist-credentials: false
+
+      - name: Bump to next development version
+        if: ${{ steps.next_version.outputs.next != '' }}
+        id: bump
+        working-directory: version-bump
+        run: |
+          NEXT="${{ steps.next_version.outputs.next }}"
+          ESCAPED_NEXT=$(echo "$NEXT" | sed 's/[\/&]/\\&/g')
+          CURRENT=$(grep '^project\.version=' gradle.properties | cut -d= -f2)
+          echo "Current version on ${{ steps.next_version.outputs.base }}: ${CURRENT}"
+
+          # Never move a branch backwards, e.g. a 2.1.1 patch release when main is already on 2.2.0-SNAPSHOT
+          HIGHEST=$(printf '%s\n%s\n' "${CURRENT%-SNAPSHOT}" "${NEXT%-SNAPSHOT}" | sort -V | tail -n1)
+          if [ "${CURRENT}" == "${NEXT}" ] || [ "${HIGHEST}" != "${NEXT%-SNAPSHOT}" ]; then
+            echo "Branch is already at ${CURRENT}; skipping version bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          sed -i "s/^project\\.version=.*/project.version=${ESCAPED_NEXT}/" gradle.properties
+          sed -i "s/^configurable string icpVersion = \".*\";/configurable string icpVersion = \"${ESCAPED_NEXT}\";/" icp_server/config.bal
+          jq --arg v "$NEXT" '.VITE_ICP_VERSION = $v' frontend/public/config.json > /tmp/config.json && mv /tmp/config.json frontend/public/config.json
+          sed -i "0,/^version = \".*\"/s//version = \"${ESCAPED_NEXT}\"/" icp_server/Ballerina.toml
+          sed -i "/^name = \"icp_server\"$/{n;s/^version = \".*\"/version = \"${ESCAPED_NEXT}\"/}" icp_server/Dependencies.toml
+
+          git diff --stat
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Create version bump pull request
+        if: ${{ steps.bump.outputs.skip == 'false' }}
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: version-bump
+          base: ${{ steps.next_version.outputs.base }}
+          branch: bump-version-${{ steps.next_version.outputs.next }}
+          commit-message: Bump version to ${{ steps.next_version.outputs.next }}
+          title: Bump version to ${{ steps.next_version.outputs.next }}
+          body: |
+            ## Purpose
+            Move the source tree to the next development version after releasing v${{ steps.version.outputs.version }}.
+
+            Release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}
 
       - name: Check Product Integrator token
         if: ${{ github.event_name == 'workflow_dispatch' && !inputs.dry_run && inputs.product_integrator_branch != '' }}
