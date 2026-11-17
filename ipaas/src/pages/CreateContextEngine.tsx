@@ -254,7 +254,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 onAnswerLlmChange={(value) => dispatch({ type: 'answerLlm', value })}
               />
             )}
-            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} database={form.database} onDatabaseChange={(value) => dispatch({ type: 'database', value })} />}
+            {activeStep === 3 && <StorageStep database={form.database} onDatabaseChange={(value) => dispatch({ type: 'database', value })} />}
             {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} onEdit={setActiveStep} />}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>

@@ -157,6 +157,9 @@ export default function DatabaseSection({ value, onChange, managedHint }: Databa
           </Stack>
         )}
       </Box>
+      <Typography variant="caption" sx={mutedSx}>
+        Neo4j and other databases are coming soon.
+      </Typography>
     </RadioGroup>
   );
 }

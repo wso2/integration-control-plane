@@ -687,39 +687,17 @@ export const playgroundFrameSx = { mt: 2, height: { xs: 680, md: 'max(680px, cal
 
 // ── Storage step ────────────────────────────────────────────────────────────
 
-/** Three cards need the widest screens; below that two per row keep the pickers readable. Each card spans three rows its row's cards share, so headers and options line up. */
-export const storageGridSx = {
-  display: 'grid',
-  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
-  gap: 2,
-} as const;
-
-export const storageCardSx = {
-  p: 2.25,
-  minWidth: 0,
-  border: '1px solid',
-  borderColor: 'divider',
-  borderRadius: 1,
-  bgcolor: 'background.paper',
-  display: 'grid',
-  gridRow: 'span 3',
-  gridTemplateRows: 'subgrid',
-  rowGap: 1.5,
-} as const;
-
-export const storageRadioGroupSx = { width: '100%', minWidth: 0, display: 'grid', gridRow: 'span 2', gridTemplateRows: 'subgrid', rowGap: 1.5 } as const;
-
-/** One placement option inside a storage card: a plain radio, as in the app's other radio groups. */
+/** One option of the database choice: a plain radio, as in the app's other radio groups. */
 export const storageOptionSx = {
   minWidth: 0,
   '& .MuiFormControlLabel-root': { alignItems: 'flex-start', m: 0 },
   '& .MuiRadio-root': { pt: 0.25, pb: 0 },
 } as const;
 
-/** The fields under a selected option: full card width, no indent, so pickers and buttons have room. */
+/** The fields under a selected option: full width, no indent, so the fields have room. */
 export const storageOptionBodySx = { mt: 1, minWidth: 0 } as const;
 
-/** The database choice: two stacked options above the per-store cards. */
+/** The database choice: two stacked options and the line on databases to come. */
 export const databaseChoiceSx = { display: 'grid', gap: 1.5, mb: 3, maxWidth: 720 } as const;
 
 /** Host and port share a row; the port stays narrow. */
@@ -727,18 +705,6 @@ export const databaseHostRowSx = { display: 'grid', gridTemplateColumns: { xs: '
 
 /** A pasted PEM keeps its line breaks readable. */
 export const pemFieldSx = { '& textarea': { fontFamily: 'monospace', fontSize: 13 } } as const;
-
-export const storageEmptySx = {
-  p: 1.75,
-  border: '1px dashed',
-  borderColor: 'divider',
-  borderRadius: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 1.25,
-} as const;
-
-export const storageLinksSx = { display: 'flex', gap: 2, alignItems: 'center' } as const;
 
 /** Under a file whose status check could not reach the engine: the caption and a "Check again" button side by side. */
 export const checkAgainRowSx = { mt: 0.75 } as const;
