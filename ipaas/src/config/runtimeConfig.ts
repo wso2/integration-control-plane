@@ -63,7 +63,7 @@ interface RuntimeConfig {
   INTEGRATION_BUILDER_MAX_TOKENS?: string;
   INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL?: string;
   MOESIF_APP_URL?: string;
-  /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
+  /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'off'. */
   TRACKING_ENV?: string;
   MOESIF_APP_API_KEY?: string;
   SCOPES_ENFORCED?: string | boolean;
