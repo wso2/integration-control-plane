@@ -982,6 +982,9 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     state: 'ready',
     createdAt: '2026-09-23T09:00:00Z',
     access: { api: false, mcp: false },
+    environment: 'development',
+    project: 'defaultaiproject',
+    component: 'ce-57c584b7be',
     sources: [
       { id: 's1', name: 'Platform docs', type: 'github', state: 'ready' },
       { id: 's2', name: 'Support runbooks', type: 'confluence', state: 'ready' },

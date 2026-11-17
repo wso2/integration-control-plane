@@ -36,6 +36,7 @@ import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
 import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
 import GraphTab from '../components/ContextEngine/detail/GraphTab';
+import LogsTab from '../components/ContextEngine/detail/LogsTab';
 import ApiTab from '../components/ContextEngine/detail/ApiTab';
 import McpTab from '../components/ContextEngine/detail/McpTab';
 import ApiMockTab from '../components/ContextEngine/detail/mock/ApiMockTab';
@@ -49,6 +50,7 @@ const TABS: { value: ContextEngineTabKey; label: string }[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'playground', label: 'Playground' },
   { value: 'graph', label: 'Graph' },
+  { value: 'logs', label: 'Logs' },
   { value: 'api', label: 'API' },
   { value: 'mcp', label: 'MCP' },
   // MOCK: proposed layouts for the API and MCP tabs, for the team to compare with the real ones.
@@ -270,6 +272,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
       {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} readOnly={!running} onRequestDelete={deleting || !canManage ? undefined : () => setConfirmDelete(true)} />}
       {shownTab === 'playground' && (canManage ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'graph' && (canManage ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
+      {shownTab === 'logs' && (canManage ? <LogsTab engine={engine} /> : <NoConsoleAccess />)}
       {shownTab === 'api' && <ApiTab engine={engine} />}
       {shownTab === 'mcp' && <McpTab key={engine.id} engine={engine} />}
       {shownTab === 'api-mock' && <ApiMockTab engine={engine} orgHandle={scope.org} />}
