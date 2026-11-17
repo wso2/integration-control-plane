@@ -263,6 +263,21 @@ describe('toTaskExecution', () => {
     // Older backends omit the field entirely.
     expect(toTaskExecution({ jobId: 'job-1', status: 'Failed' }).failedReason).toBe('');
   });
+
+  it('carries how a run started', () => {
+    expect(toTaskExecution({ jobId: 'job-1', status: 'Succeeded', trigger: 'Manual' }).trigger).toBe('Manual');
+    expect(toTaskExecution({ jobId: 'job-2', status: 'Succeeded', trigger: 'Scheduled' }).trigger).toBe('Scheduled');
+  });
+
+  it('leaves the trigger unset when the backend sends none', () => {
+    // The backend omits it for a run whose name says neither, and older backends never send it.
+    expect(toTaskExecution({ jobId: 'job-1', status: 'Succeeded' }).trigger).toBeUndefined();
+  });
+
+  it('treats a trigger it does not know as unknown', () => {
+    expect(toTaskExecution({ jobId: 'job-1', status: 'Succeeded', trigger: 'Webhook' }).trigger).toBeUndefined();
+    expect(toTaskExecution({ jobId: 'job-1', status: 'Succeeded', trigger: 'manual' }).trigger).toBeUndefined();
+  });
 });
 
 // Each deployment track has its own schedule and runs. The console addresses a

@@ -26,7 +26,7 @@
 
 import { bff, q, seg } from './_client';
 import { queryObsLogEntries, resolveComponentProject, type ObsLogEntry } from './logs';
-import type { StopScheduleInput, ExecutionConfigs, TaskExecution, ExecutionLogEntry, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, TriggerRunResult, RuntimeArgument } from '../types/executions';
+import type { StopScheduleInput, ExecutionConfigs, ExecutionTrigger, TaskExecution, ExecutionLogEntry, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, TriggerRunResult, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
 import { HttpError } from '../types/http';
 
@@ -43,6 +43,7 @@ interface BffExecution {
   completionTime?: string;
   revisionId?: string;
   failedReason?: string;
+  trigger?: string;
 }
 
 // BFF Schedule (CronJob spec) from GET /components/{name}/schedules/{envId}.
@@ -63,6 +64,12 @@ function toUnixSeconds(iso?: string): string {
   return Number.isNaN(t) ? '' : String(Math.floor(t / 1000));
 }
 
+// The wire value is an unchecked string. Anything other than the two values the
+// console knows reads as unknown.
+function toExecutionTrigger(trigger?: string): ExecutionTrigger | undefined {
+  return trigger === 'Manual' || trigger === 'Scheduled' ? trigger : undefined;
+}
+
 export function toTaskExecution(e: BffExecution): TaskExecution {
   const jobId = e.jobId ?? '';
   return {
@@ -73,6 +80,7 @@ export function toTaskExecution(e: BffExecution): TaskExecution {
     revisionId: e.revisionId ?? '',
     failedReason: e.failedReason ?? '',
     status: e.status ?? '',
+    trigger: toExecutionTrigger(e.trigger),
     arguments: null,
   };
 }
