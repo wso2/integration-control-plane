@@ -42,7 +42,8 @@ export default function LogsTab({ engine }: LogsTabProps): JSX.Element {
   const { sources, isLoading, integrationsFailed } = useContextEngineLogSources(engine);
 
   if (isLoading) return <LogsTabSkeleton />;
-  return <EngineLogs engine={engine} sources={sources} integrationsFailed={integrationsFailed} />;
+  // Keyed by engine, so a source picked on one engine never carries over to another.
+  return <EngineLogs key={engine.handle} engine={engine} sources={sources} integrationsFailed={integrationsFailed} />;
 }
 
 function LogsTabSkeleton(): JSX.Element {
@@ -64,7 +65,9 @@ interface EngineLogsProps {
 function EngineLogs({ engine, sources, integrationsFailed }: EngineLogsProps): JSX.Element {
   const filters = useLogsFilters(`context-engine/${engine.handle}`);
   const { levelFilter, sortDir, searchPhrase, autoFetch, startTime, endTime } = filters;
-  const [sourceFilter, setSourceFilter] = useState(ALL_SOURCES);
+  const [pickedSource, setSourceFilter] = useState(ALL_SOURCES);
+  // A picked integration that has since been removed falls back to every source.
+  const sourceFilter = sources.some((s) => s.component === pickedSource) ? pickedSource : ALL_SOURCES;
 
   // One source is searched on its own; several read the whole project and keep only this engine's rows.
   const componentIds = sourceFilter === ALL_SOURCES ? sources.map((s) => s.component) : [sourceFilter];
