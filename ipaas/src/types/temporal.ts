@@ -39,9 +39,6 @@ export interface TemporalPlan {
   historyShards?: number;
   /** Size of the server's internal store. */
   storageGi?: number;
-  /** List price per server; absent when unpriced. */
-  monthlyPrice?: number;
-  currency?: string;
 }
 
 export interface TemporalOffering {

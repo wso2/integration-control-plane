@@ -29,7 +29,6 @@ export interface PlanSpec {
 interface ServicePlanCardProps {
   name: string;
   tagline: string;
-  price?: { monthly: string; hourly: string };
   specs: PlanSpec[];
   note: string;
   /** `warning` marks a plan unfit for production, such as one without backups. */
@@ -39,12 +38,11 @@ interface ServicePlanCardProps {
   onSelect: () => void;
 }
 
-/** A plan option in a radio group: name, list price, size grid and one reliability note. */
-export default function ServicePlanCard({ name, tagline, price, specs, note, noteTone, selected, disabled = false, onSelect }: ServicePlanCardProps): JSX.Element {
-  const ariaLabel = price ? `${name}, ${price.monthly} per month` : name;
+/** A plan option in a radio group: name, size grid and one reliability note. */
+export default function ServicePlanCard({ name, tagline, specs, note, noteTone, selected, disabled = false, onSelect }: ServicePlanCardProps): JSX.Element {
   return (
     <Card variant="outlined" sx={styles.cardSx(selected, disabled)}>
-      <CardActionArea role="radio" aria-checked={selected} aria-label={ariaLabel} disabled={disabled} disableRipple onClick={onSelect} sx={styles.actionAreaSx}>
+      <CardActionArea role="radio" aria-checked={selected} aria-label={name} disabled={disabled} disableRipple onClick={onSelect} sx={styles.actionAreaSx}>
         <Box sx={styles.headerSx}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
@@ -59,20 +57,6 @@ export default function ServicePlanCard({ name, tagline, price, specs, note, not
           </Box>
         </Box>
 
-        {price && (
-          <Box>
-            <Typography variant="h4" component="p" sx={styles.priceSx(selected)}>
-              {price.monthly}
-              <Typography component="span" variant="body2" color="text.secondary">
-                {' '}
-                / month
-              </Typography>
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={styles.hourlySx}>
-              {price.hourly} / hour
-            </Typography>
-          </Box>
-        )}
 
         <Box sx={styles.specGridSx}>
           {specs.map((spec) => (

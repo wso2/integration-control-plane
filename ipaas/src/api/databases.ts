@@ -35,8 +35,6 @@ interface BffPlan {
   defaultStorageGi?: number;
   maxStorageGi?: number;
   backups: boolean;
-  monthlyPrice?: number;
-  currency?: string;
 }
 
 interface BffOffering {

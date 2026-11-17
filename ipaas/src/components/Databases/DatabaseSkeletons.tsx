@@ -53,7 +53,7 @@ export function DatabaseDetailSkeleton(): JSX.Element {
   );
 }
 
-/** Stands in for the create page's plan cards while the offering loads, sized like a card with a price block. */
+/** Stands in for the create page's plan cards while the offering loads, sized like a card. */
 export function DatabasePlansSkeleton(): JSX.Element {
   return (
     <Box aria-busy="true" aria-label="Loading service plans" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
