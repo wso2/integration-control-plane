@@ -52,7 +52,7 @@ describe('initTracking', () => {
     delete (window as unknown as Record<string, unknown>).dataLayer;
     delete (window as unknown as Record<string, unknown>).OptanonWrapper;
     delete (globalThis as Record<string, unknown>).OneTrust;
-    delete (window as unknown as Record<string, unknown>).API_CONFIG;
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'dev' };
     setActiveGroups(undefined);
 
     session.current = null;
@@ -79,7 +79,7 @@ describe('initTracking', () => {
   });
 
   it('does not initialize Moesif before analytics consent is granted', () => {
-    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { moesifAppApiKey: 'test-key' };
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'dev', moesifAppApiKey: 'test-key' };
 
     initTracking();
     setActiveGroups('C0001'); // strictly necessary only — no analytics consent
@@ -89,7 +89,7 @@ describe('initTracking', () => {
   });
 
   it('initializes and starts Moesif once analytics consent is granted', () => {
-    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { moesifAppApiKey: 'test-key' };
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'dev', moesifAppApiKey: 'test-key' };
 
     initTracking();
     setActiveGroups('C0001,C0002');
@@ -100,7 +100,7 @@ describe('initTracking', () => {
   });
 
   it('identifies the signed-in user once consent initializes Moesif', () => {
-    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { moesifAppApiKey: 'test-key' };
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'dev', moesifAppApiKey: 'test-key' };
     session.current = { user: { userId: 'u-1', username: 'jane@wso2.com', displayName: 'Jane' }, orgHandle: 'acme', orgUuid: 'org-1' };
 
     initTracking();
@@ -112,7 +112,7 @@ describe('initTracking', () => {
   });
 
   it('stops Moesif when analytics consent is later withdrawn', () => {
-    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { moesifAppApiKey: 'test-key' };
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'dev', moesifAppApiKey: 'test-key' };
     let onConsentChanged: (() => void) | undefined;
     (globalThis as Record<string, unknown>).OneTrust = {
       OnConsentChanged: (callback: () => void) => {
@@ -152,7 +152,17 @@ describe('initTracking', () => {
     expect(onConsentChanged).toHaveBeenCalledTimes(1);
   });
 
-  it('loads the dev/stage GTM container and CookiePro test domain script by default', () => {
+  it('loads nothing when trackingEnv is unset', () => {
+    delete (window as unknown as Record<string, unknown>).API_CONFIG;
+
+    initTracking();
+
+    expect(document.head.querySelector('script[src*="cookiepro"]')).toBeNull();
+    expect(window.OptanonWrapper).toBeUndefined();
+    expect(moesifInit).not.toHaveBeenCalled();
+  });
+
+  it('loads the dev/stage GTM container and CookiePro test domain script when trackingEnv is dev', () => {
     initTracking();
     setActiveGroups('C0001,C0002');
     window.OptanonWrapper?.();
@@ -197,7 +207,7 @@ describe('initTracking', () => {
 describe('trackEvent', () => {
   // The Moesif client is module state, created on first consent; one consented init serves the block.
   beforeEach(() => {
-    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { moesifAppApiKey: 'test-key' };
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'dev', moesifAppApiKey: 'test-key' };
     initTracking();
     setActiveGroups('C0001,C0002');
     window.OptanonWrapper?.();
@@ -254,7 +264,7 @@ describe('events before consent resolves', () => {
     document.head.innerHTML = '';
     delete (window as unknown as Record<string, unknown>).OptanonWrapper;
     delete (globalThis as Record<string, unknown>).OneTrust;
-    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { moesifAppApiKey: 'test-key' };
+    (window as unknown as { API_CONFIG: unknown }).API_CONFIG = { trackingEnv: 'dev', moesifAppApiKey: 'test-key' };
     setActiveGroups(undefined);
     session.current = null;
     moesifClient.track.mockClear();

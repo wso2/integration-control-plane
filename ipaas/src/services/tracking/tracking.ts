@@ -294,7 +294,7 @@ function injectGtmOnceConsented(containerId: string): () => void {
  * from MOESIF_APP_API_KEY.
  */
 export function initTracking(): void {
-  const env = window.API_CONFIG?.trackingEnv ?? 'dev';
+  const env = window.API_CONFIG?.trackingEnv ?? 'off';
   if (env === 'off') {
     // Nothing loads, so nothing will ever resolve consent; stop events from queueing.
     consentResolved = true;

@@ -63,7 +63,7 @@ interface RuntimeConfig {
   INTEGRATION_BUILDER_MAX_TOKENS?: string;
   INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL?: string;
   MOESIF_APP_URL?: string;
-  /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
+  /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'off'. */
   TRACKING_ENV?: string;
   MOESIF_APP_API_KEY?: string;
   SCOPES_ENFORCED?: string | boolean;
@@ -178,12 +178,13 @@ function parsePositiveInt(value: unknown, fallback: number): number {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
-// Accepts only the recognized tracking-env values; anything else (including unset) falls back to 'dev'.
-// A set but unrecognized value is warned about, since a typo would otherwise load dev codes silently.
+// Accepts only the recognized tracking-env values; anything else (including unset) falls back to 'off',
+// so a deployment loads CookiePro, GTM and Moesif only when it asks for them by tier.
+// A set but unrecognized value is warned about, since a typo would otherwise turn tracking off silently.
 function parseTrackingEnv(value: unknown): ApiConfig['trackingEnv'] {
-  if (value === 'stage' || value === 'prod' || value === 'off') return value;
-  if (typeof value === 'string' && value.trim() !== '' && value !== 'dev') console.warn(`Unrecognized TRACKING_ENV "${value}"; using 'dev'.`);
-  return 'dev';
+  if (value === 'dev' || value === 'stage' || value === 'prod' || value === 'off') return value;
+  if (typeof value === 'string' && value.trim() !== '') console.warn(`Unrecognized TRACKING_ENV "${value}"; using 'off'.`);
+  return 'off';
 }
 
 // Default configuration (used as fallback if config.json fails to load)
@@ -210,7 +211,7 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderLlmModel: 'claude-sonnet-4-6',
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
-  trackingEnv: 'dev',
+  trackingEnv: 'off',
   organizationSwitcher: false,
 };
 
