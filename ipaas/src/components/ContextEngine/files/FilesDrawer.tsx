@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Drawer, IconButton, LinearProgress, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { FileText, RefreshCw, Search, Trash2, Upload, Users, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, DrawerPanel, IconButton, LinearProgress, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { FileText, RefreshCw, Search, Trash2, Upload, Users } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { changeUploadVisibility, checkUpload, holdsUploadBytes, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
 import { useContextEngineProgress, useUploadAudience } from '../../../hooks/useContextEngine';
@@ -50,7 +50,7 @@ import FileVisibilityField from './FileVisibilityField';
 import VisibilityComingSoon from './VisibilityComingSoon';
 import StagedFileList from './StagedFileList';
 import UploadStatusChip from './UploadStatusChip';
-import { checkAgainRowSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx, warningCaptionSx, wrapSx } from '../styles';
+import { checkAgainRowSx, drawerContentSx, fileListSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx, warningCaptionSx, wrapSx } from '../styles';
 import type { ContextSource, FileVisibility, StagedFileMeta, UploadEntry, UploadFileStatus } from '../../../types/contextEngine';
 
 interface FilesDrawerProps {
@@ -337,25 +337,18 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={filesDrawerSx}>
-      <Box sx={drawerHeaderSx}>
-        <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-          <SourceMark type={source.type} variant="tile" />
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }} noWrap>
-              {source.name}
-            </Typography>
-            <Typography variant="caption" sx={mutedSx}>
-              File Upload · {summarizeUploads(entries)}
-            </Typography>
-          </Box>
-        </Stack>
-        <IconButton size="small" aria-label="Close" onClick={onClose}>
-          <X size={18} />
-        </IconButton>
-      </Box>
+    <DrawerPanel open={open} onClose={onClose}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title icon={<SourceMark type={source.type} size={20} />}>{source.name}</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={drawerBodySx}>
+      <DrawerPanel.Body sx={drawerContentSx}>
+        <Typography variant="caption" sx={mutedSx}>
+          File Upload · {summarizeUploads(entries)}
+        </Typography>
         {notice && <Alert severity="warning">{notice}</Alert>}
         {forbidden && (
           <Alert severity="warning" action={<OwnerAccessButton engineId={engineId} onGranted={() => retryForbidden(engineId, source.id)} />}>
@@ -473,13 +466,13 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
             e.target.value = '';
           }}
         />
-      </Box>
+      </DrawerPanel.Body>
 
-      <Box sx={drawerFooterSx}>
-        <Button variant="outlined" onClick={onClose}>
+      <DrawerPanel.Footer>
+        <Button variant="outlined" color="inherit" onClick={onClose}>
           Close
         </Button>
-      </Box>
+      </DrawerPanel.Footer>
 
       {removing && (
         <ConfirmDeleteDialog
@@ -509,6 +502,6 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
           )}
         </ConfirmDeleteDialog>
       )}
-    </Drawer>
+    </DrawerPanel>
   );
 }

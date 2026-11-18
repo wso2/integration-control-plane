@@ -85,6 +85,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const [form, dispatch] = useReducer(contextEngineFormReducer, initialContextEngineForm);
   const [activeStep, setActiveStep] = useState(0);
+  // The Sources step's catalog, opened from "Add another source": its own back link returns to the list, so the wizard buttons step aside.
+  const [pickingSource, setPickingSource] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const create = useCreateContextEngine();
   const qc = useQueryClient();
@@ -180,6 +182,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 onUpdate={(index, source) => dispatch({ type: 'updateSource', index, source })}
                 onRemove={(index) => dispatch({ type: 'removeSource', index })}
                 roleNames={roleNames}
+                onBrowsingChange={setPickingSource}
               />
             )}
             {/* 'Grant Access' step hidden — restore this branch (as activeStep === 2) and renumber the steps below to bring it back.
@@ -201,27 +204,32 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             {activeStep === 3 && <StorageStep database={form.database} onDatabaseChange={(value) => dispatch({ type: 'database', value })} />}
             {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} onEdit={setActiveStep} />}
 
-            <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
-              <Button variant="outlined" disabled={create.isPending} onClick={
-                  activeStep === 0
-                    ? () => {
-                        allowLeave();
-                        navigate(base);
-                      }
-                    : () => setActiveStep((s) => Math.max(0, s - 1))
-                }>
-                {activeStep === 0 ? 'Cancel' : 'Back'}
-              </Button>
-              {activeStep < LAST_STEP ? (
-                <Button variant="contained" disabled={!stepValid[activeStep]} onClick={() => setActiveStep((s) => Math.min(LAST_STEP, s + 1))}>
-                  Next
+            {!(activeStep === 1 && pickingSource) && (
+              <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
+                <Button
+                  variant="outlined"
+                  disabled={create.isPending}
+                  onClick={
+                    activeStep === 0
+                      ? () => {
+                          allowLeave();
+                          navigate(base);
+                        }
+                      : () => setActiveStep((s) => Math.max(0, s - 1))
+                  }>
+                  {activeStep === 0 ? 'Cancel' : 'Back'}
                 </Button>
-              ) : (
-                <Button variant="contained" disabled={!canCreate || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
-                  {create.isPending ? 'Creating…' : 'Create Context Engine'}
-                </Button>
-              )}
-            </Stack>
+                {activeStep < LAST_STEP ? (
+                  <Button variant="contained" disabled={!stepValid[activeStep]} onClick={() => setActiveStep((s) => Math.min(LAST_STEP, s + 1))}>
+                    Next
+                  </Button>
+                ) : (
+                  <Button variant="contained" disabled={!canCreate || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
+                    {create.isPending ? 'Creating…' : 'Create Context Engine'}
+                  </Button>
+                )}
+              </Stack>
+            )}
           </Box>
         </Stack>
       )}

@@ -29,7 +29,11 @@ export function repoPathOf(url: string | undefined): string | null {
     .replace(/:(?!\d)/, '/');
   const parts = path.split('/').filter(Boolean);
   if (parts.length < 3) return null;
-  return parts.slice(1).join('/').replace(/\.git$/i, '').toLowerCase();
+  return parts
+    .slice(1)
+    .join('/')
+    .replace(/\.git$/i, '')
+    .toLowerCase();
 }
 
 /** The repository lookup fills `repository`; without it, the deployment track's URL is used. */

@@ -29,11 +29,7 @@ describe('editorCallbackUri', () => {
 
   // A private scheme resolves to a locally installed application, so it cannot
   // direct the code at a host of the caller's choosing.
-  it.each([
-    ['vscode-insiders://wso2.wso2-integrator/ghapp'],
-    ['vscodium://wso2.wso2-integrator/ghapp'],
-    ['code-oss://wso2.wso2-integrator/ghapp'],
-  ])('accepts the private scheme %s', (uri) => {
+  it.each([['vscode-insiders://wso2.wso2-integrator/ghapp'], ['vscodium://wso2.wso2-integrator/ghapp'], ['code-oss://wso2.wso2-integrator/ghapp']])('accepts the private scheme %s', (uri) => {
     expect(editorCallbackUri(state({ callbackUri: uri }))).toBe(uri);
   });
 
@@ -42,9 +38,7 @@ describe('editorCallbackUri', () => {
   // whatever this returns, so a network URL is followed only when named.
   it('refuses an https callback that is not allowlisted', () => {
     expect(editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }))).toBeNull();
-    expect(
-      editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }), { origins: ['https://editor.example.dev'] }),
-    ).toBeNull();
+    expect(editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }), { origins: ['https://editor.example.dev'] })).toBeNull();
   });
 
   it('accepts an https callback whose origin is allowlisted', () => {
@@ -54,12 +48,7 @@ describe('editorCallbackUri', () => {
 
   // Comparing origins as text would let a trusted origin be a prefix of an
   // attacker's host, and credentials or a port could disguise the real one.
-  it.each([
-    ['https://editor.example.dev.evil.com/ghapp'],
-    ['https://editor.example.dev@evil.com/ghapp'],
-    ['https://editor.example.dev:8443/ghapp'],
-    ['https://eviledito.example.dev/ghapp'],
-  ])('refuses %s against an allowlisted origin', (uri) => {
+  it.each([['https://editor.example.dev.evil.com/ghapp'], ['https://editor.example.dev@evil.com/ghapp'], ['https://editor.example.dev:8443/ghapp'], ['https://eviledito.example.dev/ghapp']])('refuses %s against an allowlisted origin', (uri) => {
     expect(editorCallbackUri(state({ callbackUri: uri }), { origins: ['https://editor.example.dev'] })).toBeNull();
   });
 
@@ -72,12 +61,7 @@ describe('editorCallbackUri', () => {
     ).toBeNull();
   });
 
-  it.each([
-    ['javascript:alert(1)'],
-    ['data:text/html,<script>alert(1)</script>'],
-    ['file:///etc/passwd'],
-    ['//evil.example/ghapp'],
-  ])('refuses %s', (uri) => {
+  it.each([['javascript:alert(1)'], ['data:text/html,<script>alert(1)</script>'], ['file:///etc/passwd'], ['//evil.example/ghapp']])('refuses %s', (uri) => {
     expect(editorCallbackUri(state({ callbackUri: uri }), { origins: ['https://editor.example.dev'] })).toBeNull();
   });
 
@@ -95,12 +79,7 @@ describe('editorCallbackUri', () => {
 
   // The dot separating subdomain from parent is the whole test: a plain suffix
   // match would hand the code to a domain an attacker can simply register.
-  it.each([
-    ['https://evilcloud.wso2.com/ghapp'],
-    ['https://cloud.wso2.com.evil.com/ghapp'],
-    ['https://cloud-wso2.com/ghapp'],
-    ['http://editor-abc123.cloud.wso2.com/ghapp'],
-  ])('refuses %s against an allowlisted domain', (uri) => {
+  it.each([['https://evilcloud.wso2.com/ghapp'], ['https://cloud.wso2.com.evil.com/ghapp'], ['https://cloud-wso2.com/ghapp'], ['http://editor-abc123.cloud.wso2.com/ghapp']])('refuses %s against an allowlisted domain', (uri) => {
     expect(editorCallbackUri(state({ callbackUri: uri }), { domains: ['cloud.wso2.com'] })).toBeNull();
   });
 
@@ -114,9 +93,7 @@ describe('editorCallbackUri', () => {
 
   it('refuses loopback that is not allowlisted', () => {
     expect(editorCallbackUri(state({ callbackUri: 'http://localhost:5173/ghapp' }))).toBeNull();
-    expect(
-      editorCallbackUri(state({ callbackUri: 'http://127.0.0.1:5173/ghapp' }), { origins: ['http://localhost:5173'] }),
-    ).toBeNull();
+    expect(editorCallbackUri(state({ callbackUri: 'http://127.0.0.1:5173/ghapp' }), { origins: ['http://localhost:5173'] })).toBeNull();
   });
 
   // A domain allowlist says nothing about plaintext, and loopback is the only
@@ -146,23 +123,17 @@ describe('editorCallbackUri', () => {
 
 describe('buildEditorCallbackUrl', () => {
   it('appends the result', () => {
-    expect(buildEditorCallbackUrl('vscode://x/ghapp', { code: 'abc', orgId: 'org-1' })).toBe(
-      'vscode://x/ghapp?code=abc&orgId=org-1',
-    );
+    expect(buildEditorCallbackUrl('vscode://x/ghapp', { code: 'abc', orgId: 'org-1' })).toBe('vscode://x/ghapp?code=abc&orgId=org-1');
   });
 
   // The editor may already have put a query on its callback; replacing it would
   // drop whatever it needs to correlate the result.
   it('preserves an existing query', () => {
-    expect(buildEditorCallbackUrl('vscode://x/ghapp?windowId=7', { code: 'abc' })).toBe(
-      'vscode://x/ghapp?windowId=7&code=abc',
-    );
+    expect(buildEditorCallbackUrl('vscode://x/ghapp?windowId=7', { code: 'abc' })).toBe('vscode://x/ghapp?windowId=7&code=abc');
   });
 
   it('omits absent values rather than sending empties', () => {
-    expect(buildEditorCallbackUrl('vscode://x/ghapp', { code: 'abc', orgId: null, setup_action: '' })).toBe(
-      'vscode://x/ghapp?code=abc',
-    );
+    expect(buildEditorCallbackUrl('vscode://x/ghapp', { code: 'abc', orgId: null, setup_action: '' })).toBe('vscode://x/ghapp?code=abc');
   });
 
   it('encodes values', () => {

@@ -83,10 +83,12 @@ const MAX_MISSING_POLLS = 5;
 const LOST_RESPONSE_STATUSES = new Set([408, 502, 504]);
 
 /** fetch rejects with a TypeError when the connection itself fails or the gateway hangs up. */
-const isLostResponse = (err: unknown): boolean =>
-  err instanceof BffError ? LOST_RESPONSE_STATUSES.has(err.status) : err instanceof TypeError;
+const isLostResponse = (err: unknown): boolean => (err instanceof BffError ? LOST_RESPONSE_STATUSES.has(err.status) : err instanceof TypeError);
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 export async function getOrCreateSampleRegistry(_orgUuid: string): Promise<ContainerRegistry> {
   return { id: 'openchoreo-default', host: '', name: 'OpenChoreo Registry' };

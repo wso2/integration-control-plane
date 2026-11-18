@@ -61,6 +61,8 @@ function queryFailure(e: unknown, mode: ContextQueryMode): QueryFailure {
     if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };
     if (e.status === 400) return { message: `The engine rejected the question: ${e.message}` };
     if (e.status === 401) return { message: 'The context engine rejected the credential.' };
+    if (e.status === 502) return { message: "The gateway couldn't reach the context engine. Check that the engine is running, then ask again." };
+    if (e.status === 504) return { message: 'The engine took too long to answer. Try a narrower question, or ask in Context mode.' };
   }
   return { message: "Couldn't run the query. Please try again." };
 }
@@ -238,8 +240,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     // Full cards for passages, a hidden answer or an answer the engine declined; an answer gets its rail instead.
     const cards = result.evidence.map((ev, idx) => <EvidenceCard key={ev.id} question={t.question} evidence={ev} n={idx + 1} source={sourcesById.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => openEvidence(ev)} />);
 
-    let body: JSX.Element;
+    let body: JSX.Element | null = null;
     let summary: string;
+    // An answer is usually short and its passages run longer beside it, so its footer sits under the answer, not under both.
+    let answerTurn = false;
     if (result.answerWithheld) {
       summary = `Answer hidden · ${t.reopened && lost ? `${n} of ${t.reopened.passagesThen} passages still available` : `${n} passage${n === 1 ? '' : 's'}`}`;
       body = (
@@ -264,7 +268,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else if (answerText) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = <AnsweredTurn question={t.question} answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
+      answerTurn = true;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = readsNothing ? (
@@ -302,6 +306,39 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     }
 
+    const footer = (
+      <Box sx={answerFooterSx}>
+        <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
+          <Typography variant="caption" sx={mutedSx}>
+            {summary}
+          </Typography>
+          {/* The ids are for debugging against the API: out of the outcome line, one click copies them. */}
+          <Tooltip title={copied === `ids-${result.queryId}` ? 'Copied' : `Query ${result.queryId} · Trace ${result.traceId}. Click to copy.`}>
+            <IconButton size="small" aria-label="Copy query and trace IDs" onClick={() => copyIds(result.queryId, result.traceId)}>
+              <Info size={14} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          {answered && (
+            <Button size="small" variant="text" disabled={!canQuery || asking} onClick={() => ask(t.question, 'context')}>
+              See all matching passages
+            </Button>
+          )}
+          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
+            {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
+          </Button>
+          <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
+            Use in API
+          </Button>
+        </Stack>
+      </Box>
+    );
+    if (answerTurn && answerText)
+      body = (
+        <AnsweredTurn question={t.question} answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} footer={footer} />
+      );
+
     return (
       <Stack key={`${result.queryId}-${i}`} gap={1.5}>
         {t.reopened && (
@@ -325,27 +362,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               </Typography>
             </Box>
           )}
-          <Box sx={answerFooterSx}>
-            <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
-              <Typography variant="caption" sx={mutedSx}>
-                {summary}
-              </Typography>
-              {/* The ids are for debugging against the API: out of the outcome line, one click copies them. */}
-              <Tooltip title={copied === `ids-${result.queryId}` ? 'Copied' : `Query ${result.queryId} · Trace ${result.traceId}. Click to copy.`}>
-                <IconButton size="small" aria-label="Copy query and trace IDs" onClick={() => copyIds(result.queryId, result.traceId)}>
-                  <Info size={14} />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-            <Stack direction="row" gap={1}>
-              <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
-                {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
-              </Button>
-              <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
-                Use in API
-              </Button>
-            </Stack>
-          </Box>
+          {!answerTurn && footer}
         </Box>
       </Stack>
     );

@@ -39,7 +39,14 @@ interface ModelsStepProps {
   onAnswerLlmChange: (value: LlmConfig) => void;
 }
 
-const EMBEDDING_OPTIONS = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]), models: p.models, unavailable: isModelProviderUnavailable(p.id) }));
+const EMBEDDING_OPTIONS = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({
+  id: p.id,
+  name: p.name,
+  logo: contextLogoUrl(p.logo),
+  logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]),
+  models: p.models,
+  unavailable: isModelProviderUnavailable(p.id),
+}));
 const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models, unavailable: isModelProviderUnavailable(p.id) }));
 
 const ANSWER_CHOICES: { value: AnswerChoice; label: string }[] = [

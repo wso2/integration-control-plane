@@ -17,7 +17,20 @@
  */
 
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, getMcpServerTools, regenerateConsumerToken, revokeConsumer, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
+import {
+  createConsumer,
+  createEndpointTestKey,
+  deleteConsumer,
+  fetchConsumers,
+  getEndpointPolicies,
+  getEndpointSecurity,
+  getMcpServerTools,
+  regenerateConsumerToken,
+  revokeConsumer,
+  setEndpointApiKeyAuth,
+  setEndpointPolicies,
+  setEndpointSecurity,
+} from '../api/consumers';
 import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
 import type { McpTool } from '../types/mcp';
 

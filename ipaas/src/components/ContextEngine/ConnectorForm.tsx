@@ -117,7 +117,8 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
   const select = def.kind === 'select';
   const multiline = def.kind === 'urls' || def.kind === 'multiline';
   return (
-    <TextField labelPlacement="top"
+    <TextField
+      labelPlacement="top"
       label={def.label}
       required={def.required}
       select={select}
@@ -185,12 +186,14 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
       </Box>
 
       <Stack sx={connectorFieldStackSx}>
-        <TextField labelPlacement="top"
+        <TextField
+          labelPlacement="top"
           label="Source Name"
           required
           fullWidth
           size="small"
           value={draft.name}
+          placeholder="e.g. Support team docs"
           error={!!nameError && draft.name.trim() !== ''}
           helperText={(draft.name.trim() !== '' && nameError) || undefined}
           onChange={(e) => change({ ...draft, name: e.target.value })}

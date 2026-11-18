@@ -44,8 +44,7 @@ function traceParams(query: TraceQuery): string {
   });
 }
 
-export const fetchTraces = (componentId: string, envId: string, query: TraceQuery): Promise<TraceListResponse> =>
-  bff.get<TraceListResponse>(`${tracesBase(componentId, envId)}${traceParams(query)}`);
+export const fetchTraces = (componentId: string, envId: string, query: TraceQuery): Promise<TraceListResponse> => bff.get<TraceListResponse>(`${tracesBase(componentId, envId)}${traceParams(query)}`);
 
 /** Asks for the maximum page: a partial span list renders as orphaned branches. */
 export const fetchTraceSpans = (componentId: string, envId: string, traceId: string, query: TraceQuery): Promise<SpanListResponse> =>

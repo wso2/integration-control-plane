@@ -747,16 +747,21 @@ export default function AppLayout(): JSX.Element {
                         <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     </Sidebar.Item>
-
-                    {isContextEngineEnabled() && canReadIntegrations && (
-                      <Sidebar.Item id="org-context-engines">
-                        <Sidebar.ItemIcon>
-                          <Waypoints size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Context Engines</Sidebar.ItemLabel>
-                      </Sidebar.Item>
-                    )}
                   </Sidebar.Category>,
+
+                  // Its own category, so a divider sets it apart from Build, Deploy, Test and Observe.
+                  ...(isContextEngineEnabled() && canReadIntegrations
+                    ? [
+                        <Sidebar.Category key="org-context">
+                          <Sidebar.Item id="org-context-engines">
+                            <Sidebar.ItemIcon>
+                              <Waypoints size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Context Engines</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        </Sidebar.Category>,
+                      ]
+                    : []),
 
                   <Sidebar.Category key="org-ai">
                     <Sidebar.Item id="org-ai-services">

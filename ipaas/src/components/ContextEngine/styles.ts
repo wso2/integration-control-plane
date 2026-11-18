@@ -152,62 +152,8 @@ export const sourceTileMarkSx = {
 
 // ── Source drawer ───────────────────────────────────────────────────────────
 
-/** Add-source drawer, matching the integration Configure drawer: 560 wide, below the app header. */
-export const sourceDrawerSx = {
-  '& .MuiDrawer-paper': {
-    width: 560,
-    maxWidth: '100%',
-    position: 'fixed',
-    top: 64,
-    height: 'calc(100% - 64px)',
-    borderLeft: '1px solid',
-    borderColor: 'divider',
-    display: 'flex',
-    flexDirection: 'column',
-    ...wrapSx,
-  },
-} as const;
-
-export const drawerHeaderSx = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 1,
-  px: 3,
-  py: 2,
-  borderBottom: '1px solid',
-  borderColor: 'divider',
-  flexShrink: 0,
-} as const;
-
-const drawerBodySxBase = {
-  flex: 1,
-  minHeight: 0,
-  overflowY: 'auto',
-  px: 3,
-  py: 2.5,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 2,
-} as const;
-
-export const drawerBodySx = drawerBodySxBase;
-
-export const drawerFooterSx = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 1.5,
-  px: 3,
-  py: 1.75,
-  borderTop: '1px solid',
-  borderColor: 'divider',
-  flexShrink: 0,
-  bgcolor: 'background.paper',
-} as const;
-
-/** Body and footer spacing of the integration Configure drawer, for the add-source drawer. */
-export const sourceDrawerBodySx = { ...drawerBodySxBase, px: 2, py: 2 } as const;
-export const sourceDrawerFooterSx = { display: 'flex', justifyContent: 'flex-end', gap: 1, px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 } as const;
+/** Content spacing inside an Oxygen DrawerPanel.Body, which supplies the padding and scrolling. */
+export const drawerContentSx = { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, ...wrapSx } as const;
 
 export const catalogChipsSx = { display: 'flex', gap: 1, flexWrap: 'wrap' } as const;
 
@@ -383,8 +329,6 @@ export const uploadRowHeadSx = { display: 'flex', alignItems: 'center', gap: 1.5
 
 /** Lines the bar and captions up with the file name: the 18px icon plus the 12px gap. */
 export const uploadRowBodySx = { pl: '30px', mt: 0.75 } as const;
-
-export const filesDrawerSx = { '& .MuiDrawer-paper': { width: { xs: '100%', sm: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column', ...wrapSx } } as const;
 
 export const filesToolbarSx = { display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' } as const;
 

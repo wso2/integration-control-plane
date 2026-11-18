@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, PageContent, PageTitle, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, PageContent, PageTitle, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -24,7 +24,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, useContextEngine, useContextEngineProgress, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
 import { useStagedEngineSources } from '../hooks/stagedEngineSources';
 import { engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
@@ -37,8 +37,6 @@ import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
 import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
 import GraphTab from '../components/ContextEngine/detail/GraphTab';
 import LogsTab from '../components/ContextEngine/detail/LogsTab';
-import ApiTab from '../components/ContextEngine/detail/ApiTab';
-import McpTab from '../components/ContextEngine/detail/McpTab';
 import ApiMockTab from '../components/ContextEngine/detail/mock/ApiMockTab';
 import McpMockTab from '../components/ContextEngine/detail/mock/McpMockTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
@@ -55,8 +53,6 @@ const TABS: { value: ContextEngineTabKey; label: string; whileStopped?: boolean 
   { value: 'api', label: 'API' },
   { value: 'mcp', label: 'MCP' },
   // MOCK: proposed layouts for the API and MCP tabs, for the team to compare with the real ones.
-  { value: 'api-mock', label: 'API mock' },
-  { value: 'mcp-mock', label: 'MCP mock' },
   // { value: 'access', label: 'Access' },
 ];
 
@@ -162,6 +158,8 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const { tab = 'overview' } = useParams();
   const engineId = useRouteEngineId();
   const { data: engine, isLoading, isError, error, refetch } = useContextEngine(engineId);
+  // Shared with the Sources card: the same query, so the tabs open the moment the first records are indexed.
+  const progress = useContextEngineProgress(engine?.state === 'ready' ? engineId : '').data;
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   const remove = useDeleteContextEngine();
@@ -232,7 +230,13 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
     });
   };
   const running = engine.state === 'ready';
-  const shownTab: ContextEngineTabKey = running || TABS.some((t) => t.value === activeTab && t.whileStopped) ? activeTab : 'overview';
+  // The Playground and Graph have nothing to show until the first records are indexed. Engines that don't report
+  // progress, and the moment before it loads, leave them open rather than lock them on a guess.
+  const awaitingData = !!progress?.available && !progress.sources.some((p) => p.records.active > 0 || (p.indexing.indexed ?? 0) > 0);
+  const dataLockReason = engine.sources.length === 0 ? 'Add a source or upload files first. This opens once records are indexed.' : 'Opens once the first sync finishes and records are indexed.';
+  const lockedTab = (key: ContextEngineTabKey) => awaitingData && (key === 'playground' || key === 'graph');
+  const openNow = running || TABS.some((t) => t.value === activeTab && t.whileStopped);
+  const shownTab: ContextEngineTabKey = openNow && !lockedTab(activeTab) ? activeTab : 'overview';
 
   return (
     <PageContent sx={wrapSx}>
@@ -264,20 +268,38 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         </Alert>
       )}
 
-      <Tabs value={shownTab} onChange={(_, v) => goTab(v as ContextEngineTabKey)} sx={tabsSx}>
-        {TABS.map((t) => (
-          <Tab key={t.value} label={t.label} value={t.value} disabled={!running && !t.whileStopped} />
-        ))}
+      <Tabs
+        value={shownTab}
+        onChange={(_, v) => {
+          if (!lockedTab(v as ContextEngineTabKey)) goTab(v as ContextEngineTabKey);
+        }}
+        sx={tabsSx}>
+        {TABS.map((t) =>
+          running && lockedTab(t.value) ? (
+            // Not natively disabled: a disabled tab takes no pointer events, so its tooltip could never show.
+            <Tab
+              key={t.value}
+              value={t.value}
+              aria-disabled="true"
+              label={
+                <Tooltip title={dataLockReason}>
+                  <span>{t.label}</span>
+                </Tooltip>
+              }
+              sx={{ color: 'text.disabled', cursor: 'not-allowed', '&:hover': { color: 'text.disabled' } }}
+            />
+          ) : (
+            <Tab key={t.value} label={t.label} value={t.value} disabled={!running && !t.whileStopped} />
+          ),
+        )}
       </Tabs>
 
       {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} readOnly={!running} onRequestDelete={deleting || !canManage ? undefined : () => setConfirmDelete(true)} />}
       {shownTab === 'playground' && (canManage ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'graph' && (canManage ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'logs' && (canManage ? <LogsTab engine={engine} /> : <NoConsoleAccess />)}
-      {shownTab === 'api' && <ApiTab engine={engine} />}
-      {shownTab === 'mcp' && <McpTab key={engine.id} engine={engine} />}
-      {shownTab === 'api-mock' && <ApiMockTab engine={engine} orgHandle={scope.org} />}
-      {shownTab === 'mcp-mock' && <McpMockTab engine={engine} />}
+      {shownTab === 'api' && <ApiMockTab engine={engine} orgHandle={scope.org} />}
+      {shownTab === 'mcp' && <McpMockTab key={engine.id} engine={engine} />}
       {/* {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />} */}
 
       {confirmDelete && (

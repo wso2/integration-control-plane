@@ -20,7 +20,21 @@ import { describe, expect, it } from 'vitest';
 import type { Component } from '../types/component';
 import { componentRepoPath, isExternalRepoIntegration, repoPathOf } from './projectRepo';
 
-const component = (partial: Partial<Component>): Component => ({ id: 'c1', projectId: 'p1', name: 'n', handler: 'h', displayName: 'N', displayType: 'ballerinaService', description: '', status: '', componentSubType: null, version: '1.0.0', createdAt: '', lastBuildDate: '', ...partial });
+const component = (partial: Partial<Component>): Component => ({
+  id: 'c1',
+  projectId: 'p1',
+  name: 'n',
+  handler: 'h',
+  displayName: 'N',
+  displayType: 'ballerinaService',
+  description: '',
+  status: '',
+  componentSubType: null,
+  version: '1.0.0',
+  createdAt: '',
+  lastBuildDate: '',
+  ...partial,
+});
 
 const onTrack = (url: string) => component({ deploymentTracks: [{ id: 't1', url }] });
 

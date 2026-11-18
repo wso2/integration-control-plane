@@ -91,7 +91,17 @@ export default function LlmModelStep({ value, onChange }: LlmModelStepProps): JS
 
           {value.provider === 'azure_openai' && (
             <>
-              <TextField labelPlacement="top" label="Base URL" required fullWidth size="small" value={value.azureBaseUrl} placeholder="https://<resource>.openai.azure.com" onChange={(e) => onChange({ ...value, azureBaseUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              <TextField
+                labelPlacement="top"
+                label="Base URL"
+                required
+                fullWidth
+                size="small"
+                value={value.azureBaseUrl}
+                placeholder="https://<resource>.openai.azure.com"
+                onChange={(e) => onChange({ ...value, azureBaseUrl: e.target.value })}
+                sx={REQUIRED_FIELD_SX}
+              />
               <TextField labelPlacement="top" label="API Version" required fullWidth size="small" value={value.azureApiVersion} onChange={(e) => onChange({ ...value, azureApiVersion: e.target.value })} sx={REQUIRED_FIELD_SX} />
             </>
           )}

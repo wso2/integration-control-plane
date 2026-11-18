@@ -26,6 +26,10 @@ import CodeViewer from '../../../CodeViewer';
 import McpPlayground from '../../../McpPlayground/McpPlayground';
 import OperationHeader from '../../../Overview/_shared/bodies/OperationHeader';
 import OperationTile, { type OperationTileColors } from '../../../Overview/_shared/bodies/OperationTile';
+import AccessOffAlert from '../AccessOffAlert';
+import AccessSwitch from '../AccessSwitch';
+import { Scopes } from '../../../../constants/permissions';
+import { useCan } from '../../../../hooks/useCan';
 import SurfaceHeader from '../SurfaceHeader';
 import { clientTabsSx, playgroundFrameSx } from '../../styles';
 import { BaseUrl, FieldTable, Mono } from './ApiMockTab';
@@ -70,6 +74,8 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
   const testKey = useCreateContextApiKey(engine.id);
   const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() });
   const selected = configs.find((c) => c.id === client) ?? configs[0];
+  const mcpOff = engine.access?.mcp === false;
+  const canMintKey = useCan()(Scopes.CONFIG_MANAGE);
   const tools = CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers);
 
   if (!engine.publicApiUrl) {
@@ -86,11 +92,8 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
   return (
     <Box>
       <Box sx={readableSx}>
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          Mock: a proposed layout for review. Tokens created here are not real, and the engine does not accept them.
-        </Alert>
-
-        <SurfaceHeader title="MCP server" description="Agents connect here and call the tools below." />
+        <SurfaceHeader title="MCP server" description="Agents connect here and call the tools below." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="mcp" />} />
+        {mcpOff && <AccessOffAlert surface="mcp" />}
 
         <BaseUrl label="Server URL" url={endpoint} />
 
@@ -119,12 +122,12 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
         <CodeViewer title={selected.path} language="json" code={selected.json} showCopyButton />
 
         <Box sx={{ my: 3 }}>
-          <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} onClick={() => setTesting((t) => !t)}>
+          <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} disabled={mcpOff} onClick={() => setTesting((t) => !t)}>
             {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
           </Button>
         </Box>
       </Box>
-      {testing && (
+      {testing && canMintKey && !mcpOff && (
         <Box sx={playgroundFrameSx}>
           <McpPlayground url={endpoint} token={testKey.data?.apiKey ?? null} headerName="X-API-Key" isTokenFetching={testKey.isPending} onTokenRegenerate={mintTestKey} connectionLayout="bar" />
         </Box>

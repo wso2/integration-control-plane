@@ -180,7 +180,7 @@ const RULE = { group: 'engineering', role: 'admin' };
 /** A source with field values and one complete visibility rule. */
 const withValues = (id: string, values: Record<string, string>, name?: string): ContextSourceConfig => {
   const blank = blankSource(id);
-  return { ...blank, name: name ?? blank.name, values: { ...blank.values, ...values }, audience: [RULE] };
+  return { ...blank, name: name ?? SOURCE_CONNECTORS.find((c) => c.id === id)?.name ?? id, values: { ...blank.values, ...values }, audience: [RULE] };
 };
 
 /** The upload connector has no fields, so this is complete once it has a rule. */
@@ -241,7 +241,8 @@ describe('source validation', () => {
     expect(isSourceValid(withValues('website', { urls: 'https://a.com\nnot-a-url' }))).toBe(false);
     expect(isSourceValid(withValues('website', { urls: 'https://a.com' }))).toBe(true);
     expect(isSourceValid(upload())).toBe(true);
-    expect(isSourceValid(blankSource('upload'))).toBe(true); // uploads choose who can see them per upload; no rules to type
+    expect(isSourceValid({ ...blankSource('upload'), name: 'Handbook' })).toBe(true); // uploads choose who can see them per upload; no rules to type
+    expect(isSourceValid(blankSource('upload'))).toBe(false); // a new source starts unnamed, so the user names it
     expect(isSourceValid({ type: 'gone', name: 'x', values: {}, audience: [RULE] })).toBe(false);
   });
 
@@ -251,7 +252,8 @@ describe('source validation', () => {
     expect(sourceIncompleteReason(src)).toBe('Base URL invalid');
     expect(sourceIncompleteReason(withValues('confluence', { baseUrl: 'https://x.atlassian.net/wiki' }))).toBe('Space Key missing');
     expect(sourceIncompleteReason(upload())).toBe('');
-    expect(sourceIncompleteReason(blankSource('upload'))).toBe('');
+    expect(sourceIncompleteReason({ ...blankSource('upload'), name: 'Handbook' })).toBe('');
+    expect(sourceIncompleteReason(blankSource('upload'))).toBe('Name missing');
     // Every source defaults to "everyone who can query"; only an empty "only some roles" choice is incomplete.
     const drive = withValues('gdrive', { folderId: 'abc', clientId: 'c', clientSecret: 's', refreshToken: 'r' });
     expect(sourceIncompleteReason(drive)).toBe('');

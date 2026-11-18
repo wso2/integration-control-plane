@@ -217,12 +217,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     // emptied so none is offered, and a pick carrying one is dropped rather than written.
     // An MI env var takes a resource key only: both endpoint groups are emptied so none is offered,
     // and a pick carrying one is dropped rather than taken for an unlink.
-    const picker = view.picker && name && (
-      <FieldLinkPicker
-        field={name}
-        picker={{ ...view.picker, endpoints: [], connections: [], disabled: linkBusy, onPick: (pick) => (pick && 'endpoint' in pick ? undefined : link(name, pick)) }}
-      />
-    );
+    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, endpoints: [], connections: [], disabled: linkBusy, onPick: (pick) => (pick && 'endpoint' in pick ? undefined : link(name, pick)) }} />;
     if (!view.source)
       return picker ? (
         <Stack direction="row" alignItems="flex-start" sx={{ flex: 1 }}>

@@ -86,16 +86,19 @@ export default function TracesTable({ traces, onSelect }: TracesTableProps): JSX
                     // The row handles the click too; without this the drawer opens twice.
                     event.stopPropagation();
                     onSelect(trace);
-                  }}
-                >
+                  }}>
                   {trace.rootSpanName}
                 </Button>
                 <Stack direction="row" alignItems="center" gap={0.75} sx={styles.chips}>
                   <Typography variant="caption" sx={styles.traceId}>
                     {trace.traceId.slice(0, 16)}
                   </Typography>
-                  {trace.models?.map((model) => <Chip key={model} size="small" variant="outlined" label={model} />)}
-                  {trace.tools?.map((tool) => <Chip key={tool} size="small" variant="outlined" color={trace.failedTools?.includes(tool) ? 'error' : 'default'} label={tool} />)}
+                  {trace.models?.map((model) => (
+                    <Chip key={model} size="small" variant="outlined" label={model} />
+                  ))}
+                  {trace.tools?.map((tool) => (
+                    <Chip key={tool} size="small" variant="outlined" color={trace.failedTools?.includes(tool) ? 'error' : 'default'} label={tool} />
+                  ))}
                 </Stack>
               </ListingTable.Cell>
               <ListingTable.Cell>
