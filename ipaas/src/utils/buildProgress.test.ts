@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildStepperSteps, describeBuildStatus, failedStepPhrase, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, type StepperState } from './buildProgress';
+import { buildStepperSteps, describeBuildStatus, failedStepLabel, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, type StepperState } from './buildProgress';
 import { BUILD_STAGES } from '../constants/build';
 import type { BuildRunLogs, BuildStage } from '../types/build';
 
@@ -134,7 +134,7 @@ describe('getBuildStatus', () => {
   });
 });
 
-describe('failedStepPhrase', () => {
+describe('failedStepLabel', () => {
   const named = (steps: { name: string; conclusion: string | null }[]): BuildStage => ({
     log: null,
     status: 'completed',
@@ -142,21 +142,29 @@ describe('failedStepPhrase', () => {
   });
 
   it('names the failed OpenChoreo task', () => {
-    expect(failedStepPhrase(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), named([{ name: 'build-image', conclusion: 'failure' }]), stage(null)))).toBe('building the image');
+    expect(failedStepLabel(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), named([{ name: 'build-image', conclusion: 'failure' }]), stage(null)))).toBe('Failed while building the image');
+  });
+
+  it('names a build the image scan blocked', () => {
+    const scanBlocked = named([
+      { name: 'build-image', conclusion: 'success' },
+      { name: 'scan-image', conclusion: 'failure' },
+    ]);
+    expect(failedStepLabel(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), scanBlocked, stage(null)))).toBe('Vulnerability scan failed');
   });
 
   it('reports the earliest failure when several steps fail', () => {
     const failed = logs(named([{ name: 'checkout-source', conclusion: 'failure' }]), named([{ name: 'build-image', conclusion: 'failure' }]), stage(null));
-    expect(failedStepPhrase(failed)).toBe('checking out the source');
+    expect(failedStepLabel(failed)).toBe('Failed while checking out the source');
   });
 
-  it('gives no phrase for an unmapped step name', () => {
-    expect(failedStepPhrase(logs(stage(null), named([{ name: 'some-new-task', conclusion: 'failure' }]), stage(null)))).toBeUndefined();
+  it('gives no label for an unmapped step name', () => {
+    expect(failedStepLabel(logs(stage(null), named([{ name: 'some-new-task', conclusion: 'failure' }]), stage(null)))).toBeUndefined();
   });
 
-  it('gives no phrase without logs or without a failure', () => {
-    expect(failedStepPhrase(null)).toBeUndefined();
-    expect(failedStepPhrase(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), stage(null), stage(null)))).toBeUndefined();
+  it('gives no label without logs or without a failure', () => {
+    expect(failedStepLabel(null)).toBeUndefined();
+    expect(failedStepLabel(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), stage(null), stage(null)))).toBeUndefined();
   });
 });
 

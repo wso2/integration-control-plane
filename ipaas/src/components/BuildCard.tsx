@@ -23,7 +23,7 @@ import { useEffect, useState } from 'react';
 import { useDeploymentStatus } from '../hooks/useDeployments';
 import { useBuildLogs } from '../hooks/useBuilds';
 import { useStableStepperState } from '../hooks/useStableStepperState';
-import { buildStepperSteps, describeBuildStatus, failedStepPhrase, getBuildStatus, isFailedConclusion } from '../utils/buildProgress';
+import { buildStepperSteps, describeBuildStatus, failedStepLabel, getBuildStatus, isFailedConclusion } from '../utils/buildProgress';
 import { findCommitBySha } from '../utils/commits';
 import { isBuildLive } from '../utils/build';
 import type { Commit } from '../types/repository';
@@ -89,8 +89,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
   const commitTooltip = commitMessage ? `"${commitMessage}"${buildCommit?.author?.name ? ` by ${buildCommit.author.name}` : ''}` : commitSha;
 
   // Name the step that broke when we can resolve it: "Failed while building the image".
-  const failedPhrase = failedStepPhrase(logs);
-  const failedLabel = failedPhrase ? `Failed while ${failedPhrase}` : 'Failed';
+  const failedLabel = failedStepLabel(logs) ?? 'Failed';
 
   const { label: statusLabel, tone } = describeBuildStatus(status, conclusion, stepperState, failedLabel);
 
