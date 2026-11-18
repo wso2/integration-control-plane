@@ -45,6 +45,7 @@ import UserPortalAction from '../../UserPortal/UserPortalAction';
 import { footerSx as userPortalFooterSx } from '../../UserPortal/UserPortal.styles';
 import EnvCardNotice from '../../EnvironmentCard/EnvCardNotice';
 import { useEnvCardNotification } from '../../EnvironmentCard/useEnvCardNotification';
+import WorkflowDeployNotice from '../../Workflows/deploy/WorkflowDeployNotice';
 import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
 import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
@@ -377,6 +378,7 @@ export default function DeployEnvironmentCard({
             onEndpointsClick={showEndpoints ? () => setEndpointsOpen(true) : undefined}
           />
           {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
+          {isWorkflow && <WorkflowDeployNotice componentId={componentId} environment={env.id} />}
           <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
           {/* The Overview card's User Portal action, so publishing works the same on both cards. */}
           {publishesToUserPortal && (

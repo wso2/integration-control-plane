@@ -16,8 +16,14 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
-import { toWorkflowRuntime } from './workflowRuntime';
+import { describe, expect, it, vi } from 'vitest';
+import { acceptedWorkflowDeploy, fetchWorkflowDeploy, toWorkflowDeploy, toWorkflowRuntime } from './workflowRuntime';
+
+const bffGet = vi.hoisted(() => vi.fn());
+vi.mock('./_client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./_client')>();
+  return { ...actual, bff: { ...actual.bff, get: bffGet } };
+});
 
 describe('toWorkflowRuntime', () => {
   it('maps the server name and namespaces', () => {
@@ -30,5 +36,54 @@ describe('toWorkflowRuntime', () => {
 
   it('reads an unknown status as an error and a null list as empty', () => {
     expect(toWorkflowRuntime({ status: 'SOMETHING_NEW', namespaces: null })).toEqual({ status: 'ERROR', serverName: undefined, namespaces: [] });
+  });
+});
+
+describe('acceptedWorkflowDeploy', () => {
+  it('reads the deploying status a 202 answer to a workflow deploy carries', () => {
+    expect(acceptedWorkflowDeploy({ environment: 'development', state: 'deploying', operation: 'deploy', startedAt: '2026-11-10T11:33:09Z', message: 'running' })).toEqual({
+      environment: 'development',
+      state: 'deploying',
+      operation: 'deploy',
+      startedAt: '2026-11-10T11:33:09Z',
+      finishedAt: undefined,
+      releaseName: undefined,
+      message: 'running',
+    });
+  });
+
+  it.each([
+    ['a deploy finished within its request', { message: 'orders-20261110-3' }],
+    ['a promote finished within its request', { message: 'orders-20261110-3', proxyReconciliation: { status: 'SUCCEEDED' } }],
+    ['an empty answer', null],
+  ])('finds none in %s', (_name, body) => {
+    expect(acceptedWorkflowDeploy(body)).toBeUndefined();
+  });
+});
+
+describe('toWorkflowDeploy', () => {
+  it('reads a state or operation it does not know as none and unset', () => {
+    expect(toWorkflowDeploy({ environment: 'development', state: 'rolling', operation: 'redeploy' })).toMatchObject({ state: 'none', operation: undefined });
+  });
+
+  it('keeps a failed deploy’s message', () => {
+    expect(toWorkflowDeploy({ environment: 'production', state: 'failed', operation: 'promote', message: 'the workflow runtime is unavailable; try again later' })).toMatchObject({
+      state: 'failed',
+      operation: 'promote',
+      message: 'the workflow runtime is unavailable; try again later',
+    });
+  });
+});
+
+describe('fetchWorkflowDeploy', () => {
+  it('reads an empty answer as no deploy', async () => {
+    bffGet.mockResolvedValueOnce(null);
+    await expect(fetchWorkflowDeploy('orders', 'development')).resolves.toEqual({ environment: 'development', state: 'none' });
+  });
+
+  it('reads the status of the environment it asked for', async () => {
+    bffGet.mockResolvedValueOnce({ environment: 'development', state: 'deploying', operation: 'deploy' });
+    await expect(fetchWorkflowDeploy('orders', 'development')).resolves.toMatchObject({ state: 'deploying' });
+    expect(bffGet).toHaveBeenLastCalledWith('/components/orders/workflow-deploy?environment=development');
   });
 });

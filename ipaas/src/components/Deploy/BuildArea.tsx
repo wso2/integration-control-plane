@@ -47,6 +47,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { useWorkflowDeploy } from '../../hooks/useWorkflowDeploy';
 import { useWorkflowRuntime } from '../../hooks/useWorkflowRuntime';
 import { useUpdateAutoDeployEnabled } from '../../hooks/useComponents';
 import { useComponentDeployment, useDeploymentStatus, useDeploymentTrackImages } from '../../hooks/useDeployments';
@@ -137,7 +138,10 @@ export default function BuildArea({
   }, [initialAutoDeployEnabled]);
 
   const isLatest = selectedImage?.imageId === images[0]?.imageId;
-  const isDeploying = deployTrack.isPending;
+  // A workflow deploys after its request: the first environment's deploy holds the button until
+  // it ends, and so does the read that tells whether one is running.
+  const { isDeploying: workflowDeploying, isChecking: workflowChecking } = useWorkflowDeploy(componentId, firstEnvId, isWorkflow);
+  const isDeploying = deployTrack.isPending || workflowDeploying;
   // Image-only components (e.g. knowledge base data sources) have no builds, so there is
   // no image to pick. Once deployed they can still be redeployed: an empty imageId makes
   // the BFF cut a new release from the current workload, picking up component changes.
@@ -148,7 +152,7 @@ export default function BuildArea({
   const { data: workflowRuntime } = useWorkflowRuntime(isWorkflow);
   // A workflow's worker needs the runtime to connect to; the environment card says why it is not ready.
   const workflowRuntimeBlocked = isWorkflow && workflowRuntime?.status !== 'READY';
-  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending && !workflowRuntimeBlocked;
+  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !workflowChecking && !isBuildPending && !workflowRuntimeBlocked;
 
   const handleDeploy = () => {
     if (!canDeploy) return;

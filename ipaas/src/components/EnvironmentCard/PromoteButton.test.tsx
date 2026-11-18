@@ -37,6 +37,14 @@ vi.mock('../../hooks/useDeployments', () => ({
   },
   usePromote: () => ({ mutate, isPending: false }),
 }));
+// The promote a workflow runs after its request, as the BFF reports it for the target.
+const workflowDeploy = vi.hoisted(() => ({ deploying: false, checking: false, args: [] as unknown[][] }));
+vi.mock('../../hooks/useWorkflowDeploy', () => ({
+  useWorkflowDeploy: (...args: unknown[]) => {
+    workflowDeploy.args.push(args);
+    return { isDeploying: workflowDeploy.deploying, isChecking: workflowDeploy.checking };
+  },
+}));
 vi.mock('../../hooks/useOrgUuid', () => ({ useOrgUuid: () => 'org' }));
 // The read of the links the click makes: what it answers, or a promise that never settles.
 const read = vi.hoisted(() => ({ result: undefined as unknown }));
@@ -84,6 +92,9 @@ const button = () => container.querySelector('button')!;
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mutate.mockClear();
+  workflowDeploy.deploying = false;
+  workflowDeploy.checking = false;
+  workflowDeploy.args = [];
   read.result = answered();
   portal.result = publishedIn();
   portal.reads = 0;
@@ -101,6 +112,21 @@ afterEach(() => {
 });
 
 describe('PromoteButton', () => {
+  it('holds Promote until it knows whether a workflow’s promote to the target is running', async () => {
+    workflowDeploy.checking = true;
+    await render(true);
+    expect(button().disabled).toBe(true);
+    expect(button().textContent).toBe('Promote');
+  });
+
+  it('holds Promote while a workflow’s promote to the target runs after its request', async () => {
+    workflowDeploy.deploying = true;
+    await render(true);
+    expect(workflowDeploy.args.at(-1)).toEqual(['sftask', 'production', true]);
+    expect(button().disabled).toBe(true);
+    expect(button().textContent).toBe('Promoting…');
+  });
+
   it('offers a release of the build the target already runs', async () => {
     await render();
     expect(button().disabled).toBe(false);
