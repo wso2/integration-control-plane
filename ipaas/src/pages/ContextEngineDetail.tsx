@@ -31,6 +31,7 @@ import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import NotFound from '../components/NotFound';
+import { UpgradeLinkedText } from '../components/common/PlanLimitWarning';
 import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
@@ -138,7 +139,9 @@ function EngineStatusAlert({ engineId, state, reason, setup }: EngineStatusAlert
       {warnings.length > 0 && (
         <Box component="ul" sx={listSx}>
           {warnings.map((w) => (
-            <li key={w}>{w}</li>
+            <li key={w}>
+              <UpgradeLinkedText message={w} />
+            </li>
           ))}
         </Box>
       )}

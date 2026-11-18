@@ -25,6 +25,9 @@ import { useCan } from '../hooks/useCan';
 import { isContextEngineEnabled, useContextEngines, useContextEngineSummary, useDeleteContextEngine, useSeenOnScreen } from '../hooks/useContextEngine';
 import { contextEngineUrl, newContextEngineUrl } from '../paths';
 import { Scopes } from '../constants/permissions';
+import { FREE_CONTEXT_ENGINE_LIMIT } from '../constants/subscription';
+import { usePlanAccess } from '../hooks/useBillingOrg';
+import PlanLimitWarning from '../components/common/PlanLimitWarning';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
@@ -178,6 +181,8 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
   }, [location, navigate]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const planAccess = usePlanAccess();
+  const atFreeLimit = planAccess?.state === 'free' && (engines ?? []).filter((e) => e.state !== 'deleting').length >= FREE_CONTEXT_ENGINE_LIMIT;
 
   const goCreate = () => navigate(newContextEngineUrl(scope.org));
   const goDetail = (id: string) => navigate(contextEngineUrl(scope.org, id));
@@ -286,12 +291,14 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
         <Stack direction="row" gap={1} alignItems="center" sx={toolbarSx}>
           <SearchField value={search} onChange={setSearch} placeholder="Search context engines..." fullWidth />
           {canManage && (
-            <Button variant="contained" startIcon={<Plus size={16} />} onClick={goCreate} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+            <Button variant="contained" startIcon={<Plus size={16} />} disabled={atFreeLimit} onClick={goCreate} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
               Create Context Engine
             </Button>
           )}
         </Stack>
       )}
+
+      {canManage && atFreeLimit && <PlanLimitWarning severity="info" message={`Free plans can only create ${FREE_CONTEXT_ENGINE_LIMIT} context engine${FREE_CONTEXT_ENGINE_LIMIT === 1 ? '' : 's'}. Upgrade your subscription to create more.`} sx={{ mb: 2 }} />}
 
       {alert && (
         <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 2 }}>

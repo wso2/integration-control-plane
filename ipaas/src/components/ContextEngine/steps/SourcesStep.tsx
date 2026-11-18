@@ -24,6 +24,9 @@ import ConnectorPicker from '../ConnectorPicker';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
 import { sourceListSx, sourceRowSx, sourceRowTextSx, statusChipSx, stepHeadingSx, stepHintSx } from '../styles';
+import { FREE_CONTEXT_SOURCE_LIMIT } from '../../../constants/subscription';
+import { usePlanAccess } from '../../../hooks/useBillingOrg';
+import PlanLimitWarning from '../../common/PlanLimitWarning';
 import type { ContextSourceConfig } from '../../../types/contextEngine';
 
 interface SourcesStepProps {
@@ -105,6 +108,9 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
   };
 
   const incomplete = sources.filter((s) => !isSourceValid(s)).length;
+  const planAccess = usePlanAccess();
+  const connectorCount = sources.filter((s) => s.type !== 'upload').length;
+  const atSourceLimit = planAccess?.state === 'free' && connectorCount >= FREE_CONTEXT_SOURCE_LIMIT;
   const addedCounts = sources.reduce<Record<string, number>>((acc, s) => ({ ...acc, [s.type]: (acc[s.type] ?? 0) + 1 }), {});
 
   return (
@@ -144,7 +150,9 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
         </Box>
       )}
 
-      <ConnectorPicker addedCounts={addedCounts} onPick={(connectorId) => openDrawer({ connectorId })} />
+      {atSourceLimit && <PlanLimitWarning severity="info" message={`Free plans can add up to ${FREE_CONTEXT_SOURCE_LIMIT} connector sources; file uploads don't count. Upgrade your subscription to add more.`} sx={{ mb: 3 }} />}
+
+      <ConnectorPicker addedCounts={addedCounts} blocked={atSourceLimit ? (id) => id !== 'upload' : undefined} onPick={(connectorId) => openDrawer({ connectorId })} />
 
       <SourceDrawer key={drawer.session} formOnly orgHandle={orgHandle} open={drawer.open} start={drawer.start} existing={sources} onClose={closeDrawer} onSubmit={submit} />
     </>

@@ -33,6 +33,8 @@ interface ConnectorPickerProps {
   /** How many sources of each connector id have been added. */
   addedCounts: Record<string, number>;
   onPick: (connectorId: string) => void;
+  /** Connectors that cannot be added now, such as when the plan's source limit is reached. */
+  blocked?: (connectorId: string) => boolean;
 }
 
 type CategoryFilter = SourceCategory | 'all';
@@ -46,9 +48,10 @@ function ConnectorLogo({ connector }: { connector: SourceConnector }): JSX.Eleme
 }
 
 /** A live connector: opens its form. Shows a check once added; a single-instance connector cannot be added twice. */
-function AvailableCard({ connector, added, onPick }: { connector: SourceConnector; added: number; onPick: () => void }): JSX.Element {
-  const locked = !!connector.single && added > 0;
-  const label = locked ? `${connector.name}, already added` : added > 0 ? `Add another ${connector.name} source, ${added} added` : `Add ${connector.name} source`;
+function AvailableCard({ connector, added, blocked = false, onPick }: { connector: SourceConnector; added: number; blocked?: boolean; onPick: () => void }): JSX.Element {
+  const single = !!connector.single && added > 0;
+  const locked = single || blocked;
+  const label = single ? `${connector.name}, already added` : blocked ? `${connector.name}, source limit reached` : added > 0 ? `Add another ${connector.name} source, ${added} added` : `Add ${connector.name} source`;
   // Clicking an added card adds another source of that type; edit an existing one from its row above.
   const card = (
     <Box component="button" type="button" onClick={onPick} disabled={locked} aria-label={label} sx={connectorCardSx({ added: added > 0, interactive: !locked })}>
@@ -94,7 +97,7 @@ function ComingSoonCard({ connector }: { connector: SourceConnector }): JSX.Elem
  * search, category filter, the live connectors, then the upcoming ones.
  * Picking a live connector opens its form; upcoming ones are shown, not picked.
  */
-export default function ConnectorPicker({ addedCounts, onPick }: ConnectorPickerProps): JSX.Element {
+export default function ConnectorPicker({ addedCounts, onPick, blocked }: ConnectorPickerProps): JSX.Element {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
@@ -132,7 +135,7 @@ export default function ConnectorPicker({ addedCounts, onPick }: ConnectorPicker
               </Typography>
               <Box sx={connectorGridSx}>
                 {available.map((c) => (
-                  <AvailableCard key={c.id} connector={c} added={addedCounts[c.id] ?? 0} onPick={() => onPick(c.id)} />
+                  <AvailableCard key={c.id} connector={c} added={addedCounts[c.id] ?? 0} blocked={blocked?.(c.id)} onPick={() => onPick(c.id)} />
                 ))}
               </Box>
             </Box>

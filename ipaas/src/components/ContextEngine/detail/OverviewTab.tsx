@@ -27,6 +27,8 @@ import { ENGINE_DATABASE_LABEL, STORAGE_BACKENDS } from '../../../constants/cont
 import { answersFromIngestion, checkStagedFile, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
+import { isQuotaError } from '../../../utils/apiErrors';
+import { UpgradeLinkedText } from '../../common/PlanLimitWarning';
 import GetStartedChecklist from './GetStartedChecklist';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourcesProgressCard from './SourcesProgressCard';
@@ -139,7 +141,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const [addSession, setAddSession] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [editSource, setEditSource] = useState<ContextSource | null>(null);
-  const [sourceNotice, setSourceNotice] = useState<{ severity: 'success' | 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
+  const [sourceNotice, setSourceNotice] = useState<{ severity: 'success' | 'warning' | 'error'; message: string; forbidden?: boolean; planLimit?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
   const permissions = useContextPermissions(readOnly ? '' : engine.id);
   const llmModels = engine.models.llm ? { ...engine.models, llm: engine.models.llm } : null;
@@ -179,6 +181,10 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
         setSourceNotice({ severity: 'success', message: `Source '${created.name}' added successfully.` });
       },
       onError: (e) => {
+        if (isQuotaError(e)) {
+          setSourceNotice({ severity: 'warning', planLimit: true, message: engineMessage(e, 'Your plan has no room for another source. Upgrade your subscription to add more.') });
+          return;
+        }
         const forbidden = e instanceof HttpError && e.status === 403;
         setSourceNotice({ severity: 'error', forbidden, message: forbidden ? 'Adding a source needs the manage permission on this engine.' : engineMessage(e, "Couldn't add the source."), retry: () => submitNewSource(picked) });
       },
@@ -212,7 +218,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
 
       {sourceNotice && (
         <Alert severity={sourceNotice.severity} onClose={() => setSourceNotice(null)} action={sourceNotice.forbidden && sourceNotice.retry ? <OwnerAccessButton engineId={engine.id} onGranted={sourceNotice.retry} /> : undefined} sx={{ mb: 2 }}>
-          {sourceNotice.message}
+          {sourceNotice.planLimit ? <UpgradeLinkedText message={sourceNotice.message} /> : sourceNotice.message}
         </Alert>
       )}
 

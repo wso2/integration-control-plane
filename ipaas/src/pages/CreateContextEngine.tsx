@@ -45,6 +45,7 @@ import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import VerticalStepper from '../components/VerticalStepper';
+import PlanLimitWarning from '../components/common/PlanLimitWarning';
 import NameStep from '../components/ContextEngine/steps/NameStep';
 import SourcesStep from '../components/ContextEngine/steps/SourcesStep';
 // import AccessStep from '../components/ContextEngine/steps/AccessStep'; — 'Grant Access' step hidden
@@ -86,6 +87,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const [form, dispatch] = useReducer(contextEngineFormReducer, initialContextEngineForm);
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [planLimit, setPlanLimit] = useState<string | null>(null);
   const create = useCreateContextEngine();
   const qc = useQueryClient();
   const { data: orgRoles } = useRoles(scope.org);
@@ -128,6 +130,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const submit = () => {
     if (!canCreate || create.isPending) return;
     setError(null);
+    setPlanLimit(null);
     // Each source's visibility becomes audience rules now that the query roles are known.
     const withRules = withSourceVisibilityRules(form.sources, everyone);
     create.mutate(toCreateInput({ ...form, sources: withRules }), {
@@ -139,7 +142,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
       onError: (e) => {
         if (e instanceof HttpError && e.status === 409) setError(`Couldn't create the context engine: ${engineMessage(e, 'the name is taken')}`);
         else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines in this organization.");
-        else if (e instanceof HttpError && e.status === 402) setError(`Couldn't create the context engine: ${engineMessage(e, 'your plan has no room for another engine')}`);
+        else if (e instanceof HttpError && e.status === 402) setPlanLimit(engineMessage(e, 'Your plan has no room for another context engine. Upgrade your subscription to create more.'));
         else if (e instanceof HttpError) setError(`Couldn't create the context engine: ${engineMessage(e)}`);
         else setError("Couldn't create the context engine. Please try again.");
       },
@@ -170,6 +173,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 {error}
               </Alert>
             )}
+            {planLimit && <PlanLimitWarning message={planLimit} onClose={() => setPlanLimit(null)} sx={{ mb: 3 }} />}
 
             {activeStep === 0 && <NameStep name={form.name} description={form.description} onNameChange={(value) => dispatch({ type: 'name', value })} onDescriptionChange={(value) => dispatch({ type: 'description', value })} />}
             {activeStep === 1 && (
