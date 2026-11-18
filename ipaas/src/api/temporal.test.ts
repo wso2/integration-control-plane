@@ -53,7 +53,7 @@ describe('toTemporalOffering', () => {
 
   it('keeps plans, the version and the plane', () => {
     const offering = toTemporalOffering({
-      plans: [{ id: 'dev', replicas: 1, cpu: '0.5', memory: '1.125Gi', historyShards: 1, storageGi: 2, monthlyPrice: 25, currency: 'USD' }],
+      plans: [{ id: 'dev', replicas: 1, cpu: '0.5', memory: '1.125Gi', historyShards: 1, storageGi: 2 }],
       defaultPlan: 'dev',
       temporalVersion: '1.31.2',
       maxNameLength: 29,

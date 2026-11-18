@@ -88,6 +88,8 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
   const planAccess = usePlanAccess();
   const freeTierOnly = planAccess?.state === 'free';
   const planLocked = (id: string): boolean => planAccess?.state !== 'paid' && id !== FREE_PLAN_TIER;
+  // A free organization can never pick the larger tiers, so they are left out rather than shown locked.
+  const planShown = (id: string): boolean => !freeTierOnly || id === FREE_PLAN_TIER;
   const selectableIds = planIds.filter((id) => !planLocked(id));
   const defaultPlan = offering.data?.defaultPlan;
   const fallbackPlan = defaultPlan && selectableIds.includes(defaultPlan) ? defaultPlan : (selectableIds[0] ?? '');
@@ -204,13 +206,13 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
       }>
       Failed to load the service plans.
     </Alert>
-  ) : !planIds.length ? (
+  ) : !planIds.some(planShown) ? (
     <Alert severity="info">No service plans are offered.</Alert>
   ) : (
     <Box role="radiogroup" aria-labelledby="service-plan-title" sx={styles.planGridSx}>
       {isTemporal
-        ? temporalOffering.data?.plans.map((plan) => <TemporalPlanCard key={plan.id} plan={plan} selected={planId === plan.id} disabled={create.isPending || planLocked(plan.id)} onSelect={() => setPickedPlan(plan.id)} />)
-        : dbOffering.data?.plans.map((plan) => <PlanCard key={plan.id} plan={plan} selected={planId === plan.id} disabled={create.isPending || planLocked(plan.id)} onSelect={() => setPickedPlan(plan.id)} />)}
+        ? temporalOffering.data?.plans.filter((plan) => planShown(plan.id)).map((plan) => <TemporalPlanCard key={plan.id} plan={plan} selected={planId === plan.id} disabled={create.isPending || planLocked(plan.id)} onSelect={() => setPickedPlan(plan.id)} />)
+        : dbOffering.data?.plans.filter((plan) => planShown(plan.id)).map((plan) => <PlanCard key={plan.id} plan={plan} selected={planId === plan.id} disabled={create.isPending || planLocked(plan.id)} onSelect={() => setPickedPlan(plan.id)} />)}
     </Box>
   );
 

@@ -22,9 +22,6 @@ import type { DatabasePlan, DatabaseServerDetail, DatabaseStatus } from '../type
 /** The provider's name rule: a lowercase DNS label. */
 export const DATABASE_NAME_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
-/** Hours in the month the provider quotes its prices per. */
-const HOURS_PER_MONTH = 730;
-
 /** The validation message for a database name, or '' when it is acceptable. */
 export function databaseNameError(name: string, takenNames: readonly string[], maxLength?: number): string {
   if (name === '') return '';
@@ -100,14 +97,6 @@ export function planSpecLine(plan: Pick<DatabasePlan, 'cpu' | 'memory' | 'defaul
 
 export function nodeDescription(count: number): string {
   return count > 1 ? `${count} nodes (high availability)` : '1 node (not highly available)';
-}
-
-/** Monthly and hourly list prices of a plan, or undefined when the provider publishes none. */
-export function planPrice(plan: Pick<DatabasePlan, 'monthlyPrice' | 'currency'>): { monthly: string; hourly: string } | undefined {
-  if (plan.monthlyPrice === undefined) return undefined;
-  const currency = plan.currency || 'USD';
-  const format = (value: number, digits: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
-  return { monthly: format(plan.monthlyPrice, 2), hourly: format(plan.monthlyPrice / HOURS_PER_MONTH, 4) };
 }
 
 /**

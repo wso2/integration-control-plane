@@ -18,7 +18,7 @@
 
 import type { JSX } from 'react';
 import ServicePlanCard, { type PlanSpec } from './ServicePlanCard';
-import { cpuLabel, memoryLabel, planLabel, planPrice } from '../../utils/databases';
+import { cpuLabel, memoryLabel, planLabel } from '../../utils/databases';
 import type { DatabasePlan } from '../../types/databases';
 
 interface PlanCardProps {
@@ -28,7 +28,7 @@ interface PlanCardProps {
   onSelect: () => void;
 }
 
-/** A PostgreSQL plan option showing the plan's per-node size and list price. */
+/** A PostgreSQL plan option showing the plan's per-node size. */
 export default function PlanCard({ plan, selected, disabled, onSelect }: PlanCardProps): JSX.Element {
   const specs: PlanSpec[] = [{ label: 'Nodes', value: String(plan.nodeCount) }];
   if (plan.defaultStorageGi !== undefined) specs.push({ label: 'Storage', value: `${plan.defaultStorageGi} GB` });
@@ -38,7 +38,6 @@ export default function PlanCard({ plan, selected, disabled, onSelect }: PlanCar
     <ServicePlanCard
       name={planLabel(plan.id)}
       tagline={plan.nodeCount > 1 ? `${plan.nodeCount}-node cluster` : 'Single node'}
-      price={planPrice(plan)}
       specs={specs}
       note={plan.backups ? 'Daily backups, kept 7 days' : 'No backups · development only'}
       noteTone={plan.backups ? 'success' : 'warning'}

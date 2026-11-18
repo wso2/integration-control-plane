@@ -18,7 +18,7 @@
 
 import type { JSX } from 'react';
 import ServicePlanCard, { type PlanSpec } from '../Databases/ServicePlanCard';
-import { cpuLabel, memoryLabel, planLabel, planPrice } from '../../utils/databases';
+import { cpuLabel, memoryLabel, planLabel } from '../../utils/databases';
 import type { TemporalPlan } from '../../types/temporal';
 
 interface TemporalPlanCardProps {
@@ -28,7 +28,7 @@ interface TemporalPlanCardProps {
   onSelect: () => void;
 }
 
-/** A Temporal plan option showing the plan's size, throughput and list price. */
+/** A Temporal plan option showing the plan's size and throughput. */
 export default function TemporalPlanCard({ plan, selected, disabled, onSelect }: TemporalPlanCardProps): JSX.Element {
   const highlyAvailable = plan.replicas > 1;
   const specs: PlanSpec[] = [{ label: 'Replicas', value: String(plan.replicas) }];
@@ -39,7 +39,6 @@ export default function TemporalPlanCard({ plan, selected, disabled, onSelect }:
     <ServicePlanCard
       name={planLabel(plan.id)}
       tagline={highlyAvailable ? `${plan.replicas} replicas · highly available` : 'Single replica'}
-      price={planPrice(plan)}
       specs={specs}
       note={highlyAvailable ? 'Every Temporal service runs on separate nodes' : 'No redundancy · development only'}
       noteTone={highlyAvailable ? 'success' : 'warning'}

@@ -19,7 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BffError } from '../api/_client';
-import { caCertificateFileName, cpuLabel, databaseBackupView, databaseNameError, isDatabaseOpenable, isBackupStarting, isTransitionalDatabaseStatus, memoryLabel, nodeDescription, planLabel, planPrice, planSpecLine, toCreateDatabaseError } from './databases';
+import { caCertificateFileName, cpuLabel, databaseBackupView, databaseNameError, isDatabaseOpenable, isBackupStarting, isTransitionalDatabaseStatus, memoryLabel, nodeDescription, planLabel, planSpecLine, toCreateDatabaseError } from './databases';
 
 describe('databaseNameError', () => {
   it.each([
@@ -59,16 +59,6 @@ describe('statuses', () => {
     expect(isDatabaseOpenable('ACTIVE')).toBe(true);
     expect(isDatabaseOpenable('DELETING')).toBe(false);
     expect(isDatabaseOpenable('DELETED')).toBe(false);
-  });
-});
-
-describe('planPrice', () => {
-  it('quotes the monthly price and the hourly one from it', () => {
-    expect(planPrice({ monthlyPrice: 73, currency: 'USD' })).toEqual({ monthly: '$73.00', hourly: '$0.1000' });
-  });
-
-  it('has no price for an unpriced plan', () => {
-    expect(planPrice({})).toBeUndefined();
   });
 });
 

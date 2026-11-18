@@ -43,9 +43,6 @@ export interface DatabasePlan {
   defaultStorageGi?: number;
   maxStorageGi?: number;
   backups: boolean;
-  /** List price at the plan's default node count and storage; absent when unpriced. */
-  monthlyPrice?: number;
-  currency?: string;
 }
 
 /** Where new databases run. Region and cloud are absent when the provider records none. */

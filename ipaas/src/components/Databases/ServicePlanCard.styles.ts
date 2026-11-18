@@ -59,10 +59,6 @@ export const radioDotSx = (selected: boolean) =>
     color: 'primary.contrastText',
   }) as const;
 
-export const priceSx = (selected: boolean) => ({ fontWeight: 700, letterSpacing: '-0.02em', color: selected ? 'primary.main' : 'text.primary' }) as const;
-
-export const hourlySx = { fontFamily: 'monospace' } as const;
-
 // Cells draw the inner lines themselves, so the grid has no fill of its own to clash with the card.
 export const specGridSx = {
   display: 'grid',

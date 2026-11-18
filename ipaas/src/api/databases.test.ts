@@ -50,13 +50,13 @@ describe('toDatabaseOffering', () => {
 
   it('keeps plans, versions and the plane', () => {
     const offering = toDatabaseOffering({
-      plans: [{ id: 'dev', nodeCount: 1, backups: false, monthlyPrice: 10.5, currency: 'USD' }],
+      plans: [{ id: 'dev', nodeCount: 1, backups: false }],
       defaultPlan: 'dev',
       postgresVersion: '17',
       maxNameLength: 46,
       plane: { name: 'shared', region: 'local' },
     });
-    expect(offering.plans[0]).toEqual({ id: 'dev', nodeCount: 1, backups: false, monthlyPrice: 10.5, currency: 'USD' });
+    expect(offering.plans[0]).toEqual({ id: 'dev', nodeCount: 1, backups: false });
     expect(offering.postgresVersion).toBe('17');
     expect(offering.plane?.region).toBe('local');
   });
