@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useCreateContextApiKey } from '../../../../hooks/useContextEngine';
@@ -76,6 +76,8 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
   const selected = configs.find((c) => c.id === client) ?? configs[0];
   const mcpOff = engine.access?.mcp === false;
   const canMintKey = useCan()(Scopes.CONFIG_MANAGE);
+  // The playground runs on a test key, which only a role that manages configuration can create.
+  const testBlockedReason = mcpOff ? 'Turn on MCP access to test the server here.' : !canMintKey ? "Your role can't create the test key the playground needs." : '';
   const tools = CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers);
 
   if (!engine.publicApiUrl) {
@@ -122,12 +124,16 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
         <CodeViewer title={selected.path} language="json" code={selected.json} showCopyButton />
 
         <Box sx={{ my: 3 }}>
-          <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} disabled={mcpOff} onClick={() => setTesting((t) => !t)}>
-            {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
-          </Button>
+          <Tooltip title={testBlockedReason}>
+            <span>
+              <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} disabled={!!testBlockedReason} onClick={() => setTesting((t) => !t)}>
+                {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
+              </Button>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
-      {testing && canMintKey && !mcpOff && (
+      {testing && !testBlockedReason && (
         <Box sx={playgroundFrameSx}>
           <McpPlayground url={endpoint} token={testKey.data?.apiKey ?? null} headerName="X-API-Key" isTokenFetching={testKey.isPending} onTokenRegenerate={mintTestKey} connectionLayout="bar" />
         </Box>

@@ -26,6 +26,7 @@ import {
   CONTEXT_ENGINE_HANDLE_MAX,
   DELETION_POLL_MS,
   ENGINE_NATIVE_CONNECTOR_IDS,
+  ENGINE_STATUS_POLL_MS,
   EVERYONE_VISIBILITY,
   INTEGRATION_TYPE_BY_CONNECTOR,
   ROLE_VISIBILITY_ENABLED,
@@ -39,6 +40,7 @@ import {
   RML_MAPPING_KEY,
   PLAYGROUND_SUGGESTIONS,
   PROGRESS_POLL_ACTIVE_MS,
+  PROGRESS_POLL_IDLE_MS,
   RETIRED_MODEL_PROVIDER_NAMES,
   ROLE_GRANT_PREFIX,
   STORAGE_BACKEND_BY_KIND,
@@ -62,6 +64,7 @@ import type {
   ContextEngineForm,
   ContextEngineProgress,
   ContextEngineProgressSummary,
+  ContextIntegration,
   ContextEngineStorage,
   ContextGrant,
   ContextRecordStatus,
@@ -1164,6 +1167,15 @@ export function listPollInterval(engines: { state: string; summary?: Pick<Contex
   if (!engines?.length) return false;
   if (engines.some((e) => e.state === 'deleting')) return DELETION_POLL_MS;
   return engines.some((e) => (e.summary?.progress?.active ?? 0) > 0) ? PROGRESS_POLL_ACTIVE_MS : false;
+}
+
+/**
+ * How often an engine's integrations should be read again: quickly while one is being set up or removed, or after a
+ * failed read. Following runs, they are also read at the idle progress rate, so a scheduled run that finishes shows up.
+ */
+export function integrationsPollInterval(integrations: Pick<ContextIntegration, 'status'>[] | undefined, failed: boolean, followRuns = false): number | false {
+  if (failed || integrations?.some((i) => i.status === 'provisioning' || i.status === 'removing')) return ENGINE_STATUS_POLL_MS;
+  return followRuns && !!integrations?.length ? PROGRESS_POLL_IDLE_MS : false;
 }
 
 // ── File uploads ────────────────────────────────────────────────────────────

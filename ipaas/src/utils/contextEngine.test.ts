@@ -73,6 +73,7 @@ import {
   progressListingText,
   progressListingLine,
   listPollInterval,
+  integrationsPollInterval,
   sourceIndexingText,
   sourceProgressDetail,
   sourceProgressStatus,
@@ -1334,6 +1335,15 @@ describe('source progress', () => {
     expect(listPollInterval([{ state: 'ready', summary: { progress: null } }])).toBe(false);
     expect(listPollInterval([{ state: 'ready', summary: { progress: syncing } }])).toBe(3000);
     expect(listPollInterval([{ state: 'deleting', summary: null }])).toBe(3000);
+  });
+
+  it('reads integrations quickly while one settles, and at the idle rate only when following runs', () => {
+    expect(integrationsPollInterval([{ status: 'provisioning' }, { status: 'ready' }], false)).toBe(4000);
+    expect(integrationsPollInterval([{ status: 'removing' }], false, true)).toBe(4000);
+    expect(integrationsPollInterval(undefined, true)).toBe(4000);
+    expect(integrationsPollInterval([{ status: 'ready' }], false)).toBe(false);
+    expect(integrationsPollInterval([{ status: 'ready' }, { status: 'failed' }], false, true)).toBe(15000);
+    expect(integrationsPollInterval([], false, true)).toBe(false);
   });
 });
 

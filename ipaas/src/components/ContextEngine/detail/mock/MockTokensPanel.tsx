@@ -21,6 +21,7 @@ import { Eye, EyeOff, KeyRound, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react
 import { useEffect, useState, type JSX } from 'react';
 import { REGENERATE_KEY_WARNING, TOKEN_MASK, TOKEN_NOT_RETRIEVABLE_NOTICE, TOKEN_ONE_TIME_WARNING } from '../../../../constants/apiConsumption';
 import { Scopes } from '../../../../constants/permissions';
+import { useLeaveGuard, useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useCan } from '../../../../hooks/useCan';
 import { useContextApiKeys, useCreateContextApiKey, useRevokeContextApiKey } from '../../../../hooks/useContextEngine';
 import { engineMessage } from '../../../../utils/contextEngine';
@@ -176,6 +177,8 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
   const [issued, setIssued] = useState<{ token: Token; secret: string } | null>(null);
   const [reveal, setReveal] = useState(false);
   const [confirm, setConfirm] = useState<'regenerate' | 'revoke' | null>(null);
+  /** The token a regenerate replaced, once its replacement is issued and until the old one is revoked. */
+  const [replaced, setReplaced] = useState<Token | null>(null);
   const open = target !== null;
   const managed = target && target !== 'new' ? target : null;
   // The listing may not have the new key yet, so the issued token stands in until it does.
@@ -184,6 +187,9 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
   const taken = tokens.some((t) => t.name.toLowerCase() === name.trim().toLowerCase());
   const busy = create.isPending || revoke.isPending;
   const error = create.error ?? revoke.error;
+  // A name typed into the create form counts as unsaved until the token is issued, which leaves the form.
+  useUnsavedChanges(open && !token && name.trim() !== '');
+  const guardNavigation = useLeaveGuard();
 
   useEffect(() => {
     if (!open) return;
@@ -191,6 +197,7 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
     setIssued(null);
     setReveal(false);
     setConfirm(null);
+    setReplaced(null);
     create.reset();
     revoke.reset();
     // Reset only when the drawer opens on a new target.
@@ -200,8 +207,10 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
   // The plaintext is shown once: closing the drawer forgets it.
   const close = () => {
     if (busy) return;
-    setIssued(null);
-    onClose();
+    guardNavigation(() => {
+      setIssued(null);
+      onClose();
+    });
   };
 
   const issue = (displayName: string, onIssued?: (token: Token) => void) =>
@@ -218,7 +227,19 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
     );
 
   // There is no rotate route: a regenerated token is a new key under the same name, and the old one is revoked.
-  const regenerate = (old: Token) => issue(old.name, () => revoke.mutate(old.id, { onSuccess: () => setConfirm(null) }));
+  // A revoke that fails leaves the replacement issued, so trying again only revokes the old token.
+  const revokeReplaced = (old: Token) =>
+    revoke.mutate(old.id, {
+      onSuccess: () => {
+        setReplaced(null);
+        setConfirm(null);
+      },
+    });
+  const regenerate = (old: Token) =>
+    issue(old.name, () => {
+      setReplaced(old);
+      revokeReplaced(old);
+    });
   const revokeToken = (t: Token) => revoke.mutate(t.id, { onSuccess: () => (setConfirm(null), onClose()) });
 
   return (
@@ -286,17 +307,26 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
         )}
 
         {/* Confirmed in the drawer itself: a dialog over a drawer would stack two modal layers. */}
-        {confirm && token && <Alert severity="warning">{confirm === 'regenerate' ? REGENERATE_KEY_WARNING : 'The token is revoked immediately, and apps and agents using it stop working at once.'}</Alert>}
+        {confirm && token && (
+          <Alert severity="warning">
+            {replaced ? 'The new token is issued, but the old one still works. Revoke it to finish regenerating.' : confirm === 'regenerate' ? REGENERATE_KEY_WARNING : 'The token is revoked immediately, and apps and agents using it stop working at once.'}
+          </Alert>
+        )}
       </DrawerPanel.Body>
 
       <DrawerPanel.Footer sx={token && !confirm ? splitFooterSx : undefined}>
         {confirm && token ? (
           <>
-            <Button variant="outlined" color="inherit" disabled={busy} onClick={() => setConfirm(null)}>
+            <Button variant="outlined" color="inherit" disabled={busy || !!replaced} onClick={() => setConfirm(null)}>
               Cancel
             </Button>
-            <Button variant="contained" color="error" disabled={busy} startIcon={busy ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={() => (confirm === 'regenerate' ? regenerate(token) : revokeToken(token))}>
-              {confirm === 'regenerate' ? 'Regenerate token' : 'Revoke token'}
+            <Button
+              variant="contained"
+              color="error"
+              disabled={busy}
+              startIcon={busy ? <CircularProgress size={14} color="inherit" /> : undefined}
+              onClick={() => (replaced ? revokeReplaced(replaced) : confirm === 'regenerate' ? regenerate(token) : revokeToken(token))}>
+              {replaced ? 'Revoke old token' : confirm === 'regenerate' ? 'Regenerate token' : 'Revoke token'}
             </Button>
           </>
         ) : token ? (

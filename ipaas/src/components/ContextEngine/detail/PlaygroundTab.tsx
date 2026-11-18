@@ -139,14 +139,16 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
   const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
-  const ask = (text = question, askMode = mode) => {
-    const q = text.trim();
+  // Without `text`, the question is the composer's; a re-ask from the thread leaves the composer as it is.
+  const ask = (text?: string, askMode = mode) => {
+    const fromComposer = text === undefined;
+    const q = (text ?? question).trim();
     // A reopen in flight would replace the conversation and drop this question's turn.
     if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || asking || openingId !== null) return;
     setNotice(null);
     const token = startQuestion(engine.id, q, askMode);
     // The question now sits in the thread, so the box empties; it comes back if asking fails.
-    setQuestion('');
+    if (fromComposer) setQuestion('');
     window.requestAnimationFrame(() => pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
     query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT }).then(
@@ -158,7 +160,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } });
       },
       (error: unknown) => {
-        if (finishQuestion(engine.id, token, { error })) setQuestion((current) => current || q);
+        if (finishQuestion(engine.id, token, { error }) && fromComposer) setQuestion((current) => current || q);
       },
     );
   };
@@ -441,7 +443,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Alert
             severity="error"
             onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
-            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
+            // A failed question from the composer is back in it; one asked from the thread is retried as it was.
+            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => (question.trim() === failure.question ? ask() : ask(failure.question, failure.mode))} /> : undefined}>
             {queryFailure(failure.error, failure.mode).message}
           </Alert>
         )}

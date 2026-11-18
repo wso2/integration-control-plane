@@ -73,9 +73,9 @@ function syncStatus(source: ContextSource, p: SourceProgress | undefined, integr
   const status = p ? sourceProgressStatus(p) : null;
   if (integration?.status === 'provisioning') return { label: 'Setting up', tone: 'info' };
   if (integration?.status === 'removing') return { label: 'Removing', tone: 'warning' };
-  // A run in progress outranks how the last one ended: the row says it is syncing, not that it failed.
-  if (integration?.lastRun?.startedAt && !integration.lastRun.completedAt) return { label: 'Syncing', tone: 'info' };
+  // A failure comes first: a failed run can come back without a completion time, and must not read as still syncing.
   if (integration && (integration.status === 'failed' || integration.lastRun?.status === 'failed')) return { label: 'Sync failed', tone: 'error', detail: integration.statusReason };
+  if (integration?.lastRun?.startedAt && !integration.lastRun.completedAt) return { label: 'Syncing', tone: 'info' };
   if (status === 'attention') return { label: SOURCE_PROGRESS_LABEL.attention, tone: 'warning' };
   if (status === 'waiting') return { label: SOURCE_PROGRESS_LABEL.waiting, tone: 'default' };
   if (source.type === 'upload') return status ? { label: SOURCE_PROGRESS_LABEL[status], tone: SOURCE_PROGRESS_TONE[status] } : null;
@@ -185,9 +185,11 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  */
 export default function SourcesProgressCard({ id, engineId, running, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
   const progressQuery = useContextEngineProgress(running ? engineId : '');
+  // Followed while the card is open, so a scheduled run's result and the next run's time stay current.
   const integrations = useContextIntegrations(
     engineId,
     sources.some((s) => s.type !== 'upload'),
+    { followRuns: true },
   );
   const now = useNow();
   const integrationBySource = new Map((integrations.data ?? []).flatMap((i) => (i.sourceId ? [[i.sourceId, i] as const] : [])));

@@ -40,7 +40,7 @@ import LogsTab from '../components/ContextEngine/detail/LogsTab';
 import ApiMockTab from '../components/ContextEngine/detail/mock/ApiMockTab';
 import McpMockTab from '../components/ContextEngine/detail/mock/McpMockTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
-import type { ContextEngineSetup, ContextEngineState, ContextEngineTabKey } from '../types/contextEngine';
+import type { ContextEngineSetup, ContextEngineState, ContextEnginesLocationState, ContextEngineTabKey } from '../types/contextEngine';
 import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
@@ -225,7 +225,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const onDelete = () => {
     setDeleteError(null);
     remove.mutate(engine.id, {
-      onSuccess: () => navigate(base, { state: { engineDeleted: true, engineName: engine.name } }),
+      onSuccess: () => navigate(base, { state: { engineDeleted: true, engineId: engine.id, engineName: engine.name, deletedAt: Date.now() } satisfies ContextEnginesLocationState }),
       onError: (e) => setDeleteError(e instanceof HttpError && e.status === 403 ? "You don't have permission to delete context engines." : `Couldn't delete the context engine: ${engineMessage(e, 'please try again')}.`),
     });
   };

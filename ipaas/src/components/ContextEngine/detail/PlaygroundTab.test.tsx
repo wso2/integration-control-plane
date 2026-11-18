@@ -49,7 +49,7 @@ vi.mock('@wso2/oxygen-ui', () => {
     }: Record<string, unknown> & { children?: ReactNode }) =>
       tag === 'textarea' ? createElement('textarea', { ...props, ...(inputProps as object), value, onChange }) : createElement(typeof component === 'string' ? component : tag, props, children);
   return {
-    Alert: plain('div'),
+    Alert: ({ action, children }: { action?: ReactNode; children?: ReactNode }) => createElement('div', null, children, action),
     Box: plain('div'),
     Button: plain('button'),
     CircularProgress: plain('span'),
@@ -85,9 +85,9 @@ vi.mock('../../../hooks/contextQuestions', () => ({
   useAskedQuestions: () => asked.list,
 }));
 vi.mock('../../../hooks/useAppNavigate', () => ({ useAppNavigate: () => vi.fn() }));
-vi.mock('./AnsweredTurn', () => ({ default: () => null }));
+vi.mock('./AnsweredTurn', () => ({ default: ({ footer }: { footer: ReactNode }) => footer }));
 vi.mock('./EvidenceCard', () => ({ default: () => null }));
-vi.mock('./OwnerAccessButton', () => ({ default: () => null }));
+vi.mock('./OwnerAccessButton', () => ({ default: ({ onGranted }: { onGranted?: () => void }) => (onGranted ? createElement('button', { 'aria-label': 'Grant access', onClick: onGranted }) : null) }));
 vi.mock('./RecentQuestions', () => ({
   default: ({ questions, onOpen }: { questions: AskedQuestion[]; onOpen: (q: AskedQuestion) => void }) => createElement('button', { 'aria-label': 'Open recent', onClick: () => onOpen(questions[0]) }),
 }));
@@ -95,6 +95,7 @@ vi.mock('./RecentQuestions', () => ({
 import PlaygroundTab from './PlaygroundTab';
 import { appendTurn, getPlaygroundConversation } from '../../../hooks/contextTurns';
 import { rememberQuestion } from '../../../hooks/contextQuestions';
+import { HttpError } from '../../../types/http';
 
 const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true } } as unknown as ContextEngineDetail;
 const result = { queryId: 'qry_1', evidence: [] } as unknown as ContextQueryResult;
@@ -144,6 +145,48 @@ describe('PlaygroundTab', () => {
     expect(getPlaygroundConversation(engine.id).turns.map((t) => t.question)).toEqual(['What changed?']);
     expect(rememberQuestion).toHaveBeenCalledWith(expect.objectContaining({ queryId: 'qry_1', question: 'What changed?' }));
     root = createRoot(host);
+  });
+
+  it('leaves the composer as typed when a turn asks for its matching passages, even if that fails', async () => {
+    appendTurn('e-keep', { question: 'Earlier', mode: 'answer', result: { ...result, answer: 'Yes.', facts: [], traceId: 'trc_1' } as ContextQueryResult });
+    const failed = Promise.reject(new Error('down'));
+    failed.catch(() => undefined);
+    queryContext.mutateAsync.mockReturnValue(failed);
+    act(() =>
+      root.render(
+        <MemoryRouter initialEntries={['/?q=My%20draft']}>
+          <PlaygroundTab engine={{ ...engine, id: 'e-keep' }} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    const composer = () => host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Question"]')?.value;
+    expect(composer()).toBe('My draft');
+    act(() => button('See all matching passages')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ question: 'Earlier', mode: 'context' }));
+    expect(composer()).toBe('My draft');
+    await act(async () => undefined);
+    expect(composer()).toBe('My draft');
+  });
+
+  it('retries the question that was refused once access is granted, not the draft in the composer', async () => {
+    appendTurn('e-grant', { question: 'Earlier', mode: 'answer', result: { ...result, answer: 'Yes.', facts: [], traceId: 'trc_1' } as ContextQueryResult });
+    const refused = Promise.reject(new HttpError(403, 'forbidden'));
+    refused.catch(() => undefined);
+    queryContext.mutateAsync.mockReturnValueOnce(refused).mockReturnValue(new Promise(() => undefined));
+    act(() =>
+      root.render(
+        <MemoryRouter initialEntries={['/?q=My%20draft']}>
+          <PlaygroundTab engine={{ ...engine, id: 'e-grant' }} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    act(() => button('See all matching passages')?.click());
+    await act(async () => undefined);
+    expect(button('Grant access')).not.toBeNull();
+    act(() => button('Grant access')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'Earlier', mode: 'context' }));
+    expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Question"]')?.value).toBe('My draft');
   });
 
   it('holds asking and clearing while a recent question is being reopened', () => {

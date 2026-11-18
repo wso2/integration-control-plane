@@ -207,4 +207,28 @@ describe('nextCronRunMs', () => {
   it('returns null for a malformed expression', () => {
     expect(nextCronRunMs('0 3 * *', 'UTC')).toBeNull();
   });
+
+  describe('day of month and day of week', () => {
+    // Wednesday 18 November 2026, 12:00 UTC.
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.UTC(2026, 10, 18, 12, 0));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('fires on either when both are restricted', () => {
+      expect(nextCronRunMs('0 9 1 * 1', 'UTC')).toBe(Date.UTC(2026, 10, 23, 9, 0)); // Monday, before the 1st
+      expect(nextCronRunMs('0 9 20 * 1', 'UTC')).toBe(Date.UTC(2026, 10, 20, 9, 0)); // the 20th, a Friday
+    });
+
+    it('follows the restricted one when the other is unrestricted', () => {
+      expect(nextCronRunMs('0 9 1 * *', 'UTC')).toBe(Date.UTC(2026, 11, 1, 9, 0));
+      expect(nextCronRunMs('0 9 * * 1', 'UTC')).toBe(Date.UTC(2026, 10, 23, 9, 0));
+      expect(nextCronRunMs('0 9 */2 * 1', 'UTC')).toBe(Date.UTC(2026, 10, 23, 9, 0)); // odd day and a Monday
+    });
+
+    it('still requires the month', () => {
+      expect(nextCronRunMs('0 9 1 1 1', 'UTC')).toBe(Date.UTC(2027, 0, 1, 9, 0));
+    });
+  });
 });

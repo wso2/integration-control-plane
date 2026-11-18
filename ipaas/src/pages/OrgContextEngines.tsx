@@ -36,7 +36,7 @@ import SourceMark from '../components/ContextEngine/SourceMark';
 import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
 import { engineMessage, progressListingLine } from '../utils/contextEngine';
 import EmptyListing from '../components/EmptyListing';
-import type { ContextEngine, ContextEngineAccess, ContextEngineSummary } from '../types/contextEngine';
+import type { ContextEngine, ContextEngineAccess, ContextEnginesLocationState, ContextEngineSummary } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' } as const;
@@ -163,25 +163,29 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const can = useCan();
   const canRead = can(Scopes.INTEGRATION_READ);
   const canManage = can(Scopes.CONFIG_MANAGE);
-  const { data: engines, isLoading, isError, error, refetch } = useContextEngines(canRead);
+  const { data: engines, dataUpdatedAt, isLoading, isError, error, refetch } = useContextEngines(canRead);
   const remove = useDeleteContextEngine();
   const [search, setSearch] = useState('');
   const [toDelete, setToDelete] = useState<ContextEngine | null>(null);
   const [deleteAlert, setDeleteAlert] = useState<string | null>(null);
   // Like integrations, a delete is confirmed once the engine leaves the list; until then its row shows Deleting.
-  // A delete started on the engine page lands here too, and is confirmed the same way.
+  // An accepted delete is also recorded by id, as it may leave the list before any read shows it deleting.
   const removable = useMemo(() => engines?.map((e) => ({ id: e.id, name: e.name, deleting: e.state === 'deleting' })), [engines]);
-  useRemovalNotice(
+  const trackRemoval = useRemovalNotice(
     scope.org,
     removable,
     (e) => e.name,
     (name) => setDeleteAlert(`Context engine '${name}' deleted successfully.`),
+    dataUpdatedAt,
   );
   const location = useLocation();
+  // A delete started on the engine page lands here with the engine, and is confirmed the same way.
   useEffect(() => {
-    const state = location.state as { engineDeleted?: boolean } | null;
-    if (state?.engineDeleted) navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-  }, [location, navigate]);
+    const state = location.state as ContextEnginesLocationState | null;
+    if (!state?.engineDeleted) return;
+    trackRemoval(state.engineId, state.engineName, state.deletedAt);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location, navigate, trackRemoval]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const goCreate = () => navigate(newContextEngineUrl(scope.org));
@@ -207,6 +211,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     setDeleteError(null);
     remove.mutate(engine.id, {
       onSuccess: () => {
+        trackRemoval(engine.id, engine.name, Date.now());
         setToDelete(null);
       },
       onError: (e) => setDeleteError(deletionError(e, engine.name)),

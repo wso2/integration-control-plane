@@ -990,7 +990,16 @@ export interface PlaygroundConversation {
   /** The question on its way to the engine; `token` tells its answer from a later question's. */
   pending?: { question: string; mode: ContextQueryMode; token: number };
   /** The last question's failure, until it is dismissed or another question is asked. */
-  failure?: { error: unknown; mode: ContextQueryMode };
+  failure?: { error: unknown; mode: ContextQueryMode; question: string };
+}
+
+/** Router state the engines list is opened with after an engine page deleted its engine, so the list confirms the delete. */
+export interface ContextEnginesLocationState {
+  engineDeleted: true;
+  engineId: string;
+  engineName: string;
+  /** When the delete was accepted; only a list read after it confirms the engine is gone. */
+  deletedAt: number;
 }
 
 /** Router state a passage page is opened with, so its Back returns to where the reader came from. */
