@@ -16,15 +16,21 @@
  * under the License.
  */
 
-import { MenuItem, Stack, Typography, TextField } from '@wso2/oxygen-ui';
+import { Box, MenuItem, Stack, Switch, Typography, TextField } from '@wso2/oxygen-ui';
+import { FileText } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import { CHUNKING_STRATEGIES } from '../../../constants/ragIngestion';
 import { fieldStackSx, stepHeadingSx } from '../styles';
-import type { ChunkingConfig, ChunkingStrategy } from '../../../types/ragIngestion';
+import type { ChunkingConfig, ChunkingStrategy, ParsingConfig } from '../../../types/ragIngestion';
 
 interface ChunkingStepProps {
   value: ChunkingConfig;
   onChange: (value: ChunkingConfig) => void;
+  /** Shows the parsing section when set. */
+  parsing?: ParsingConfig;
+  onParsingChange?: (value: ParsingConfig) => void;
+  /** The knowledge base predates the OCR setting. */
+  ocrUnset?: boolean;
 }
 
 /** Parse a numeric field, treating empty/NaN as 0 so validation flags it. */
@@ -33,7 +39,7 @@ const num = (raw: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export default function ChunkingStep({ value, onChange }: ChunkingStepProps): JSX.Element {
+export default function ChunkingStep({ value, onChange, parsing, onParsingChange, ocrUnset = false }: ChunkingStepProps): JSX.Element {
   const overlapError = value.maxOverlapSize >= value.maxSegmentSize ? 'Overlap must be smaller than the segment size.' : '';
   return (
     <>
@@ -71,6 +77,36 @@ export default function ChunkingStep({ value, onChange }: ChunkingStepProps): JS
           helperText={overlapError || undefined}
         />
       </Stack>
+
+      {parsing && onParsingChange && (
+        <>
+          <Typography variant="subtitle2" sx={{ ...stepHeadingSx, mt: 4, mb: 1 }}>
+            Configure Parsing
+          </Typography>
+          <Stack sx={{ ...fieldStackSx, gap: 1.5 }}>
+            <Typography variant="body2" color="text.secondary">
+              Text in documents is always read. Images are read with OCR, and audio files are transcribed.
+            </Typography>
+            <Box component="label" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: 2, border: '1px solid', borderColor: parsing.ocrEnabled ? 'primary.main' : 'divider', borderRadius: 1, cursor: 'pointer' }}>
+              <Box sx={{ color: 'text.secondary', pt: 0.25 }}>
+                <FileText size={20} />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Scanned PDFs (OCR)
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Reads the text in scanned PDF pages. Ingestion is slower and needs more memory.
+                </Typography>
+              </Box>
+              <Switch checked={parsing.ocrEnabled} onChange={(e) => onParsingChange({ ...parsing, ocrEnabled: e.target.checked })} inputProps={{ 'aria-label': 'Scanned PDFs (OCR)' }} />
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              {ocrUnset ? "OCR was never set for this knowledge base, so scanned PDF pages aren't read. Turn it on and save if its sources have scanned PDFs." : 'Applies to every file ingested into this knowledge base, from uploads and every data source.'}
+            </Typography>
+          </Stack>
+        </>
+      )}
     </>
   );
 }
