@@ -36,6 +36,7 @@ import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
 import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
 import GraphTab from '../components/ContextEngine/detail/GraphTab';
+import LogsTab from '../components/ContextEngine/detail/LogsTab';
 import ApiTab from '../components/ContextEngine/detail/ApiTab';
 import McpTab from '../components/ContextEngine/detail/McpTab';
 import ApiMockTab from '../components/ContextEngine/detail/mock/ApiMockTab';
@@ -45,10 +46,12 @@ import type { ContextEngineSetup, ContextEngineState, ContextEngineTabKey } from
 import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
-const TABS: { value: ContextEngineTabKey; label: string }[] = [
-  { value: 'overview', label: 'Overview' },
+/** `whileStopped`: open while the engine is not running, as its overview and its logs say why. */
+const TABS: { value: ContextEngineTabKey; label: string; whileStopped?: boolean }[] = [
+  { value: 'overview', label: 'Overview', whileStopped: true },
   { value: 'playground', label: 'Playground' },
   { value: 'graph', label: 'Graph' },
+  { value: 'logs', label: 'Logs', whileStopped: true },
   { value: 'api', label: 'API' },
   { value: 'mcp', label: 'MCP' },
   // MOCK: proposed layouts for the API and MCP tabs, for the team to compare with the real ones.
@@ -67,7 +70,7 @@ interface EngineStatusAlertProps {
   setup?: ContextEngineSetup;
 }
 
-/** Why an engine that is not running shows only its overview, then where adding its sources stands: the BFF's connector sources, and the File Upload sources this tab holds. */
+/** Why an engine that is not running shows only its overview and logs, then where adding its sources stands: the BFF's connector sources, and the File Upload sources this tab holds. */
 function EngineStatusAlert({ engineId, state, reason, setup }: EngineStatusAlertProps): JSX.Element | null {
   const staged = useStagedEngineSources(engineId);
   const [dismissed, setDismissed] = useState(false);
@@ -229,7 +232,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
     });
   };
   const running = engine.state === 'ready';
-  const shownTab: ContextEngineTabKey = running ? activeTab : 'overview';
+  const shownTab: ContextEngineTabKey = running || TABS.some((t) => t.value === activeTab && t.whileStopped) ? activeTab : 'overview';
 
   return (
     <PageContent sx={wrapSx}>
@@ -263,13 +266,14 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
       <Tabs value={shownTab} onChange={(_, v) => goTab(v as ContextEngineTabKey)} sx={tabsSx}>
         {TABS.map((t) => (
-          <Tab key={t.value} label={t.label} value={t.value} disabled={!running && t.value !== 'overview'} />
+          <Tab key={t.value} label={t.label} value={t.value} disabled={!running && !t.whileStopped} />
         ))}
       </Tabs>
 
       {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} readOnly={!running} onRequestDelete={deleting || !canManage ? undefined : () => setConfirmDelete(true)} />}
       {shownTab === 'playground' && (canManage ? <PlaygroundTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
       {shownTab === 'graph' && (canManage ? <GraphTab engine={engine} orgHandle={scope.org} /> : <NoConsoleAccess />)}
+      {shownTab === 'logs' && (canManage ? <LogsTab engine={engine} /> : <NoConsoleAccess />)}
       {shownTab === 'api' && <ApiTab engine={engine} />}
       {shownTab === 'mcp' && <McpTab key={engine.id} engine={engine} />}
       {shownTab === 'api-mock' && <ApiMockTab engine={engine} orgHandle={scope.org} />}

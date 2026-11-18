@@ -220,6 +220,9 @@ interface RawPrincipal {
 /** An engine as the BFF lists it. The URLs are set only while it runs. */
 interface BffEngine {
   name: string;
+  environment: string;
+  project: string;
+  component: string;
   displayName?: string;
   description?: string;
   status: string;
@@ -239,6 +242,8 @@ interface BffEngine {
 
 interface BffIntegration {
   name: string;
+  project: string;
+  component: string;
   type: string;
   shape: string;
   sourceId?: string;
@@ -318,6 +323,9 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   state: ENGINE_STATES[raw.status] ?? 'unknown',
   ...(raw.statusReason ? { statusReason: raw.statusReason } : {}),
   createdAt: raw.createdAt ?? '',
+  environment: raw.environment,
+  project: raw.project,
+  component: raw.component,
   ...(raw.publicApiUrl ? { publicApiUrl: raw.publicApiUrl.replace(/\/+$/, '') } : {}),
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
   ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
@@ -611,7 +619,7 @@ export async function updateContextModels({ engineId, ...input }: UpdateContextM
 
 export async function listContextIntegrations(engineId: string): Promise<ContextIntegration[]> {
   const raw = await viaBff(() => bff.get<ListResponse<BffIntegration>>(`${enginePath(engineId)}/integrations`));
-  return items(raw).map((i) => ({ name: i.name, type: i.type, shape: i.shape, sourceId: i.sourceId, status: i.status, statusReason: i.statusReason, lastRun: i.lastRun }));
+  return items(raw).map((i) => ({ name: i.name, project: i.project, component: i.component, type: i.type, shape: i.shape, sourceId: i.sourceId, status: i.status, statusReason: i.statusReason, lastRun: i.lastRun }));
 }
 
 export async function listContextApiKeys(engineId: string): Promise<ContextApiKey[]> {

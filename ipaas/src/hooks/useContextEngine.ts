@@ -61,7 +61,8 @@ import {
 import { everyoneRoles, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { clearQuestions } from './contextQuestions';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngine, ContextEngineAccess, ContextEngineDetail, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import { engineLogSources } from '../utils/contextEngineLogs';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -503,6 +504,14 @@ export function useConnectViewedFlag(engineId: string, createdAt?: string) {
 }
 
 // ── Integrations and API keys ──
+
+/** The components whose logs make up an engine's logs: the engine, then each of its integrations. */
+export function useContextEngineLogSources(engine: ContextEngine) {
+  const integrations = useContextIntegrations(engine.handle);
+  const sources = useMemo(() => engineLogSources(engine, integrations.data ?? []), [engine, integrations.data]);
+  // An engine whose integrations cannot be listed still has its own logs.
+  return { sources, isLoading: integrations.isLoading, integrationsFailed: integrations.isError };
+}
 
 /** The integrations running an engine's sources, with their status; checked again while any is settling. */
 export function useContextIntegrations(engineId: string, enabled = true) {

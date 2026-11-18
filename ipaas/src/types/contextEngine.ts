@@ -34,7 +34,7 @@ import type { EmbeddingConfig } from './ragIngestion';
 export type ContextEngineState = 'provisioning' | 'starting' | 'ready' | 'failed' | 'deleting' | 'unknown';
 
 /** Tabs on the engine detail page; the active one is a URL segment. */
-export type ContextEngineTabKey = 'overview' | 'playground' | 'graph' | 'api' | 'mcp' | 'api-mock' | 'mcp-mock' | 'access';
+export type ContextEngineTabKey = 'overview' | 'playground' | 'graph' | 'logs' | 'api' | 'mcp' | 'api-mock' | 'mcp-mock' | 'access';
 
 /** At-a-glance facts for the listing; absent when the engine could not report them. */
 export interface ContextEngineSummary {
@@ -58,6 +58,11 @@ export interface ContextEngine {
   state: ContextEngineState;
   statusReason?: string;
   createdAt: string;
+  /** The environment the engine runs in (OpenChoreo environment name). */
+  environment: string;
+  /** The OpenChoreo project and component that run the engine; they scope a search of its logs. */
+  project: string;
+  component: string;
   /** The gateway URL integrations call; set only while the engine runs. */
   publicApiUrl?: string;
   /** Whether the gateway lets callers through to the REST API and the MCP server; set only while the engine runs. */
@@ -659,6 +664,9 @@ export interface CreateContextEngineInput {
 /** A source run by an integration the BFF deploys next to the engine. Settings never come back. */
 export interface ContextIntegration {
   name: string;
+  /** The OpenChoreo project and component that run the integration; they scope a search of its logs. */
+  project: string;
+  component: string;
   type: string;
   shape: 'automation' | 'service' | string;
   sourceId?: string;
