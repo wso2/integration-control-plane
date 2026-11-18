@@ -651,7 +651,7 @@ modules = [
 [[package]]
 org = "wso2"
 name = "icp_server"
-version = "2.0.0-SNAPSHOT"
+version = "2.1.0"
 dependencies = [
 	{org = "ballerina", name = "cache"},
 	{org = "ballerina", name = "crypto"},
