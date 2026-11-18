@@ -945,6 +945,7 @@ export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
   stored: 'Stored, not searchable',
   unreadable: 'Not readable',
   held: 'Held back',
+  needed: 'Needed again',
   failed: 'Failed',
 };
 
@@ -956,6 +957,7 @@ export const UPLOAD_STATUS_TONE: Record<UploadFileStatus, 'default' | 'info' | '
   stored: 'default',
   unreadable: 'warning',
   held: 'warning',
+  needed: 'warning',
   failed: 'error',
 };
 
