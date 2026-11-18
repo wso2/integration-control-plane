@@ -400,8 +400,7 @@ jobs:
             echo "ERROR: tag ${TAG} already exists on origin; refusing to move it."
             exit 1
           fi
-          git tag -a "${TAG}" -m "WSO2 Integration Control Plane ${TAG}" "${{ steps.release_commit.outputs.sha }}"
-          git push origin "refs/tags/${TAG}"
+          git push origin "${{ steps.release_commit.outputs.sha }}:refs/tags/${TAG}"
 
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
