@@ -19,6 +19,7 @@
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, LinearProgress, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Pencil, Plus, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useSourceUploads } from '../../../hooks/contextUploads';
+import { useStagedEngineSources } from '../../../hooks/stagedEngineSources';
 import type { JSX } from 'react';
 import { useContextEngineProgress, useContextIntegrations } from '../../../hooks/useContextEngine';
 import { SOURCE_PROGRESS_LABEL, SOURCE_PROGRESS_TONE } from '../../../constants/contextEngine';
@@ -35,6 +36,8 @@ interface SourcesProgressCardProps {
   /** Progress comes from the engine, so it is asked for only once the engine runs. */
   running: boolean;
   sources: ContextSource[];
+  /** The BFF is still adding the sources the engine was created with. */
+  setupPending?: boolean;
   /** Drives the fallback chip on engines that do not report progress yet. */
   /** Opens the Files drawer for a File Upload source. */
   onManageFiles?: (source: ContextSource) => void;
@@ -131,7 +134,9 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  * how many delivered items the engine has processed, and, once the engine
  * collects it, how much the search index has caught up. Polls while anything moves.
  */
-export default function SourcesProgressCard({ id, engineId, running, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
+export default function SourcesProgressCard({ id, engineId, running, sources, setupPending = false, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
+  const staged = useStagedEngineSources(engineId);
+  const adding = setupPending || staged.waiting > 0;
   const progressQuery = useContextEngineProgress(running ? engineId : '');
   const integrations = useContextIntegrations(
     engineId,
@@ -197,7 +202,12 @@ export default function SourcesProgressCard({ id, engineId, running, sources, on
         </Typography>
       )}
 
-      {sources.length === 0 ? (
+      {sources.length === 0 && adding ? (
+        <Box sx={progressHeadlineSx} aria-live="polite">
+          <CircularProgress size={12} color="inherit" aria-hidden />
+          <Typography variant="body2">{running ? 'Adding your sources. They appear here shortly.' : 'Adding your sources. They appear here once the engine is running.'}</Typography>
+        </Box>
+      ) : sources.length === 0 ? (
         <Typography variant="body2" sx={mutedSx}>
           No sources yet.
         </Typography>

@@ -223,6 +223,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             engineId={engine.id}
             running={!readOnly}
             sources={engine.sources}
+            setupPending={engine.setup?.status === 'pending'}
             onManageFiles={canManage ? openFiles : undefined}
             onAddSource={
               !canManage
