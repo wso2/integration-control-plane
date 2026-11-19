@@ -189,9 +189,11 @@ export function nextCronRunMs(cron: string, timeZone?: string): number | null {
   const validDoms = expandCronField(domF, 1, 31);
   const validMonths = expandCronField(monthF, 1, 12);
   const validDows = expandCronField(dowF, 0, 6);
-  // As in cron, a day matches either field when both are restricted, and the restricted one when only one is.
-  const domRestricted = !domF.startsWith('*');
-  const dowRestricted = !dowF.startsWith('*');
+  // As the cluster's cron (robfig/cron) reads them: a day matches either field when both are restricted, and the
+  // restricted one when only one is. A field is unrestricted when any alternative is `*` unstepped; `*/2` restricts.
+  const unrestricted = (field: string): boolean => field.split(',').some((part) => part === '*' || part === '*/1');
+  const domRestricted = !unrestricted(domF);
+  const dowRestricted = !unrestricted(dowF);
   const dayMatches = (d: Date): boolean => {
     const dom = validDoms.has(d.getUTCDate());
     const dow = validDows.has(d.getUTCDay());

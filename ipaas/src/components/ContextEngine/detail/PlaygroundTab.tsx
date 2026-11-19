@@ -116,7 +116,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   }, [principal.data, engine.sources]);
   const canGrantSelf = !!permissions.data?.includes('access.manage');
   // "Ask about this" on a passage page lands here with the question in the URL.
-  const [aiIndexed, setAiIndexed] = useState(true);
   const [question, setQuestion] = useState(() => params.get('q')?.trim() ?? '');
   const [copied, setCopied] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ severity: 'info' | 'error'; message: string } | null>(null);
@@ -427,8 +426,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Alert
             severity="error"
             onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
-            // A failed question from the composer is back in it; one asked from the thread is retried as it was.
-            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => (question.trim() === failure.question ? ask() : ask(failure.question, failure.mode))} /> : undefined}>
+            // Retried in the mode it failed in; a failed question from the composer is back in it, one asked from the thread is not.
+            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode)} /> : undefined}>
             {queryFailure(failure.error, failure.mode).message}
           </Alert>
         )}
@@ -487,9 +486,13 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                   ),
                 )}
               </ToggleButtonGroup>
-              {/* A setting of the next question, so it sits with Answer/Context rather than far right. Not sent yet: the query API has no field for it. */}
+              {/* A setting of the next question, so it sits with Answer/Context. Disabled until the query API has a field for it. */}
               <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-              <FormControlLabel control={<Checkbox size="small" checked={aiIndexed} onChange={(e) => setAiIndexed(e.target.checked)} />} label={<Typography variant="caption">AI Indexed</Typography>} sx={{ m: 0 }} />
+              <Tooltip title="Not available yet. This setting isn't sent with questions.">
+                <span>
+                  <FormControlLabel control={<Checkbox size="small" checked={false} disabled />} label={<Typography variant="caption">AI indexed</Typography>} disabled sx={{ m: 0 }} />
+                </span>
+              </Tooltip>
             </Stack>
           </Stack>
         </Stack>

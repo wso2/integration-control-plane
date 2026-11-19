@@ -96,8 +96,9 @@ vi.mock('./RecentQuestions', () => ({
 }));
 
 import PlaygroundTab from './PlaygroundTab';
-import { appendTurn, getPlaygroundConversation } from '../../../hooks/contextTurns';
+import { appendTurn, getPlaygroundConversation, setPlaygroundMode } from '../../../hooks/contextTurns';
 import { rememberQuestion } from '../../../hooks/contextQuestions';
+import { HttpError } from '../../../types/http';
 
 const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true } } as unknown as ContextEngineDetail;
 const result = { queryId: 'qry_1', evidence: [] } as unknown as ContextQueryResult;
@@ -147,6 +148,26 @@ describe('PlaygroundTab', () => {
     expect(getPlaygroundConversation(engine.id).turns.map((t) => t.question)).toEqual(['What changed?']);
     expect(rememberQuestion).toHaveBeenCalledWith(expect.objectContaining({ queryId: 'qry_1', question: 'What changed?' }));
     root = createRoot(host);
+  });
+
+  it('retries a refused question in the mode it was asked in, even after the mode changed', async () => {
+    const refused = Promise.reject(new HttpError(403, 'forbidden'));
+    refused.catch(() => undefined);
+    queryContext.mutateAsync.mockReturnValueOnce(refused).mockReturnValue(new Promise(() => undefined));
+    act(() =>
+      root.render(
+        <MemoryRouter initialEntries={['/?q=What%20changed%3F']}>
+          <PlaygroundTab engine={{ ...engine, id: 'e-mode' }} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    act(() => button('Ask')?.click());
+    await act(async () => undefined);
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'What changed?', mode: 'answer' }));
+    act(() => setPlaygroundMode('e-mode', 'context'));
+    act(() => button('Grant access')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'What changed?', mode: 'answer' }));
   });
 
   it('holds asking and clearing while a recent question is being reopened', () => {

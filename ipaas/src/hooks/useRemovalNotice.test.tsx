@@ -31,15 +31,15 @@ interface Item {
 
 let root: Root;
 let host: HTMLDivElement;
-let track: (id: string, label: string, acceptedAt: number) => void = () => undefined;
+let track: (id: string, label: string, acceptedAt: number, acceptedIn: string) => void = () => undefined;
 const onRemoved = vi.fn();
 
-function Harness({ items, listedAt }: { items: Item[] | undefined; listedAt: number }): null {
-  track = useRemovalNotice('org', items, (i) => i.name, onRemoved, listedAt);
+function Harness({ items, listedAt, scope = 'org' }: { items: Item[] | undefined; listedAt: number; scope?: string }): null {
+  track = useRemovalNotice(scope, items, (i) => i.name, onRemoved, listedAt);
   return null;
 }
 
-const show = (items: Item[] | undefined, listedAt = 0) => act(() => root.render(<Harness items={items} listedAt={listedAt} />));
+const show = (items: Item[] | undefined, listedAt = 0, scope = 'org') => act(() => root.render(<Harness items={items} listedAt={listedAt} scope={scope} />));
 
 beforeEach(() => {
   host = document.createElement('div');
@@ -59,7 +59,7 @@ describe('useRemovalNotice', () => {
 
   it('confirms a tracked delete only from a list read after it was accepted', () => {
     show([], 100);
-    act(() => track('a', 'Alpha', 200));
+    act(() => track('a', 'Alpha', 200, 'org'));
     expect(onRemoved).not.toHaveBeenCalled();
     show([{ id: 'a', name: 'Alpha' }], 300);
     expect(onRemoved).not.toHaveBeenCalled();
@@ -70,7 +70,15 @@ describe('useRemovalNotice', () => {
 
   it('confirms a tracked delete at once when the list was already read again without it', () => {
     show([], 500);
-    act(() => track('a', 'Alpha', 200));
+    act(() => track('a', 'Alpha', 200, 'org'));
     expect(onRemoved).toHaveBeenCalledWith('Alpha');
+  });
+
+  it('ignores a delete accepted in a scope the list has since left', () => {
+    show([{ id: 'a', name: 'Alpha' }], 100, 'org-a');
+    show([], 200, 'org-b');
+    act(() => track('a', 'Alpha', 150, 'org-a'));
+    show([], 300, 'org-b');
+    expect(onRemoved).not.toHaveBeenCalled();
   });
 });

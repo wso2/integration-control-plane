@@ -34,11 +34,12 @@ interface Pending {
  * accepted when the request returns, so confirming then would outrun the backend.
  * `scopeKey` identifies which list these entries belong to.
  *
- * The returned `track(id, label, acceptedAt)` records a delete the backend accepted, for one that may leave
- * the list before any read shows it deleting. It is confirmed only by a list read after `acceptedAt`, so
- * `listedAt` (when `items` was read) must be passed for it.
+ * The returned `track(id, label, acceptedAt, acceptedIn)` records a delete the backend accepted, for one that may
+ * leave the list before any read shows it deleting. It is confirmed only by a list read after `acceptedAt`, so
+ * `listedAt` (when `items` was read) must be passed for it. A delete accepted in another scope than the list's
+ * current one is ignored.
  */
-export function useRemovalNotice<T extends Removable>(scopeKey: string, items: T[] | undefined, labelOf: (item: T) => string, onRemoved: (label: string) => void, listedAt = 0): (id: string, label: string, acceptedAt: number) => void {
+export function useRemovalNotice<T extends Removable>(scopeKey: string, items: T[] | undefined, labelOf: (item: T) => string, onRemoved: (label: string) => void, listedAt = 0): (id: string, label: string, acceptedAt: number, acceptedIn: string) => void {
   const pending = useRef<Map<string, Pending>>(new Map());
   const scope = useRef(scopeKey);
   const notify = useRef(onRemoved);
@@ -74,7 +75,9 @@ export function useRemovalNotice<T extends Removable>(scopeKey: string, items: T
   }, [items, listedAt, scopeKey, confirmAbsent]);
 
   return useCallback(
-    (id: string, label: string, acceptedAt: number) => {
+    (id: string, label: string, acceptedAt: number, acceptedIn: string) => {
+      // A delete whose reply arrives after the list moved to another scope never belonged to this one.
+      if (acceptedIn !== scope.current) return;
       pending.current.set(id, { label, acceptedAt });
       // The list may already have been read again since the delete was accepted.
       confirmAbsent();

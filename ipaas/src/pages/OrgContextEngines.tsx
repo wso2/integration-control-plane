@@ -183,9 +183,9 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   useEffect(() => {
     const state = location.state as ContextEnginesLocationState | null;
     if (!state?.engineDeleted) return;
-    trackRemoval(state.engineId, state.engineName, state.deletedAt);
+    trackRemoval(state.engineId, state.engineName, state.deletedAt, scope.org);
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-  }, [location, navigate, trackRemoval]);
+  }, [location, navigate, trackRemoval, scope.org]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const goCreate = () => navigate(newContextEngineUrl(scope.org));
@@ -211,7 +211,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     setDeleteError(null);
     remove.mutate(engine.id, {
       onSuccess: () => {
-        trackRemoval(engine.id, engine.name, Date.now());
+        trackRemoval(engine.id, engine.name, Date.now(), scope.org);
         setToDelete(null);
       },
       onError: (e) => setDeleteError(deletionError(e, engine.name)),
