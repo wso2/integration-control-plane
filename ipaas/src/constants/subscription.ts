@@ -25,8 +25,8 @@ export const PAID_SUBSCRIPTION_TYPE = 'devant-subscription';
 /** The cloud billing product this console belongs to; the billing org is read for it. */
 export const BILLING_PRODUCT_CODE = 'integration-platform';
 
-/** Context engines a free-plan org may have; the BFF enforces it, the console only warns ahead. */
+/** Context engines a free-plan org may have; platform-api enforces it, the console only warns ahead. */
 export const FREE_CONTEXT_ENGINE_LIMIT = 1;
 
-/** Connector sources (file uploads excluded) a free-plan org may have; the BFF enforces it. */
+/** Connector sources (file uploads excluded) a free-plan org may have; platform-api enforces it. */
 export const FREE_CONTEXT_SOURCE_LIMIT = 3;
