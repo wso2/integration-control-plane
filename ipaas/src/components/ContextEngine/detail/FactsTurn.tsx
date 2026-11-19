@@ -59,7 +59,7 @@ export default function FactsTurn({ facts, evidence, sources, hrefFor, onOpen, g
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
       <Box sx={{ minWidth: 0 }}>
-        <GraphFacts facts={facts} evidence={evidence} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
+        <GraphFacts facts={facts} evidence={evidence} />
       </Box>
       <EvidenceRail question={question} evidence={evidence} sources={sources} active={active} pinned={pinned} hrefFor={hrefFor} onHover={setActive} onPin={togglePin} onOpen={onOpen} graphHrefFor={graphHrefFor} />
     </Box>

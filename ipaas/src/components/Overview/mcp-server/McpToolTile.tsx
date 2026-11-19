@@ -20,13 +20,14 @@ import type { ReactNode } from 'react';
 import type { McpTool } from '../../../types/mcp';
 import OperationTile, { type OperationTileColors } from '../_shared/bodies/OperationTile';
 import McpToolDrawer from './McpToolDrawer';
+import { MCP_TOOL_COLORS } from '../../../utils/httpMethods';
 
 /**
  * Colours for MCP tool tiles + their drawer header — the brand primary, the
  * "preferred colour" for this consumer (Integration as API uses per-HTTP-method
  * colours instead). Shared between the tile and its drawer so they match.
  */
-const MCP_TOOL_COLORS: OperationTileColors = { badgeBg: 'primary.main', badgeText: 'primary.contrastText' };
+const TOOL_COLORS: OperationTileColors = MCP_TOOL_COLORS;
 
 /**
  * A single MCP tool row, rendered with the shared {@link OperationTile} (same
@@ -34,5 +35,5 @@ const MCP_TOOL_COLORS: OperationTileColors = { badgeBg: 'primary.main', badgeTex
  * with a "View details" drawer showing the tool's parameters and schema.
  */
 export default function McpToolTile({ tool }: { tool: McpTool }): ReactNode {
-  return <OperationTile badgeLabel="TOOL" label={tool.name} colors={MCP_TOOL_COLORS} drawerContent={<McpToolDrawer tool={tool} colors={MCP_TOOL_COLORS} />} drawerWidth={480} />;
+  return <OperationTile badgeLabel="TOOL" label={tool.name} colors={TOOL_COLORS} drawerContent={<McpToolDrawer tool={tool} colors={TOOL_COLORS} />} drawerWidth={480} />;
 }

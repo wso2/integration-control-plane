@@ -69,7 +69,7 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
       <Box sx={{ minWidth: 0 }}>
-        <CitedAnswer answer={answer} passages={evidence.length} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
+        <CitedAnswer answer={answer} passages={evidence.length} active={null} pinned={null} onHover={() => undefined} onPin={() => undefined} />
         {footer}
         {/* How this answer was derived: hidden by the team for now (4ed1e9b2c). To bring it back, render this under the answer
             (with Button from oxygen-ui, ArrowRight from oxygen-ui-icons-react and Link as RouterLink from react-router):

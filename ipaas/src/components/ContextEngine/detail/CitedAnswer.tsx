@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Box, ButtonBase } from '@wso2/oxygen-ui';
+import { Box } from '@wso2/oxygen-ui';
 import { Children, cloneElement, createContext, isValidElement, useContext, type JSX, type ReactElement, type ReactNode } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CITE_PROPERTY, endsSentence, remarkCitations, splitSentences } from '../../../utils/contextEngine';
-import { answerMarkdownSx, citationMarkSx, citationRunSx, litSentenceSx } from '../styles';
+import { answerMarkdownSx, citationRunSx, litSentenceSx } from '../styles';
 
 /** A citation someone is pointing at: its evidence number and, from the answer, the sentence it sits in. */
 export interface CitationFocus {
@@ -41,25 +41,6 @@ const LinkContext = createContext<LinkState>({ active: null, pinned: null, onHov
 
 const matches = (focus: CitationFocus | null, n: number, sentence: string): boolean => !!focus && focus.n === n && (focus.sentence === undefined || focus.sentence === sentence);
 
-/** A `[n]` citation drawn as a small numbered mark; the sentence it sits in is filled in by the block that groups sentences. */
-function Mark({ n, sentence = '' }: { n: number; sentence?: string }): JSX.Element {
-  const { active, pinned, onHover, onPin } = useContext(LinkContext);
-  const isPinned = matches(pinned, n, sentence);
-  return (
-    <ButtonBase
-      aria-label={`Evidence ${n}`}
-      aria-pressed={isPinned}
-      onMouseEnter={() => onHover({ n, sentence })}
-      onMouseLeave={() => onHover(null)}
-      onFocus={() => onHover({ n, sentence })}
-      onBlur={() => onHover(null)}
-      onClick={() => onPin({ n, sentence })}
-      sx={citationMarkSx(matches(active, n, sentence) || isPinned, isPinned)}>
-      {n}
-    </ButtonBase>
-  );
-}
-
 /** The passage number a citation link stands for; links the model wrote carry none. */
 function citeNumber(node: ExtraProps['node']): number | null {
   const n = node?.properties?.[CITE_PROPERTY];
@@ -69,7 +50,8 @@ function citeNumber(node: ExtraProps['node']): number | null {
 /** The Markdown renderer's link: a citation link becomes a mark, anything else opens in a new tab. The grouping block fills in `sentence`. */
 function CiteLink({ href, children, sentence, node, ...props }: JSX.IntrinsicElements['a'] & ExtraProps & { sentence?: string }): JSX.Element {
   const n = citeNumber(node);
-  if (n !== null) return <Mark n={n} sentence={sentence} />;
+  // Citations are not shown in the answer; the passages stand beside it.
+  if (n !== null) return <></>;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
       {children}

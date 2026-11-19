@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, DrawerPanel, IconButton, Skeleton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Eye, EyeOff, KeyRound, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useState, type JSX } from 'react';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, DrawerPanel, IconButton, InputAdornment, Skeleton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Check, Copy, Eye, EyeOff, KeyRound, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { REGENERATE_KEY_WARNING, TOKEN_MASK, TOKEN_NOT_RETRIEVABLE_NOTICE, TOKEN_ONE_TIME_WARNING } from '../../../../constants/apiConsumption';
 import { Scopes } from '../../../../constants/permissions';
 import { useLeaveGuard, useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
@@ -26,7 +26,7 @@ import { useCan } from '../../../../hooks/useCan';
 import { useContextApiKeys, useCreateContextApiKey, useRevokeContextApiKey } from '../../../../hooks/useContextEngine';
 import { engineMessage } from '../../../../utils/contextEngine';
 import ConfirmDeleteDialog from '../../../ConfirmDeleteDialog';
-import CopyButton from '../../../Overview/integration-as-api/CopyButton';
+import { copyToClipboard } from '../../../../utils/clipboard';
 import * as styles from '../../../Overview/integration-as-api/apiConsumption.styles';
 import type { ContextApiKey } from '../../../../types/contextEngine';
 
@@ -54,7 +54,8 @@ type Target = Token | 'new' | null;
  * Manage and Delete, and a drawer that creates a token and shows it once. Each token is an API key
  * of the engine's public endpoint, so one token works for both the REST API and the MCP server.
  */
-export default function MockTokensPanel({ engineId }: { engineId: string }): JSX.Element {
+/** `onIssued` receives each token's secret the moment it is created, while it is still known. */
+export default function MockTokensPanel({ engineId, onIssued }: { engineId: string; onIssued?: (secret: string) => void }): JSX.Element {
   const can = useCan();
   const canRead = can(Scopes.INTEGRATION_READ);
   const canManage = can(Scopes.CONFIG_MANAGE);
@@ -74,6 +75,7 @@ export default function MockTokensPanel({ engineId }: { engineId: string }): JSX
         <Alert
           severity="error"
           variant="outlined"
+          sx={{ mt: 2 }}
           action={
             <Button color="inherit" size="small" onClick={() => keys.refetch()}>
               Retry
@@ -145,7 +147,7 @@ export default function MockTokensPanel({ engineId }: { engineId: string }): JSX
 
       {list()}
 
-      <TokenDrawer engineId={engineId} target={target} tokens={tokens} onClose={() => setTarget(null)} />
+      <TokenDrawer engineId={engineId} target={target} tokens={tokens} onClose={() => setTarget(null)} onSecret={onIssued} />
 
       {pendingDelete && (
         <ConfirmDeleteDialog
@@ -169,7 +171,42 @@ export default function MockTokensPanel({ engineId }: { engineId: string }): JSX
   );
 }
 
-function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; target: Target; tokens: Token[]; onClose: () => void }): JSX.Element {
+/** A read-only field with its label on top and a copy button, as the console's other drawers show values. */
+function CopyTextField({ label, value, copyValue = value, action }: { label: string; value: string; copyValue?: string; action?: ReactNode }): JSX.Element {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    if (!(await copyToClipboard(copyValue))) return;
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  };
+  return (
+    <TextField
+      labelPlacement="top"
+      label={label}
+      size="small"
+      fullWidth
+      value={value}
+      slotProps={{
+        input: {
+          readOnly: true,
+          sx: { fontFamily: 'monospace', fontSize: 12.5 },
+          endAdornment: (
+            <InputAdornment position="end">
+              {action}
+              <Tooltip title={copied ? 'Copied' : `Copy ${label.toLowerCase()}`}>
+                <IconButton size="small" aria-label={`Copy ${label.toLowerCase()}`} onClick={() => void copy()} edge="end" sx={copied ? { color: 'success.main' } : undefined}>
+                  {copied ? <Check size={15} /> : <Copy size={15} />}
+                </IconButton>
+              </Tooltip>
+            </InputAdornment>
+          ),
+        },
+      }}
+    />
+  );
+}
+
+function TokenDrawer({ engineId, target, tokens, onClose, onSecret }: { engineId: string; target: Target; tokens: Token[]; onClose: () => void; onSecret?: (secret: string) => void }): JSX.Element {
   const create = useCreateContextApiKey(engineId);
   const revoke = useRevokeContextApiKey(engineId);
   const [name, setName] = useState('');
@@ -221,6 +258,7 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
           const t: Token = { id: k.keyId, name: displayName, status: 'active', expiresAt: k.expiresAt };
           setIssued({ token: t, secret: k.apiKey });
           setReveal(false);
+          onSecret?.(k.apiKey);
           onIssued?.(t);
         },
       },
@@ -274,32 +312,26 @@ function TokenDrawer({ engineId, target, tokens, onClose }: { engineId: string; 
         />
 
         {token && (
-          <Box sx={styles.credentialsSection}>
+          <Box sx={{ ...styles.credentialsSection, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {secret && (
               <Alert severity="warning" sx={styles.dialogAlert}>
                 {TOKEN_ONE_TIME_WARNING}
               </Alert>
             )}
-            <Typography sx={styles.fieldLabel}>Header</Typography>
-            <Box sx={styles.credField}>
-              <Typography component="span" sx={styles.credValue}>
-                X-API-Key
-              </Typography>
-              <CopyButton value="X-API-Key" label="Copy header name" />
-            </Box>
-            <Typography sx={styles.nextFieldLabel}>Value</Typography>
+            <CopyTextField label="Header" value="X-API-Key" />
             {secret ? (
-              <Box sx={styles.credField}>
-                <Typography component="span" sx={styles.credValue}>
-                  {reveal ? secret : TOKEN_MASK}
-                </Typography>
-                <Tooltip title={reveal ? 'Hide' : 'Reveal'}>
-                  <IconButton size="small" aria-label={reveal ? 'Hide token' : 'Reveal token'} onClick={() => setReveal((v) => !v)} sx={styles.credIconButton}>
-                    {reveal ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </IconButton>
-                </Tooltip>
-                <CopyButton value={secret} label="Copy header value" />
-              </Box>
+              <CopyTextField
+                label="Value"
+                value={reveal ? secret : TOKEN_MASK}
+                copyValue={secret}
+                action={
+                  <Tooltip title={reveal ? 'Hide' : 'Reveal'}>
+                    <IconButton size="small" aria-label={reveal ? 'Hide token' : 'Reveal token'} onClick={() => setReveal((v) => !v)}>
+                      {reveal ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </IconButton>
+                  </Tooltip>
+                }
+              />
             ) : (
               <Alert severity="info">{isActive(token) ? TOKEN_NOT_RETRIEVABLE_NOTICE : 'This token is no longer active. Regenerate it to use it again.'}</Alert>
             )}

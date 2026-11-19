@@ -20,6 +20,7 @@ import { IconButton, Tooltip } from '@wso2/oxygen-ui';
 import { Check, Copy } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import * as styles from './apiConsumption.styles';
+import { copyToClipboard } from '../../../utils/clipboard';
 
 interface CopyButtonProps {
   /** Value written to the clipboard. */
@@ -34,18 +35,14 @@ export default function CopyButton({ value, label = 'Copy' }: CopyButtonProps): 
 
   // Confirm only after the write resolves — a blocked clipboard must not read as a copy.
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      return;
-    }
+    if (!(await copyToClipboard(value))) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   };
 
   return (
     <Tooltip title={copied ? 'Copied' : label}>
-      <IconButton size="small" onClick={() => void copy()} aria-label={label} sx={styles.credIconButton}>
+      <IconButton size="small" onClick={() => void copy()} aria-label={label} sx={copied ? { ...styles.credIconButton, color: 'success.main' } : styles.credIconButton}>
         {copied ? <Check size={15} /> : <Copy size={15} />}
       </IconButton>
     </Tooltip>

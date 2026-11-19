@@ -46,6 +46,9 @@ interface McpPlaygroundProps {
   isTokenFetching?: boolean;
   /** Mint a fresh token ("Get test key"). */
   onTokenRegenerate?: () => void;
+  /** Makes the token field editable, for a token the user already holds. */
+  onTokenChange?: (token: string) => void;
+  tokenPlaceholder?: string;
   /** Endpoint chooser rendered in the sidebar. */
   endpointSwitcher?: McpSwitcher;
   /** Where the connection controls go: a `sidebar` beside the panel (default) or a `bar` above it. */
@@ -64,7 +67,7 @@ interface McpPlaygroundProps {
  * Tools tab (list → schema-driven form → run → result), a Ping tab, and a resizable
  * activity-history panel — all over the `useMcpConnection` session.
  */
-export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, endpointSwitcher, relay, visibility, connectionLayout = 'sidebar' }: McpPlaygroundProps): JSX.Element {
+export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, onTokenChange, tokenPlaceholder, endpointSwitcher, relay, visibility, connectionLayout = 'sidebar' }: McpPlaygroundProps): JSX.Element {
   const conn = useMcpConnection(relay ? { url: relay.url, token: null, headerName, fetch: relay.fetch } : { url, token, headerName });
   const { status, listTools } = conn;
 
@@ -127,6 +130,8 @@ export default function McpPlayground({ url, token, headerName = 'test-key', isT
           onDisconnect={() => void conn.disconnect()}
           onReconnect={() => void reconnect()}
           onGetTestKey={onTokenRegenerate}
+          onTokenChange={onTokenChange}
+          tokenPlaceholder={tokenPlaceholder}
         />
 
         <Stack sx={mainPanelSx}>

@@ -52,7 +52,19 @@ import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX, CON
 import { everyoneRoles, integrationsPollInterval, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { clearQuestions } from './contextQuestions';
-import type { ContextEngine, ContextEngineAccess, ContextEngineDetail, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type {
+  ContextEngine,
+  ContextEngineAccess,
+  ContextEngineDetail,
+  ContextEngineState,
+  ContextQueryInput,
+  ContextSourceConfig,
+  CreateContextEngineInput,
+  ExternalDatabase,
+  PutContextGrantInput,
+  UpdateContextModelsInput,
+  UpdateContextSourceInput,
+} from '../types/contextEngine';
 import { engineLogSources } from '../utils/contextEngineLogs';
 
 const ROOT_KEY = 'contextEngines';

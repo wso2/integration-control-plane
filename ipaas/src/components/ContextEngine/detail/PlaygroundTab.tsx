@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, /* Chip, */ CircularProgress, IconButton, Skeleton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Braces, Copy, Eraser, EyeOff, History, Info, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Checkbox, /* Chip, */ CircularProgress, Divider, FormControlLabel, IconButton, Skeleton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
@@ -116,6 +116,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   }, [principal.data, engine.sources]);
   const canGrantSelf = !!permissions.data?.includes('access.manage');
   // "Ask about this" on a passage page lands here with the question in the URL.
+  const [aiIndexed, setAiIndexed] = useState(true);
   const [question, setQuestion] = useState(() => params.get('q')?.trim() ?? '');
   const [copied, setCopied] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ severity: 'info' | 'error'; message: string } | null>(null);
@@ -191,12 +192,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       .finally(() => setOpeningId((current) => (current === q.queryId ? null : current)));
   };
 
-  const copyIds = (queryId: string, traceId: string) => {
-    void navigator.clipboard?.writeText(`query ${queryId}\ntrace ${traceId}`).then(() => {
-      setCopied(`ids-${queryId}`);
-      window.setTimeout(() => setCopied((c) => (c === `ids-${queryId}` ? null : c)), 1500);
-    });
-  };
   const copyResult = (turn: PlaygroundTurn) => {
     const text = turn.result.answer && !turn.result.answerWithheld ? turn.result.answer : turn.result.evidence.map((e, i) => `[${i + 1}] ${e.passage}`).join('\n');
     navigator.clipboard?.writeText(text).then(() => {
@@ -314,19 +309,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Typography variant="caption" sx={mutedSx}>
             {summary}
           </Typography>
-          {/* The ids are for debugging against the API: out of the outcome line, one click copies them. */}
-          <Tooltip title={copied === `ids-${result.queryId}` ? 'Copied' : `Query ${result.queryId} · Trace ${result.traceId}. Click to copy.`}>
-            <IconButton size="small" aria-label="Copy query and trace IDs" onClick={() => copyIds(result.queryId, result.traceId)}>
-              <Info size={14} />
-            </IconButton>
-          </Tooltip>
         </Stack>
         <Stack direction="row" gap={1} flexWrap="wrap">
-          {answered && (
-            <Button size="small" variant="text" disabled={!canQuery || asking} onClick={() => ask(t.question, 'context')}>
-              See all matching passages
-            </Button>
-          )}
           <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
             {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
           </Button>
@@ -503,13 +487,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                   ),
                 )}
               </ToggleButtonGroup>
-              <Typography variant="caption" sx={mutedSx}>
-                {CONTEXT_QUERY_MODES.find((m) => m.value === mode)?.hint}
-              </Typography>
+              {/* A setting of the next question, so it sits with Answer/Context rather than far right. Not sent yet: the query API has no field for it. */}
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+              <FormControlLabel control={<Checkbox size="small" checked={aiIndexed} onChange={(e) => setAiIndexed(e.target.checked)} />} label={<Typography variant="caption">AI Indexed</Typography>} sx={{ m: 0 }} />
             </Stack>
-            <Typography variant="caption" sx={mutedSx}>
-              Enter to ask · Shift+Enter for a new line
-            </Typography>
           </Stack>
         </Stack>
       </Stack>

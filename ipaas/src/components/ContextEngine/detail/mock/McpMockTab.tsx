@@ -19,7 +19,6 @@
 import { Alert, Box, Button, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
-import { useCreateContextApiKey } from '../../../../hooks/useContextEngine';
 import { CONTEXT_MCP_TOOLS } from '../../../../constants/contextEngine';
 import { buildMcpClientConfigs, mcpEndpointUrl } from '../../../../utils/contextEngine';
 import CodeViewer from '../../../CodeViewer';
@@ -28,16 +27,15 @@ import OperationHeader from '../../../Overview/_shared/bodies/OperationHeader';
 import OperationTile, { type OperationTileColors } from '../../../Overview/_shared/bodies/OperationTile';
 import AccessOffAlert from '../AccessOffAlert';
 import AccessSwitch from '../AccessSwitch';
-import { Scopes } from '../../../../constants/permissions';
-import { useCan } from '../../../../hooks/useCan';
 import SurfaceHeader from '../SurfaceHeader';
 import { clientTabsSx, playgroundFrameSx } from '../../styles';
 import { BaseUrl, FieldTable, Mono } from './ApiMockTab';
 import MockTokensPanel from './MockTokensPanel';
+import { MCP_TOOL_COLORS } from '../../../../utils/httpMethods';
 import type { ContextEngineDetail, McpClientId } from '../../../../types/contextEngine';
 
 /** The integration section's MCP tool colours: the brand primary. */
-const TOOL_COLORS: OperationTileColors = { badgeBg: 'primary.main', badgeText: 'primary.contrastText' };
+const TOOL_COLORS: OperationTileColors = MCP_TOOL_COLORS;
 const readableSx = { maxWidth: 900 } as const;
 
 function ToolDrawer({ name, description }: { name: string; description: string }): JSX.Element {
@@ -70,14 +68,11 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
   const configs = useMemo(() => buildMcpClientConfigs(base, engine.name), [base, engine.name]);
   const [client, setClient] = useState<McpClientId>('claude-desktop');
   const [testing, setTesting] = useState(false);
-  // The playground calls the engine with a short-lived API key, as the MCP tab does.
-  const testKey = useCreateContextApiKey(engine.id);
-  const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() });
+  // The playground connects with one of the engine's access tokens: the one created above in this visit, or one pasted in.
+  const [playgroundToken, setPlaygroundToken] = useState('');
   const selected = configs.find((c) => c.id === client) ?? configs[0];
   const mcpOff = engine.access?.mcp === false;
-  const canMintKey = useCan()(Scopes.CONFIG_MANAGE);
-  // The playground runs on a test key, which only a role that manages configuration can create.
-  const testBlockedReason = mcpOff ? 'Turn on MCP access to test the server here.' : !canMintKey ? "Your role can't create the test key the playground needs." : '';
+  const testBlockedReason = mcpOff ? 'Turn on MCP access to test the server here.' : '';
   const tools = CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers);
 
   if (!engine.publicApiUrl) {
@@ -108,13 +103,13 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
           ))}
         </Stack>
 
-        <MockTokensPanel engineId={engine.id} />
+        <MockTokensPanel engineId={engine.id} onIssued={setPlaygroundToken} />
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>
           Connect from your client
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Replace <code>&lt;api key&gt;</code> with one of this engine&apos;s API keys. The mock tokens above don&apos;t work with the engine.
+          Replace <code>&lt;api key&gt;</code> with one of the access tokens above.
         </Typography>
         <Tabs value={client} onChange={(_, v) => setClient(v as McpClientId)} sx={clientTabsSx} aria-label="MCP client">
           {configs.map((c) => (
@@ -135,7 +130,7 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
       </Box>
       {testing && !testBlockedReason && (
         <Box sx={playgroundFrameSx}>
-          <McpPlayground url={endpoint} token={testKey.data?.apiKey ?? null} headerName="X-API-Key" isTokenFetching={testKey.isPending} onTokenRegenerate={mintTestKey} connectionLayout="bar" />
+          <McpPlayground url={endpoint} token={playgroundToken || null} headerName="X-API-Key" onTokenChange={setPlaygroundToken} tokenPlaceholder="Paste an access token" connectionLayout="bar" />
         </Box>
       )}
     </Box>
