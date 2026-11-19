@@ -108,7 +108,7 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(Math.ceil(p * sorted.length) - 1, sorted.length - 1)] ?? 0;
 }
 
-/** The spans of each sampled trace, keyed by trace id. */
+/** The spans of each trace, keyed by trace id. */
 function spansByTrace(spans: SpanRow[]): Map<string, SpanRow[]> {
   const byTrace = new Map<string, SpanRow[]>();
   for (const s of spans) {
@@ -126,7 +126,7 @@ function entrySpan(traceSpans: SpanRow[], service: string): SpanRow | undefined 
 }
 
 /**
- * The sampled traces each service took part in, newest first. Only traces whose spans
+ * The traces each service took part in, newest first. Only traces whose spans
  * were read appear, since the trace list does not name the services a trace passed through.
  */
 export const tracesOfService = (traces: TraceRow[], spans: SpanRow[], service: string): ServiceTrace[] => serviceTraces(traces, spansByTrace(spans), service);
@@ -142,11 +142,28 @@ function serviceTraces(traces: TraceRow[], byTrace: Map<string, SpanRow[]>, serv
     .sort((a, b) => Date.parse(b.trace.startTime) - Date.parse(a.trace.startTime));
 }
 
-/** Per service: the sampled traces it took part in, how many had an error, and their duration. */
+/** The services a trace entered, as entrySpan finds them, in one pass over its spans. */
+function servicesEntered(traceSpans: SpanRow[]): Set<string> {
+  const serviceOf = new Map(traceSpans.map((s) => [s.spanId, s.serviceName]));
+  return new Set(traceSpans.filter((s) => !s.parentSpanId || serviceOf.get(s.parentSpanId) !== s.serviceName).map((s) => s.serviceName));
+}
+
+/** Per service: the traces it took part in, how many had an error, and their duration. */
 export function summarizeServiceTraces(traces: TraceRow[], spans: SpanRow[]): ServiceTraceSummary[] {
   const byTrace = spansByTrace(spans);
+  // One pass over the traces: it runs again each time more traces' spans arrive.
+  const tracesOf = new Map<string, TraceRow[]>();
+  for (const trace of traces) {
+    const traceSpans = byTrace.get(trace.traceId);
+    if (!traceSpans) continue;
+    for (const service of servicesEntered(traceSpans)) {
+      const own = tracesOf.get(service);
+      if (own) own.push(trace);
+      else tracesOf.set(service, [trace]);
+    }
+  }
   return servicesBySpanCount(spans).map((service) => {
-    const own = serviceTraces(traces, byTrace, service).map((t) => t.trace);
+    const own = tracesOf.get(service) ?? [];
     const durations = own.map((t) => t.durationMs).sort((a, b) => a - b);
     return {
       service,
@@ -188,20 +205,32 @@ export function traceWaterfall(spans: SpanRow[]): WaterfallRow[] {
   return rows;
 }
 
-/** Runs fn over items with at most `limit` calls in flight, keeping input order in the result. */
-export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
-  const results: PromiseSettledResult<R>[] = new Array(items.length);
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    while (next < items.length) {
-      const index = next++;
-      try {
-        results[index] = { status: 'fulfilled', value: await fn(items[index] as T) };
-      } catch (reason) {
-        results[index] = { status: 'rejected', reason };
-      }
+/** A runner that keeps at most `limit` calls in flight; a queued call whose signal aborts leaves the queue without running. */
+export function concurrencyLimit(limit: number): <T>(fn: () => Promise<T>, signal?: AbortSignal) => Promise<T> {
+  let inFlight = 0;
+  const waiting: (() => void)[] = [];
+  const turn = (signal?: AbortSignal): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const onAbort = (): void => {
+        waiting.splice(waiting.indexOf(wake), 1);
+        reject(signal?.reason);
+      };
+      const wake = (): void => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      waiting.push(wake);
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  return async (fn, signal) => {
+    signal?.throwIfAborted();
+    while (inFlight >= Math.max(limit, 1)) await turn(signal);
+    inFlight++;
+    try {
+      return await fn();
+    } finally {
+      inFlight--;
+      waiting.shift()?.();
     }
   };
-  await Promise.all(Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, worker));
-  return results;
 }

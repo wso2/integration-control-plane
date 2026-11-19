@@ -25,7 +25,8 @@
 
 import { obsClient, seg } from './_client';
 import { resolveComponentProject } from './logs';
-import { TRACE_QUERY_LIMIT, UNKNOWN_SERVICE } from '../constants/integrationTraces';
+import { SPAN_FETCH_CONCURRENCY, TRACE_QUERY_LIMIT, UNKNOWN_SERVICE } from '../constants/integrationTraces';
+import { concurrencyLimit } from '../utils/integrationTraces';
 import type { ComponentTracesRequest, SpanRow, SpanStatus, TracePage, TraceRow } from '../types/integrationTraces';
 
 const TRACES_QUERY_PATH = '/wso2cloud-obs/api/v1alpha1/traces/query';
@@ -135,10 +136,15 @@ export async function fetchComponentTraces(req: ComponentTracesRequest): Promise
   return { traces, total, truncated: total >= TRACE_QUERY_LIMIT };
 }
 
+// A page reads one trace's spans per query, so the limit is shared by every caller rather than set per batch.
+const spanQuerySlot = concurrencyLimit(SPAN_FETCH_CONCURRENCY);
+
 /** Every span of one trace, with attributes and the service that emitted it. */
-export async function fetchTraceSpans(req: ComponentTracesRequest, traceId: string): Promise<SpanRow[]> {
-  const query = await traceQuery(req, { includeAttributes: true });
-  if (!query) return [];
-  const json = await obsClient.post<{ spans?: ObsSpanInfo[] }>(spansQueryPath(traceId), query);
-  return (json?.spans ?? []).map((s) => toSpanRow(traceId, s)).filter((s): s is SpanRow => s !== null);
+export function fetchTraceSpans(req: ComponentTracesRequest, traceId: string, signal?: AbortSignal): Promise<SpanRow[]> {
+  return spanQuerySlot(async () => {
+    const query = await traceQuery(req, { includeAttributes: true });
+    if (!query) return [];
+    const json = await obsClient.post<{ spans?: ObsSpanInfo[] }>(spansQueryPath(traceId), query, signal);
+    return (json?.spans ?? []).map((s) => toSpanRow(traceId, s)).filter((s): s is SpanRow => s !== null);
+  }, signal);
 }

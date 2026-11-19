@@ -18,14 +18,14 @@
 
 import { PageContent, Typography } from '@wso2/oxygen-ui';
 import { Waypoints } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type JSX } from 'react';
+import { useDeferredValue, useMemo, useState, type JSX } from 'react';
 import { useOrgs } from '../hooks/useOrg';
 import { useProjects } from '../hooks/useProjects';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useAllEnvironments, useEnvironments } from '../hooks/useEnvironments';
-import { useComponentTraces, useSampledTraceSpans, useTracesFetching, type SampledSpans } from '../hooks/useIntegrationTraces';
+import { useComponentTraces, useTraceSpans, useTracesFetching, type TraceSpans } from '../hooks/useIntegrationTraces';
 import { spanSeriesByService, summarizeServiceTraces, traceStats } from '../utils/integrationTraces';
-import type { ComponentTracesRequest, TraceRow } from '../types/integrationTraces';
+import type { ComponentTracesRequest, TracePage } from '../types/integrationTraces';
 import EmptyListing from '../components/EmptyListing';
 import NotFound from '../components/NotFound';
 import TracesError from '../components/IntegrationTraces/TracesError';
@@ -40,24 +40,28 @@ import { broaden, resourceUrl, type ComponentScope } from '../nav';
 const DEFAULT_RANGE_HOURS = 24;
 const HOUR_MS = 3_600_000;
 
-function sampleNote(sampled: number, listed: number, failed: number): string {
-  const base = sampled < listed ? `From the spans of the newest ${sampled} of ${listed.toLocaleString()} traces` : `From the spans of all ${listed.toLocaleString()} traces`;
-  return failed > 0 ? `${base}; ${failed} could not be read` : base;
+function spansNote(page: TracePage, spans: TraceSpans): string {
+  const listed = page.traces.length.toLocaleString();
+  const base = spans.pending > 0 ? `From the spans of ${spans.read.toLocaleString()} of ${listed} traces so far` : page.truncated ? `From the spans of the newest ${listed} traces` : `From the spans of all ${listed} traces`;
+  return spans.failed > 0 ? `${base}; ${spans.failed.toLocaleString()} could not be read` : base;
 }
 
-/** The per-service chart and trace view, built from the sampled spans. */
-function ServiceSections({ sampled, traces, request }: { sampled: SampledSpans; traces: TraceRow[]; request: ComponentTracesRequest }): JSX.Element {
+/** The per-service chart and trace view, built from the spans of every listed trace. */
+function ServiceSections({ traceSpans, page, request }: { traceSpans: TraceSpans; page: TracePage; request: ComponentTracesRequest }): JSX.Element {
   const startMs = Date.parse(request.startTime);
   const endMs = Date.parse(request.endTime);
-  const series = useMemo(() => spanSeriesByService(sampled.spans, startMs, endMs), [sampled.spans, startMs, endMs]);
-  const summaries = useMemo(() => summarizeServiceTraces(traces, sampled.spans), [traces, sampled.spans]);
+  const traces = page.traces;
+  const { spans } = traceSpans;
+  const series = useMemo(() => spanSeriesByService(spans, startMs, endMs), [spans, startMs, endMs]);
+  const summaries = useMemo(() => summarizeServiceTraces(traces, spans), [traces, spans]);
+  const note = spansNote(page, traceSpans);
   return (
     <>
-      <TraceSection title="Spans per service" subtitle={`${sampleNote(sampled.sampled, traces.length, sampled.failed)}. Tick the services to plot.`}>
+      <TraceSection title="Spans per service" subtitle={`${note}. Tick the services to plot.`}>
         <ServiceSpanChart data={series} />
       </TraceSection>
-      <TraceSection title="Traces by service" subtitle="Select a service to see the traces it took part in; expand a trace to see its spans, and select a span to see its attributes.">
-        <ServiceTraces summaries={summaries} traces={traces} spans={sampled.spans} />
+      <TraceSection title="Traces by service" subtitle={`${note}. Select a service to see the traces it took part in; expand a trace to see its spans, and select a span to see its attributes.`}>
+        <ServiceTraces summaries={summaries} traces={traces} spans={spans} />
       </TraceSection>
     </>
   );
@@ -66,9 +70,13 @@ function ServiceSections({ sampled, traces, request }: { sampled: SampledSpans; 
 /** Everything under the toolbar, for one environment and window. */
 function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.Element {
   const traces = useComponentTraces(request);
-  const sampled = useSampledTraceSpans(request, traces.data?.traces);
-  // Counted from the sampled spans, so it shows once they arrive.
-  const services = useMemo(() => (sampled.data ? new Set(sampled.data.spans.map((s) => s.serviceName)).size : undefined), [sampled.data]);
+  const live = useTraceSpans(request, traces.data?.traces);
+  // Every span batch is a new result; deferring it lets React skip intermediate ones while spans stream in.
+  // With nothing read yet, the deferred value could still be another environment's, so the live one is shown.
+  const deferred = useDeferredValue(live);
+  const spans = live.read === 0 ? live : deferred;
+  // Counted from the spans read so far, so it shows once the first trace's arrive.
+  const services = useMemo(() => (spans.read > 0 ? new Set(spans.spans.map((s) => s.serviceName)).size : undefined), [spans.read, spans.spans]);
 
   if (traces.isPending) {
     return (
@@ -91,17 +99,14 @@ function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.El
     );
   }
 
-  const sections = sampled.isPending ? (
-    <TraceSectionsSkeleton />
-  ) : sampled.isError ? (
-    <TracesError title="Couldn't load the spans of these traces" onRetry={() => void sampled.refetch()} />
-  ) : (
-    <ServiceSections sampled={sampled.data} traces={traces.data.traces} request={request} />
-  );
+  const sections =
+    spans.read === 0 && spans.pending > 0 ? <TraceSectionsSkeleton /> : spans.read === 0 ? <TracesError title="Couldn't load the spans of these traces" onRetry={live.retryFailed} /> : <ServiceSections traceSpans={spans} page={traces.data} request={request} />;
+  // Not every trace's services are known while spans load, after some fail, or past the list's limit.
+  const servicesLowerBound = spans.pending > 0 || spans.failed > 0 || traces.data.truncated;
 
   return (
     <>
-      <TraceStatCards stats={traceStats(traces.data)} services={services} />
+      <TraceStatCards stats={traceStats(traces.data)} services={services} servicesLowerBound={servicesLowerBound} />
       {sections}
     </>
   );

@@ -25,17 +25,19 @@ import * as styles from './IntegrationTraces.styles';
 
 interface TraceStatCardsProps {
   stats: TraceStats;
-  /** Services seen in the sampled spans (the newest traces only); undefined while they load. */
+  /** Services seen in the traces' spans; undefined until the first trace's spans arrive. */
   services: number | undefined;
+  /** Some traces' spans are missing, so there may be more services than counted. */
+  servicesLowerBound: boolean;
 }
 
-export default function TraceStatCards({ stats, services }: TraceStatCardsProps): JSX.Element {
+export default function TraceStatCards({ stats, services, servicesLowerBound }: TraceStatCardsProps): JSX.Element {
   return (
     <Box sx={styles.kpiGrid}>
       <StatCard label="Total traces" value={formatCount(stats.traces, stats.lowerBound)} icon={<Waypoints size={20} />} iconColor="primary" />
       <StatCard label="Error traces" value={`${formatCount(stats.errorTraces, stats.lowerBound)} (${formatPercent(stats.errorRate)})`} icon={<TriangleAlert size={20} />} iconColor="error" />
       <StatCard label="Spans" value={formatCount(stats.spans, stats.lowerBound)} icon={<Layers size={20} />} iconColor="info" />
-      <StatCard label="Services (sampled)" value={services === undefined ? '—' : services} icon={<Server size={20} />} iconColor="secondary" />
+      <StatCard label="Services" value={services === undefined ? '—' : formatCount(services, servicesLowerBound)} icon={<Server size={20} />} iconColor="secondary" />
     </Box>
   );
 }

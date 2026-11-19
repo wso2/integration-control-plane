@@ -18,7 +18,7 @@
 
 import { Box, Button, Checkbox, FormControlLabel, Stack, Typography } from '@wso2/oxygen-ui';
 import { LineChart } from '@wso2/oxygen-ui-charts-react';
-import { useState, type JSX } from 'react';
+import { memo, useState, type JSX } from 'react';
 import { INSIGHTS_CHART_COLORS } from '../../constants/insights';
 import type { ServiceSpanSeries } from '../../types/integrationTraces';
 import * as styles from './IntegrationTraces.styles';
@@ -26,7 +26,7 @@ import * as styles from './IntegrationTraces.styles';
 const PALETTE = Object.values(INSIGHTS_CHART_COLORS);
 
 /** Span counts per Ballerina service over the selected window, with a checklist of the services to plot. */
-export default function ServiceSpanChart({ data }: { data: ServiceSpanSeries }): JSX.Element {
+function ServiceSpanChart({ data }: { data: ServiceSpanSeries }): JSX.Element {
   // Services the user unticked. Tracking the hidden ones keeps a service that appears on refresh plotted.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   // Colours follow a service's place in the full list, so ticking another never recolours it.
@@ -91,3 +91,6 @@ export default function ServiceSpanChart({ data }: { data: ServiceSpanSeries }):
     </Box>
   );
 }
+
+// Its props change only when the deferred spans do, not on every span batch.
+export default memo(ServiceSpanChart);
