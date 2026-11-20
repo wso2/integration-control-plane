@@ -121,6 +121,7 @@ import {
   isHttpUrl,
   isLlmValid,
   isNameStepValid,
+  integrationTypeFor,
   isSourceValid,
   visibleFields,
   isSourcesStepValid,
@@ -316,6 +317,27 @@ describe('source validation', () => {
     expect(isSourceValid(withValues('salesforce', { ...base, authType: 'bearer', token: 't' }))).toBe(true);
 
     expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
+  });
+
+  it('offers SAP SuccessFactors with the auth flows of its integration', () => {
+    expect(isConnectorEnabled('sap-successfactors')).toBe(true);
+    expect(integrationTypeFor('sap-successfactors')).toBe('sap_successfactors');
+    expect(blankSource('sap-successfactors').values.authType).toBe('samlBearer');
+    const connection = { hostname: 'api4.successfactors.com', companyId: 'acmeT1', username: 'integration' };
+    expect(invalidSourceFields(withValues('sap-successfactors', { ...connection, clientId: 'key' })).map((f) => f.key)).toEqual(['privateKey', 'certificate']);
+    expect(isSourceValid(withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p' }))).toBe(true);
+
+    // The settings are the integration's own: the auth block nested, the PEMs kept whole, the hidden flow's fields left out.
+    const pem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+    const sf = withValues('sap-successfactors', { ...connection, clientId: 'key', privateKey: 'k', certificate: pem, password: 'stale' });
+    expect(toIntegrationRequest(sf, 'sap_successfactors').settings).toEqual({
+      hostname: 'api4.successfactors.com',
+      companyId: 'acmeT1',
+      auth: { type: 'samlBearer', clientId: 'key', username: 'integration', privateKey: 'k', certificate: pem },
+      pollInterval: 900,
+      pageSize: 100,
+    });
+    expect(toIntegrationRequest(withValues('sap-successfactors', { ...connection, authType: 'basic', password: ' p ' }), 'sap_successfactors').settings.auth).toEqual({ type: 'basic', username: 'integration', password: ' p ' });
   });
 
   it('shows and requires only the fields of the chosen Google auth flow', () => {
