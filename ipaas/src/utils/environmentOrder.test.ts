@@ -43,10 +43,7 @@ describe('pipelineEnvOrder', () => {
       children: [
         {
           env_template_id: 'dev',
-          children: [
-            { env_template_id: 'staging', children: [{ env_template_id: 'prod' }] },
-            { env_template_id: 'prod' },
-          ],
+          children: [{ env_template_id: 'staging', children: [{ env_template_id: 'prod' }] }, { env_template_id: 'prod' }],
         },
       ],
     };
@@ -80,7 +77,7 @@ describe('orderEnvironmentsByPipeline', () => {
 });
 
 describe('restrictEnvironmentsToPipeline', () => {
-  it('drops environments the project\'s pipeline does not promote through', () => {
+  it("drops environments the project's pipeline does not promote through", () => {
     expect(restrictEnvironmentsToPipeline(envs('dev', 'other-team-env', 'prod'), chain('dev', 'prod'))).toEqual(envs('dev', 'prod'));
   });
 

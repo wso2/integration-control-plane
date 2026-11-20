@@ -42,11 +42,7 @@ const missingRequired = (schemaConfig: SchemaConfigData | null | undefined, link
   try {
     const schema = JSON.parse(atob(schemaConfig.jsonSchema));
     const allRequired = getRequiredPathsAtLevel(schema).filter((p) => !p.includes('[*]') && !p.includes('.*'));
-    const filledKeys = new Set([
-      ...(schemaConfig.configurations ?? []).filter((c) => savedValue(c) !== undefined).map((c) => c.key),
-      ...linkedWithValues(links, env),
-      ...linkedToEndpoints(links),
-    ]);
+    const filledKeys = new Set([...(schemaConfig.configurations ?? []).filter((c) => savedValue(c) !== undefined).map((c) => c.key), ...linkedWithValues(links, env), ...linkedToEndpoints(links)]);
     return allRequired.filter((k) => !filledKeys.has(k));
   } catch {
     return [];

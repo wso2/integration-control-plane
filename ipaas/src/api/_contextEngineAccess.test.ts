@@ -121,9 +121,7 @@ describe('engineRequest', () => {
   it('sends the login token the BFF returned when the browser holds none, and renews before it expires', async () => {
     vi.useFakeTimers();
     getAccessToken.mockResolvedValue(null);
-    post
-      .mockResolvedValueOnce({ ...access('k1'), userToken: 'session-token', userTokenExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() })
-      .mockResolvedValueOnce({ ...access('k1'), userToken: 'refreshed-token' });
+    post.mockResolvedValueOnce({ ...access('k1'), userToken: 'session-token', userTokenExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() }).mockResolvedValueOnce({ ...access('k1'), userToken: 'refreshed-token' });
     authenticatedFetch.mockImplementation(async () => response(200));
 
     await engineRequest(ENGINE, 'GET', '/v1/engine');

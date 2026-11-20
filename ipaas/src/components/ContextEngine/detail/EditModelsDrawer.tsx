@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, FormControlLabel, IconButton, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
-import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, DrawerPanel, FormControlLabel, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
+import { Info, Lock } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
 import { useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
@@ -26,7 +26,7 @@ import { engineMessage, isModelProviderUnavailable, modelProviderName, modelsDra
 import { HttpError } from '../../../types/http';
 import SecretField from '../../common/SecretField';
 import ModelProviderColumn, { type ProviderOption } from '../steps/ModelProviderColumn';
-import { drawerBodySx, drawerFooterSx, drawerHeaderSx, filesDrawerSx, modelColumnSx, mutedSx } from '../styles';
+import { drawerContentSx, modelColumnSx, mutedSx } from '../styles';
 import type { ContextEngineModels, ContextModelSummary, LlmConfig, LlmProvider, ModelsDraft } from '../../../types/contextEngine';
 
 interface EditModelsDrawerProps {
@@ -46,7 +46,7 @@ const KEEP_KEY_TEXT = 'Leave empty to keep the current key';
 
 const lockRowSx = { p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
 const infoIconStyle = { marginTop: 2, flexShrink: 0 } as const;
-const footerSx = { ...drawerFooterSx, flexDirection: 'column' } as const;
+const footerSx = { display: 'block' } as const;
 
 /** Why the save failed, in words. */
 function saveFailure(e: Error): { title: string; body: string } {
@@ -94,17 +94,15 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={save.isPending ? undefined : close} variant="temporary" sx={filesDrawerSx} disableAutoFocus={focusEmbeddingKey}>
-      <Box sx={drawerHeaderSx}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Change models
-        </Typography>
-        <IconButton size="small" aria-label="Close" onClick={close} disabled={save.isPending}>
-          <X size={18} />
-        </IconButton>
-      </Box>
+    <DrawerPanel open={open} onClose={save.isPending ? () => undefined : close}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Change models</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={drawerBodySx}>
+      <DrawerPanel.Body sx={drawerContentSx}>
         <Box sx={modelColumnSx}>
           <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
@@ -168,27 +166,31 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
             }
           />
         )}
-      </Box>
 
-      <Box component="footer" sx={footerSx}>
-        {failure && (
-          <Alert severity="error">
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {failure.title}
-            </Typography>
-            {failure.body}
-          </Alert>
-        )}
         <Alert severity="warning">Saving restarts the engine. Queries fail for about a minute.</Alert>
-        <Stack direction="row" gap={1.5} justifyContent="flex-end">
-          <Button variant="outlined" onClick={close} disabled={save.isPending}>
-            Cancel
-          </Button>
-          <Button variant="contained" disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={submit}>
-            {save.isPending ? 'Saving…' : 'Save and restart'}
-          </Button>
+      </DrawerPanel.Body>
+
+      {/* The save error sits by the buttons, so a scrolled drawer still shows it. */}
+      <DrawerPanel.Footer sx={footerSx}>
+        <Stack component="footer" gap={1.5}>
+          {failure && (
+            <Alert severity="error">
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {failure.title}
+              </Typography>
+              {failure.body}
+            </Alert>
+          )}
+          <Stack direction="row" gap={1} justifyContent="flex-end">
+            <Button variant="outlined" color="inherit" onClick={close} disabled={save.isPending}>
+              Cancel
+            </Button>
+            <Button variant="contained" disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={submit}>
+              {save.isPending ? 'Saving…' : 'Save and restart'}
+            </Button>
+          </Stack>
         </Stack>
-      </Box>
-    </Drawer>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

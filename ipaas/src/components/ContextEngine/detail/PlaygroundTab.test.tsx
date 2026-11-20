@@ -49,10 +49,13 @@ vi.mock('@wso2/oxygen-ui', () => {
     }: Record<string, unknown> & { children?: ReactNode }) =>
       tag === 'textarea' ? createElement('textarea', { ...props, ...(inputProps as object), value, onChange }) : createElement(typeof component === 'string' ? component : tag, props, children);
   return {
-    Alert: plain('div'),
+    Alert: ({ action, children }: { action?: ReactNode; children?: ReactNode }) => createElement('div', null, children, action),
     Box: plain('div'),
     Button: plain('button'),
     CircularProgress: plain('span'),
+    Checkbox: ({ checked, onChange }: { checked?: boolean; onChange?: () => void }) => createElement('input', { type: 'checkbox', checked, onChange }),
+    Divider: () => null,
+    FormControlLabel: ({ control, label }: { control?: ReactNode; label?: ReactNode }) => createElement('label', null, control, label),
     IconButton: plain('button'),
     Skeleton: plain('span'),
     Stack: plain('div'),
@@ -85,16 +88,17 @@ vi.mock('../../../hooks/contextQuestions', () => ({
   useAskedQuestions: () => asked.list,
 }));
 vi.mock('../../../hooks/useAppNavigate', () => ({ useAppNavigate: () => vi.fn() }));
-vi.mock('./AnsweredTurn', () => ({ default: () => null }));
+vi.mock('./AnsweredTurn', () => ({ default: ({ footer }: { footer: ReactNode }) => footer }));
 vi.mock('./EvidenceCard', () => ({ default: () => null }));
-vi.mock('./OwnerAccessButton', () => ({ default: () => null }));
+vi.mock('./OwnerAccessButton', () => ({ default: ({ onGranted }: { onGranted?: () => void }) => (onGranted ? createElement('button', { 'aria-label': 'Grant access', onClick: onGranted }) : null) }));
 vi.mock('./RecentQuestions', () => ({
   default: ({ questions, onOpen }: { questions: AskedQuestion[]; onOpen: (q: AskedQuestion) => void }) => createElement('button', { 'aria-label': 'Open recent', onClick: () => onOpen(questions[0]) }),
 }));
 
 import PlaygroundTab from './PlaygroundTab';
-import { appendTurn, getPlaygroundConversation } from '../../../hooks/contextTurns';
+import { appendTurn, getPlaygroundConversation, setPlaygroundMode } from '../../../hooks/contextTurns';
 import { rememberQuestion } from '../../../hooks/contextQuestions';
+import { HttpError } from '../../../types/http';
 
 const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true } } as unknown as ContextEngineDetail;
 const result = { queryId: 'qry_1', evidence: [] } as unknown as ContextQueryResult;
@@ -144,6 +148,26 @@ describe('PlaygroundTab', () => {
     expect(getPlaygroundConversation(engine.id).turns.map((t) => t.question)).toEqual(['What changed?']);
     expect(rememberQuestion).toHaveBeenCalledWith(expect.objectContaining({ queryId: 'qry_1', question: 'What changed?' }));
     root = createRoot(host);
+  });
+
+  it('retries a refused question in the mode it was asked in, even after the mode changed', async () => {
+    const refused = Promise.reject(new HttpError(403, 'forbidden'));
+    refused.catch(() => undefined);
+    queryContext.mutateAsync.mockReturnValueOnce(refused).mockReturnValue(new Promise(() => undefined));
+    act(() =>
+      root.render(
+        <MemoryRouter initialEntries={['/?q=What%20changed%3F']}>
+          <PlaygroundTab engine={{ ...engine, id: 'e-mode' }} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    act(() => button('Ask')?.click());
+    await act(async () => undefined);
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'What changed?', mode: 'answer' }));
+    act(() => setPlaygroundMode('e-mode', 'context'));
+    act(() => button('Grant access')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'What changed?', mode: 'answer' }));
   });
 
   it('holds asking and clearing while a recent question is being reopened', () => {

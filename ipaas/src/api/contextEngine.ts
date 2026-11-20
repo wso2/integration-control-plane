@@ -246,6 +246,7 @@ interface BffIntegration {
   component: string;
   type: string;
   shape: string;
+  schedule?: string;
   sourceId?: string;
   status: string;
   statusReason?: string;
@@ -619,7 +620,7 @@ export async function updateContextModels({ engineId, ...input }: UpdateContextM
 
 export async function listContextIntegrations(engineId: string): Promise<ContextIntegration[]> {
   const raw = await viaBff(() => bff.get<ListResponse<BffIntegration>>(`${enginePath(engineId)}/integrations`));
-  return items(raw).map((i) => ({ name: i.name, project: i.project, component: i.component, type: i.type, shape: i.shape, sourceId: i.sourceId, status: i.status, statusReason: i.statusReason, lastRun: i.lastRun }));
+  return items(raw).map((i) => ({ name: i.name, project: i.project, component: i.component, type: i.type, shape: i.shape, schedule: i.schedule, sourceId: i.sourceId, status: i.status, statusReason: i.statusReason, lastRun: i.lastRun }));
 }
 
 export async function listContextApiKeys(engineId: string): Promise<ContextApiKey[]> {

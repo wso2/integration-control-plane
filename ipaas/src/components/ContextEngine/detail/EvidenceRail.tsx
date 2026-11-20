@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, Chip, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Chip, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { /* Check, */ ChevronDown, ChevronRight, ExternalLink, History, X /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 // import { Link as RouterLink } from 'react-router';
@@ -53,11 +53,26 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
     if (pinned) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [pinned]);
   return (
-    <Box ref={ref} onMouseEnter={() => onHover(n)} onMouseLeave={() => onHover(null)} sx={railCardSx(active, pinned, dimmed)}>
+    // The whole card pins and releases the passage, so a click anywhere on it opens more of the text.
+    <Box
+      ref={ref}
+      role="button"
+      tabIndex={0}
+      aria-label={`${pinned ? 'Release' : 'Pin'} passage ${n}`}
+      aria-pressed={pinned}
+      onClick={() => onPin(n)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        onPin(n);
+      }}
+      onMouseEnter={() => onHover(n)}
+      onMouseLeave={() => onHover(null)}
+      sx={{ ...railCardSx(active, pinned, dimmed), cursor: 'pointer' }}>
       <Stack direction="row" alignItems="center" gap={1}>
-        <ButtonBase aria-label={`${pinned ? 'Release' : 'Pin'} passage ${n}`} aria-pressed={pinned} onClick={() => onPin(n)} sx={railNumberSx(active || pinned)}>
+        <Box component="span" aria-hidden sx={railNumberSx(active || pinned)}>
           {n}
-        </ButtonBase>
+        </Box>
         {/* An opaque record id (a Drive file id) names nothing; the source name stands in until the engine has item names. */}
         <Typography variant="caption" sx={{ fontWeight: 600, minWidth: 0 }} noWrap title={evidence.recordId}>
           {opaque ? (source?.name ?? evidence.sourceId) : evidence.recordId}
@@ -65,7 +80,14 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
         {!cited && <Chip size="small" variant="outlined" label="Not cited" sx={{ ml: 'auto', height: 20, color: 'text.secondary' }} />}
         {pinned && (
           <Tooltip title="Release (Esc)">
-            <IconButton size="small" aria-label="Close pinned passage" onClick={() => onPin(n)} sx={{ ml: cited ? 'auto' : 0, p: 0.25 }}>
+            <IconButton
+              size="small"
+              aria-label="Close pinned passage"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin(n);
+              }}
+              sx={{ ml: cited ? 'auto' : 0, p: 0.25 }}>
               <X size={14} />
             </IconButton>
           </Tooltip>
@@ -90,7 +112,14 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
       {pinned && (
         <Box sx={{ pl: 3.5 }}>
           <Stack direction="row" gap={1} sx={{ mt: 1.25 }}>
-            <Button size="small" variant="outlined" startIcon={<ExternalLink size={14} />} onClick={onOpen}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ExternalLink size={14} />}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+              }}>
               Open
             </Button>
           </Stack>

@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Alert, Box, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, CircleAlert, Pencil, Trash2 } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX } from 'react';
+import { Alert, Box, Button, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft, Check, CircleAlert, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { useEffect, useState, type JSX } from 'react';
 import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSourceVisibility, summarizeSource } from '../../../utils/contextEngine';
 import ConnectorPicker from '../ConnectorPicker';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
@@ -34,6 +34,8 @@ interface SourcesStepProps {
   onRemove: (index: number) => void;
   /** Role handle → display name, for each row's visibility line. */
   roleNames?: Record<string, string>;
+  /** True while the catalog is open over sources already added, so the wizard can hold back Back and Next. */
+  onBrowsingChange?: (browsing: boolean) => void;
 }
 
 interface DrawerState {
@@ -85,17 +87,25 @@ function SourceRow({ source, roleNames, onEdit, onRemove }: { source: ContextSou
  * first; the connector catalog sits on the page (live connectors, then upcoming
  * ones), and picking a connector opens its form in a drawer.
  */
-export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRemove, roleNames = {} }: SourcesStepProps): JSX.Element {
+export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRemove, roleNames = {}, onBrowsingChange }: SourcesStepProps): JSX.Element {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, session: 0 });
   const openDrawer = (start?: SourceDrawerStart) => setDrawer((d) => ({ open: true, session: d.session + 1, start }));
   const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }));
   // Confirms each change inline, like the console's other success alerts; it stays until dismissed or replaced by the next change.
   const [notice, setNotice] = useState<string | null>(null);
+  // Once a source is added the step shows the list; "Add another source" swaps in the catalog until one is added or the user goes back.
+  const [adding, setAdding] = useState(false);
+  const browsing = adding && sources.length > 0;
+  const showCatalog = sources.length === 0 || adding;
+  useEffect(() => {
+    onBrowsingChange?.(browsing);
+  }, [browsing, onBrowsingChange]);
   const displayName = (s: ContextSourceConfig) => s.name.trim() || sourceTypeName(s.type);
   const submit = (config: ContextSourceConfig, index?: number) => {
     if (index === undefined) onAdd(config);
     else onUpdate(index, config);
     closeDrawer();
+    setAdding(false);
     setNotice(index === undefined ? `Source '${displayName(config)}' added successfully.` : `Source '${displayName(config)}' updated successfully.`);
   };
   const remove = (index: number) => {
@@ -109,22 +119,37 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
 
   return (
     <>
-      <Typography variant="subtitle2" sx={stepHeadingSx}>
-        Choose sources
-      </Typography>
+      {browsing ? (
+        <>
+          <Button startIcon={<ArrowLeft size={16} />} onClick={() => setAdding(false)} sx={{ mb: 2 }}>
+            Back to selected sources
+          </Button>
+          <Typography variant="subtitle2" sx={stepHeadingSx}>
+            Add another source
+          </Typography>
+          <Typography variant="body2" sx={stepHintSx}>
+            Pick a connector. {sources.length} source{sources.length === 1 ? ' is' : 's are'} added so far.
+          </Typography>
+        </>
+      ) : (
+        <>
+          <Typography variant="subtitle2" sx={stepHeadingSx}>
+            Choose sources
+          </Typography>
+          <Typography variant="body2" sx={stepHintSx}>
+            Add the places this engine reads content from. You can add more later.
+          </Typography>
+        </>
+      )}
 
-      <Typography variant="body2" sx={stepHintSx}>
-        Add the places this engine reads content from. You can add more later.
-      </Typography>
-
-      {notice && (
+      {notice && !browsing && (
         <Alert severity="success" onClose={() => setNotice(null)} sx={{ mb: 3 }}>
           {notice}
         </Alert>
       )}
 
-      {sources.length > 0 && (
-        <Box sx={{ mb: 4 }}>
+      {sources.length > 0 && !browsing && (
+        <Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
             {sources.length} source{sources.length === 1 ? '' : 's'} added
             {incomplete > 0 && (
@@ -141,10 +166,20 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
               <SourceRow key={`${s.type}-${i}`} source={s} roleNames={roleNames} onEdit={() => openDrawer({ config: s, index: i })} onRemove={() => remove(i)} />
             ))}
           </Box>
+          <Button
+            variant="outlined"
+            startIcon={<Plus size={14} />}
+            onClick={() => {
+              setNotice(null);
+              setAdding(true);
+            }}
+            sx={{ mt: 2 }}>
+            Add another source
+          </Button>
         </Box>
       )}
 
-      <ConnectorPicker addedCounts={addedCounts} onPick={(connectorId) => openDrawer({ connectorId })} />
+      {showCatalog && <ConnectorPicker addedCounts={addedCounts} onPick={(connectorId) => openDrawer({ connectorId })} />}
 
       <SourceDrawer key={drawer.session} formOnly orgHandle={orgHandle} open={drawer.open} start={drawer.start} existing={sources} onClose={closeDrawer} onSubmit={submit} />
     </>

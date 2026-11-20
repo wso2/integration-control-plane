@@ -148,15 +148,13 @@ const fieldType = (f: SchemaField): string => f.schema.properties?.[f.key]?.type
  * several values and a member of one is no configurable, so neither takes a link; a library's settings are the
  * runtime's rather than the integration's.
  */
-export const linkableFields = (schema: JSONSchema): string[] =>
-  schemaFields(schema).flatMap((f) => (SIMPLE_TYPES.includes(fieldType(f)) && !ofLibrary(f) ? [f.path] : []));
+export const linkableFields = (schema: JSONSchema): string[] => schemaFields(schema).flatMap((f) => (SIMPLE_TYPES.includes(fieldType(f)) && !ofLibrary(f) ? [f.path] : []));
 
 /**
  * The config keys an endpoint can fill: the linkable ones typed string. Everything an endpoint feeds is text —
  * an address, a URL, an API key — so a key that cannot hold text takes a resource key or a value of its own.
  */
-export const addressableFields = (schema: JSONSchema): string[] =>
-  schemaFields(schema).flatMap((f) => (fieldType(f) === 'string' && !ofLibrary(f) ? [f.path] : []));
+export const addressableFields = (schema: JSONSchema): string[] => schemaFields(schema).flatMap((f) => (fieldType(f) === 'string' && !ofLibrary(f) ? [f.path] : []));
 
 /** The integration's own package among the fields': the first not from a library org. */
 export const ownPackage = (fields: SchemaField[]): string => (fields.find((f) => !ofLibrary(f)) ?? fields[0])?.pkg ?? '';

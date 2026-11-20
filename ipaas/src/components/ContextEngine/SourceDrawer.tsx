@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Box, Button, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Plus, X } from '@wso2/oxygen-ui-icons-react';
+import { Button, DrawerPanel, IconButton, Stack } from '@wso2/oxygen-ui';
+import { ArrowLeft, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { blankSource, CONNECTOR_BY_ID } from '../../constants/contextEngine';
 import { isSourceValid, sourceNameError } from '../../utils/contextEngine';
 import ConnectorCatalog from './ConnectorCatalog';
 import ConnectorForm from './ConnectorForm';
-import { drawerHeaderSx, sourceDrawerBodySx, sourceDrawerFooterSx, sourceDrawerSx } from './styles';
+import { drawerContentSx } from './styles';
 import type { ContextSourceConfig } from '../../types/contextEngine';
 
 /** Where the drawer opens: the catalog (nothing set), a connector's blank form (`connectorId`), or an existing source (`config` + `index`). */
@@ -76,39 +76,39 @@ export default function SourceDrawer({ orgHandle, open, start, existing, onClose
   const title = connector ? (editing ? `Edit ${connector.name} source` : `Configure ${connector.name}`) : 'Add source';
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={sourceDrawerSx}>
-      <Box sx={drawerHeaderSx}>
-        <Stack direction="row" alignItems="center" gap={1}>
+    <DrawerPanel open={open} onClose={onClose}>
+      <DrawerPanel.Header>
+        <Stack direction="row" alignItems="center" gap={1} sx={{ minWidth: 0 }}>
           {connector && !editing && !formOnly && (
             <IconButton size="small" aria-label="Back to all sources" onClick={backToCatalog}>
               <ArrowLeft size={18} />
             </IconButton>
           )}
-          <Typography variant="h5">{title}</Typography>
+          <DrawerPanel.Title>{title}</DrawerPanel.Title>
         </Stack>
-        <IconButton size="small" aria-label="Close" onClick={onClose}>
-          <X size={16} />
-        </IconButton>
-      </Box>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={sourceDrawerBodySx}>
+      <DrawerPanel.Body sx={drawerContentSx}>
         {connector && draft ? (
           <ConnectorForm orgHandle={orgHandle} connector={connector} draft={draft} otherNames={otherNames} onChange={setDraft} onChangeSource={editing || formOnly ? undefined : backToCatalog} queryRoles={queryRoles} engineId={engineId} />
         ) : (
           <ConnectorCatalog addedIds={existing.map((s) => s.type)} onPick={pick} />
         )}
-      </Box>
+      </DrawerPanel.Body>
 
       {connector && draft && (
-        <Box sx={sourceDrawerFooterSx}>
+        <DrawerPanel.Footer>
           <Button variant="outlined" color="inherit" onClick={onClose}>
             Cancel
           </Button>
           <Button variant="contained" disabled={!canSubmit} startIcon={editing ? undefined : <Plus size={16} />} onClick={() => onSubmit(draft, start?.index)}>
             {editing ? 'Save changes' : 'Add source'}
           </Button>
-        </Box>
+        </DrawerPanel.Footer>
       )}
-    </Drawer>
+    </DrawerPanel>
   );
 }

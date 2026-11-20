@@ -17,7 +17,6 @@
  */
 
 import { Box, Button, Chip, ColorSchemeImage, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { CheckCircle } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { CATALOG_CONNECTORS, contextLogoUrl, isConnectorEnabled, SOURCE_CATEGORIES } from '../../constants/contextEngine';
 import { connectorCountsByCategory, filterConnectors } from '../../utils/contextEngine';
@@ -45,32 +44,23 @@ function ConnectorLogo({ connector }: { connector: SourceConnector }): JSX.Eleme
   );
 }
 
-/** A live connector: opens its form. Shows a check once added; a single-instance connector cannot be added twice. */
+/**
+ * A live connector: opens its form. It looks the same whether or not a source of its type is added,
+ * since another one can be added (a second Drive folder, say); only a single-instance connector locks once added.
+ */
 function AvailableCard({ connector, added, onPick }: { connector: SourceConnector; added: number; onPick: () => void }): JSX.Element {
   const locked = !!connector.single && added > 0;
-  const label = locked ? `${connector.name}, already added` : added > 0 ? `Add another ${connector.name} source, ${added} added` : `Add ${connector.name} source`;
-  // Clicking an added card adds another source of that type; edit an existing one from its row above.
   const card = (
-    <Box component="button" type="button" onClick={onPick} disabled={locked} aria-label={label} sx={connectorCardSx({ added: added > 0, interactive: !locked })}>
-      {added > 0 && (
-        <Box sx={{ position: 'absolute', top: 8, right: 8, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          {added > 1 && (
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>
-              {added}
-            </Typography>
-          )}
-          <CheckCircle size={16} />
-        </Box>
-      )}
+    <Box component="button" type="button" onClick={onPick} disabled={locked} aria-label={locked ? `${connector.name}, only one per engine` : `Add ${connector.name} source`} sx={connectorCardSx({ added: false, interactive: !locked })}>
       <ConnectorLogo connector={connector} />
       <Typography variant="body2" fontWeight={600} textAlign="center" sx={{ lineHeight: 1.2 }}>
         {connector.name}
       </Typography>
     </Box>
   );
-  return added > 0 && !locked ? (
-    <Tooltip title={`Add another ${connector.name} source`} placement="top">
-      {card}
+  return locked ? (
+    <Tooltip title={`Only one ${connector.name} source per engine`} placement="top">
+      <span>{card}</span>
     </Tooltip>
   ) : (
     card

@@ -68,7 +68,7 @@ export function finishQuestion(engineId: string, token: number, outcome: { turn:
   const { pending, ...current } = getPlaygroundConversation(engineId);
   if (pending?.token !== token) return false;
   if ('turn' in outcome) write(engineId, { ...current, turns: [...current.turns, outcome.turn] });
-  else write(engineId, { ...current, failure: { error: outcome.error, mode: pending.mode } });
+  else write(engineId, { ...current, failure: { error: outcome.error, mode: pending.mode, question: pending.question } });
   return true;
 }
 

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, DrawerPanel, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
@@ -28,7 +27,7 @@ import FileVisibilityField from '../files/FileVisibilityField';
 import VisibilityComingSoon from '../files/VisibilityComingSoon';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourceMark from '../SourceMark';
-import { connectorHeaderSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fieldStackSx, filesDrawerSx, mutedSx } from '../styles';
+import { connectorHeaderSx, drawerContentSx, fieldStackSx, mutedSx } from '../styles';
 import type { ContextSource, FileVisibility } from '../../../types/contextEngine';
 
 interface EditSourceDrawerProps {
@@ -84,17 +83,15 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={filesDrawerSx}>
-      <Box sx={drawerHeaderSx}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Edit source
-        </Typography>
-        <IconButton size="small" aria-label="Close" onClick={onClose}>
-          <X size={18} />
-        </IconButton>
-      </Box>
+    <DrawerPanel open={open} onClose={update.isPending ? () => undefined : onClose}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Edit source</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={drawerBodySx}>
+      <DrawerPanel.Body sx={drawerContentSx}>
         <Box sx={connectorHeaderSx}>
           <SourceMark type={source.type} size={24} variant="tile" />
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -108,7 +105,18 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
         </Box>
 
         <Stack sx={fieldStackSx}>
-          <TextField labelPlacement="top" label="Source Name" required fullWidth size="small" value={name} error={!!nameError && name.trim() !== ''} helperText={(name.trim() !== '' && nameError) || undefined} onChange={(e) => setName(e.target.value)} sx={REQUIRED_FIELD_SX} />
+          <TextField
+            labelPlacement="top"
+            label="Source Name"
+            required
+            fullWidth
+            size="small"
+            value={name}
+            error={!!nameError && name.trim() !== ''}
+            helperText={(name.trim() !== '' && nameError) || undefined}
+            onChange={(e) => setName(e.target.value)}
+            sx={REQUIRED_FIELD_SX}
+          />
         </Stack>
 
         {!ROLE_VISIBILITY_ENABLED ? (
@@ -146,16 +154,16 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
             {forbidden ? 'Changing a source needs the manage permission on this engine.' : engineMessage(update.error, "Couldn't save the source.")}
           </Alert>
         )}
-      </Box>
+      </DrawerPanel.Body>
 
-      <Box sx={drawerFooterSx}>
-        <Button variant="outlined" onClick={onClose} disabled={update.isPending}>
+      <DrawerPanel.Footer>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
         <Button variant="contained" disabled={!canSave} startIcon={update.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={save}>
           {update.isPending ? 'Saving…' : 'Save changes'}
         </Button>
-      </Box>
-    </Drawer>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

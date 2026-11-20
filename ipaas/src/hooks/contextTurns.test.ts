@@ -96,11 +96,11 @@ describe('contextTurns', () => {
     expect(ids('e-stale')).toEqual(['q3']);
   });
 
-  it('keeps a failure with the mode it was asked in until dismissed or asked again', () => {
+  it('keeps a failure with the question and mode it was asked in until dismissed or asked again', () => {
     const token = startQuestion('e-fail', 'q', 'answer');
     const error = new Error('down');
     finishQuestion('e-fail', token, { error });
-    expect(getPlaygroundConversation('e-fail').failure).toEqual({ error, mode: 'answer' });
+    expect(getPlaygroundConversation('e-fail').failure).toEqual({ error, mode: 'answer', question: 'q' });
     dismissQuestionFailure('e-fail');
     expect(getPlaygroundConversation('e-fail').failure).toBeUndefined();
     finishQuestion('e-fail', startQuestion('e-fail', 'q', 'context'), { error });

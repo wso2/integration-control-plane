@@ -33,6 +33,12 @@ export const HTTP_METHOD_COLORS: Record<string, HttpMethodColors> = {
   TRACE: { badgeBg: '#785446', border: '#d0d0d0', cardBg: '#f5f5f5' },
 };
 
+/**
+ * MCP tool tiles: the purple of HEAD, so tools sit in the same family as the API tab's methods
+ * without borrowing a status colour (green, orange, red or the info blue).
+ */
+export const MCP_TOOL_COLORS = { badgeBg: HTTP_METHOD_COLORS.HEAD.badgeBg, badgeText: '#FFFFFF', cardBg: HTTP_METHOD_COLORS.HEAD.cardBg };
+
 export const DEFAULT_HTTP_METHOD_COLORS: HttpMethodColors = {
   badgeBg: '#9e9e9e',
   border: '#e0e0e0',

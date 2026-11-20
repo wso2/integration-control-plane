@@ -26,7 +26,7 @@ describe('project listing — RAG components', () => {
     expect(getDisplayLabel('byoiCronjob', null)).toBe('Automation');
   });
 
-  it('labels a knowledge base\'s service and data sources', () => {
+  it("labels a knowledge base's service and data sources", () => {
     expect(getDisplayLabel('service', 'knowledge-base')).toBe('Knowledge Base Service');
     expect(getDisplayLabel('automation', 'kb-ingestion')).toBe('Knowledge Base Data Source');
     expect(isSupportedIntegration('service', 'knowledge-base')).toBe(true);
@@ -71,7 +71,7 @@ describe('project listing — foreign runtimes', () => {
 });
 
 describe('componentSubTypeFromSample', () => {
-  it("subtypes webhook samples so create stamps the component-type annotation", () => {
+  it('subtypes webhook samples so create stamps the component-type annotation', () => {
     expect(componentSubTypeFromSample('webhook', 'ballerina')).toBe('webhook');
     expect(componentSubTypeFromSample('webhook', 'wso2-mi')).toBe('webhook');
   });

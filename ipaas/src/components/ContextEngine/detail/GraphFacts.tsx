@@ -16,50 +16,29 @@
  * under the License.
  */
 
-import { Box, ButtonBase, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Stack, Typography } from '@wso2/oxygen-ui';
 import { type JSX } from 'react';
 import { restoreCase } from '../../../utils/contextEngine';
-import { derivationSummary } from '../../../utils/contextGraph';
-import { citationMarkSx, mutedSx } from '../styles';
+import { mutedSx } from '../styles';
 import type { ContextEvidence, ContextFact } from '../../../types/contextEngine';
 
 interface GraphFactsProps {
   facts: ContextFact[];
-  /** The passages returned with the facts: a fact's `[n]` is `evidence[n - 1]`. */
+  /** The passages returned with the facts, read for the spelling of names. */
   evidence: ContextEvidence[];
-  /** The passage pointed at, here or in the rail beside. */
-  active: number | null;
-  pinned: number | null;
-  onHover: (n: number | null) => void;
-  onPin: (n: number) => void;
 }
 
-const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
-
-/**
- * Beside the passages: the graph relationships that came with them, each
- * marked with the passages it stands on. Pointing at a mark lights that
- * passage in the rail; clicking pins it. The words were written by the
- * language model while indexing, so they guide; the passages are what gets
- * cited.
- */
-export default function GraphFacts({ facts, evidence, active, pinned, onHover, onPin }: GraphFactsProps): JSX.Element {
-  const numberOf = new Map(evidence.map((e, i) => [e.id, i + 1]));
+/** Beside the passages: the graph relationships that came with them. The words were written by the language model while indexing, so they guide; the passages are the evidence. */
+export default function GraphFacts({ facts, evidence }: GraphFactsProps): JSX.Element {
   const passages = evidence.map((e) => e.passage);
-  const { entities } = derivationSummary({ evidence, facts });
   return (
     <Box>
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-        Facts
-      </Typography>
-      <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1.25 }}>
-        {count(facts.length, 'fact', 'facts')} about {count(entities, 'thing', 'things')} found in your sources. Each links to the passages it comes from.
-      </Typography>
-      <Stack component="ul" gap={0.75} sx={{ listStyle: 'none', m: 0, p: 0 }}>
+      <Stack component="ul" gap={1.25} sx={{ listStyle: 'none', m: 0, p: 0 }}>
         {facts.map((fact, i) => {
-          const numbers = fact.evidenceIds.map((id) => numberOf.get(id)).filter((n): n is number => n !== undefined);
+          const object = restoreCase(fact.object, passages);
+          const cut = object.lastIndexOf(' ');
           return (
-            <Box component="li" key={`${fact.subject}|${fact.relation}|${fact.object}|${i}`} sx={{ fontSize: 13, lineHeight: 1.5 }}>
+            <Box component="li" key={`${fact.subject}|${fact.relation}|${fact.object}|${i}`} sx={{ fontSize: 14, lineHeight: 1.6 }}>
               <Box component="span" sx={{ fontWeight: 600 }}>
                 {restoreCase(fact.subject, passages)}
               </Box>{' '}
@@ -67,22 +46,13 @@ export default function GraphFacts({ facts, evidence, active, pinned, onHover, o
                 {fact.relation}
               </Box>{' '}
               <Box component="span" sx={{ fontWeight: 600 }}>
-                {restoreCase(fact.object, passages)}
+                {cut > 0 ? object.slice(0, cut + 1) : ''}
               </Box>
-              {numbers.map((n) => (
-                <ButtonBase
-                  key={n}
-                  aria-label={`Passage ${n}`}
-                  aria-pressed={pinned === n}
-                  onMouseEnter={() => onHover(n)}
-                  onMouseLeave={() => onHover(null)}
-                  onFocus={() => onHover(n)}
-                  onBlur={() => onHover(null)}
-                  onClick={() => onPin(n)}
-                  sx={citationMarkSx(active === n || pinned === n, pinned === n)}>
-                  {n}
-                </ButtonBase>
-              ))}
+              <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
+                <Box component="span" sx={{ fontWeight: 600 }}>
+                  {cut > 0 ? object.slice(cut + 1) : object}
+                </Box>
+              </Box>
               {fact.linkedThrough && (
                 <Box component="span" sx={mutedSx}>
                   {' '}

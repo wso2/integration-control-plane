@@ -27,10 +27,7 @@ const commit = (sha: string, message: string, isLatest = false): Commit => ({
   author: { name: 'Ada', date: '2026-09-01T00:00:00Z', email: 'ada@example.com', avatarUrl: '' },
 });
 
-const history: Commit[] = [
-  commit('aaaaaaa1111111111111111111111111111111111', 'Add webhook type', true),
-  commit('bbbbbbb2222222222222222222222222222222222', 'Fix schedule validation'),
-];
+const history: Commit[] = [commit('aaaaaaa1111111111111111111111111111111111', 'Add webhook type', true), commit('bbbbbbb2222222222222222222222222222222222', 'Fix schedule validation')];
 
 describe('findCommitBySha', () => {
   // The build records 8 characters (the Argo checkout step truncates); history carries 40.

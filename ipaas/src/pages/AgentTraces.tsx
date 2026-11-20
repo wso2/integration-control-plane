@@ -144,11 +144,7 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
         <Typography variant="h1" sx={{ mb: 3 }}>
           Traces
         </Typography>
-        <EmptyListing
-          icon={<Waypoints size={48} />}
-          title="No environments in this project"
-          description="Traces are recorded per environment. Create one and deploy the agent to it, and its executions appear here."
-        />
+        <EmptyListing icon={<Waypoints size={48} />} title="No environments in this project" description="Traces are recorded per environment. Create one and deploy the agent to it, and its executions appear here." />
       </PageContent>
     );
   }
@@ -194,11 +190,7 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
               <EmptyListing
                 icon={<Waypoints size={48} />}
                 title={onFirstPage ? 'No traces in this range' : 'No traces on this page'}
-                description={
-                  onFirstPage
-                    ? 'Invoke the agent in this environment, or widen the time range. Traces appear once the agent has handled a request.'
-                    : 'The search found none here. Continue with Next, or go back.'
-                }
+                description={onFirstPage ? 'Invoke the agent in this environment, or widen the time range. Traces appear once the agent has handled a request.' : 'The search found none here. Continue with Next, or go back.'}
               />
             ) : (
               <TracesTable
@@ -234,14 +226,7 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
         )}
       </PageContent>
 
-      <TraceSpansDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        trace={selectedTrace}
-        componentId={componentId}
-        envId={envId}
-        window={spanWindow}
-      />
+      <TraceSpansDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} trace={selectedTrace} componentId={componentId} envId={envId} window={spanWindow} />
     </Box>
   );
 }

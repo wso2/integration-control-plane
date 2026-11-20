@@ -88,7 +88,7 @@ export default function OverviewShell({ component, identity, environments, versi
             orgHandler={orgHandler}
             projectHandler={projectHandler}
             deploymentPipelineId={deploymentPipelineId}
-                  isBuildInProgress={isBuildInProgress}
+            isBuildInProgress={isBuildInProgress}
             module={module}
           />
           {i < environments.length - 1 && (

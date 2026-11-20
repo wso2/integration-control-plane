@@ -220,7 +220,9 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
         Service plan
       </Typography>
       {freeTierOnly && (
-        <Alert severity="info">Free plans can only create {isTemporal ? 'Temporal servers' : 'databases'} on the {FREE_PLAN_TIER} tier. Upgrade your subscription to choose another tier.</Alert>
+        <Alert severity="info">
+          Free plans can only create {isTemporal ? 'Temporal servers' : 'databases'} on the {FREE_PLAN_TIER} tier. Upgrade your subscription to choose another tier.
+        </Alert>
       )}
       {planCards}
     </Box>

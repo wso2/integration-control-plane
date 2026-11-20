@@ -17,7 +17,7 @@
  */
 
 import { Box } from '@wso2/oxygen-ui';
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 // import { Link as RouterLink } from 'react-router';
 import { citedNumbers } from '../../../utils/contextEngine';
 import CitedAnswer, { type CitationFocus } from './CitedAnswer';
@@ -37,6 +37,8 @@ interface AnsweredTurnProps {
   derivationHref?: (evidence?: ContextEvidence) => string;
   /** The question asked, for the excerpts. */
   question?: string;
+  /** The outcome line and actions, kept right under the answer so a short answer leaves no gap above them. */
+  footer?: ReactNode;
 }
 
 /**
@@ -45,7 +47,7 @@ interface AnsweredTurnProps {
  * until it is clicked again or Esc is pressed. On narrow screens the rail
  * follows the answer instead of sitting beside it.
  */
-export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, derivationHref, question }: AnsweredTurnProps): JSX.Element {
+export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, derivationHref, question, footer }: AnsweredTurnProps): JSX.Element {
   const [active, setActive] = useState<CitationFocus | null>(null);
   const [pinned, setPinned] = useState<CitationFocus | null>(null);
   const cited = citedNumbers(answer, evidence.length);
@@ -67,7 +69,8 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
       <Box sx={{ minWidth: 0 }}>
-        <CitedAnswer answer={answer} passages={evidence.length} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
+        <CitedAnswer answer={answer} passages={evidence.length} active={null} pinned={null} onHover={() => undefined} onPin={() => undefined} />
+        {footer}
         {/* How this answer was derived: hidden by the team for now (4ed1e9b2c). To bring it back, render this under the answer
             (with Button from oxygen-ui, ArrowRight from oxygen-ui-icons-react and Link as RouterLink from react-router):
         {derivationHref && (

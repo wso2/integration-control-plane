@@ -29,6 +29,8 @@ import OperationHeader from '../../../Overview/_shared/bodies/OperationHeader';
 import OperationTile from '../../../Overview/_shared/bodies/OperationTile';
 import CopyButton from '../../../Overview/integration-as-api/CopyButton';
 import * as consumption from '../../../Overview/integration-as-api/apiConsumption.styles';
+import AccessOffAlert from '../AccessOffAlert';
+import AccessSwitch from '../AccessSwitch';
 import SurfaceHeader from '../SurfaceHeader';
 import { mutedSx } from '../../styles';
 import MockTokensPanel from './MockTokensPanel';
@@ -177,16 +179,11 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <Alert severity="warning" sx={{ mb: 3 }}>
-        Mock: a proposed layout for review. Tokens created here are not real, and the engine does not accept them.
-      </Alert>
-
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
-        <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
-        <Button variant="text" startIcon={<MessageSquare size={16} />} onClick={() => navigate(contextEngineUrl(orgHandle, engine.id, 'playground'))}>
-          Try it in the Playground
-        </Button>
-      </Stack>
+      <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
+      {engine.access?.api === false && <AccessOffAlert surface="api" />}
+      <Button variant="text" startIcon={<MessageSquare size={16} />} onClick={() => navigate(contextEngineUrl(orgHandle, engine.id, 'playground'))} sx={{ mb: 2, ml: -1 }}>
+        Try it in the Playground
+      </Button>
 
       <BaseUrl label="Base URL" url={`${base.replace(/\/$/, '')}/v1`} />
 

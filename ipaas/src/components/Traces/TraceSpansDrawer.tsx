@@ -84,10 +84,7 @@ export default function TraceSpansDrawer({ open, onClose, trace, componentId, en
         </Box>
       ) : rows.length === 0 ? (
         <Box sx={styles.detailPane}>
-          <Alert severity="info">
-            This trace has no spans in the selected time range. Widen the range to cover the whole trace — a trace is listed by its start, but its spans are read over the range you
-            choose.
-          </Alert>
+          <Alert severity="info">This trace has no spans in the selected time range. Widen the range to cover the whole trace — a trace is listed by its start, but its spans are read over the range you choose.</Alert>
         </Box>
       ) : (
         <Box sx={styles.body}>
@@ -98,14 +95,7 @@ export default function TraceSpansDrawer({ open, onClose, trace, componentId, en
               </Alert>
             ) : null}
             {rows.map(({ span, depth, offset, width }) => (
-              <Box
-                key={span.spanId}
-                component="button"
-                type="button"
-                aria-current={span.spanId === activeSpanId}
-                onClick={() => setSelectedSpanId(span.spanId)}
-                sx={styles.spanRow(span.spanId === activeSpanId)}
-              >
+              <Box key={span.spanId} component="button" type="button" aria-current={span.spanId === activeSpanId} onClick={() => setSelectedSpanId(span.spanId)} sx={styles.spanRow(span.spanId === activeSpanId)}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={styles.spanIndent(depth)}>
                   <Stack direction="row" alignItems="center" gap={0.5} minWidth={0}>
                     {span.error ? <CircleAlert size={13} color="var(--oxygen-palette-error-main)" /> : null}

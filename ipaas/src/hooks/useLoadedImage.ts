@@ -36,4 +36,3 @@ export function useLoadedImage(url: string | undefined): string | undefined {
 
   return url && loaded === url ? url : undefined;
 }
- 

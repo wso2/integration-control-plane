@@ -48,20 +48,23 @@ import {
   updateContextModels,
   updateContextSource,
 } from '../api/contextEngine';
-import {
-  CONTEXT_ENGINE_ASKED_KEY_PREFIX,
-  CONTEXT_ENGINE_CONNECT_KEY_PREFIX,
-  CONTEXT_OWNER_ACTIONS,
-  DELETION_POLL_MS,
-  ENGINE_STATUS_POLL_MS,
-  PROGRESS_POLL_ACTIVE_MS,
-  PROGRESS_POLL_IDLE_MS,
-  SUMMARY_CONCURRENCY,
-} from '../constants/contextEngine';
-import { everyoneRoles, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
+import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
+import { everyoneRoles, integrationsPollInterval, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { clearQuestions } from './contextQuestions';
-import type { ContextEngine, ContextEngineAccess, ContextEngineDetail, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, ExternalDatabase, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type {
+  ContextEngine,
+  ContextEngineAccess,
+  ContextEngineDetail,
+  ContextEngineState,
+  ContextQueryInput,
+  ContextSourceConfig,
+  CreateContextEngineInput,
+  ExternalDatabase,
+  PutContextGrantInput,
+  UpdateContextModelsInput,
+  UpdateContextSourceInput,
+} from '../types/contextEngine';
 import { engineLogSources } from '../utils/contextEngineLogs';
 
 const ROOT_KEY = 'contextEngines';
@@ -513,14 +516,14 @@ export function useContextEngineLogSources(engine: ContextEngine) {
   return { sources, isLoading: integrations.isLoading, integrationsFailed: integrations.isError };
 }
 
-/** The integrations running an engine's sources, with their status; checked again while any is settling. */
-export function useContextIntegrations(engineId: string, enabled = true) {
+/** The integrations running an engine's sources, with their status; checked again while any is settling, and with `followRuns` while any exists. */
+export function useContextIntegrations(engineId: string, enabled = true, { followRuns = false }: { followRuns?: boolean } = {}) {
   return useQuery({
     queryKey: [ROOT_KEY, 'integrations', engineId],
     queryFn: () => listContextIntegrations(engineId),
     enabled: isContextEngineEnabled() && !!engineId && enabled,
     retry: false,
-    refetchInterval: (query) => (query.state.status === 'error' || query.state.data?.some((i) => i.status === 'provisioning' || i.status === 'removing') ? ENGINE_STATUS_POLL_MS : false),
+    refetchInterval: (query) => integrationsPollInterval(query.state.data, query.state.status === 'error', followRuns),
   });
 }
 

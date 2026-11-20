@@ -21,10 +21,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import CitedAnswer from './CitedAnswer';
 
-// The UI library's bundle pulls in syntax highlighting that Vitest cannot resolve; the renderer only needs these two primitives.
+// The UI library's bundle pulls in syntax highlighting that Vitest cannot resolve; the renderer only needs this primitive.
 vi.mock('@wso2/oxygen-ui', () => ({
   Box: ({ component = 'div', sx: _sx, children, ...props }: { component?: string; sx?: unknown; children?: ReactNode }) => createElement(component, props, children),
-  ButtonBase: ({ sx: _sx, children, ...props }: { sx?: unknown; children?: ReactNode }) => createElement('button', { type: 'button', ...props }, children),
 }));
 
 const ANSWER = '## Rollback\n\nOpen the Deploy page and click **Promote** [1]. Rollbacks keep secrets [1][2].\n\n- Pause the workers [2].\n- Then promote the standby. [1]\n\nSee `arr[1]` and an unknown source [9].';
@@ -32,43 +31,30 @@ const ANSWER = '## Rollback\n\nOpen the Deploy page and click **Promote** [1]. R
 const render = (props: Partial<Parameters<typeof CitedAnswer>[0]> = {}) => renderToStaticMarkup(<CitedAnswer answer={ANSWER} passages={2} active={null} pinned={null} onHover={() => undefined} onPin={() => undefined} {...props} />);
 
 describe('CitedAnswer', () => {
-  it('renders the Markdown and turns markers into citation marks', () => {
+  it('renders the Markdown and drops the citation markers', () => {
     const html = render();
     expect(html).toContain('<h2>');
     expect(html).toContain('<strong>Promote</strong>');
     expect(html).toContain('<li>');
     expect(html).toContain('<code>arr[1]</code>');
-    expect(html.match(/aria-label="Evidence 1"/g)).toHaveLength(3);
-    expect(html.match(/aria-label="Evidence 2"/g)).toHaveLength(2);
-    // Nothing is left as raw Markdown or a raw marker, except the number that names no passage.
+    // No marks are drawn and no raw marker is left, except the number that names no passage.
+    expect(html).not.toContain('aria-label="Evidence');
     expect(html).not.toMatch(/\*\*|## /);
     expect(html.replace(/<code>arr\[1\]<\/code>/, '')).not.toMatch(/\[[12]\]/);
     expect(html).toContain('[9]');
   });
 
-  it('presses every mark of a pinned passage when no sentence is named', () => {
-    const html = render({ pinned: { n: 1 } });
-    expect(html.match(/aria-label="Evidence 1" aria-pressed="true"/g)).toHaveLength(3);
-    expect(html.match(/aria-label="Evidence 2" aria-pressed="false"/g)).toHaveLength(2);
-  });
-
-  it('keeps a mark with the sentence before it, ahead of the sentence end', () => {
-    const html = render();
-    // "Rollbacks keep secrets [1][2]." : the marks come before the full stop, held on one line with the last word and the full stop.
-    expect(html).toMatch(/Rollbacks keep <span>secrets<button[^>]*aria-label="Evidence 1"[\s\S]*?<\/button><button[^>]*aria-label="Evidence 2"[\s\S]*?<\/button>\.<\/span>/);
-  });
-
-  it('lets a long last word wrap, keeping only its end with the marks', () => {
-    const html = render({ answer: 'Edit /opt/wso2/conf/deployment/deployment.toml [1].' });
-    expect(html).toMatch(/Edit \/opt\/wso2\/conf\/deployment\/deployment\.<span>toml<button[^>]*aria-label="Evidence 1"[\s\S]*?<\/button>\.<\/span>/);
+  it('keeps the sentence and its full stop together once the markers are gone', () => {
+    // The word before a dropped marker and the full stop after it still sit together.
+    expect(render()).toMatch(/Rollbacks keep (<[^>]+>)*secrets\./);
+    expect(render({ answer: 'Edit /opt/wso2/conf/deployment.toml [1].' })).toMatch(/deployment\.(<[^>]+>)*toml(<[^>]+>)*\./);
   });
 
   it('reads citations only where the engine does', () => {
-    const marks = (answer: string) => [...render({ answer }).matchAll(/aria-label="Evidence (\d+)"/g)].map((m) => m[1]);
-    // Subscripts, reference links, and code of every kind are left as written.
-    expect(marks('Use items[1], [guide][2], ``b[1]``, and [2].')).toEqual(['2']);
-    expect(marks('Set it up [1].\n\n    value = items[2]\n')).toEqual(['1']);
-    // A link the model wrote is a link, whatever its address.
-    expect(marks('A fake [cite](#cite-2) and a real [1].')).toEqual(['1']);
+    // Subscripts, reference links and code are left as written; only the real marker is dropped.
+    const html = render({ answer: 'Use items[1], ``b[1]``, and [2].' });
+    expect(html).toContain('items[1]');
+    expect(html).toContain('<code>b[1]</code>');
+    expect(html).not.toMatch(/and \[2\]/);
   });
 });

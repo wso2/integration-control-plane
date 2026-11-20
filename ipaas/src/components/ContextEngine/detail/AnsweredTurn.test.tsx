@@ -69,32 +69,29 @@ afterEach(() => {
   host.remove();
 });
 
-const button = (label: RegExp): HTMLButtonElement => {
-  const found = [...host.querySelectorAll('button')].find((b) => label.test(b.getAttribute('aria-label') ?? ''));
+// A passage card is a clickable block with the button role, not a <button>.
+const button = (label: RegExp): HTMLElement => {
+  const found = [...host.querySelectorAll<HTMLElement>('button, [role="button"]')].find((b) => label.test(b.getAttribute('aria-label') ?? ''));
   if (!found) throw new Error(`no button matching ${label}`);
   return found;
 };
-const click = (b: HTMLButtonElement) => act(() => b.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+const click = (b: HTMLElement) => act(() => b.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
 describe('AnsweredTurn pinning', () => {
-  it('releases a passage pinned from a citation mark when its rail number is clicked', () => {
-    click(button(/^Evidence 2$/));
-    expect(button(/passage 2$/).getAttribute('aria-label')).toBe('Release passage 2');
-    click(button(/^Release passage 2$/));
-    expect(button(/passage 2$/).getAttribute('aria-label')).toBe('Pin passage 2');
-    expect(button(/^Evidence 2$/).getAttribute('aria-pressed')).toBe('false');
+  it('draws no citation marks in the answer', () => {
+    expect([...host.querySelectorAll('button')].some((b) => /^Evidence /.test(b.getAttribute('aria-label') ?? ''))).toBe(false);
   });
 
-  it('pins and releases from the rail alone', () => {
+  it('pins and releases from the rail', () => {
     click(button(/^Pin passage 1$/));
-    expect(button(/^Evidence 1$/).getAttribute('aria-pressed')).toBe('true');
+    expect(button(/passage 1$/).getAttribute('aria-label')).toBe('Release passage 1');
     click(button(/^Release passage 1$/));
-    expect(button(/^Evidence 1$/).getAttribute('aria-pressed')).toBe('false');
+    expect(button(/passage 1$/).getAttribute('aria-label')).toBe('Pin passage 1');
   });
 
-  it('still moves a pin from one passage to another', () => {
-    click(button(/^Evidence 1$/));
-    click(button(/^Evidence 2$/));
+  it('moves a pin from one passage to another', () => {
+    click(button(/^Pin passage 1$/));
+    click(button(/^Pin passage 2$/));
     expect(button(/passage 1$/).getAttribute('aria-label')).toBe('Pin passage 1');
     expect(button(/passage 2$/).getAttribute('aria-label')).toBe('Release passage 2');
   });

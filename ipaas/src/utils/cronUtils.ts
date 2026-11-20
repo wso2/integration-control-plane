@@ -189,6 +189,16 @@ export function nextCronRunMs(cron: string, timeZone?: string): number | null {
   const validDoms = expandCronField(domF, 1, 31);
   const validMonths = expandCronField(monthF, 1, 12);
   const validDows = expandCronField(dowF, 0, 6);
+  // As the cluster's cron (robfig/cron) reads them: a day matches either field when both are restricted, and the
+  // restricted one when only one is. A field is unrestricted when any alternative is `*` unstepped; `*/2` restricts.
+  const unrestricted = (field: string): boolean => field.split(',').some((part) => part === '*' || part === '*/1');
+  const domRestricted = !unrestricted(domF);
+  const dowRestricted = !unrestricted(dowF);
+  const dayMatches = (d: Date): boolean => {
+    const dom = validDoms.has(d.getUTCDate());
+    const dow = validDows.has(d.getUTCDay());
+    return domRestricted && dowRestricted ? dom || dow : dom && dow;
+  };
 
   // Start at the next whole wall minute; the current one has already begun.
   let cursor = wallClockAsUtc(Date.now(), timeZone) + 60_000;
@@ -197,7 +207,7 @@ export function nextCronRunMs(cron: string, timeZone?: string): number | null {
 
   while (cursor <= limit) {
     candidate.setTime(cursor);
-    if (validMonths.has(candidate.getUTCMonth() + 1) && validDoms.has(candidate.getUTCDate()) && validDows.has(candidate.getUTCDay()) && validHours.has(candidate.getUTCHours()) && validMins.has(candidate.getUTCMinutes())) {
+    if (validMonths.has(candidate.getUTCMonth() + 1) && dayMatches(candidate) && validHours.has(candidate.getUTCHours()) && validMins.has(candidate.getUTCMinutes())) {
       return instantForWallClock(cursor, timeZone);
     }
     cursor += 60_000;

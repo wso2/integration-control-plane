@@ -19,15 +19,14 @@
 import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography, Paper } from '@wso2/oxygen-ui';
 import { EyeOff, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { useAddContextSource, useAskedFlag, useConnectViewedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
+import { useAddContextSource, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { useCan } from '../../../hooks/useCan';
 import { Scopes } from '../../../constants/permissions';
 import { ENGINE_DATABASE_LABEL, STORAGE_BACKENDS } from '../../../constants/contextEngine';
-import { answersFromIngestion, checkStagedFile, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
+import { answersFromIngestion, checkStagedFile, effectiveVisibility, engineMessage, modelProviderName, sourceAsConfig, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
-import GetStartedChecklist from './GetStartedChecklist';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourcesProgressCard from './SourcesProgressCard';
 import SectionCard from '../SectionCard';
@@ -37,7 +36,7 @@ import EditModelsDrawer from './EditModelsDrawer';
 import AccessSwitch from './AccessSwitch';
 import SourceDrawer from '../SourceDrawer';
 import { deleteCardSx, exposureButtonSx, mutedSx, summaryRowSx } from '../styles';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineTabKey, ContextModelSummary, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineTabKey, ContextModelSummary, ContextSource, ContextSourceConfig } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
   engine: ContextEngineDetail;
@@ -132,9 +131,6 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   };
   const can = useCan();
   const canManage = !readOnly && can(Scopes.CONFIG_MANAGE);
-  const { asked } = useAskedFlag(engine.id, engine.createdAt);
-  const { connectViewed } = useConnectViewedFlag(engine.id, engine.createdAt);
-  const progress = useContextEngineProgress(readOnly ? '' : engine.id);
   // Adding a source reuses the wizard's drawer; the session key remounts it fresh each time.
   const [addSession, setAddSession] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
@@ -185,31 +181,8 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
     });
   };
 
-  const progressSummary = progress.data?.available
-    ? summarizeEngineProgress(
-        engine.sources.map((s) => s.id),
-        progress.data.sources,
-      )
-    : null;
-  // An engine whose only sources are uploads starts with an upload, not a wait for a connector.
-  const uploadSources = engine.sources.filter((s) => s.type === 'upload');
-  const uploadFirst = uploadSources.length > 0 && uploadSources.length === engine.sources.length && (!progressSummary || (progressSummary.processed === 0 && progressSummary.active === 0));
-  // 'Grant access' step hidden along with the Access tab: roles can't be granted from the UI, so it would never complete.
-  const steps = getStartedSteps(engine, asked, progressSummary, uploadFirst, connectViewed).filter((s) => s.id !== 'grant');
-  const allDone = steps.every((s) => s.state === 'done');
-
-  const onChecklistAction = (id: GetStartedStepId) => {
-    if (id === 'index' && uploadFirst) openFiles(uploadSources[0]);
-    else if (id === 'index') document.getElementById(SOURCES_CARD_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else if (id === 'ask') onGoTab('playground');
-    else if (id === 'publish') onGoTab('api');
-    // else onGoTab('access'); — 'Grant access' step hidden with the Access tab
-  };
-
   return (
     <>
-      {!allDone && !readOnly && <GetStartedChecklist steps={steps} onAction={onChecklistAction} />}
-
       {sourceNotice && (
         <Alert severity={sourceNotice.severity} onClose={() => setSourceNotice(null)} action={sourceNotice.forbidden && sourceNotice.retry ? <OwnerAccessButton engineId={engine.id} onGranted={sourceNotice.retry} /> : undefined} sx={{ mb: 2 }}>
           {sourceNotice.message}

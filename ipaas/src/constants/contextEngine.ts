@@ -137,10 +137,7 @@ const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[]
   ),
   // Every table the integration reads, edited as one card per table; the value is a JSON array of SourceTable.
   ...G('Data to sync', F('tables', 'Tables', 'tables')),
-  ...G(
-    { label: 'Sync options', collapsed: true },
-    O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for new rows the change listener missed.', valueType: 'number' }),
-  ),
+  ...G({ label: 'Sync options', collapsed: true }, O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for new rows the change listener missed.', valueType: 'number' })),
 ];
 
 /**
@@ -490,11 +487,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     icon: 'database',
     fields: [
       ...DATABASE_FIELDS('5432', 'public'),
-      ...G(
-        { label: 'Sync options', collapsed: true },
-        O('slotName', 'Replication Slot', 'text', { helper: 'Leave empty for the default.' }),
-        O('publicationName', 'Publication', 'text', { helper: 'Leave empty for the default.' }),
-      ),
+      ...G({ label: 'Sync options', collapsed: true }, O('slotName', 'Replication Slot', 'text', { helper: 'Leave empty for the default.' }), O('publicationName', 'Publication', 'text', { helper: 'Leave empty for the default.' })),
     ],
     summaryKeys: ['host', 'database'],
     isStructuredData: true,
@@ -541,7 +534,15 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     category: 'databases',
     logo: `${CONNECTOR_LOGO_BASE}snowflake.svg`,
     icon: 'database',
-    fields: [F('account', 'Account', 'text'), F('warehouse', 'Warehouse', 'text'), F('database', 'Database', 'text'), F('schema', 'Schema', 'text'), F('table', 'Table', 'text'), F('user', 'User', 'text'), F('password', 'Password', 'secret', { verbatim: true })],
+    fields: [
+      F('account', 'Account', 'text'),
+      F('warehouse', 'Warehouse', 'text'),
+      F('database', 'Database', 'text'),
+      F('schema', 'Schema', 'text'),
+      F('table', 'Table', 'text'),
+      F('user', 'User', 'text'),
+      F('password', 'Password', 'secret', { verbatim: true }),
+    ],
     summaryKeys: ['database', 'table'],
   },
   {
@@ -699,11 +700,11 @@ export const QUICK_ADD_CONNECTORS: SourceConnector[] = CATALOG_CONNECTORS.filter
 /** Connectors rendered per catalog page; the next page loads as the list scrolls into view. */
 export const CATALOG_PAGE_SIZE = 24;
 
-/** Blank config for a connector; `name` defaults to the connector's display name, fields to their defaults, and visibility to everyone who can query. */
+/** Blank config for a connector: no name, so the user gives it one they will recognise; fields at their defaults, and visibility set to everyone who can query. */
 export function blankSource(connectorId: string): ContextSourceConfig {
   const connector = CONNECTOR_BY_ID[connectorId];
   if (!connector) throw new Error(`Unknown source connector: ${connectorId}`);
-  return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [], stagedVisibility: EVERYONE_VISIBILITY };
+  return { type: connector.id, name: '', values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [], stagedVisibility: EVERYONE_VISIBILITY };
 }
 
 // ── Models step: embedding and language model providers ─────────────────────

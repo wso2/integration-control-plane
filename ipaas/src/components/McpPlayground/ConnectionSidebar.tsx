@@ -31,6 +31,10 @@ interface ConnectionSidebarProps {
   onDisconnect: () => void;
   onReconnect: () => void;
   onGetTestKey?: () => void;
+  /** Lets the user type or paste the token instead of only showing a minted one. */
+  onTokenChange?: (token: string) => void;
+  /** Shown in an empty, editable token field. */
+  tokenPlaceholder?: string;
   /** `sidebar` (default) stacks the controls in a column; `bar` lays them out in one row above the panel. */
   layout?: 'sidebar' | 'bar';
   /** The connection takes no key: the token field gives way to a note on why. */
@@ -48,11 +52,28 @@ const STATUS_META: Record<McpConnectionStatus, { label: string; color: string }>
 
 const readOnlyInputSx = { bgcolor: 'action.hover', fontFamily: 'monospace', fontSize: 12.5 } as const;
 const sidebarSx = { width: 300, flexShrink: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2.5, alignSelf: 'flex-start' } as const;
-const barSx = { width: '100%', flexWrap: 'wrap', alignItems: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 } as const;
+const barSx = { width: '100%', flexWrap: 'wrap', alignItems: 'flex-end', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 } as const;
 
 /** The playground's left panel: the endpoint selector, the derived URL + test key, and connect controls. */
-export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, visibility, layout = 'sidebar' }: ConnectionSidebarProps): JSX.Element {
+export default function ConnectionSidebar({
+  url,
+  token,
+  status,
+  isTokenFetching,
+  endpointSwitcher,
+  onConnect,
+  onDisconnect,
+  onReconnect,
+  onGetTestKey,
+  onTokenChange,
+  tokenPlaceholder,
+  keyless = false,
+  visibility,
+  layout = 'sidebar',
+}: ConnectionSidebarProps): JSX.Element {
   const bar = layout === 'bar';
+  // In the bar the fields carry labels on top, so the controls beside them take the inputs' height and line up with them.
+  const barControlSx = bar ? { height: 40, flexShrink: 0 } : undefined;
   const [showToken, setShowToken] = useState(false);
   const connected = status === 'connected';
   const connecting = status === 'connecting';
@@ -115,9 +136,11 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
           sx={bar ? { flex: '1 1 200px' } : undefined}
           type={showToken ? 'text' : 'password'}
           value={token}
+          placeholder={onTokenChange ? tokenPlaceholder : undefined}
+          onChange={onTokenChange ? (e) => onTokenChange(e.target.value.trim()) : undefined}
           InputProps={{
-            readOnly: true,
-            sx: readOnlyInputSx,
+            readOnly: !onTokenChange,
+            sx: onTokenChange ? { fontFamily: 'monospace', fontSize: 12.5 } : readOnlyInputSx,
             endAdornment: (
               <InputAdornment position="end">
                 {isTokenFetching && <CircularProgress size={14} sx={{ mr: 0.5 }} />}
@@ -136,27 +159,27 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
       )}
 
       {onGetTestKey && (
-        <Button variant="outlined" size="small" onClick={onGetTestKey} disabled={isTokenFetching}>
+        <Button variant="outlined" size="small" onClick={onGetTestKey} disabled={isTokenFetching} sx={barControlSx}>
           Get test key
         </Button>
       )}
 
       {connected ? (
         <Stack direction="row" gap={1}>
-          <Button variant="outlined" size="small" fullWidth={!bar} startIcon={<RefreshCw size={14} />} onClick={onReconnect}>
+          <Button variant="outlined" size="small" fullWidth={!bar} startIcon={<RefreshCw size={14} />} onClick={onReconnect} sx={barControlSx}>
             Reconnect
           </Button>
-          <Button variant="outlined" size="small" fullWidth={!bar} color="error" onClick={onDisconnect}>
+          <Button variant="outlined" size="small" fullWidth={!bar} color="error" onClick={onDisconnect} sx={barControlSx}>
             Disconnect
           </Button>
         </Stack>
       ) : (
-        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || (keyless ? false : !url || !token)}>
+        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || (keyless ? false : !url || !token)} sx={barControlSx}>
           {connecting ? 'Connecting…' : 'Connect'}
         </Button>
       )}
 
-      <Stack direction="row" alignItems="center" gap={1}>
+      <Stack direction="row" alignItems="center" gap={1} sx={barControlSx}>
         <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: meta.color }} />
         <Typography variant="caption" color="text.secondary">
           {meta.label}

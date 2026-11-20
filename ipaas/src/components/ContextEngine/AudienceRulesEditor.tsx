@@ -57,7 +57,8 @@ export default function AudienceRulesEditor({ orgHandle, connectorName, rules, o
   const roleField = (rule: AudienceRule, i: number) => {
     if (roles.isError) {
       return (
-        <TextField labelPlacement="top"
+        <TextField
+          labelPlacement="top"
           label="Visible to role"
           size="small"
           fullWidth
@@ -71,7 +72,8 @@ export default function AudienceRulesEditor({ orgHandle, connectorName, rules, o
     const options = roles.data ?? [];
     const known = options.some((r) => r.roleId === rule.role);
     return (
-      <TextField labelPlacement="top"
+      <TextField
+        labelPlacement="top"
         select
         label="Visible to role"
         size="small"

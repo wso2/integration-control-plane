@@ -19,7 +19,9 @@
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, LinearProgress, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Pencil, Plus, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useSourceUploads } from '../../../hooks/contextUploads';
-import type { JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
+import { nextCronRunMs } from '../../../utils/cronUtils';
+import { formatDistanceToNow } from '../../../utils/time';
 import { useContextEngineProgress, useContextIntegrations } from '../../../hooks/useContextEngine';
 import { SOURCE_PROGRESS_LABEL, SOURCE_PROGRESS_TONE } from '../../../constants/contextEngine';
 import { formatProgressPercent, isSourceProgressActive, sourceFailureNotice, sourceProgressDetail, sourceProgressStatus, sourceProgressValue, sourceSyncText, sourceTypeName, summarizeEngineProgress } from '../../../utils/contextEngine';
@@ -61,13 +63,28 @@ function FallbackChip({ source }: { source: ContextSource }): JSX.Element {
   return <Chip size="small" variant="outlined" color={color} label={label} />;
 }
 
-const INTEGRATION_TONE: Record<string, 'success' | 'info' | 'error' | 'warning' | 'default'> = { running: 'success', succeeded: 'success', scheduled: 'info', provisioning: 'info', failed: 'error', removing: 'warning' };
+type ChipTone = 'success' | 'info' | 'error' | 'warning' | 'default';
 
-/** The integration that runs a source: its status, and why or when it last ran on hover. */
-function IntegrationChip({ integration }: { integration: ContextIntegration }): JSX.Element {
-  const run = integration.lastRun;
-  const detail = integration.statusReason ?? (run?.completedAt ? `Last run ${run.status} at ${new Date(run.completedAt).toLocaleString()}` : run?.startedAt ? `Running since ${new Date(run.startedAt).toLocaleString()}` : undefined);
-  const chip = <Chip size="small" variant="outlined" color={INTEGRATION_TONE[integration.status] ?? 'default'} label={`Integration · ${integration.status}`} />;
+/**
+ * The row's one status, in the user's terms: did syncing work. How the source runs underneath stays out of it;
+ * the engine's own progress speaks only while something is moving or needs attention.
+ */
+function syncStatus(source: ContextSource, p: SourceProgress | undefined, integration: ContextIntegration | undefined): { label: string; tone: ChipTone; detail?: string } | null {
+  const status = p ? sourceProgressStatus(p) : null;
+  if (integration?.status === 'provisioning') return { label: 'Setting up', tone: 'info' };
+  if (integration?.status === 'removing') return { label: 'Removing', tone: 'warning' };
+  // A failure comes first: a failed run can come back without a completion time, and must not read as still syncing.
+  if (integration && (integration.status === 'failed' || integration.lastRun?.status === 'failed')) return { label: 'Sync failed', tone: 'error', detail: integration.statusReason };
+  if (integration?.lastRun?.startedAt && !integration.lastRun.completedAt) return { label: 'Syncing', tone: 'info' };
+  if (status === 'attention') return { label: SOURCE_PROGRESS_LABEL.attention, tone: 'warning' };
+  if (status === 'waiting') return { label: SOURCE_PROGRESS_LABEL.waiting, tone: 'default' };
+  if (source.type === 'upload') return status ? { label: SOURCE_PROGRESS_LABEL[status], tone: SOURCE_PROGRESS_TONE[status] } : null;
+  if (integration) return integration.lastRun || integration.shape !== 'automation' ? { label: 'Synced', tone: 'success' } : { label: 'Waiting for first sync', tone: 'default' };
+  return status ? { label: SOURCE_PROGRESS_LABEL[status], tone: SOURCE_PROGRESS_TONE[status] } : null;
+}
+
+function StatusChip({ label, tone, detail }: { label: string; tone: ChipTone; detail?: string }): JSX.Element {
+  const chip = <Chip size="small" variant="outlined" color={tone} label={label} />;
   return detail ? (
     <Tooltip title={detail}>
       <span>{chip}</span>
@@ -85,8 +102,43 @@ function ProgressChip({ progress }: { progress: SourceProgress }): JSX.Element {
   return <Chip size="small" variant="outlined" color={SOURCE_PROGRESS_TONE[status]} icon={active ? <CircularProgress size={10} color="inherit" aria-hidden /> : undefined} label={label} />;
 }
 
+/** "8 min", "1 h 5 min": how long until `at`, rounded up to the minute. */
+function untilText(at: number, now: number): string {
+  const minutes = Math.max(1, Math.ceil((at - now) / 60000));
+  if (minutes < 60) return `${minutes} min`;
+  const rest = minutes % 60;
+  return rest ? `${Math.floor(minutes / 60)} h ${rest} min` : `${Math.floor(minutes / 60)} h`;
+}
+
+/** When the integration behind a source last synced, and when it syncs next on its schedule. */
+function syncTimesText(integration: ContextIntegration, now: number): string | null {
+  const run = integration.lastRun;
+  const parts: string[] = [];
+  if (run?.completedAt) {
+    const when = formatDistanceToNow(run.completedAt).toLowerCase();
+    parts.push(run.status === 'failed' ? `Last sync failed ${when}` : `Last sync ${when}`);
+  } else if (run?.startedAt) parts.push('Syncing now');
+  if (integration.shape !== 'automation') return run?.completedAt ? `Continuous · ${parts.join(' · ')}` : 'Continuous';
+  if (integration.shape === 'automation' && integration.schedule) {
+    // A CronJob with no time zone of its own runs on the cluster's clock, which is UTC.
+    const next = nextCronRunMs(integration.schedule, 'UTC');
+    if (next !== null) parts.push(`Next sync in ${untilText(next, now)}`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/** Re-renders every half minute, so "next sync in" counts down. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
 /** The one-line summary after the source type: what is in the index, or what is happening now. */
-function rowSummary(source: ContextSource, p: SourceProgress): string {
+function rowSummary(source: ContextSource, p: SourceProgress, withSync = true): string {
   const status = sourceProgressStatus(p);
   const ix = p.indexing;
   const n = (v: number) => v.toLocaleString('en-US');
@@ -102,7 +154,7 @@ function rowSummary(source: ContextSource, p: SourceProgress): string {
   else parts.push(`${items(p.records.active)} stored`);
   const failed = (ix.state === 'ok' ? ix.failed : null) ?? p.processing.failed;
   if (failed) parts.push(`${n(failed)} failed`);
-  const sync = sourceSyncText(p);
+  const sync = withSync ? sourceSyncText(p) : null;
   if (sync) parts.push(sync);
   return parts.join(' · ');
 }
@@ -133,10 +185,13 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  */
 export default function SourcesProgressCard({ id, engineId, running, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
   const progressQuery = useContextEngineProgress(running ? engineId : '');
+  // Followed while the card is open, so a scheduled run's result and the next run's time stay current.
   const integrations = useContextIntegrations(
     engineId,
     sources.some((s) => s.type !== 'upload'),
+    { followRuns: true },
   );
+  const now = useNow();
   const integrationBySource = new Map((integrations.data ?? []).flatMap((i) => (i.sourceId ? [[i.sourceId, i] as const] : [])));
   const progress = progressQuery.data;
   const available = !!progress?.available;
@@ -205,6 +260,11 @@ export default function SourcesProgressCard({ id, engineId, running, sources, on
         sources.map((s) => {
           const p = byId.get(s.id);
           const integration = integrationBySource.get(s.id);
+          // The integration knows the schedule and the last run, so its times replace the engine's own sync line.
+          const syncTimes = integration ? syncTimesText(integration, now) : null;
+          const caption = [sourceTypeName(s.type), p ? rowSummary(s, p, !syncTimes) : null].filter(Boolean).join(' · ');
+          const moving = !!p && isSourceProgressActive(p);
+          const rowStatus = moving ? null : syncStatus(s, p, integration);
           return (
             <Box key={s.id} sx={sourceProgressRowSx}>
               <Box sx={sourceProgressHeadSx}>
@@ -215,13 +275,17 @@ export default function SourcesProgressCard({ id, engineId, running, sources, on
                       {s.name}
                     </Typography>
                     <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }}>
-                      {p ? `${sourceTypeName(s.type)} · ${rowSummary(s, p)}` : sourceTypeName(s.type)}
+                      {caption}
                     </Typography>
                   </Box>
                 </Stack>
                 <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
-                  {integration && <IntegrationChip integration={integration} />}
-                  {p ? <ProgressChip progress={p} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} />}
+                  {syncTimes && (
+                    <Typography variant="caption" sx={{ ...mutedSx, mr: 0.5 }} noWrap>
+                      {syncTimes}
+                    </Typography>
+                  )}
+                  {moving && p ? <ProgressChip progress={p} /> : rowStatus ? <StatusChip {...rowStatus} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} />}
                   {s.type === 'upload' && onManageFiles && <FilesAction engineId={engineId} source={s} onManage={onManageFiles} />}
                   {onEditSource && (
                     <Tooltip title="Edit source">

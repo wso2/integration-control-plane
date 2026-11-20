@@ -21,6 +21,7 @@ import { Play, Plus, Trash2, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX, type MouseEvent } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useRemovalNotice } from '../hooks/useRemovalNotice';
 import { useCan } from '../hooks/useCan';
 import { isContextEngineEnabled, useContextEngines, useContextEngineSummary, useDeleteContextEngine, useSeenOnScreen } from '../hooks/useContextEngine';
 import { contextEngineUrl, newContextEngineUrl } from '../paths';
@@ -35,11 +36,11 @@ import SourceMark from '../components/ContextEngine/SourceMark';
 import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
 import { engineMessage, progressListingLine } from '../utils/contextEngine';
 import EmptyListing from '../components/EmptyListing';
-import type { ContextEngine, ContextEngineAccess, ContextEngineSummary } from '../types/contextEngine';
+import type { ContextEngine, ContextEngineAccess, ContextEnginesLocationState, ContextEngineSummary } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' } as const;
-const toolbarSx = { mb: 3 } as const;
+const searchSx = { mb: 3 } as const;
 
 /** At most this many connector marks per row; the count covers the rest. */
 const MAX_MARKS = 4;
@@ -109,9 +110,7 @@ function SummaryCells({ summary, pending, access }: { summary: ContextEngineSumm
       <ListingTable.Cell>
         <Typography variant="body2">{summary.roleCount === 0 ? 'Only you' : `${summary.roleCount} role${summary.roleCount === 1 ? '' : 's'}`}</Typography>
       </ListingTable.Cell>
-      <ListingTable.Cell>
-        {access ? <ExposurePills access={access} /> : '—'}
-      </ListingTable.Cell>
+      <ListingTable.Cell>{access ? <ExposurePills access={access} /> : '—'}</ListingTable.Cell>
     </>
   );
 }
@@ -164,19 +163,29 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const can = useCan();
   const canRead = can(Scopes.INTEGRATION_READ);
   const canManage = can(Scopes.CONFIG_MANAGE);
-  const { data: engines, isLoading, isError, error, refetch } = useContextEngines(canRead);
+  const { data: engines, dataUpdatedAt, isLoading, isError, error, refetch } = useContextEngines(canRead);
   const remove = useDeleteContextEngine();
   const [search, setSearch] = useState('');
   const [toDelete, setToDelete] = useState<ContextEngine | null>(null);
-  const [alert, setAlert] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+  const [deleteAlert, setDeleteAlert] = useState<string | null>(null);
+  // Like integrations, a delete is confirmed once the engine leaves the list; until then its row shows Deleting.
+  // An accepted delete is also recorded by id, as it may leave the list before any read shows it deleting.
+  const removable = useMemo(() => engines?.map((e) => ({ id: e.id, name: e.name, deleting: e.state === 'deleting' })), [engines]);
+  const trackRemoval = useRemovalNotice(
+    scope.org,
+    removable,
+    (e) => e.name,
+    (name) => setDeleteAlert(`Context engine '${name}' deleted successfully.`),
+    dataUpdatedAt,
+  );
   const location = useLocation();
-  // A delete started on the engine page lands here with the engine's name, like a deleted project does.
+  // A delete started on the engine page lands here with the engine, and is confirmed the same way.
   useEffect(() => {
-    const state = location.state as { engineDeleted?: boolean; engineName?: string } | null;
+    const state = location.state as ContextEnginesLocationState | null;
     if (!state?.engineDeleted) return;
-    setAlert({ type: 'info', message: `Context engine '${state.engineName ?? ''}' is being deleted. It leaves this list once it is gone.` });
+    trackRemoval(state.engineId, state.engineName, state.deletedAt, scope.org);
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-  }, [location, navigate]);
+  }, [location, navigate, trackRemoval, scope.org]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const goCreate = () => navigate(newContextEngineUrl(scope.org));
@@ -202,8 +211,8 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     setDeleteError(null);
     remove.mutate(engine.id, {
       onSuccess: () => {
+        trackRemoval(engine.id, engine.name, Date.now(), scope.org);
         setToDelete(null);
-        setAlert({ type: 'info', message: `Context engine '${engine.name}' is being deleted. It leaves this list once it is gone.` });
       },
       onError: (e) => setDeleteError(deletionError(e, engine.name)),
     });
@@ -280,22 +289,20 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
       <PageTitle>
         <PageTitle.Header>Context Engines</PageTitle.Header>
         <PageTitle.SubHeader>Knowledge graphs built from your sources, for integrations and agents to query over API or MCP.</PageTitle.SubHeader>
-      </PageTitle>
-
-      {!!engines?.length && (
-        <Stack direction="row" gap={1} alignItems="center" sx={toolbarSx}>
-          <SearchField value={search} onChange={setSearch} placeholder="Search context engines..." fullWidth />
-          {canManage && (
-            <Button variant="contained" startIcon={<Plus size={16} />} onClick={goCreate} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+        {!!engines?.length && canManage && (
+          <PageTitle.Actions>
+            <Button variant="contained" startIcon={<Plus size={16} />} onClick={goCreate} sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
               Create Context Engine
             </Button>
-          )}
-        </Stack>
-      )}
+          </PageTitle.Actions>
+        )}
+      </PageTitle>
 
-      {alert && (
-        <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 2 }}>
-          {alert.message}
+      {!!engines?.length && <SearchField value={search} onChange={setSearch} placeholder="Search context engines" width="standard" sx={searchSx} />}
+
+      {deleteAlert && (
+        <Alert severity="success" onClose={() => setDeleteAlert(null)} sx={{ mb: 2 }}>
+          {deleteAlert}
         </Alert>
       )}
 

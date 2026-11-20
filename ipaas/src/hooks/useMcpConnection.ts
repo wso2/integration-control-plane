@@ -186,6 +186,14 @@ export function useMcpConnection({ url, token, headerName, fetch: relayFetch }: 
     }
   }, [addHistoryEvent]);
 
+  // A connection, or an attempt still retrying, carries the token it started with; a new token needs a new connection.
+  const tokenRef = useRef(token);
+  useEffect(() => {
+    if (tokenRef.current === token) return;
+    tokenRef.current = token;
+    if (status === 'connected' || status === 'connecting') void disconnect();
+  }, [token, status, disconnect]);
+
   // Close the live client if the hook unmounts while still connected, so the
   // transport doesn't leak. Runs on unmount only — no state changes here.
   useEffect(

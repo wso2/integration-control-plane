@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, /* Chip, */ CircularProgress, IconButton, Skeleton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Braces, Copy, Eraser, EyeOff, History, Info, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Checkbox, /* Chip, */ CircularProgress, Divider, FormControlLabel, IconButton, Skeleton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
@@ -61,6 +61,8 @@ function queryFailure(e: unknown, mode: ContextQueryMode): QueryFailure {
     if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };
     if (e.status === 400) return { message: `The engine rejected the question: ${e.message}` };
     if (e.status === 401) return { message: 'The context engine rejected the credential.' };
+    if (e.status === 502) return { message: "The gateway couldn't reach the context engine. Check that the engine is running, then ask again." };
+    if (e.status === 504) return { message: 'The engine took too long to answer. Try a narrower question, or ask in Context mode.' };
   }
   return { message: "Couldn't run the query. Please try again." };
 }
@@ -137,14 +139,16 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
   const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
-  const ask = (text = question, askMode = mode) => {
-    const q = text.trim();
+  // Without `text`, the question is the composer's; a re-ask from the thread leaves the composer as it is.
+  const ask = (text?: string, askMode = mode) => {
+    const fromComposer = text === undefined;
+    const q = (text ?? question).trim();
     // A reopen in flight would replace the conversation and drop this question's turn.
     if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || asking || openingId !== null) return;
     setNotice(null);
     const token = startQuestion(engine.id, q, askMode);
     // The question now sits in the thread, so the box empties; it comes back if asking fails.
-    setQuestion('');
+    if (fromComposer) setQuestion('');
     window.requestAnimationFrame(() => pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
     query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT }).then(
@@ -156,7 +160,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } });
       },
       (error: unknown) => {
-        if (finishQuestion(engine.id, token, { error })) setQuestion((current) => current || q);
+        if (finishQuestion(engine.id, token, { error }) && fromComposer) setQuestion((current) => current || q);
       },
     );
   };
@@ -187,12 +191,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       .finally(() => setOpeningId((current) => (current === q.queryId ? null : current)));
   };
 
-  const copyIds = (queryId: string, traceId: string) => {
-    void navigator.clipboard?.writeText(`query ${queryId}\ntrace ${traceId}`).then(() => {
-      setCopied(`ids-${queryId}`);
-      window.setTimeout(() => setCopied((c) => (c === `ids-${queryId}` ? null : c)), 1500);
-    });
-  };
   const copyResult = (turn: PlaygroundTurn) => {
     const text = turn.result.answer && !turn.result.answerWithheld ? turn.result.answer : turn.result.evidence.map((e, i) => `[${i + 1}] ${e.passage}`).join('\n');
     navigator.clipboard?.writeText(text).then(() => {
@@ -238,8 +236,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     // Full cards for passages, a hidden answer or an answer the engine declined; an answer gets its rail instead.
     const cards = result.evidence.map((ev, idx) => <EvidenceCard key={ev.id} question={t.question} evidence={ev} n={idx + 1} source={sourcesById.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => openEvidence(ev)} />);
 
-    let body: JSX.Element;
+    let body: JSX.Element | null = null;
     let summary: string;
+    // An answer is usually short and its passages run longer beside it, so its footer sits under the answer, not under both.
+    let answerTurn = false;
     if (result.answerWithheld) {
       summary = `Answer hidden · ${t.reopened && lost ? `${n} of ${t.reopened.passagesThen} passages still available` : `${n} passage${n === 1 ? '' : 's'}`}`;
       body = (
@@ -264,7 +264,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else if (answerText) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = <AnsweredTurn question={t.question} answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
+      answerTurn = true;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = readsNothing ? (
@@ -302,6 +302,28 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     }
 
+    const footer = (
+      <Box sx={answerFooterSx}>
+        <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
+          <Typography variant="caption" sx={mutedSx}>
+            {summary}
+          </Typography>
+        </Stack>
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
+            {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
+          </Button>
+          <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
+            Use in API
+          </Button>
+        </Stack>
+      </Box>
+    );
+    if (answerTurn && answerText)
+      body = (
+        <AnsweredTurn question={t.question} answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} footer={footer} />
+      );
+
     return (
       <Stack key={`${result.queryId}-${i}`} gap={1.5}>
         {t.reopened && (
@@ -325,27 +347,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               </Typography>
             </Box>
           )}
-          <Box sx={answerFooterSx}>
-            <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
-              <Typography variant="caption" sx={mutedSx}>
-                {summary}
-              </Typography>
-              {/* The ids are for debugging against the API: out of the outcome line, one click copies them. */}
-              <Tooltip title={copied === `ids-${result.queryId}` ? 'Copied' : `Query ${result.queryId} · Trace ${result.traceId}. Click to copy.`}>
-                <IconButton size="small" aria-label="Copy query and trace IDs" onClick={() => copyIds(result.queryId, result.traceId)}>
-                  <Info size={14} />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-            <Stack direction="row" gap={1}>
-              <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
-                {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
-              </Button>
-              <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
-                Use in API
-              </Button>
-            </Stack>
-          </Box>
+          {!answerTurn && footer}
         </Box>
       </Stack>
     );
@@ -424,7 +426,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Alert
             severity="error"
             onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
-            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
+            // Retried in the mode it failed in; a failed question from the composer is back in it, one asked from the thread is not.
+            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode)} /> : undefined}>
             {queryFailure(failure.error, failure.mode).message}
           </Alert>
         )}
@@ -483,13 +486,14 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                   ),
                 )}
               </ToggleButtonGroup>
-              <Typography variant="caption" sx={mutedSx}>
-                {CONTEXT_QUERY_MODES.find((m) => m.value === mode)?.hint}
-              </Typography>
+              {/* A setting of the next question, so it sits with Answer/Context. Disabled until the query API has a field for it. */}
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+              <Tooltip title="Not available yet. This setting isn't sent with questions.">
+                <span>
+                  <FormControlLabel control={<Checkbox size="small" checked={false} disabled />} label={<Typography variant="caption">AI indexed</Typography>} disabled sx={{ m: 0 }} />
+                </span>
+              </Tooltip>
             </Stack>
-            <Typography variant="caption" sx={mutedSx}>
-              Enter to ask · Shift+Enter for a new line
-            </Typography>
           </Stack>
         </Stack>
       </Stack>
