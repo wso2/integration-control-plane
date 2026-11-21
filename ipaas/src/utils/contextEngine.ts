@@ -2009,14 +2009,9 @@ export function resolveEngineBaseUrl(configured: string, origin: string): string
  */
 const publicUrl = (baseUrl: string, route: string): string => `${trimSlash(baseUrl)}/v1/${route}`;
 
-/** The public route that returns the passages answering a question. */
+/** The public route that returns the statements for a query, with an answer when the engine answers. */
 export function contextEndpointUrl(baseUrl: string): string {
   return publicUrl(baseUrl, 'context');
-}
-
-/** The public route that answers a question with checked citations. */
-export function answerEndpointUrl(baseUrl: string): string {
-  return publicUrl(baseUrl, 'answer');
 }
 
 /** The engine's MCP endpoint. */
@@ -2027,29 +2022,25 @@ export function mcpEndpointUrl(baseUrl: string): string {
 /** The question can come from a link, so a `'` in it must not end the shell's single-quoted body. */
 const shellSingleQuoted = (text: string): string => text.replaceAll("'", "'\\''");
 
-export function buildQueryCurl(baseUrl: string, question = 'What is our rollback procedure?', route: 'context' | 'answer' = 'context'): string {
-  const body = JSON.stringify({ question, limit: 5 }, null, 2);
-  const url = route === 'answer' ? answerEndpointUrl(baseUrl) : contextEndpointUrl(baseUrl);
-  return `curl -X POST ${url} \\\n  -H "X-API-Key: $API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '${shellSingleQuoted(body)}'`;
+/** A `POST /v1/context` call; the search and limit are left to the engine's defaults. */
+export function buildQueryCurl(baseUrl: string, question = 'What is our rollback procedure?'): string {
+  const body = JSON.stringify({ query: question }, null, 2);
+  return `curl -X POST ${contextEndpointUrl(baseUrl)} \\\n  -H "X-API-Key: $API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '${shellSingleQuoted(body)}'`;
 }
 
-/** The shape of a `/v1/context` response, for the API tab; `/v1/answer` adds `answer`. */
-export function buildQueryResponseExample(sourceId = 'src_…'): string {
+/**
+ * The shape of a `POST /v1/context` response, for the API tab, with plainly placeholder values so no one mistakes
+ * it for the engine's content. `answer` is null on an engine that does not answer.
+ */
+export function buildQueryResponseExample(answers: boolean, search: ContextQuerySearch = 'deterministic'): string {
   return JSON.stringify(
     {
       state: 'completed',
-      evidence: [
-        {
-          id: 'evi_…',
-          recordId: 'rollback-runbook',
-          sourceId,
-          sourceVersion: '42',
-          passage: 'To roll back a failed deployment, open the Deploy page, pick the previous release and click Promote.',
-          location: 'chunk:0',
-          sourceUrl: 'https://docs.example.com/runbooks/rollback',
-        },
-      ],
-      traceId: 'trace_…',
+      search,
+      answer: answers ? 'The answer, as Markdown, written from the statements below.' : null,
+      statements: [{ n: 1, subject: '<entity>', relation: '<relation>', object: '<entity>', description: '<the statement as a sentence>', evidence: [1] }],
+      evidence: [{ n: 1, text: '<the passage text>' }],
+      ...(search === 'agentic' ? { agent: { outcome: 'finished' } } : {}),
     },
     null,
     2,

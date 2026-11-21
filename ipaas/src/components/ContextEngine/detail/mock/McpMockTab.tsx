@@ -29,16 +29,16 @@ import AccessOffAlert from '../AccessOffAlert';
 import AccessSwitch from '../AccessSwitch';
 import SurfaceHeader from '../SurfaceHeader';
 import { clientTabsSx, playgroundFrameSx } from '../../styles';
-import { BaseUrl, FieldTable, Mono } from './ApiMockTab';
+import { BaseUrl, QueryFields } from './ApiMockTab';
 import MockTokensPanel from './MockTokensPanel';
 import { MCP_TOOL_COLORS } from '../../../../utils/httpMethods';
-import type { ContextEngineDetail, McpClientId } from '../../../../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineExposure, McpClientId } from '../../../../types/contextEngine';
 
 /** The integration section's MCP tool colours: the brand primary. */
 const TOOL_COLORS: OperationTileColors = MCP_TOOL_COLORS;
 const readableSx = { maxWidth: 900 } as const;
 
-function ToolDrawer({ name, description }: { name: string; description: string }): JSX.Element {
+function ToolDrawer({ name, description, exposure }: { name: string; description: string; exposure: ContextEngineExposure }): JSX.Element {
   return (
     <Stack gap={2.5}>
       <OperationHeader badgeLabel="TOOL" label={name} colors={TOOL_COLORS} description={description} />
@@ -46,13 +46,7 @@ function ToolDrawer({ name, description }: { name: string; description: string }
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
           Input parameters
         </Typography>
-        <FieldTable
-          head={['Name', 'Type', 'Description']}
-          rows={[
-            [<Mono>question</Mono>, 'string, required', 'What to ask, in plain language.'],
-            [<Mono>limit</Mono>, 'number, optional', 'How many passages to use.'],
-          ]}
-        />
+        <QueryFields name="Name" exposure={exposure} />
       </Box>
     </Stack>
   );
@@ -73,7 +67,6 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
   const selected = configs.find((c) => c.id === client) ?? configs[0];
   const mcpOff = engine.access?.mcp === false;
   const testBlockedReason = mcpOff ? 'Turn on MCP access to test the server here.' : '';
-  const tools = CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers);
 
   if (!engine.publicApiUrl) {
     return (
@@ -98,8 +91,8 @@ export default function McpMockTab({ engine }: { engine: ContextEngineDetail }):
           Tools
         </Typography>
         <Stack gap={1}>
-          {tools.map((t) => (
-            <OperationTile key={t.name} badgeLabel="TOOL" label={t.name} colors={TOOL_COLORS} drawerTitle="Tool details" drawerWidth={480} drawerContent={<ToolDrawer name={t.name} description={t.description} />} />
+          {CONTEXT_MCP_TOOLS.map((t) => (
+            <OperationTile key={t.name} badgeLabel="TOOL" label={t.name} colors={TOOL_COLORS} drawerTitle="Tool details" drawerWidth={480} drawerContent={<ToolDrawer name={t.name} description={t.description} exposure={engine.exposure} />} />
           ))}
         </Stack>
 

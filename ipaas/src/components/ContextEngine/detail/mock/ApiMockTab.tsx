@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Alert, Box, Button, ListingTable, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, ListingTable, Stack, Typography } from '@wso2/oxygen-ui';
 import { MessageSquare } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type JSX, type ReactNode } from 'react';
+import { useMemo, type JSX, type ReactNode } from 'react';
 import { useAskedQuestions } from '../../../../hooks/contextQuestions';
 import { useAppNavigate } from '../../../../hooks/useAppNavigate';
 import { contextEngineUrl } from '../../../../paths';
 import { HTTP_METHOD_COLORS } from '../../../../utils/httpMethods';
-import { answerEndpointUrl, buildQueryCurl, contextEndpointUrl } from '../../../../utils/contextEngine';
+import { buildQueryCurl, buildQueryResponseExample, contextEndpointUrl, playgroundSearch } from '../../../../utils/contextEngine';
 import CodeViewer from '../../../CodeViewer';
 import OperationHeader from '../../../Overview/_shared/bodies/OperationHeader';
 import OperationTile from '../../../Overview/_shared/bodies/OperationTile';
@@ -34,24 +34,10 @@ import AccessSwitch from '../AccessSwitch';
 import SurfaceHeader from '../SurfaceHeader';
 import { mutedSx } from '../../styles';
 import MockTokensPanel from './MockTokensPanel';
-import type { ContextEngineDetail } from '../../../../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineExposure } from '../../../../types/contextEngine';
 
 const POST_COLORS = HTTP_METHOD_COLORS.POST;
 
-/** The response shape with plainly placeholder values, so no one mistakes it for this engine's content (round 1, 13.3). */
-function exampleResponse(route: 'context' | 'answer', sourceId = 'src_…'): string {
-  return JSON.stringify(
-    {
-      state: 'completed',
-      ...(route === 'answer' ? { answer: 'The answer, written from the statements below.' } : {}),
-      facts: [{ subject: '<entity>', relation: '<relation>', object: '<entity>', description: '<the statement as a sentence>', evidenceIds: ['evi_…'] }],
-      evidence: [{ id: 'evi_…', recordId: '<document id>', sourceId, passage: '<the passage text>', location: 'chunk:0' }],
-      traceId: 'trace_…',
-    },
-    null,
-    2,
-  );
-}
 const tableSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } as const;
 
 /** A small field table, as the integration section's operation drawers show parameters. */
@@ -78,6 +64,33 @@ export function FieldTable({ head, rows }: { head: string[]; rows: ReactNode[][]
       </ListingTable>
     </ListingTable.Container>
   );
+}
+
+/**
+ * The fields a query takes, on the REST route and the MCP tool alike, under the first column's name. The search
+ * field is listed only where the engine offers agentic search; elsewhere the engine refuses it.
+ */
+export function QueryFields({ name, exposure }: { name: string; exposure: Pick<ContextEngineExposure, 'agenticSearch'> }): JSX.Element {
+  const rows: ReactNode[][] = [
+    [<Mono>query</Mono>, 'string, required', 'Your question, in plain language.'],
+    ...(exposure.agenticSearch
+      ? [
+          [
+            <Mono>search</Mono>,
+            'string, optional',
+            <>
+              {'How to search: '}
+              <Mono>deterministic</Mono>
+              {" is the engine's standard search, and "}
+              <Mono>agentic</Mono>
+              {' has a model follow links between records, for questions whose answer spans several of them.'}
+            </>,
+          ],
+        ]
+      : []),
+    [<Mono>limit</Mono>, 'number, optional', 'The most statements to return with deterministic search; agentic search returns everything it finds.'],
+  ];
+  return <FieldTable head={[name, 'Type', 'Description']} rows={rows} />;
 }
 
 /** A field or value name in code type. */
@@ -110,26 +123,24 @@ export function BaseUrl({ label, url }: { label: string; url: string }): JSX.Ele
   );
 }
 
-function OperationDrawer({ route, url, curl, response }: { route: 'context' | 'answer'; url: string; curl: string; response: string }): JSX.Element {
+function OperationDrawer({ exposure, url, curl, response }: { exposure: ContextEngineExposure; url: string; curl: string; response: string }): JSX.Element {
   return (
     <Stack gap={2.5}>
       <OperationHeader
         badgeLabel="POST"
-        label={`/v1/${route}`}
+        label="/v1/context"
         colors={POST_COLORS}
-        description={route === 'answer' ? 'Answers a question from what the caller may read, with the statements that support the answer.' : 'Returns the passages the caller may read that answer a question, best match first.'}
+        description={
+          exposure.answers
+            ? 'Returns the statements the caller may read for a query, with the evidence they stand on, and an answer written from exactly those statements.'
+            : 'Returns the statements the caller may read for a query, in rank order, with the evidence they stand on.'
+        }
       />
       <Box>
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
           Request body
         </Typography>
-        <FieldTable
-          head={['Field', 'Type', 'Description']}
-          rows={[
-            [<Mono>question</Mono>, 'string, required', 'What to ask, in plain language.'],
-            [<Mono>limit</Mono>, 'number, optional', 'How many passages to use.'],
-          ]}
-        />
+        <QueryFields name="Field" exposure={exposure} />
       </Box>
       <Box>
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -138,8 +149,8 @@ function OperationDrawer({ route, url, curl, response }: { route: 'context' | 'a
         <FieldTable
           head={['state', 'Meaning']}
           rows={[
-            [<Mono>completed</Mono>, route === 'answer' ? 'An answer, with the statements that support it in facts.' : 'Passages in evidence, best match first.'],
-            [<Mono>insufficient_evidence</Mono>, 'Nothing the caller may read answers the question.'],
+            [<Mono>completed</Mono>, exposure.answers ? 'The search ran. answer holds the answer, or null when the answer model failed.' : 'The search ran. statements hold what it found.'],
+            [<Mono>insufficient_evidence</Mono>, exposure.answers ? 'Nothing the caller may read answers the query, and answer is null.' : 'Nothing the caller may read answers the query.'],
           ]}
         />
       </Box>
@@ -163,14 +174,15 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
   const asked = useAskedQuestions(engine.id);
   // A question this engine has answered, so the example reads like its content; the stock one otherwise.
   const question = useMemo(() => asked.find((q) => (!engine.createdAt || q.askedAt >= engine.createdAt) && q.outcome === 'answered')?.question, [asked, engine.createdAt]);
-  const routes = engine.exposure.answers ? (['answer', 'context'] as const) : (['context'] as const);
-  const [route, setRoute] = useState<'context' | 'answer'>(routes[0]);
-  const urlOf = (r: 'context' | 'answer') => (r === 'answer' ? answerEndpointUrl(base) : contextEndpointUrl(base));
+  // One route: an engine that answers puts the answer beside the statements. The example leaves the search to the engine.
+  const curl = buildQueryCurl(base, question);
+  const response = buildQueryResponseExample(engine.exposure.answers, playgroundSearch(engine.exposure));
+  const description = engine.exposure.answers ? 'Send a question and get an answer, with the statements it was written from.' : 'Send a question and get the statements that answer it.';
 
   if (!engine.publicApiUrl) {
     return (
       <Box sx={{ maxWidth: 900 }}>
-        <SurfaceHeader title="REST API" description="Send a question and get passages or an answer." />
+        <SurfaceHeader title="REST API" description={description} />
         <Alert severity="info" variant="outlined">
           The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
         </Alert>
@@ -180,7 +192,7 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <SurfaceHeader title="REST API" description="Send a question and get passages or an answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
+      <SurfaceHeader title="REST API" description={description} action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
       {engine.access?.api === false && <AccessOffAlert surface="api" />}
       <Button variant="text" startIcon={<MessageSquare size={16} />} onClick={() => navigate(contextEngineUrl(orgHandle, engine.id, 'playground'))} sx={{ mb: 2, ml: -1 }}>
         Try it in the Playground
@@ -192,16 +204,13 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
         Endpoints
       </Typography>
       <Stack gap={1}>
-        {routes.map((r) => (
-          <OperationTile
-            key={r}
-            badgeLabel="POST"
-            label={`/v1/${r}`}
-            colors={POST_COLORS}
-            drawerTitle="Endpoint details"
-            drawerContent={<OperationDrawer route={r} url={urlOf(r)} curl={buildQueryCurl(base, question, r)} response={exampleResponse(r, engine.sources[0]?.id)} />}
-          />
-        ))}
+        <OperationTile
+          badgeLabel="POST"
+          label="/v1/context"
+          colors={POST_COLORS}
+          drawerTitle="Endpoint details"
+          drawerContent={<OperationDrawer exposure={engine.exposure} url={contextEndpointUrl(base)} curl={curl} response={response} />}
+        />
       </Stack>
 
       <MockTokensPanel engineId={engine.id} />
@@ -209,19 +218,12 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>
         Example
       </Typography>
-      {routes.length > 1 && (
-        <Tabs value={route} onChange={(_, v) => setRoute(v as 'context' | 'answer')} sx={{ mb: 1.5 }} aria-label="Example endpoint">
-          {routes.map((r) => (
-            <Tab key={r} value={r} label={r === 'answer' ? 'Answer' : 'Context'} />
-          ))}
-        </Tabs>
-      )}
       <Typography variant="body2" sx={{ ...mutedSx, mb: 1.5 }}>
         Replace <code>$API_KEY</code> with one of this engine&apos;s API keys. The mock tokens above don&apos;t work with the engine.
       </Typography>
-      <CodeViewer title="Request" language="text" code={buildQueryCurl(base, question, route)} showCopyButton wrapLongLines />
+      <CodeViewer title="Request" language="text" code={curl} showCopyButton wrapLongLines />
       <Box sx={{ mt: 2 }}>
-        <CodeViewer title="Response" language="json" code={exampleResponse(route, engine.sources[0]?.id)} showCopyButton wrapLongLines />
+        <CodeViewer title="Response" language="json" code={response} showCopyButton wrapLongLines />
       </Box>
     </Box>
   );
