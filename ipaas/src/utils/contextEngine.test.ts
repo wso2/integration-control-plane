@@ -16,9 +16,6 @@
  * under the License.
  */
 
-import remarkGfm from 'remark-gfm';
-import remarkParse from 'remark-parse';
-import { unified } from 'unified';
 import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
@@ -40,10 +37,8 @@ import {
   nextRecordVersion,
   reselectedFileProblem,
   describeUploadAudience,
-  endsSentence,
   splitSentences,
   askedQuestionMeta,
-  markCitations,
   evidencePart,
   evidencePlace,
   evidenceVersionLabel,
@@ -1683,27 +1678,8 @@ describe('provenance and evidence', () => {
     const pieces = splitSentences(text);
     expect(pieces).toEqual(['Open the Deploy page. ', 'Pick the release!\n', 'Then promote it. ', 'Finally update DNS']);
     expect(pieces.join('')).toBe(text);
-    expect(pieces.map(endsSentence)).toEqual([true, true, true, false]);
     expect(splitSentences('e.g. 5 seconds.')).toEqual(['e.g. ', '5 seconds.']);
     expect(splitSentences('')).toEqual([]);
-  });
-
-  it('finds the [n] markers in an answer the way it is rendered', () => {
-    const cited = (answer: string | undefined, passages = 3) => (answer ? [...markCitations(unified().use(remarkParse).use(remarkGfm).parse(answer), passages, answer)].sort() : []);
-    expect(cited('Do this [2]. Then that [1][2].')).toEqual([1, 2]);
-    expect(cited(undefined)).toEqual([]);
-    // Only numbers that name a passage count.
-    expect(cited('Out of range [4] and zero [0], kept [1].')).toEqual([1]);
-    // Code of every kind holds no citation.
-    expect(cited('Use `arr[1]`, ``b[2]``, and [3].')).toEqual([3]);
-    expect(cited('```js\nconst x = arr[1];\n```\n\n    y = arr[2]\n\nSee [3].')).toEqual([3]);
-    // Nor do links: their address, or their text, which a mark would nest a link inside.
-    expect(cited('[1](https://example.com), [see [2]](https://example.com), and [3]')).toEqual([3]);
-    // Subscripts and reference links are not citations; scripts without spaces cite after the last character.
-    expect(cited('items[1], café[2], grid[3][1], and [guide][2] are not citations.')).toEqual([]);
-    expect(cited('\u4fdd\u7559\u671f\u4e3a30\u5929[2]\u3002')).toEqual([2]);
-    // A table cell cites like any other text.
-    expect(cited('| a | b |\n|---|---|\n| fact [1] | `y[2]` |')).toEqual([1]);
   });
 
   it('finds the passages a fact stands on, in its order, among those returned', () => {

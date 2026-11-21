@@ -796,7 +796,7 @@ export interface ContextFact {
 export interface ContextQueryResult {
   queryId: string;
   state: 'completed' | 'insufficient_evidence' | string;
-  /** Answer mode only. It carries no citations: `facts` lists the statements that support it. */
+  /** Answer mode only, as Markdown the model wrote. It carries no citations: `facts` lists the statements it was written from. */
   answer?: string;
   /** A reopened answer whose passages the reader can no longer all see: the text is withheld, the visible evidence stays. */
   answerWithheld?: boolean;

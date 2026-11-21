@@ -446,9 +446,9 @@ describe('links as selections', () => {
 });
 
 describe('answer sentences', () => {
-  it('joins a marker after the full stop to the sentence before it', () => {
-    const answer = 'The checkpoint is error rate below 1 percent for ten minutes. [1] Ask ops first. [2, 3]';
-    expect(answerSentences(answer)).toHaveLength(2);
+  it('splits an answer into its sentences, leaving out the breaks between paragraphs', () => {
+    expect(answerSentences('John Doe reports to Priya Raman. She heads Engineering.\n\nAsk HR for more.')).toEqual(['John Doe reports to Priya Raman. ', 'She heads Engineering.\n\n', 'Ask HR for more.']);
+    expect(answerSentences(undefined)).toEqual([]);
   });
 
   it('names ranks', () => {
