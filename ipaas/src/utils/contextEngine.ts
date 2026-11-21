@@ -50,9 +50,6 @@ import {
   UPLOAD_SLOW_AFTER_MS,
 } from '../constants/contextEngine';
 import type { Link, Parent, Root, RootContent, Text } from 'mdast';
-import remarkGfm from 'remark-gfm';
-import remarkParse from 'remark-parse';
-import { unified } from 'unified';
 import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
 import { formatDistanceToNow, formatElapsed } from './time';
@@ -84,7 +81,9 @@ import type {
   UpdateContextModelsInput,
   ContextEvidence,
   ContextEvidenceLocationState,
+  ContextFact,
   ContextQueryMode,
+  ContextQueryResult,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -1657,7 +1656,7 @@ export function withLastKnownFacets(engine: ContextEngineDetail, last: ContextEn
     sources: last.sources,
     models: last.models,
     queryRoles: last.queryRoles,
-    exposure: { ...engine.exposure, answers: last.exposure.answers },
+    exposure: { ...engine.exposure, answers: last.exposure.answers, agenticSearch: last.exposure.agenticSearch },
     storage: last.storage,
   };
 }
@@ -1761,11 +1760,28 @@ export function remarkCitations(passages: number, source: string) {
   };
 }
 
-/** The evidence numbers an answer cites, read the way the answer is rendered. */
-export function citedNumbers(answer: string | undefined, passages: number): Set<number> {
-  if (!answer) return new Set();
-  const tree = unified().use(remarkParse).use(remarkGfm).parse(answer);
-  return markCitations(tree, passages, answer);
+/** The passages a fact stands on, in the order the fact names them. */
+export function factEvidence(fact: Pick<ContextFact, 'evidenceIds'>, evidence: ContextEvidence[]): ContextEvidence[] {
+  const byId = new Map(evidence.map((e) => [e.id, e]));
+  return fact.evidenceIds.flatMap((id) => byId.get(id) ?? []);
+}
+
+/**
+ * Statement `n` of a stored answer, counted from one in the order the engine
+ * listed them, with the passages it stands on; null when the answer is not
+ * shown or has no such statement. A withheld answer may have lost statements
+ * with their passages, which shifts the numbers of those after them.
+ */
+export function answerFact(result: Pick<ContextQueryResult, 'answer' | 'facts' | 'evidence'> | undefined, n: number | null): { n: number; fact: ContextFact; support: ContextEvidence[] } | null {
+  if (!result?.answer || n === null) return null;
+  const fact = result.facts.at(n - 1);
+  const support = fact ? factEvidence(fact, result.evidence) : [];
+  return fact && support.length ? { n, fact, support } : null;
+}
+
+/** A fact's number from a URL, counted from one; null when it is not a whole number from one up. */
+export function factNumberParam(value: string | undefined): number | null {
+  return value && /^[1-9]\d*$/.test(value) ? Number(value) : null;
 }
 
 // ── Passage places ──────────────────────────────────────────────────────────
@@ -1825,7 +1841,7 @@ export function passageLines(evidence: Pick<ContextEvidence, 'locator' | 'passag
 /** How a stored question reads in the recent list, e.g. "2 hours ago · answered · 3 passages". */
 export function askedQuestionMeta(q: Pick<AskedQuestion, 'askedAt' | 'outcome' | 'passages'>): string {
   const when = formatDistanceToNow(q.askedAt) || 'Earlier';
-  const what = { answered: `answered · ${plural(q.passages, 'passage')}`, passages: plural(q.passages, 'passage'), none: 'no answer', hidden: 'answer hidden' }[q.outcome] ?? '';
+  const what = { answered: `answered · ${q.passages.toLocaleString('en-US')} evidence`, passages: `${q.passages.toLocaleString('en-US')} evidence`, none: 'no answer', hidden: 'answer hidden' }[q.outcome] ?? '';
   return `${when} · ${what}`;
 }
 

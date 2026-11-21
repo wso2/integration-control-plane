@@ -53,7 +53,7 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
       <Stack component="ul" gap={1} sx={{ listStyle: 'none', p: 0, m: 0, mt: 1.75 }}>
         <Item icon={<Database size={16} />}>{sources}</Item>
         <Item icon={<Upload size={16} />}>Files uploaded to it</Item>
-        <Item icon={<MessageSquare size={16} />}>Stored questions, answers and links to their passages</Item>
+        <Item icon={<MessageSquare size={16} />}>Stored questions, answers and links to their evidence</Item>
         <Item icon={<KeyRound size={16} />}>Its models, API keys, integrations and every access grant</Item>
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>

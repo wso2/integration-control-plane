@@ -17,17 +17,18 @@
  */
 
 import { Alert, Box, Button, /* Chip, */ CircularProgress, Grid, PageContent, Stack, Typography, Paper } from '@wso2/oxygen-ui';
-import { ArrowLeft, /* Check, */ ChevronRight, Hash, /* Link as LinkIcon, */ MessageSquare, Unlink /* , Users */ } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, /* Check, */ ChevronRight /* , Link as LinkIcon, MessageSquare, Users */ } from '@wso2/oxygen-ui-icons-react';
 import { /* useState, */ type JSX /* , type ReactNode */ } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions, useRouteEngineId } from '../hooks/useContextEngine';
-import { /* absoluteUrl, */ evidenceBackTarget, /* evidencePart, evidencePlace, */ evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
+import { /* absoluteUrl, */ evidenceBackTarget, /* evidencePart, evidencePlace, */ evidenceVersionLabel, sourceTypeName } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl /* , contextEvidenceUrl */ } from '../paths';
 import NotFound from '../components/NotFound';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
-import { mutedSx, summaryCardHeaderSx, summaryCardSx, /* summaryRowSx, */ wrapSx } from '../components/ContextEngine/styles';
+import { ChainStep, EvidenceText, UnavailableCard } from '../components/ContextEngine/detail/PassageParts';
+import { provenanceChainSx, summaryCardHeaderSx, summaryCardSx, /* mutedSx, summaryRowSx, */ wrapSx } from '../components/ContextEngine/styles';
 import type { /* ContextEvidence as Evidence, */ ContextEvidenceLocationState } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
@@ -40,24 +41,6 @@ const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'cen
 //   if (l?.path) return l.path;
 //   return evidencePlace(ev).parts.find((p) => !p.startsWith('under')) ?? 'Passage';
 // }
-
-function ChainStep({ label, value, detail, mono = false }: { label: string; value: string; detail?: string; mono?: boolean }): JSX.Element {
-  return (
-    <Box sx={{ flex: 1, minWidth: 180, p: 1.75, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
-      <Typography variant="overline" sx={{ ...mutedSx, lineHeight: 1.4, display: 'block' }}>
-        {label}
-      </Typography>
-      <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.25, fontFamily: mono ? 'monospace' : undefined, wordBreak: 'break-word' }}>
-        {value}
-      </Typography>
-      {detail && (
-        <Typography variant="caption" sx={mutedSx}>
-          {detail}
-        </Typography>
-      )}
-    </Box>
-  );
-}
 
 // The "Where it is" card's rows, hidden with the card for now.
 // function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
@@ -128,25 +111,13 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
       <PageContent sx={wrapSx}>
         {back}
         {gone ? (
-          <Paper variant="outlined" sx={{ ...summaryCardSx, height: 'auto', maxWidth: 620, p: 3.5 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Unlink size={22} aria-hidden />
-            </Box>
-            <Typography variant="h6" sx={{ mt: 2, fontWeight: 600 }}>
-              This passage is no longer available
-            </Typography>
-            <Typography variant="body2" sx={{ ...mutedSx, mt: 1, lineHeight: 1.55 }}>
-              The item it came from may have changed or been removed, or you may not have access to it.
-            </Typography>
-            <Stack direction="row" gap={1.5} sx={{ mt: 2.5 }}>
-              <Button variant="contained" startIcon={<MessageSquare size={16} />} onClick={() => navigate(contextEngineUrl(scope.org, engineId, 'playground'))}>
-                Ask in the Playground
-              </Button>
-              <Button variant="outlined" onClick={toEngine}>
-                {backTarget.label}
-              </Button>
-            </Stack>
-          </Paper>
+          <UnavailableCard
+            title="This evidence is no longer available"
+            description="The item it came from may have changed or been removed, or you may not have access to it."
+            onAsk={() => navigate(contextEngineUrl(scope.org, engineId, 'playground'))}
+            backLabel={backTarget.label}
+            onBack={toEngine}
+          />
         ) : (
           <Alert
             severity="error"
@@ -156,7 +127,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 Retry
               </Button>
             }>
-            Couldn&apos;t load this passage. Please try again.
+            Couldn&apos;t load this evidence. Please try again.
           </Alert>
         )}
       </PageContent>
@@ -166,8 +137,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   const source = engine.data?.sources.find((s) => s.id === ev.sourceId);
   // const place = evidencePlace(ev);
   // const part = evidencePart(ev);
-  const lines = passageLines(ev);
-  const l = ev.locator;
+  // const l = ev.locator;
   // Someone who may open evidence but not ask: the engine's evidence.read without context.read.
   const readerOnly = !!permissions.data && !permissions.data.includes('context.read');
   // Ask about this hidden for now.
@@ -225,7 +195,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             Provenance
           </Typography>
         </Box>
-        <Stack direction="row" alignItems="stretch" gap={1} sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' }, '& > svg': { alignSelf: 'center' } }} aria-label="Where this passage comes from">
+        <Stack direction="row" alignItems="stretch" gap={1} sx={provenanceChainSx} aria-label="Where this evidence comes from">
           <ChainStep label="Source" value={source?.name ?? ev.sourceId} detail={source ? sourceTypeName(source.type) : undefined} />
           <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
           <ChainStep label="ID" value={ev.recordId} />
@@ -247,30 +217,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 Evidence
               </Typography>
             </Box>
-            {l?.heading && (
-              <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mb: 1 }}>
-                <Hash size={14} aria-hidden />
-                <Typography variant="body2">Under “{l.heading}”</Typography>
-              </Stack>
-            )}
-            {lines ? (
-              <Box component="pre" sx={{ m: 0, py: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 1, fontFamily: 'monospace', fontSize: 13, lineHeight: 1.85, overflowX: 'auto', bgcolor: 'background.paper' }}>
-                {lines.map((line) => (
-                  <Box key={line.n} sx={{ display: 'flex', bgcolor: 'rgba(255, 115, 0, 0.07)' }}>
-                    <Box component="span" sx={{ width: 52, flexShrink: 0, textAlign: 'right', pr: 2, color: 'warning.dark', userSelect: 'none' }}>
-                      {line.n}
-                    </Box>
-                    <Box component="span" sx={{ whiteSpace: 'pre' }}>
-                      {line.text}
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65, p: 2, borderRadius: 1, bgcolor: 'rgba(255, 115, 0, 0.07)' }}>
-                {ev.passage}
-              </Typography>
-            )}
+            <EvidenceText evidence={ev} />
           </Paper>
         </Grid>
         {/* The "Where it is" and "Who can open this link" cards, hidden for now.

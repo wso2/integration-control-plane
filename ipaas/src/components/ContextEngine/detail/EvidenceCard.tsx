@@ -92,13 +92,13 @@ export default function EvidenceCard({ evidence, n, source, href, onOpen, id, qu
               Open source
             </Link>
           )}
-          <Tooltip title={copied ? 'Link copied' : 'Copy link to this passage'}>
-            <IconButton size="small" aria-label={`Copy link to passage ${n}`} onClick={() => void copy()}>
+          <Tooltip title={copied ? 'Link copied' : 'Copy link to this evidence'}>
+            <IconButton size="small" aria-label={`Copy link to evidence ${n}`} onClick={() => void copy()}>
               {copied ? <Check size={15} /> : <LinkIcon size={15} />}
             </IconButton>
           </Tooltip>
-          <Tooltip title="Open passage">
-            <IconButton size="small" aria-label={`Open passage ${n}`} onClick={onOpen}>
+          <Tooltip title="Open evidence">
+            <IconButton size="small" aria-label={`Open evidence ${n}`} onClick={onOpen}>
               <ExternalLink size={15} />
             </IconButton>
           </Tooltip>

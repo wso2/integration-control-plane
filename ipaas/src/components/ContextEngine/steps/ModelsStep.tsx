@@ -86,7 +86,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, 
         <ModelProviderColumn<LlmConfig>
           key={answerChoice}
           title="Answer language model"
-          purpose="Writes the cited answers."
+          purpose="Writes the answers."
           providers={LLM_OPTIONS}
           value={answerLlm}
           onChange={onAnswerLlmChange}

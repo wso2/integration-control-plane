@@ -53,12 +53,13 @@ vi.mock('@wso2/oxygen-ui', () => {
     Box: plain('div'),
     Button: plain('button'),
     CircularProgress: plain('span'),
-    Checkbox: ({ checked, onChange }: { checked?: boolean; onChange?: () => void }) => createElement('input', { type: 'checkbox', checked, onChange }),
     Divider: () => null,
     FormControlLabel: ({ control, label }: { control?: ReactNode; label?: ReactNode }) => createElement('label', null, control, label),
     IconButton: plain('button'),
     Skeleton: plain('span'),
     Stack: plain('div'),
+    Switch: ({ checked, onChange }: { checked?: boolean; onChange?: (e: unknown, checked: boolean) => void }) =>
+      createElement('input', { type: 'checkbox', role: 'switch', checked, onChange: (e: { target: HTMLInputElement }) => onChange?.(e, e.target.checked) }),
     TextField: plain('textarea'),
     ToggleButton: plain('button'),
     ToggleButtonGroup: plain('div'),
@@ -96,11 +97,11 @@ vi.mock('./RecentQuestions', () => ({
 }));
 
 import PlaygroundTab from './PlaygroundTab';
-import { appendTurn, getPlaygroundConversation, setPlaygroundMode } from '../../../hooks/contextTurns';
+import { appendTurn, getPlaygroundConversation, setPlaygroundMode, setPlaygroundSearch } from '../../../hooks/contextTurns';
 import { rememberQuestion } from '../../../hooks/contextQuestions';
 import { HttpError } from '../../../types/http';
 
-const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true } } as unknown as ContextEngineDetail;
+const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true, agenticSearch: true } } as unknown as ContextEngineDetail;
 const result = { queryId: 'qry_1', evidence: [] } as unknown as ContextQueryResult;
 let root: Root;
 let host: HTMLDivElement;
@@ -168,6 +169,35 @@ describe('PlaygroundTab', () => {
     act(() => button('Grant access')?.click());
     expect(queryContext.mutateAsync).toHaveBeenCalledTimes(2);
     expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'What changed?', mode: 'answer' }));
+  });
+
+  it('asks with agentic search once it is switched on', () => {
+    queryContext.mutateAsync.mockReturnValue(new Promise(() => undefined));
+    act(() =>
+      root.render(
+        <MemoryRouter initialEntries={['/?q=Who%20approves%3F']}>
+          <PlaygroundTab engine={{ ...engine, id: 'e-agentic' }} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    act(() => host.querySelector<HTMLInputElement>('input[role="switch"]')?.click());
+    expect(getPlaygroundConversation('e-agentic').search).toBe('agentic');
+    act(() => button('Ask')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'Who approves?', search: 'agentic' }));
+  });
+
+  it('asks with the engine’s own search when the engine does not offer agentic search', () => {
+    queryContext.mutateAsync.mockReturnValue(new Promise(() => undefined));
+    setPlaygroundSearch('e-plain', 'agentic');
+    act(() =>
+      root.render(
+        <MemoryRouter initialEntries={['/?q=Who%20approves%3F']}>
+          <PlaygroundTab engine={{ ...engine, id: 'e-plain', exposure: { ...engine.exposure, agenticSearch: false } }} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    act(() => button('Ask')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'Who approves?', search: 'deterministic' }));
   });
 
   it('holds asking and clearing while a recent question is being reopened', () => {

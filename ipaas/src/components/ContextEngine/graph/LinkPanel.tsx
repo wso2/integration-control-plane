@@ -22,10 +22,10 @@ import { type JSX, type ReactNode } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useContextEntity } from '../../../hooks/useContextEngine';
 import { contextEngineUrl } from '../../../paths';
-import { conflictLink, conflictsOn, factIs, relationLink, relationOf, sameRelation, sentencesCiting, type GraphModel } from '../../../utils/contextGraph';
+import { conflictLink, conflictsOn, factIs, relationLink, relationOf, sameRelation, type GraphModel } from '../../../utils/contextGraph';
 import { EntityChip, PassageRow } from './EntityPanel';
 import { mutedSx } from '../styles';
-import { panelLabelSx, panelSx, selectRowSx, sentenceSx } from './graphStyles';
+import { panelLabelSx, panelSx, selectRowSx } from './graphStyles';
 import type { ContextEntityView, ContextEvidence, ContextFact, ContextGraph, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
 
 /** An entity at one end of a relationship, as the panel names it. */
@@ -100,8 +100,7 @@ interface RelationPanelProps {
  * One relationship, selected by clicking its label on the canvas: the two
  * entities it joins, the sentence it was taken from, the passages it stands on,
  * each of which opens, and any conflict it is one side of. In the derivation
- * view it also says which passages the answer was given and which of the
- * answer's sentences cite them, as the entity panel does.
+ * view it also says which passages the answer was given.
  *
  * The passages come from the engine's view of one end of the relationship, the
  * same call the entity panel makes. When neither end's view holds it, the
@@ -136,8 +135,6 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourc
   // Each passage once, the ones the answer was given first, in its order.
   const passages = [...new Map([...fromAnswer, ...fromEngine].map((e) => [e.id, e])).values()].sort((a, b) => (used.get(a.id) ?? Infinity) - (used.get(b.id) ?? Infinity));
   const looking = near.isLoading || far.isLoading;
-  const numbers = [...new Set(passages.map((e) => used.get(e.id)).filter((n): n is number => n !== undefined))];
-  const inAnswer = derivation?.answer ? [...new Set(numbers.flatMap((n) => sentencesCiting(derivation.answer, n)))] : [];
   return (
     <Box component="aside" aria-label={`Relationship: ${sentence}`} sx={panelSx(true)}>
       <PanelHeader title={view.relation.relation} caption="Relationship" color="primary.main" onClose={onClose} />
@@ -159,26 +156,6 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourc
         Mentioned in {count} document{count === 1 ? '' : 's'} you may read.
       </Typography>
 
-      {/* While the passages are read, the sentences that cite them are not known yet, unless the answer's own facts named them. */}
-      {derivation?.answer && (inAnswer.length > 0 || !looking) && (
-        <Box>
-          <Typography sx={panelLabelSx}>In this answer</Typography>
-          {inAnswer.length ? (
-            <Stack gap={0.75} sx={{ mt: 0.75 }}>
-              {inAnswer.map((line) => (
-                <Box key={line} component="span" sx={sentenceSx}>
-                  {line}
-                </Box>
-              ))}
-            </Stack>
-          ) : (
-            <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
-              No sentence of the answer cites a passage this relationship stands on.
-            </Typography>
-          )}
-        </Box>
-      )}
-
       {passages.length > 0 ? (
         <Box>
           <Typography sx={panelLabelSx}>Found in</Typography>
@@ -192,7 +169,7 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourc
         <Stack direction="row" alignItems="center" gap={1}>
           <CircularProgress size={14} />
           <Typography variant="caption" sx={mutedSx}>
-            Reading the passages behind it…
+            Reading the evidence behind it…
           </Typography>
         </Stack>
       ) : (

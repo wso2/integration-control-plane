@@ -151,7 +151,7 @@ interface RawFact {
   object: string;
   evidenceIds?: string[];
   linkedThrough?: string;
-  text?: string;
+  description?: string;
   subjectKind?: string;
   objectKind?: string;
 }
@@ -271,7 +271,7 @@ interface RawEngineConfig {
   description?: string | null;
   models?: { embedding?: RawModelSummary | null; llm?: RawModelSummary | null; answer?: RawModelSummary | null } | null;
   storage?: Partial<Record<StorageKind, { provider?: string } | null>> | null;
-  interfaces?: { publicApi?: boolean; mcp?: boolean; answers?: boolean } | null;
+  interfaces?: { publicApi?: boolean; mcp?: boolean; answers?: boolean; agenticSearch?: boolean } | null;
 }
 
 /** `GET /v1/progress` — one entry per source the caller may inspect. */
@@ -406,8 +406,13 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
   },
 });
 
-/** API and MCP are on when the BFF says the gateway lets callers through; answers are on when the engine offers them. Unknown counts as off. */
-const toExposure = (raw: RawEngineConfig | null, access: ContextEngineAccess | undefined): ContextEngineExposure => ({ api: access?.api ?? false, mcp: access?.mcp ?? false, answers: raw?.interfaces?.answers ?? false });
+/** API and MCP are on when the BFF says the gateway lets callers through; answers and agentic search are on when the engine offers them. Unknown counts as off. */
+const toExposure = (raw: RawEngineConfig | null, access: ContextEngineAccess | undefined): ContextEngineExposure => ({
+  api: access?.api ?? false,
+  mcp: access?.mcp ?? false,
+  answers: raw?.interfaces?.answers ?? false,
+  agenticSearch: raw?.interfaces?.agenticSearch ?? false,
+});
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
@@ -442,7 +447,8 @@ const toFact = (raw: RawFact): ContextFact => ({
   object: raw.object,
   evidenceIds: raw.evidenceIds ?? [],
   ...(raw.linkedThrough ? { linkedThrough: raw.linkedThrough } : {}),
-  ...(raw.text ? { text: raw.text } : {}),
+  // The engine calls the fact's sentence its description.
+  ...(raw.description ? { text: raw.description } : {}),
   ...(raw.subjectKind ? { subjectKind: raw.subjectKind } : {}),
   ...(raw.objectKind ? { objectKind: raw.objectKind } : {}),
 });
@@ -798,7 +804,13 @@ export async function getContextRecordStatus(engineId: string, sourceId: string,
 // ── Query ───────────────────────────────────────────────────────────────────
 
 export async function queryContextEngine(input: ContextQueryInput): Promise<ContextQueryResult> {
-  const raw = await contextEngineClient.post<RawQueryResponse>(input.engineId, `${V1}/queries`, { question: input.question, mode: input.mode, ...(input.limit ? { limit: input.limit } : {}) });
+  // `search` is sent only when agentic: the engine's default is its own search, and an engine from before the field would reject it.
+  const raw = await contextEngineClient.post<RawQueryResponse>(input.engineId, `${V1}/queries`, {
+    question: input.question,
+    mode: input.mode,
+    ...(input.limit ? { limit: input.limit } : {}),
+    ...(input.search === 'agentic' ? { search: 'agentic' } : {}),
+  });
   return toQueryResult(raw);
 }
 

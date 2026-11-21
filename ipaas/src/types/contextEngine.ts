@@ -97,6 +97,8 @@ export interface ContextEngineExposure {
   mcp: boolean;
   /** The engine offers answers; off, answer requests return not-found. */
   answers: boolean;
+  /** The engine offers agentic search; off, a query asking for it is refused. */
+  agenticSearch: boolean;
 }
 
 /** Provider + model, without credentials — what the engine reports back. */
@@ -721,11 +723,16 @@ export interface ContextJobHandle {
 
 export type ContextQueryMode = 'context' | 'answer';
 
+/** How the facts are found: the engine's own search, or a model exploring the knowledge graph from it. */
+export type ContextQuerySearch = 'deterministic' | 'agentic';
+
 export interface ContextQueryInput {
   engineId: string;
   question: string;
   mode: ContextQueryMode;
   limit?: number;
+  /** The engine's own search unless `agentic` is asked for on an engine that offers it. */
+  search?: ContextQuerySearch;
 }
 
 /** A first-to-last range, counted from one: lines as editors count them, sentences by the engine's rules. */
@@ -767,7 +774,8 @@ export interface ContextEvidence {
  * A relationship from the engine's knowledge graph, returned with a query in
  * graph mode. It stands on passages of the same result: every id in
  * `evidenceIds` names one of its `evidence`. The words were written by the
- * language model while indexing, so they guide; the passages are cited.
+ * language model while indexing; an answer comes with the facts that support
+ * it, and the passages show where each came from.
  */
 export interface ContextFact {
   subject: string;
@@ -786,12 +794,12 @@ export interface ContextFact {
 export interface ContextQueryResult {
   queryId: string;
   state: 'completed' | 'insufficient_evidence' | string;
-  /** Answer mode only; each `[n]` cites `evidence[n - 1]`, and every passage listed was given to the model. */
+  /** Answer mode only. It carries no citations: `facts` lists the statements that support it. */
   answer?: string;
   /** A reopened answer whose passages the reader can no longer all see: the text is withheld, the visible evidence stays. */
   answerWithheld?: boolean;
   evidence: ContextEvidence[];
-  /** Graph mode only: relationships that stand on `evidence`; empty in chunks mode. */
+  /** Graph mode only: relationships that stand on `evidence`, in the order the engine lists them; empty in chunks mode. */
   facts: ContextFact[];
   /** Graph mode only: pairs of facts the engine's contradiction check flagged among the passages, each side standing on `evidence`. */
   conflicts: ContextQueryConflict[];
@@ -987,10 +995,12 @@ export interface PlaygroundConversation {
   turns: PlaygroundTurn[];
   /** The mode the user chose; unset until they choose one, so the tab picks its own default. */
   mode?: ContextQueryMode;
+  /** Whether the user switched agentic search on; unset until they do. */
+  search?: ContextQuerySearch;
   /** The question on its way to the engine; `token` tells its answer from a later question's. */
-  pending?: { question: string; mode: ContextQueryMode; token: number };
+  pending?: { question: string; mode: ContextQueryMode; search: ContextQuerySearch; token: number };
   /** The last question's failure, until it is dismissed or another question is asked. */
-  failure?: { error: unknown; mode: ContextQueryMode; question: string };
+  failure?: { error: unknown; mode: ContextQueryMode; search: ContextQuerySearch; question: string };
 }
 
 /** Router state the engines list is opened with after an engine page deleted its engine, so the list confirms the delete. */
@@ -1002,7 +1012,7 @@ export interface ContextEnginesLocationState {
   deletedAt: number;
 }
 
-/** Router state a passage page is opened with, so its Back returns to where the reader came from. */
+/** Router state a passage or fact page is opened with, so its Back returns to where the reader came from. */
 export interface ContextEvidenceLocationState {
   backTo?: ContextEngineTabKey;
 }

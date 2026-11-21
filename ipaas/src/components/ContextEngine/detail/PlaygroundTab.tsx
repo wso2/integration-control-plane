@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, /* Chip, */ CircularProgress, Divider, FormControlLabel, IconButton, Skeleton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, /* Chip, */ CircularProgress, Divider, FormControlLabel, IconButton, Skeleton, Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
@@ -24,12 +24,12 @@ import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useQueryContextEngine, useReopenContextQuery, useContextPrincipal } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules } from '../../../hooks/contextUploads';
 import { clearQuestions, forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
-import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
+import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, setPlaygroundSearch, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
 import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MODES } from '../../../constants/contextEngine';
 import { defaultQueryMode } from '../../../utils/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
-import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
+import { contextEngineUrl, contextEvidenceUrl, contextFactUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
 import { engineErrorCode, engineMessage } from '../../../utils/contextEngine';
 import AnsweredTurn from './AnsweredTurn';
@@ -38,7 +38,7 @@ import FactsTurn from './FactsTurn';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
 import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx /* , suggestionRowSx */ } from '../styles';
-import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, PlaygroundTurn } from '../../../types/contextEngine';
+import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, ContextQuerySearch, PlaygroundTurn } from '../../../types/contextEngine';
 
 interface PlaygroundTabProps {
   engine: ContextEngineDetail;
@@ -96,8 +96,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const { markAsked } = useAskedFlag(engine.id, engine.createdAt);
   // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
   // Until a mode is chosen the engine's default holds, and a stored Answer gives way when the engine offers no answers.
-  const { turns, mode: chosenMode, pending, failure } = usePlaygroundConversation(engine.id);
+  const { turns, mode: chosenMode, search: chosenSearch, pending, failure } = usePlaygroundConversation(engine.id);
   const mode = chosenMode && (chosenMode !== 'answer' || engine.exposure.answers) ? chosenMode : defaultQueryMode(engine);
+  // Agentic search switched on gives way, like Answer, when the engine does not offer it.
+  const search: ContextQuerySearch = chosenSearch === 'agentic' && engine.exposure.agenticSearch ? 'agentic' : 'deterministic';
   // A question pending from before a tab switch still counts, so it is not asked twice.
   const asking = pending !== undefined;
   const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
@@ -138,20 +140,22 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   // const suggestions = suggestedQuestions(engine);
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
   const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
+  // A statement is opened by its place in the answer's list; its page reopens the stored query to show it with its passages.
+  const openFact = (queryId: string, n: number) => navigate(contextFactUrl(orgHandle, engine.id, queryId, n), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
   // Without `text`, the question is the composer's; a re-ask from the thread leaves the composer as it is.
-  const ask = (text?: string, askMode = mode) => {
+  const ask = (text?: string, askMode = mode, askSearch = search) => {
     const fromComposer = text === undefined;
     const q = (text ?? question).trim();
     // A reopen in flight would replace the conversation and drop this question's turn.
     if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || asking || openingId !== null) return;
     setNotice(null);
-    const token = startQuestion(engine.id, q, askMode);
+    const token = startQuestion(engine.id, q, askMode, askSearch);
     // The question now sits in the thread, so the box empties; it comes back if asking fails.
     if (fromComposer) setQuestion('');
     window.requestAnimationFrame(() => pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
-    query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT }).then(
+    query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT, search: askSearch }).then(
       (result) => {
         // The engine stored the question either way, so it joins the recent list even when the conversation moved on.
         rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
@@ -241,7 +245,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     // An answer is usually short and its passages run longer beside it, so its footer sits under the answer, not under both.
     let answerTurn = false;
     if (result.answerWithheld) {
-      summary = `Answer hidden · ${t.reopened && lost ? `${n} of ${t.reopened.passagesThen} passages still available` : `${n} passage${n === 1 ? '' : 's'}`}`;
+      summary = `Answer hidden · ${t.reopened && lost ? `${n} of ${t.reopened.passagesThen} evidence still available` : `${n} evidence`}`;
       body = (
         <>
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', p: 2, borderRadius: 1, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
@@ -251,51 +255,51 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 The answer is hidden
               </Typography>
               <Typography variant="body2" sx={mutedSx}>
-                A passage it used is no longer available to you.
+                Evidence it used is no longer available to you.
               </Typography>
             </Box>
             <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || asking} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
               Ask again
             </Button>
           </Box>
-          {n > 0 && <SectionHeading title="Evidence you can still read" caption={t.reopened && lost ? `${n} of ${t.reopened.passagesThen} passages` : undefined} />}
+          {n > 0 && <SectionHeading title="Evidence you can still read" caption={t.reopened && lost ? `${n} of ${t.reopened.passagesThen} evidence` : undefined} />}
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
     } else if (answerText) {
-      summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
+      summary = `Answered${llmModel ? ` by ${llmModel}` : ''}`;
       answerTurn = true;
     } else if (n === 0) {
-      summary = t.mode === 'answer' ? 'No answer' : '0 passages';
+      summary = t.mode === 'answer' ? 'No answer' : 'No evidence';
       body = readsNothing ? (
         <Alert severity="info">Nothing came back because you can&apos;t read any content in this engine. Its sources are shared with roles you&apos;re not in.</Alert>
       ) : (
-        <Alert severity="info">No passages matched this question. Try different words.</Alert>
+        <Alert severity="info">No evidence matched this question. Try different words.</Alert>
       );
     } else if (t.mode === 'answer') {
-      summary = `No answer · ${n} passage${n === 1 ? '' : 's'} checked`;
+      summary = `No answer · ${n} evidence checked`;
       body = (
         <>
           <Alert severity="info">
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              No answer from the passages you can read
+              No answer from the evidence you can read
             </Typography>
-            Related passages were found, but none answers this.
+            Related evidence was found, but none of it answers this.
           </Alert>
-          <SectionHeading title="Passages it checked" />
+          <SectionHeading title="Evidence it checked" />
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
     } else {
       const f = result.facts.length;
-      summary = `${n} passage${n === 1 ? '' : 's'}${f ? ` · ${f} fact${f === 1 ? '' : 's'}` : ''}`;
+      summary = `${n} evidence${f ? ` · ${f} statement${f === 1 ? '' : 's'}` : ''}`;
       // With graph facts, the passages move to a rail beside them, as an answer's do; without, they are the whole result.
       body = f ? (
         <FactsTurn question={t.question} facts={result.facts} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} graphHrefFor={(ev) => derivationHref(result.queryId, ev)} />
       ) : (
         <>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-            Passages
+            Evidence
           </Typography>
           <Stack gap={1.5}>{cards}</Stack>
         </>
@@ -311,7 +315,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </Stack>
         <Stack direction="row" gap={1} flexWrap="wrap">
           <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
-            {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
+            {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy evidence'}
           </Button>
           <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
             Use in API
@@ -321,7 +325,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     );
     if (answerTurn && answerText)
       body = (
-        <AnsweredTurn question={t.question} answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} footer={footer} />
+        <AnsweredTurn answer={answerText} facts={result.facts} evidence={result.evidence} sources={engine.sources} onOpenFact={(k) => openFact(result.queryId, k)} derivationHref={derivationHref(result.queryId)} footer={footer} />
       );
 
     return (
@@ -339,11 +343,11 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </Box>
         <Box sx={answerCardSx}>
           {body}
-          {lost > 0 && !result.answerWithheld && (
+          {lost > 0 && t.reopened && !result.answerWithheld && (
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mt: 1.5, p: 1.5, borderRadius: 1, border: '1px dashed', borderColor: 'divider', color: 'text.secondary' }}>
               <Unlink size={16} aria-hidden style={{ marginTop: 2 }} />
               <Typography variant="body2">
-                {lost} passage{lost === 1 ? '' : 's'} from when you asked {lost === 1 ? 'is' : 'are'} no longer available.
+                Some evidence from when you asked is no longer available ({lost} of {t.reopened.passagesThen}).
               </Typography>
             </Box>
           )}
@@ -406,7 +410,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
                 <CircularProgress size={14} aria-hidden />
                 <Typography variant="body2" sx={mutedSx}>
-                  {pending.mode === 'answer' ? 'Finding passages and writing the answer…' : 'Finding passages…'}
+                  {pending.mode === 'answer' ? 'Finding evidence and writing the answer…' : 'Finding evidence…'}
                 </Typography>
               </Stack>
               <Skeleton variant="text" width="92%" />
@@ -426,8 +430,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Alert
             severity="error"
             onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
-            // Retried in the mode it failed in; a failed question from the composer is back in it, one asked from the thread is not.
-            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode)} /> : undefined}>
+            // Retried in the mode and search it failed in; a failed question from the composer is back in it, one asked from the thread is not.
+            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode, failure.search)} /> : undefined}>
             {queryFailure(failure.error, failure.mode).message}
           </Alert>
         )}
@@ -486,11 +490,16 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                   ),
                 )}
               </ToggleButtonGroup>
-              {/* A setting of the next question, so it sits with Answer/Context. Disabled until the query API has a field for it. */}
+              {/* A setting of the next question, so it sits with Answer/Context. */}
               <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-              <Tooltip title="Not available yet. This setting isn't sent with questions.">
+              <Tooltip title={engine.exposure.agenticSearch ? 'A model explores the knowledge graph to find the statements for your question.' : 'Agentic search is off for this engine.'}>
                 <span>
-                  <FormControlLabel control={<Checkbox size="small" checked={false} disabled />} label={<Typography variant="caption">AI indexed</Typography>} disabled sx={{ m: 0 }} />
+                  <FormControlLabel
+                    control={<Switch size="small" checked={search === 'agentic'} onChange={(_e, on) => setPlaygroundSearch(engine.id, on ? 'agentic' : 'deterministic')} />}
+                    label={<Typography variant="caption">Agentic search</Typography>}
+                    disabled={!engine.exposure.agenticSearch}
+                    sx={{ m: 0 }}
+                  />
                 </span>
               </Tooltip>
             </Stack>

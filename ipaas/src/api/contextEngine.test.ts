@@ -32,7 +32,7 @@ vi.mock('./_client', async (importOriginal) => ({ ...(await importOriginal<typeo
 vi.mock('./_contextEngineAccess', async (importOriginal) => ({ ...(await importOriginal<typeof import('./_contextEngineAccess')>()), engineRequest }));
 
 import { BffError } from './_client';
-import { checkContextEngineDatabase, createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, toEngineManagedServer, updateContextModels } from './contextEngine';
+import { checkContextEngineDatabase, createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, queryContextEngine, setContextEngineAccess, toEngineManagedServer, updateContextModels } from './contextEngine';
 import type { ContextSourceConfig, CreateContextEngineInput, ExternalDatabase } from '../types/contextEngine';
 
 const ENGINE = 'docs';
@@ -84,12 +84,12 @@ describe('engines', () => {
 
   it("takes API and MCP access from the BFF, not from the engine's own configuration", async () => {
     bff.get.mockResolvedValueOnce({ ...bffEngine, apiEnabled: false, mcpEnabled: true });
-    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { publicApi: true, mcp: false, answers: true } } : []));
+    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { publicApi: true, mcp: false, answers: true, agenticSearch: true } } : []));
 
     const engine = await getContextEngine(ENGINE);
 
     expect(engine.access).toEqual({ api: false, mcp: true });
-    expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true });
+    expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true, agenticSearch: true });
   });
 
   it('reads an engine that is restarting from the BFF alone', async () => {
@@ -198,6 +198,24 @@ describe('engines', () => {
   it('turns a BFF refusal into an HttpError with its status', async () => {
     bff.delete.mockRejectedValueOnce(new BffError(403, JSON.stringify({ message: 'not permitted' })));
     await expect(deleteContextEngine(ENGINE)).rejects.toMatchObject({ status: 403, message: 'not permitted' });
+  });
+});
+
+describe('querying', () => {
+  const stored = { queryId: 'qry_1', state: 'completed', evidence: [], traceId: 'trc_1' };
+
+  it("reads a fact's sentence from its description", async () => {
+    engineRequest.mockResolvedValue({ ...stored, facts: [{ subject: 'Finance', relation: 'approves', object: 'Refunds', evidenceIds: ['evi_1'], description: 'Finance approves every refund over $500.' }] });
+    const result = await queryContextEngine({ engineId: ENGINE, question: 'Who approves refunds?', mode: 'answer' });
+    expect(result.facts[0]).toEqual({ subject: 'Finance', relation: 'approves', object: 'Refunds', evidenceIds: ['evi_1'], text: 'Finance approves every refund over $500.' });
+  });
+
+  it('asks for agentic search only when it is chosen, so the engine keeps its own search otherwise', async () => {
+    engineRequest.mockResolvedValue({ ...stored, facts: [] });
+    await queryContextEngine({ engineId: ENGINE, question: 'q', mode: 'context', search: 'agentic' });
+    expect(engineRequest).toHaveBeenLastCalledWith(ENGINE, 'POST', '/v1/queries', { question: 'q', mode: 'context', search: 'agentic' });
+    await queryContextEngine({ engineId: ENGINE, question: 'q', mode: 'context', search: 'deterministic' });
+    expect(engineRequest).toHaveBeenLastCalledWith(ENGINE, 'POST', '/v1/queries', { question: 'q', mode: 'context' });
   });
 });
 

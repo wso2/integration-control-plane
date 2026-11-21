@@ -489,7 +489,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, /* onExpl
                     </Typography>
                   </Stack>
                   <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }}>
-                    Sources disagree on these facts.
+                    Sources disagree on these statements.
                   </Typography>
                   <Button size="small" variant="text" onClick={() => selectConflict(firstConflict)} sx={{ mt: 0.5, px: 0.5, minWidth: 0 }}>
                     Review conflicts

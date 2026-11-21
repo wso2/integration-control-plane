@@ -43,7 +43,8 @@ function exampleResponse(route: 'context' | 'answer', sourceId = 'src_…'): str
   return JSON.stringify(
     {
       state: 'completed',
-      ...(route === 'answer' ? { answer: 'The answer, written from the passages, with [1] citing the first one.' } : {}),
+      ...(route === 'answer' ? { answer: 'The answer, written from the statements below.' } : {}),
+      facts: [{ subject: '<entity>', relation: '<relation>', object: '<entity>', description: '<the statement as a sentence>', evidenceIds: ['evi_…'] }],
       evidence: [{ id: 'evi_…', recordId: '<document id>', sourceId, passage: '<the passage text>', location: 'chunk:0' }],
       traceId: 'trace_…',
     },
@@ -116,7 +117,7 @@ function OperationDrawer({ route, url, curl, response }: { route: 'context' | 'a
         badgeLabel="POST"
         label={`/v1/${route}`}
         colors={POST_COLORS}
-        description={route === 'answer' ? 'Answers a question from the passages the caller may read, citing them as [n].' : 'Returns the passages the caller may read that answer a question, best match first.'}
+        description={route === 'answer' ? 'Answers a question from what the caller may read, with the statements that support the answer.' : 'Returns the passages the caller may read that answer a question, best match first.'}
       />
       <Box>
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -137,7 +138,7 @@ function OperationDrawer({ route, url, curl, response }: { route: 'context' | 'a
         <FieldTable
           head={['state', 'Meaning']}
           rows={[
-            [<Mono>completed</Mono>, route === 'answer' ? 'An answer, with [n] citing the nth item in evidence.' : 'Passages in evidence, best match first.'],
+            [<Mono>completed</Mono>, route === 'answer' ? 'An answer, with the statements that support it in facts.' : 'Passages in evidence, best match first.'],
             [<Mono>insufficient_evidence</Mono>, 'Nothing the caller may read answers the question.'],
           ]}
         />
@@ -169,7 +170,7 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
   if (!engine.publicApiUrl) {
     return (
       <Box sx={{ maxWidth: 900 }}>
-        <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
+        <SurfaceHeader title="REST API" description="Send a question and get passages or an answer." />
         <Alert severity="info" variant="outlined">
           The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
         </Alert>
@@ -179,7 +180,7 @@ export default function ApiMockTab({ engine, orgHandle }: { engine: ContextEngin
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
+      <SurfaceHeader title="REST API" description="Send a question and get passages or an answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
       {engine.access?.api === false && <AccessOffAlert surface="api" />}
       <Button variant="text" startIcon={<MessageSquare size={16} />} onClick={() => navigate(contextEngineUrl(orgHandle, engine.id, 'playground'))} sx={{ mb: 2, ml: -1 }}>
         Try it in the Playground

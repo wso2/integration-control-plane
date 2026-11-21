@@ -17,8 +17,8 @@
  */
 
 import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, ExternalLink, FileText, History, Link as LinkIcon, MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
+import { ArrowLeft, Check, ChevronRight, ExternalLink, FileText, History, Link as LinkIcon, MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
+import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAskedQuestions } from '../../../hooks/contextQuestions';
 import { useContextGraph, useContextPermissions, useContextQueryResult, useContextQueryTrace } from '../../../hooks/useContextEngine';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
@@ -27,9 +27,7 @@ import { HttpError } from '../../../types/http';
 import { absoluteUrl, evidencePlace, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import {
   answerSentences,
-  citedPassages,
   cosmosBuffers,
-  derivationSummary,
   entityId,
   entityConflicts,
   entityIndex,
@@ -46,7 +44,6 @@ import {
   litPointColors,
   ordinal,
   queryConflictLink,
-  sentencesCiting,
   shortLabel,
   withLinkSelection,
   type FactFocus,
@@ -58,7 +55,7 @@ import EntityPanel, { EntityChip } from './EntityPanel';
 import { GRAPH_ENTITY_LIMIT } from './GraphExplorer';
 import { LinkDetails } from './LinkPanel';
 import { useGraphTheme } from './graphTheme';
-import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, linkTagSx, nodeLabelSx, panelLabelSx, panelSx, selectRowSx, sentenceSx } from './graphStyles';
+import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, linkTagSx, nodeLabelSx, panelLabelSx, panelSx, selectRowSx } from './graphStyles';
 import type { ContextEngineDetail, ContextEvidence, ContextFact, ContextQueryConflict, ContextQueryResult, ContextQueryTrace } from '../../../types/contextEngine';
 
 const NO_FACTS: ContextFact[] = [];
@@ -99,8 +96,6 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   const question = asked?.question ?? 'An earlier question';
   const [selectedKey, setSelectedKey] = useState<string | null>(initialKey);
   const [hovered, setHovered] = useState<number | null>(null);
-  // Held here, not in the panel, so the uncited passages stay open after one is read and released.
-  const [showUncited, setShowUncited] = useState(false);
 
   useEffect(() => setSelectedKey(initialKey), [initialKey]);
 
@@ -120,18 +115,11 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
     }
     return selectedKey?.startsWith('p:') ? { evidenceId: selectedKey.slice(2) } : {};
   }, [selectedKey]);
-  // In an answer, only what stands on a passage it cites is listed and lit: facts and conflicts on passages the model was given but did not cite stay grey with the rest of the graph.
-  const citedIds = useMemo(() => {
-    if (!data?.answer) return null;
-    const numbers = citedPassages(data.answer);
-    return new Set(data.evidence.filter((_, i) => numbers.has(i + 1)).map((e) => e.id));
-  }, [data]);
-  const citedFacts = useMemo(() => (citedIds ? facts.filter((f) => f.evidenceIds.some((id) => citedIds.has(id))) : facts), [citedIds, facts]);
-  const citedConflicts = useMemo(() => (citedIds ? conflicts.filter((c) => [c.first, c.second].every((side) => side.evidenceIds.some((id) => citedIds.has(id)))) : conflicts), [citedIds, conflicts]);
-  const whole = useMemo(() => (model && served ? factSelection(model, served, citedFacts, {}, citedConflicts) : null), [model, served, citedFacts, citedConflicts]);
+  // The engine does not cite: every statement and conflict the query returned supports it, so all are listed and lit.
+  const whole = useMemo(() => (model && served ? factSelection(model, served, facts, {}, conflicts) : null), [model, served, facts, conflicts]);
   // How many of the answer's conflicts have their red line on the graph shown; null when there is no graph to draw them on.
-  const drawnConflicts = useMemo(() => (model && served ? citedConflicts.filter((c) => queryConflictLink(model, served, c) !== undefined).length : null), [model, served, citedConflicts]);
-  const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, citedFacts, focus, citedConflicts) : null), [model, served, citedFacts, focus, citedConflicts]);
+  const drawnConflicts = useMemo(() => (model && served ? conflicts.filter((c) => queryConflictLink(model, served, c) !== undefined).length : null), [model, served, conflicts]);
+  const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, facts, focus, conflicts) : null), [model, served, facts, focus, conflicts]);
   // A chosen entity or passage narrows the lit part; one with no fact on the graph shows the whole answer's part.
   const lit = part && part.points.length ? part : whole;
   // A clicked label selects its link, as in the explorer: what the link joins is added to the lit part, its
@@ -171,7 +159,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
       <Stack alignItems="center" justifyContent="center" gap={1.5} sx={{ height: GRAPH_HEIGHT }}>
         <CircularProgress size={22} />
         <Typography variant="body2" sx={mutedSx}>
-          Checking the question’s passages again…
+          Checking the question’s evidence again…
         </Typography>
       </Stack>
     );
@@ -185,13 +173,12 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
     );
   }
 
-  const cited = citedPassages(data.answer);
   const given = data.evidence.length;
   // A query asked for passages, or one that found no answer, has no answer to speak of.
   const subject = data.answer || data.answerWithheld ? 'answer' : 'query';
-  const state = data.answerWithheld ? 'Answer hidden' : data.answer ? 'Answered' : data.insufficientEvidence ? 'No answer' : 'Passages';
+  const state = data.answerWithheld ? 'Answer hidden' : data.answer ? 'Answered' : data.insufficientEvidence ? 'No answer' : 'Evidence';
   const passageOf = (id: string) => data.evidence.findIndex((e) => e.id === id) + 1;
-  // An `[n]` beyond the passages the model was given names nothing, so it selects nothing.
+  // A number beyond the passages returned names nothing, so it selects nothing.
   const selectPassage = (n: number) => {
     const id = data.evidence[n - 1]?.id;
     if (id) select(`p:${id}`);
@@ -207,7 +194,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
       <Stack direction="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap={1.5} sx={{ px: 1.75, py: 1.25, border: '1px solid', borderColor: 'primary.light', borderRadius: 1.25, bgcolor: 'action.hover' }}>
         <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
           <Button size="small" variant="text" startIcon={<ArrowLeft size={15} />} onClick={onBackToAnswer}>
-            {subject === 'answer' ? 'Back to the answer' : 'Back to the passages'}
+            {subject === 'answer' ? 'Back to the answer' : 'Back to the evidence'}
           </Button>
           <Typography variant="caption" sx={mutedSx}>
             Showing how this was derived
@@ -217,7 +204,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
           </Typography>
           <Chip size="small" variant="outlined" color={state === 'Answered' ? 'success' : 'default'} label={state} />
           <Typography variant="caption" sx={mutedSx}>
-            {data.answer ? `${cited.size} passage${cited.size === 1 ? '' : 's'} cited · ${given} given` : `${given} passage${given === 1 ? '' : 's'}`}
+            {facts.length ? `${facts.length} statement${facts.length === 1 ? '' : 's'} · ${given} evidence` : `${given} evidence`}
           </Typography>
         </Stack>
         <Button size="small" variant="outlined" startIcon={<X size={14} />} onClick={onExit}>
@@ -227,7 +214,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
 
       {data.answerWithheld && (
         <Alert severity="info" sx={{ mt: 1.5 }}>
-          The answer is hidden. A passage it used is no longer available to you.
+          The answer is hidden. Evidence it used is no longer available to you.
         </Alert>
       )}
 
@@ -266,10 +253,10 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
               accent={colors.accent}
               height={GRAPH_HEIGHT}
               ariaLabel={`The part of the graph this ${subject} used: ${litEntities} entit${litEntities === 1 ? 'y' : 'ies'} lit`}>
-              {citedFacts.length === 0 && citedConflicts.length === 0 && (
+              {facts.length === 0 && conflicts.length === 0 && (
                 <Box sx={canvasNoteSx}>
                   <Typography variant="body2" sx={{ ...mutedSx, textAlign: 'center', maxWidth: 380, bgcolor: 'background.paper', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
-                    {facts.length || conflicts.length ? 'No graph relationship stands on a cited passage.' : 'No graph relationships were used.'}
+                    No graph relationships were used.
                   </Typography>
                 </Box>
               )}
@@ -277,11 +264,11 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
                 <Box sx={legendSx}>
                   <Stack direction="row" alignItems="center" gap={0.75}>
                     <Box sx={legendDotSx(colors.accent)} />
-                    {citedIds ? 'Named by facts on the cited passages' : `Named by this ${subject}’s facts`}
+                    {`Named by this ${subject}’s statements`}
                   </Stack>
                   <Stack direction="row" alignItems="center" gap={0.75}>
                     <Box sx={legendDotSx(colors.muted)} />
-                    {citedIds ? 'Not cited, and the rest of the graph' : 'Rest of the graph'}
+                    Rest of the graph
                   </Stack>
                   <span>{selectedKey ? `Esc or click the background to see the whole ${subject}` : 'Click an entity to see its part, or a label to see its relationship'}</span>
                 </Box>
@@ -337,18 +324,16 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             onExplore={exploreId ? () => onExploreNode(exploreId) : undefined}
           />
         ) : selectedKey === 'answer' ? (
-          <AnswerPanel result={data} onSelectPassage={selectPassage} onClose={() => select(null)} />
+          <AnswerPanel result={data} onClose={() => select(null)} />
         ) : (
           <DerivationPanel
             result={data}
             trace={trace.data ?? null}
-            conflictCount={citedConflicts.length}
+            conflictCount={conflicts.length}
             drawnConflicts={drawnConflicts}
             sourceName={(id) => engine.sources.find((s) => s.id === id)?.name}
-            citedFacts={citedFacts}
+            facts={facts}
             linkOf={(fact) => (model && served ? factLink(model, served, fact) : undefined)}
-            showUncited={showUncited}
-            onToggleUncited={() => setShowUncited((v) => !v)}
             onSelectLink={selectLink}
             onSelectPassage={selectPassage}
             onReadAnswer={data.answer && !data.answerWithheld ? () => select('answer') : undefined}
@@ -368,10 +353,10 @@ function conflictsDrawnText(total: number, drawn: number | null): string {
 }
 
 /**
- * The right panel before anything is chosen: the graph facts on the passages
- * the answer cites, each opening its relationship as a click on its label
- * does; the conflicts the index flagged among them; and the way to the answer
- * itself. With no such fact, it lists the passages instead, cited ones first.
+ * The right panel before anything is chosen: the statements the query
+ * returned, each opening its relationship as a click on its label does; the
+ * conflicts the index flagged among them; and the way to the answer itself.
+ * With no statement, it lists the passages instead.
  */
 function DerivationPanel({
   result,
@@ -379,53 +364,40 @@ function DerivationPanel({
   conflictCount,
   drawnConflicts,
   sourceName,
-  citedFacts,
+  facts,
   linkOf,
-  showUncited,
-  onToggleUncited,
   onSelectLink,
   onSelectPassage,
   onReadAnswer,
 }: {
   result: ContextQueryResult;
   trace: ContextQueryTrace | null;
-  /** How many conflicts are lit: in an answer, those with both sides on cited passages. */
+  /** How many conflicts are lit: every one the query returned. */
   conflictCount: number;
   /** How many of those are drawn on the graph; null when there is no graph to draw them on. */
   drawnConflicts: number | null;
   sourceName: (sourceId: string) => string | undefined;
-  /** In an answer, the facts standing on a passage it cites, the only ones listed; with no answer, every fact. */
-  citedFacts: ContextFact[];
+  /** Every statement the query returned. */
+  facts: ContextFact[];
   /** The line a fact stands for on the graph shown; undefined when it is not drawn. */
   linkOf: (fact: ContextFact) => number | undefined;
-  showUncited: boolean;
-  onToggleUncited: () => void;
   onSelectLink: (link: number) => void;
   onSelectPassage: (n: number) => void;
   onReadAnswer?: () => void;
 }): JSX.Element {
-  const cited = citedPassages(result.answer);
   const subject = result.answer || result.answerWithheld ? 'answer' : 'query';
-  // An answer whose cited passages carry no fact lists its passages instead.
-  const byFacts = citedFacts.length > 0;
+  // A query that returned no statement lists its passages instead.
+  const byFacts = facts.length > 0;
   const numbers = result.evidence.map((_, i) => i + 1);
-  const listed = result.answer ? numbers.filter((n) => cited.has(n)) : numbers;
-  const uncited = result.answer ? numbers.filter((n) => !cited.has(n)) : [];
   // Passages from one document are told apart by their place in it; otherwise by document.
   const oneDocument = result.evidence.length > 1 && result.evidence.every((e) => e.recordId === result.evidence[0].recordId && e.sourceId === result.evidence[0].sourceId);
-  const statusOf = (n: number) => {
-    if (!result.answer) return 'returned';
-    const k = sentencesCiting(result.answer, n).length;
-    return k ? `cited${k > 1 ? ` in ${k} sentences` : ''}` : 'given, not cited';
-  };
   const rowSx = { width: '100%', justifyContent: 'flex-start', gap: 1, px: 0.75, py: 0.5, borderRadius: 1, textAlign: 'left', '&:hover': { bgcolor: 'action.hover' } };
   const listSx = { listStyle: 'none', m: 0, mt: 0.75, p: 0 };
   // A fact the graph shown does not draw has no relationship to open, so it reads but does not click.
   const renderFact = (fact: ContextFact, i: number) => {
     const link = linkOf(fact);
     // const on = factPassages(fact, result.evidence);
-    // const notCited = !citedFacts.includes(fact);
-    const label = [`${fact.subject} ${fact.relation} ${fact.object}`, /* on.length ? `passage${on.length === 1 ? '' : 's'} ${on.join(', ')}` : '', notCited ? 'not cited' : '', */ link === undefined ? 'not on the graph shown' : ''].filter(Boolean).join(', ');
+    const label = [`${fact.subject} ${fact.relation} ${fact.object}`, /* on.length ? `passage${on.length === 1 ? '' : 's'} ${on.join(', ')}` : '', */ link === undefined ? 'not on the graph shown' : ''].filter(Boolean).join(', ');
     return (
       <Box component="li" key={`${fact.subject}|${fact.relation}|${fact.object}|${i}`}>
         <ButtonBase
@@ -454,21 +426,13 @@ function DerivationPanel({
                     Passage{on.length === 1 ? '' : 's'}
                   </Typography>
                 )}
-                {on.map((n) => {
-                  const strong = !result.answer || cited.has(n);
-                  return (
-                    <Box key={n} component="span" title={`Passage ${n}`} sx={passageBadgeSx(strong)}>
-                      {n}
-                    </Box>
-                  );
-                })}
+                {on.map((n) => (
+                  <Box key={n} component="span" title={`Passage ${n}`} sx={passageBadgeSx(true)}>
+                    {n}
+                  </Box>
+                ))}
                 */}
-                <Stack direction="row" gap={0.5} sx={{ ml: 'auto' }}>
-                  {/* "Not cited" hidden on the card for now.
-                  {notCited && <Chip size="small" variant="outlined" label="Not cited" sx={{ height: 20, fontSize: 11, color: 'text.secondary' }} />}
-                  */}
-                  {link === undefined && <Chip size="small" variant="outlined" label="Not on the graph" sx={{ height: 20, fontSize: 11, color: 'text.secondary' }} />}
-                </Stack>
+                <Chip size="small" variant="outlined" label="Not on the graph" sx={{ ml: 'auto', height: 20, fontSize: 11, color: 'text.secondary' }} />
               </Stack>
             )}
           </Box>
@@ -483,12 +447,11 @@ function DerivationPanel({
   };
   const renderPassage = (n: number) => {
     const ev = result.evidence[n - 1];
-    const strong = !result.answer || cited.has(n);
     const place = evidencePlace(ev);
     const where = oneDocument ? place.parts.join(' · ') : [shortLabel(ev.recordId, 30), sourceName(ev.sourceId)].filter(Boolean).join(' · ');
     return (
       <Box component="li" key={ev.id}>
-        <ButtonBase aria-label={`Passage ${n}, ${ev.recordId}, ${statusOf(n)}`} onClick={() => onSelectPassage(n)} sx={rowSx}>
+        <ButtonBase aria-label={`Evidence ${n}, ${ev.recordId}`} onClick={() => onSelectPassage(n)} sx={rowSx}>
           <Box
             sx={{
               flexShrink: 0,
@@ -500,10 +463,8 @@ function DerivationPanel({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              bgcolor: strong ? 'primary.main' : 'transparent',
-              color: strong ? '#fff' : 'text.secondary',
-              border: strong ? 'none' : '1.5px solid',
-              borderColor: 'text.disabled',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
             }}>
             {n}
           </Box>
@@ -511,60 +472,42 @@ function DerivationPanel({
             <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={where}>
               {where || ev.recordId}
             </Box>
-            <Box sx={{ ...mutedSx, fontSize: 11.5 }}>{statusOf(n)}</Box>
           </Box>
         </ButtonBase>
       </Box>
     );
   };
   return (
-    <Box component="aside" aria-label={subject === 'answer' ? 'How the answer was derived' : 'How the passages were found'} sx={panelSx(false)}>
+    <Box component="aside" aria-label={subject === 'answer' ? 'How the answer was derived' : 'How the evidence was found'} sx={panelSx(false)}>
       {onReadAnswer && (
         <Button size="small" variant="text" startIcon={<FileText size={14} />} onClick={onReadAnswer} sx={{ alignSelf: 'flex-start', px: 0.5, minWidth: 0 }}>
-          Read the answer with its citations
+          Read the answer
         </Button>
       )}
       {conflictCount > 0 && (
         <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-          The index flagged {conflictCount} conflict{conflictCount === 1 ? '' : 's'} among the facts behind the {result.answer ? 'cited ' : ''}passages. {conflictsDrawnText(conflictCount, drawnConflicts)}
+          The index flagged {conflictCount} conflict{conflictCount === 1 ? '' : 's'} among the statements behind the evidence. {conflictsDrawnText(conflictCount, drawnConflicts)}
           {result.answer ? ' The model was told about them.' : ''}
         </Typography>
       )}
       {byFacts ? (
         <Box>
-          <Typography sx={panelLabelSx}>Evidence · {citedFacts.length}</Typography>
+          <Typography sx={panelLabelSx}>Statements · {facts.length}</Typography>
           <Stack component="ul" gap={0.75} sx={listSx}>
-            {citedFacts.map(renderFact)}
+            {facts.map(renderFact)}
           </Stack>
         </Box>
       ) : (
         <Box>
-          <Typography sx={panelLabelSx}>
-            {result.answer ? 'Cited passages' : 'Passages'} · {listed.length}
-          </Typography>
+          <Typography sx={panelLabelSx}>Evidence · {numbers.length}</Typography>
           {oneDocument && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }} noWrap title={result.evidence[0].recordId}>
               All from {result.evidence[0].recordId}
             </Typography>
           )}
-          {listed.length > 0 ? (
-            <Stack component="ol" gap={0.5} sx={listSx}>
-              {listed.map(renderPassage)}
-            </Stack>
-          ) : (
-            result.answer && (
-              <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.5, lineHeight: 1.5 }}>
-                The answer cites none of the passages it was given.
-              </Typography>
-            )
-          )}
-          {uncited.length > 0 && (
-            <Fold label={`Also given to the model (${uncited.length})`} note="The answer doesn't cite these, but it may still draw on them. They're part of what the engine checks before showing this answer again." open={showUncited} onToggle={onToggleUncited}>
-              <Stack component="ol" gap={0.5} sx={listSx}>
-                {uncited.map(renderPassage)}
-              </Stack>
-            </Fold>
-          )}
+          <Stack component="ol" gap={0.5} sx={listSx}>
+            {numbers.map(renderPassage)}
+          </Stack>
         </Box>
       )}
       <Typography variant="caption" sx={{ ...mutedSx, borderTop: '1px solid', borderColor: 'divider', pt: 1.25, lineHeight: 1.5 }}>
@@ -574,26 +517,7 @@ function DerivationPanel({
   );
 }
 
-/** A list folded under the panel's main one, opened and closed from its toggle. */
-function Fold({ label, note, open, onToggle, children }: { label: string; note: string; open: boolean; onToggle: () => void; children: ReactNode }): JSX.Element {
-  return (
-    <Box sx={{ mt: 1 }}>
-      <Button size="small" variant="text" color="inherit" aria-expanded={open} startIcon={open ? <ChevronDown size={14} /> : <ChevronRight size={14} />} onClick={onToggle} sx={{ color: 'text.secondary', fontWeight: 600, px: 0.5 }}>
-        {label}
-      </Button>
-      {open && (
-        <>
-          <Typography variant="caption" sx={{ ...mutedSx, display: 'block', px: 0.75, mt: 0.25, lineHeight: 1.5 }}>
-            {note}
-          </Typography>
-          {children}
-        </>
-      )}
-    </Box>
-  );
-}
-
-/** A passage chosen in the derivation: what it says, where it sits, and its part in the answer. */
+/** A passage chosen in the derivation: what it says, where it sits, and what it mentions. */
 function PassagePanel({
   result,
   n,
@@ -617,12 +541,9 @@ function PassagePanel({
   const [copied, setCopied] = useState(false);
   const evidence: ContextEvidence | undefined = result.evidence[n - 1];
   if (!evidence) return <Box sx={panelSx(false)} />;
-  const sentences = sentencesCiting(result.answer, n);
-  const cited = sentences.length > 0;
   const facts: ContextFact[] = result.facts.filter((f) => f.evidenceIds.includes(evidence.id));
   const names = [...new Set(facts.flatMap((f) => [f.subject, f.object]))];
   const href = contextEvidenceUrl(orgHandle, engineId, evidence.id);
-  const status = !result.answer ? 'returned' : cited ? `cited${sentences.length > 1 ? ` in ${sentences.length} sentences` : ''}` : 'given, not cited';
   const copy = () =>
     navigator.clipboard?.writeText(absoluteUrl(href)).then(() => {
       setCopied(true);
@@ -630,12 +551,12 @@ function PassagePanel({
     });
 
   return (
-    <Box component="aside" aria-label={`Passage ${n}`} sx={panelSx(true)}>
+    <Box component="aside" aria-label={`Evidence ${n}`} sx={panelSx(true)}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Stack direction="row" alignItems="center" gap={1}>
-          <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: cited || !result.answer ? 'primary.main' : 'text.disabled', color: '#fff', fontSize: 11.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</Box>
+          <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 11.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</Box>
           <Typography variant="subtitle2" component="h2" sx={{ fontWeight: 600 }}>
-            Passage · {status}
+            Evidence
           </Typography>
         </Stack>
         <IconButton size="small" aria-label="Release the selection" onClick={onClose}>
@@ -659,24 +580,6 @@ function PassagePanel({
           </Typography>
         </Tooltip>
       </Stack>
-      {result.answer && (
-        <Box>
-          <Typography sx={panelLabelSx}>Its part in the answer</Typography>
-          {cited ? (
-            <Stack gap={0.75} sx={{ mt: 0.75 }}>
-              {sentences.map((s) => (
-                <Box key={s} component="span" sx={sentenceSx}>
-                  {s}
-                </Box>
-              ))}
-            </Stack>
-          ) : (
-            <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5, lineHeight: 1.5 }}>
-              Given to the model but not cited.
-            </Typography>
-          )}
-        </Box>
-      )}
       {names.length > 0 && (
         <Box>
           <Typography sx={panelLabelSx}>Mentions</Typography>
@@ -689,7 +592,7 @@ function PassagePanel({
       )}
       <Stack direction="row" flexWrap="wrap" gap={1}>
         <Button size="small" variant="outlined" startIcon={<ExternalLink size={15} />} onClick={() => navigate(href)}>
-          Open passage
+          Open evidence
         </Button>
         <Button size="small" variant="text" startIcon={copied ? <Check size={15} /> : <LinkIcon size={15} />} onClick={() => void copy()}>
           {copied ? 'Link copied' : 'Copy link'}
@@ -702,38 +605,25 @@ function PassagePanel({
   );
 }
 
-/** The answer chosen in the derivation: its sentences, each with the passages it cites. */
-function AnswerPanel({ result, onSelectPassage, onClose }: { result: ContextQueryResult; onSelectPassage: (n: number) => void; onClose: () => void }): JSX.Element {
-  const summary = derivationSummary(result);
+/** The answer chosen in the derivation, sentence by sentence. */
+function AnswerPanel({ result, onClose }: { result: ContextQueryResult; onClose: () => void }): JSX.Element {
   const sentences = answerSentences(result.answer);
   return (
     <Box component="aside" aria-label="The answer" sx={panelSx(true)}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Typography variant="subtitle2" component="h2" sx={{ fontWeight: 600 }}>
-          Answer · {summary.sentences} sentence{summary.sentences === 1 ? '' : 's'}
+          Answer · {sentences.length} sentence{sentences.length === 1 ? '' : 's'}
         </Typography>
         <IconButton size="small" aria-label="Release the selection" onClick={onClose}>
           <X size={15} />
         </IconButton>
       </Stack>
       <Stack gap={1}>
-        {sentences.map((sentence, i) => {
-          const numbers = [...citedPassages(sentence)].sort((a, b) => a - b);
-          return (
-            <Box key={i} sx={{ fontSize: 13, lineHeight: 1.55 }}>
-              {sentence.replace(/\s*\[(\s*\d{1,3}(?:\s*,\s*\d{1,3})*\s*)\]/g, '')}{' '}
-              {numbers.map((n) => (
-                <ButtonBase
-                  key={n}
-                  aria-label={`Passage ${n}`}
-                  onClick={() => onSelectPassage(n)}
-                  sx={{ ml: 0.5, minWidth: 18, height: 18, px: 0.5, borderRadius: 9, bgcolor: 'primary.main', color: '#fff', fontSize: 10.5, fontWeight: 700, verticalAlign: 'text-top' }}>
-                  {n}
-                </ButtonBase>
-              ))}
-            </Box>
-          );
-        })}
+        {sentences.map((sentence, i) => (
+          <Box key={i} sx={{ fontSize: 13, lineHeight: 1.55 }}>
+            {sentence}
+          </Box>
+        ))}
       </Stack>
     </Box>
   );

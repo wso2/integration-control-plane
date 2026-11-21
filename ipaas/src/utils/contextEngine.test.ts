@@ -16,6 +16,9 @@
  * under the License.
  */
 
+import remarkGfm from 'remark-gfm';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
@@ -29,6 +32,9 @@ import {
   engineErrorCode,
   sourceFailureNotice,
   evidenceBackTarget,
+  answerFact,
+  factEvidence,
+  factNumberParam,
   isTransientReadError,
   formatBytes,
   nextRecordVersion,
@@ -37,7 +43,7 @@ import {
   endsSentence,
   splitSentences,
   askedQuestionMeta,
-  citedNumbers,
+  markCitations,
   evidencePart,
   evidencePlace,
   evidenceVersionLabel,
@@ -1007,7 +1013,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     ],
     models: { embedding: null, llm: null },
     queryRoles: [],
-    exposure: { api: false, mcp: false, answers: true },
+    exposure: { api: false, mcp: false, answers: true, agenticSearch: true },
     storage: null,
     database: 'managed',
     ...over,
@@ -1057,7 +1063,7 @@ describe('playground modes', () => {
   });
 
   it('starts in Context when the engine is set up without answers', () => {
-    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false } }))).toBe('context');
+    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false, agenticSearch: false } }))).toBe('context');
   });
 
   it('lists Answer before Context', () => {
@@ -1635,8 +1641,8 @@ describe('provenance and evidence', () => {
     expect(splitSentences('')).toEqual([]);
   });
 
-  it('collects the evidence an answer cites', () => {
-    const cited = (answer: string | undefined, passages = 3) => [...citedNumbers(answer, passages)].sort();
+  it('finds the [n] markers in an answer the way it is rendered', () => {
+    const cited = (answer: string | undefined, passages = 3) => (answer ? [...markCitations(unified().use(remarkParse).use(remarkGfm).parse(answer), passages, answer)].sort() : []);
     expect(cited('Do this [2]. Then that [1][2].')).toEqual([1, 2]);
     expect(cited(undefined)).toEqual([]);
     // Only numbers that name a passage count.
@@ -1653,10 +1659,38 @@ describe('provenance and evidence', () => {
     expect(cited('| a | b |\n|---|---|\n| fact [1] | `y[2]` |')).toEqual([1]);
   });
 
+  it('finds the passages a fact stands on, in its order, among those returned', () => {
+    const ev = (id: string) => ({ id, recordId: `${id}.md`, sourceId: 'src', sourceVersion: '1', passage: id });
+    const evidence = [ev('evi_1'), ev('evi_2'), ev('evi_3')];
+    expect(factEvidence({ evidenceIds: ['evi_3', 'evi_1'] }, evidence).map((e) => e.id)).toEqual(['evi_3', 'evi_1']);
+    // A passage the result no longer holds is left out.
+    expect(factEvidence({ evidenceIds: ['evi_2', 'evi_9'] }, evidence).map((e) => e.id)).toEqual(['evi_2']);
+  });
+
+  it("opens an answer's statement by its number only while the answer is shown", () => {
+    const ev = (id: string) => ({ id, recordId: `${id}.md`, sourceId: 'src', sourceVersion: '1', passage: id });
+    const fact = (subject: string, evidenceIds: string[]) => ({ subject, relation: 'owns', object: 'Refunds', evidenceIds });
+    const result = { answer: 'Finance owns refunds.', facts: [fact('Support', ['evi_1']), fact('Finance', ['evi_2'])], evidence: [ev('evi_1'), ev('evi_2')] };
+    expect(answerFact(result, 2)).toEqual({ n: 2, fact: result.facts[1], support: [result.evidence[1]] });
+    expect(answerFact(result, 3)).toBeNull();
+    expect(answerFact(result, null)).toBeNull();
+    expect(answerFact(undefined, 1)).toBeNull();
+    // A withheld answer may have lost statements, which shifts the numbers of those after them.
+    expect(answerFact({ ...result, answer: undefined }, 2)).toBeNull();
+    // A statement the result holds none of the passages of is not shown.
+    expect(answerFact({ ...result, evidence: [ev('evi_1')] }, 2)).toBeNull();
+  });
+
+  it("reads a fact's number from a URL", () => {
+    expect(factNumberParam('3')).toBe(3);
+    expect(factNumberParam('12')).toBe(12);
+    for (const bad of [undefined, '', '0', '-1', '1.5', '03', '2x']) expect(factNumberParam(bad)).toBeNull();
+  });
+
   it('describes a stored question for the recent list', () => {
     const now = new Date().toISOString();
-    expect(askedQuestionMeta({ askedAt: now, outcome: 'answered', passages: 3 })).toBe('Just now · answered · 3 passages');
-    expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
+    expect(askedQuestionMeta({ askedAt: now, outcome: 'answered', passages: 3 })).toBe('Just now · answered · 3 evidence');
+    expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 evidence');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
   });
 });
@@ -1699,8 +1733,8 @@ describe('changing models on a running engine', () => {
 
   it('keeps the last known models and sources while a restarted engine is not ready', () => {
     const last = engineDetail({ models: { embedding: null, llm: { provider: 'openai', model: 'gpt-5-mini' } } });
-    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false } });
-    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true } });
+    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false, agenticSearch: false } });
+    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true, agenticSearch: true } });
     expect(withLastKnownFacets({ ...restarting, restartedAt: undefined }, last)).toEqual({ ...restarting, restartedAt: undefined });
     const notReady = { ...restarting, state: 'provisioning' as const, startedAt: new Date().toISOString() };
     expect(withLastKnownFacets(notReady, last)).toMatchObject({ sources: last.sources, models: last.models });
