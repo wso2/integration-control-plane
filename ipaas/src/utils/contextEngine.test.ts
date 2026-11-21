@@ -84,6 +84,7 @@ import {
   summarizeEngineProgress,
   buildMcpClientConfigs,
   buildQueryCurl,
+  buildQueryResponseExample,
   answerChoice,
   applyAnswerChoice,
   canShareApiKey,
@@ -756,21 +757,30 @@ describe('wire payloads', () => {
 });
 
 describe('exposure snippets', () => {
-  it("builds a curl against the engine's public routes", () => {
+  it("builds a curl against the engine's one public route, leaving the search and limit to the engine", () => {
     const curl = buildQueryCurl('https://engine.example.com');
     expect(curl).toContain('https://engine.example.com/v1/context');
-    expect(curl).toContain('"question": "What is our rollback procedure?"');
-    // The mode is in the URL and the engine is its address; neither is in the body.
+    expect(curl).toContain('"query": "What is our rollback procedure?"');
+    // The engine is its address, and it decides whether to answer; neither is in the body.
     expect(curl).not.toContain('spaceId');
     expect(curl).not.toContain('"mode"');
+    expect(curl).not.toContain('/v1/answer');
     expect(curl).toContain('X-API-Key: $API_KEY');
-    expect(buildQueryCurl('https://engine.example.com', 'q', 'answer')).toContain('https://engine.example.com/v1/answer');
   });
 
   it('keeps a question from a link inside the curl body when pasted into a shell', () => {
     const curl = buildQueryCurl('https://engine.example.com', "x' ; touch /tmp/pwned ; echo '");
     const body = curl.slice(curl.indexOf("-d '"));
-    expect(body).toBe(`-d '${JSON.stringify({ question: "x' ; touch /tmp/pwned ; echo '", limit: 5 }, null, 2).replaceAll("'", "'\\''")}'`);
+    expect(body).toBe(`-d '${JSON.stringify({ query: "x' ; touch /tmp/pwned ; echo '" }, null, 2).replaceAll("'", "'\\''")}'`);
+  });
+
+  it('shows the public response with an answer only for an engine that answers', () => {
+    const answered = JSON.parse(buildQueryResponseExample(true, 'agentic'));
+    expect(Object.keys(answered)).toEqual(['state', 'search', 'answer', 'statements', 'evidence', 'agent']);
+    expect(typeof answered.answer).toBe('string');
+    const plain = JSON.parse(buildQueryResponseExample(false));
+    expect(plain).toMatchObject({ search: 'deterministic', answer: null });
+    expect(plain).not.toHaveProperty('agent');
   });
 
   it('builds an mcp client config keyed by the engine name', () => {

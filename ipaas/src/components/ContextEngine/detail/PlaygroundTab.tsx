@@ -219,7 +219,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     });
   };
 
-  const openInApi = (turn: PlaygroundTurn) => navigate(contextEngineUrl(orgHandle, engine.id, 'api', { q: turn.question, mode: turn.mode === 'answer' ? 'answer' : undefined }));
+  const openInApi = (turn: PlaygroundTurn) => navigate(contextEngineUrl(orgHandle, engine.id, 'api', { q: turn.question }));
   // The Graph tab draws a stored query's derivation, with or without an answer; a passage given here opens chosen.
   const derivationHref = (queryId: string, ev?: ContextEvidence) => contextEngineUrl(orgHandle, engine.id, 'graph', { query: queryId, node: ev ? `p:${ev.id}` : undefined });
 

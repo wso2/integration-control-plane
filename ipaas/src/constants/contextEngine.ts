@@ -805,8 +805,10 @@ export interface ContextMcpToolInfo {
 
 /** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
-  { name: 'get_context', description: 'Returns the statements the caller may read that answer a question, with the evidence they stand on.' },
-  { name: 'get_answer', description: 'Answers a question, with the statements that support the answer.' },
+  {
+    name: 'get_context',
+    description: 'Returns the statements the caller may read for a query, in rank order, with the evidence they stand on. When the engine answers, it also returns an answer written from exactly these statements.',
+  },
 ];
 
 // ── Source progress ─────────────────────────────────────────────────────────
