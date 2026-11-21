@@ -84,7 +84,9 @@ import type {
   UpdateContextModelsInput,
   ContextEvidence,
   ContextEvidenceLocationState,
+  ContextFact,
   ContextQueryMode,
+  ContextQueryResult,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -1766,6 +1768,30 @@ export function citedNumbers(answer: string | undefined, passages: number): Set<
   if (!answer) return new Set();
   const tree = unified().use(remarkParse).use(remarkGfm).parse(answer);
   return markCitations(tree, passages, answer);
+}
+
+/** The passages a fact stands on, in the order the fact names them. */
+export function factEvidence(fact: Pick<ContextFact, 'evidenceIds'>, evidence: ContextEvidence[]): ContextEvidence[] {
+  const byId = new Map(evidence.map((e) => [e.id, e]));
+  return fact.evidenceIds.flatMap((id) => byId.get(id) ?? []);
+}
+
+/**
+ * Statement `n` of a stored answer, counted from one in the order the engine
+ * listed them, with the passages it stands on; null when the answer is not
+ * shown or has no such statement. A withheld answer may have lost statements
+ * with their passages, which shifts the numbers of those after them.
+ */
+export function answerFact(result: Pick<ContextQueryResult, 'answer' | 'facts' | 'evidence'> | undefined, n: number | null): { n: number; fact: ContextFact; support: ContextEvidence[] } | null {
+  if (!result?.answer || n === null) return null;
+  const fact = result.facts.at(n - 1);
+  const support = fact ? factEvidence(fact, result.evidence) : [];
+  return fact && support.length ? { n, fact, support } : null;
+}
+
+/** A fact's number from a URL, counted from one; null when it is not a whole number from one up. */
+export function factNumberParam(value: string | undefined): number | null {
+  return value && /^[1-9]\d*$/.test(value) ? Number(value) : null;
 }
 
 // ── Passage places ──────────────────────────────────────────────────────────

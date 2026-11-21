@@ -767,7 +767,8 @@ export interface ContextEvidence {
  * A relationship from the engine's knowledge graph, returned with a query in
  * graph mode. It stands on passages of the same result: every id in
  * `evidenceIds` names one of its `evidence`. The words were written by the
- * language model while indexing, so they guide; the passages are cited.
+ * language model while indexing; an answer comes with the facts that support
+ * it, and the passages show where each came from.
  */
 export interface ContextFact {
   subject: string;
@@ -786,12 +787,12 @@ export interface ContextFact {
 export interface ContextQueryResult {
   queryId: string;
   state: 'completed' | 'insufficient_evidence' | string;
-  /** Answer mode only; each `[n]` cites `evidence[n - 1]`, and every passage listed was given to the model. */
+  /** Answer mode only. It carries no citations: `facts` lists the statements that support it. */
   answer?: string;
   /** A reopened answer whose passages the reader can no longer all see: the text is withheld, the visible evidence stays. */
   answerWithheld?: boolean;
   evidence: ContextEvidence[];
-  /** Graph mode only: relationships that stand on `evidence`; empty in chunks mode. */
+  /** Graph mode only: relationships that stand on `evidence`, in the order the engine lists them; empty in chunks mode. */
   facts: ContextFact[];
   /** Graph mode only: pairs of facts the engine's contradiction check flagged among the passages, each side standing on `evidence`. */
   conflicts: ContextQueryConflict[];
@@ -1002,7 +1003,7 @@ export interface ContextEnginesLocationState {
   deletedAt: number;
 }
 
-/** Router state a passage page is opened with, so its Back returns to where the reader came from. */
+/** Router state a passage or fact page is opened with, so its Back returns to where the reader came from. */
 export interface ContextEvidenceLocationState {
   backTo?: ContextEngineTabKey;
 }

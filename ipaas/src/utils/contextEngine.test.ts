@@ -29,6 +29,9 @@ import {
   engineErrorCode,
   sourceFailureNotice,
   evidenceBackTarget,
+  answerFact,
+  factEvidence,
+  factNumberParam,
   isTransientReadError,
   formatBytes,
   nextRecordVersion,
@@ -1651,6 +1654,34 @@ describe('provenance and evidence', () => {
     expect(cited('\u4fdd\u7559\u671f\u4e3a30\u5929[2]\u3002')).toEqual([2]);
     // A table cell cites like any other text.
     expect(cited('| a | b |\n|---|---|\n| fact [1] | `y[2]` |')).toEqual([1]);
+  });
+
+  it('finds the passages a fact stands on, in its order, among those returned', () => {
+    const ev = (id: string) => ({ id, recordId: `${id}.md`, sourceId: 'src', sourceVersion: '1', passage: id });
+    const evidence = [ev('evi_1'), ev('evi_2'), ev('evi_3')];
+    expect(factEvidence({ evidenceIds: ['evi_3', 'evi_1'] }, evidence).map((e) => e.id)).toEqual(['evi_3', 'evi_1']);
+    // A passage the result no longer holds is left out.
+    expect(factEvidence({ evidenceIds: ['evi_2', 'evi_9'] }, evidence).map((e) => e.id)).toEqual(['evi_2']);
+  });
+
+  it("opens an answer's statement by its number only while the answer is shown", () => {
+    const ev = (id: string) => ({ id, recordId: `${id}.md`, sourceId: 'src', sourceVersion: '1', passage: id });
+    const fact = (subject: string, evidenceIds: string[]) => ({ subject, relation: 'owns', object: 'Refunds', evidenceIds });
+    const result = { answer: 'Finance owns refunds.', facts: [fact('Support', ['evi_1']), fact('Finance', ['evi_2'])], evidence: [ev('evi_1'), ev('evi_2')] };
+    expect(answerFact(result, 2)).toEqual({ n: 2, fact: result.facts[1], support: [result.evidence[1]] });
+    expect(answerFact(result, 3)).toBeNull();
+    expect(answerFact(result, null)).toBeNull();
+    expect(answerFact(undefined, 1)).toBeNull();
+    // A withheld answer may have lost statements, which shifts the numbers of those after them.
+    expect(answerFact({ ...result, answer: undefined }, 2)).toBeNull();
+    // A statement the result holds none of the passages of is not shown.
+    expect(answerFact({ ...result, evidence: [ev('evi_1')] }, 2)).toBeNull();
+  });
+
+  it("reads a fact's number from a URL", () => {
+    expect(factNumberParam('3')).toBe(3);
+    expect(factNumberParam('12')).toBe(12);
+    for (const bad of [undefined, '', '0', '-1', '1.5', '03', '2x']) expect(factNumberParam(bad)).toBeNull();
   });
 
   it('describes a stored question for the recent list', () => {

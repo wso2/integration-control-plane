@@ -365,6 +365,11 @@ export function contextEvidenceUrl(orgHandler: string, engineId: string, evidenc
   return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/evidence/${encodeURIComponent(evidenceId)}`;
 }
 
+/** Statement `n` behind a stored query's answer, with the passages it stands on. */
+export function contextFactUrl(orgHandler: string, engineId: string, queryId: string, n: number): string {
+  return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/queries/${encodeURIComponent(queryId)}/statements/${n}`;
+}
+
 // ---------------------------------------------------------------------------
 // Infrastructure (org admin) — managed database servers
 // ---------------------------------------------------------------------------

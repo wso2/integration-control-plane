@@ -579,6 +579,39 @@ export const railNumberSx = (lit: boolean) =>
     transition: 'background-color 120ms, color 120ms',
   }) as const;
 
+/** A fact in the rail beside an answer: the whole card opens the fact's page. */
+export const factCardSx = (active: boolean) =>
+  ({
+    ...railCardSx(active, false, false),
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
+    '&:hover': { borderColor: 'primary.main' },
+  }) as const;
+
+/** A fact's number in the rail; not a button of its own, since the card is. */
+export const factNumberSx = (lit: boolean) =>
+  ({
+    ...railNumberSx(lit),
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    mt: 0.125,
+  }) as const;
+
+/** A fact's sentence under its relationship, cut to two lines in the rail. */
+export const factSentenceSx = {
+  color: 'text.secondary',
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+  mt: 0.5,
+} as const;
+
+/** Source › ID › Version across a passage's provenance; the steps wrap on narrow screens. */
+export const provenanceChainSx = { flexWrap: { xs: 'wrap', md: 'nowrap' }, '& > svg': { alignSelf: 'center' } } as const;
+
 /** A passage's number beside a relationship: filled when the answer cites the passage (or there is no answer), outlined when it was only given. */
 export const passageBadgeSx = (strong: boolean) =>
   ({

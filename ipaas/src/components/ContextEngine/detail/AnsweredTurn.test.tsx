@@ -21,7 +21,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AnsweredTurn from './AnsweredTurn';
-import type { ContextEvidence } from '../../../types/contextEngine';
+import type { ContextEvidence, ContextFact } from '../../../types/contextEngine';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -29,36 +29,42 @@ import type { ContextEvidence } from '../../../types/contextEngine';
 vi.mock('@wso2/oxygen-ui', () => {
   const plain =
     (tag: string) =>
-    ({ component, sx: _sx, startIcon: _s, endIcon: _e, variant: _v, size: _z, color: _c, children, ...props }: Record<string, unknown> & { children?: ReactNode }) =>
+    ({ component, sx: _sx, startIcon: _s, endIcon: _e, variant: _v, size: _z, color: _c, noWrap: _n, children, ...props }: Record<string, unknown> & { children?: ReactNode }) =>
       createElement(typeof component === 'string' ? component : tag, props, children);
-  return { Box: plain('div'), Stack: plain('div'), Typography: plain('span'), Chip: plain('span'), Link: plain('a'), Tooltip: plain('span'), IconButton: plain('button'), Button: plain('button'), ButtonBase: plain('button') };
+  return { Box: plain('div'), Stack: plain('div'), Typography: plain('span'), Chip: plain('span'), Button: plain('button'), ButtonBase: plain('button') };
 });
-// The icon package ships a stylesheet Node cannot import; the source mark pulls in dozens of icons, so it is stubbed whole.
+// The icon package ships a stylesheet Node cannot import.
 vi.mock('@wso2/oxygen-ui-icons-react', () => {
   const icon = () => null;
-  return { ArrowRight: icon, Check: icon, ChevronDown: icon, ChevronRight: icon, ExternalLink: icon, History: icon, Info: icon, Link: icon, Waypoints: icon, X: icon };
+  return { ChevronRight: icon, Waypoints: icon };
 });
-vi.mock('../SourceMark', () => ({ default: () => null }));
 
-const evidence: ContextEvidence[] = [1, 2].map((n) => ({
+const evidence: ContextEvidence[] = [1, 2, 3].map((n) => ({
   id: `evi_${n}`,
   recordId: `file-${n}.md`,
   sourceId: 'src_1',
   sourceVersion: '1',
   passage: `Passage ${n}.`,
 }));
+const facts: ContextFact[] = [
+  { subject: 'Finance', relation: 'approves', object: 'Refunds', evidenceIds: ['evi_1'] },
+  { subject: 'Refunds', relation: 'take', object: 'Five days', evidenceIds: ['evi_2', 'evi_3'] },
+  { subject: 'Support', relation: 'logs', object: 'Refunds', evidenceIds: ['evi_3'] },
+];
 
 let root: Root;
 let host: HTMLDivElement;
+const onOpenFact = vi.fn();
 
 beforeEach(() => {
+  onOpenFact.mockReset();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   act(() => {
     root.render(
       <MemoryRouter>
-        <AnsweredTurn answer="One fact [1]. Another fact [2]." evidence={evidence} sources={[]} hrefFor={(ev) => `/evidence/${ev.id}`} onOpen={() => undefined} />
+        <AnsweredTurn answer="Finance approves them. They take five days." facts={facts} evidence={evidence} sources={[{ id: 'src_1', name: 'Handbook', type: 'upload', state: 'ready' }]} onOpenFact={onOpenFact} />
       </MemoryRouter>,
     );
   });
@@ -69,30 +75,30 @@ afterEach(() => {
   host.remove();
 });
 
-// A passage card is a clickable block with the button role, not a <button>.
-const button = (label: RegExp): HTMLElement => {
-  const found = [...host.querySelectorAll<HTMLElement>('button, [role="button"]')].find((b) => label.test(b.getAttribute('aria-label') ?? ''));
+const buttons = (label: RegExp): HTMLButtonElement[] => [...host.querySelectorAll('button')].filter((b) => label.test(b.getAttribute('aria-label') ?? b.textContent ?? ''));
+const button = (label: RegExp): HTMLButtonElement => {
+  const [found] = buttons(label);
   if (!found) throw new Error(`no button matching ${label}`);
   return found;
 };
 const click = (b: HTMLElement) => act(() => b.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
-describe('AnsweredTurn pinning', () => {
-  it('draws no citation marks in the answer', () => {
-    expect([...host.querySelectorAll('button')].some((b) => /^Evidence /.test(b.getAttribute('aria-label') ?? ''))).toBe(false);
+describe('AnsweredTurn', () => {
+  it('lists every statement that supports the answer, in order, with the sources of its evidence', () => {
+    expect(buttons(/^Statement \d+:/).map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Statement 1: Finance approves Refunds. Open its evidence',
+      'Statement 2: Refunds take Five days. Open its evidence',
+      'Statement 3: Support logs Refunds. Open its evidence',
+    ]);
+    expect(button(/^Statement 2:/).textContent).toContain('Handbook');
+    expect(button(/^Statement 2:/).textContent).not.toContain('passage');
+    // The engine does not cite statements, so none is set apart as uncited.
+    expect(host.textContent).not.toMatch(/cited|Also given/i);
   });
 
-  it('pins and releases from the rail', () => {
-    click(button(/^Pin evidence 1$/));
-    expect(button(/evidence 1$/).getAttribute('aria-label')).toBe('Release evidence 1');
-    click(button(/^Release evidence 1$/));
-    expect(button(/evidence 1$/).getAttribute('aria-label')).toBe('Pin evidence 1');
+  it("opens a statement's page from the rail", () => {
+    click(button(/^Statement 2:/));
+    expect(onOpenFact).toHaveBeenCalledWith(2);
   });
 
-  it('moves a pin from one passage to another', () => {
-    click(button(/^Pin evidence 1$/));
-    click(button(/^Pin evidence 2$/));
-    expect(button(/evidence 1$/).getAttribute('aria-label')).toBe('Pin evidence 1');
-    expect(button(/evidence 2$/).getAttribute('aria-label')).toBe('Release evidence 2');
-  });
 });

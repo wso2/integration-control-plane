@@ -29,7 +29,7 @@ import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MO
 import { defaultQueryMode } from '../../../utils/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
-import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
+import { contextEngineUrl, contextEvidenceUrl, contextFactUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
 import { engineErrorCode, engineMessage } from '../../../utils/contextEngine';
 import AnsweredTurn from './AnsweredTurn';
@@ -138,6 +138,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   // const suggestions = suggestedQuestions(engine);
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
   const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
+  // A statement is opened by its place in the answer's list; its page reopens the stored query to show it with its passages.
+  const openFact = (queryId: string, n: number) => navigate(contextFactUrl(orgHandle, engine.id, queryId, n), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
   // Without `text`, the question is the composer's; a re-ask from the thread leaves the composer as it is.
   const ask = (text?: string, askMode = mode) => {
@@ -321,7 +323,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     );
     if (answerTurn && answerText)
       body = (
-        <AnsweredTurn question={t.question} answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} footer={footer} />
+        <AnsweredTurn answer={answerText} facts={result.facts} evidence={result.evidence} sources={engine.sources} onOpenFact={(k) => openFact(result.queryId, k)} derivationHref={derivationHref(result.queryId)} footer={footer} />
       );
 
     return (

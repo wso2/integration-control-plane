@@ -32,7 +32,7 @@ vi.mock('./_client', async (importOriginal) => ({ ...(await importOriginal<typeo
 vi.mock('./_contextEngineAccess', async (importOriginal) => ({ ...(await importOriginal<typeof import('./_contextEngineAccess')>()), engineRequest }));
 
 import { BffError } from './_client';
-import { checkContextEngineDatabase, createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, toEngineManagedServer, updateContextModels } from './contextEngine';
+import { checkContextEngineDatabase, createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, queryContextEngine, setContextEngineAccess, toEngineManagedServer, updateContextModels } from './contextEngine';
 import type { ContextSourceConfig, CreateContextEngineInput, ExternalDatabase } from '../types/contextEngine';
 
 const ENGINE = 'docs';
@@ -201,6 +201,16 @@ describe('engines', () => {
   });
 });
 
+describe('querying', () => {
+  const stored = { queryId: 'qry_1', state: 'completed', evidence: [], traceId: 'trc_1' };
+
+  it("reads a fact's sentence from its description", async () => {
+    engineRequest.mockResolvedValue({ ...stored, facts: [{ subject: 'Finance', relation: 'approves', object: 'Refunds', evidenceIds: ['evi_1'], description: 'Finance approves every refund over $500.' }] });
+    const result = await queryContextEngine({ engineId: ENGINE, question: 'Who approves refunds?', mode: 'answer' });
+    expect(result.facts[0]).toEqual({ subject: 'Finance', relation: 'approves', object: 'Refunds', evidenceIds: ['evi_1'], text: 'Finance approves every refund over $500.' });
+  });
+
+});
 describe('setting up a new engine', () => {
   const upload: ContextSourceConfig = { type: 'upload', name: 'Handbook', values: {}, audience: [] };
   const db: ContextSourceConfig = { type: 'mysql', name: 'Team DB', values: { tables: '[{"tableName":"articles","primaryKey":"id","columns":"","updatedAtColumn":""}]' }, audience: [{ group: 'eng', role: 'eng' }] };

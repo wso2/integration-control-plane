@@ -151,7 +151,7 @@ interface RawFact {
   object: string;
   evidenceIds?: string[];
   linkedThrough?: string;
-  text?: string;
+  description?: string;
   subjectKind?: string;
   objectKind?: string;
 }
@@ -442,7 +442,8 @@ const toFact = (raw: RawFact): ContextFact => ({
   object: raw.object,
   evidenceIds: raw.evidenceIds ?? [],
   ...(raw.linkedThrough ? { linkedThrough: raw.linkedThrough } : {}),
-  ...(raw.text ? { text: raw.text } : {}),
+  // The engine calls the fact's sentence its description.
+  ...(raw.description ? { text: raw.description } : {}),
   ...(raw.subjectKind ? { subjectKind: raw.subjectKind } : {}),
   ...(raw.objectKind ? { objectKind: raw.objectKind } : {}),
 });
