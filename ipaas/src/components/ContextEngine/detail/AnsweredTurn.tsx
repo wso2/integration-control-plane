@@ -18,7 +18,7 @@
 
 import { Box } from '@wso2/oxygen-ui';
 import { useState, type JSX, type ReactNode } from 'react';
-import CitedAnswer from './CitedAnswer';
+import AnswerMarkdown from './AnswerMarkdown';
 import FactRail from './FactRail';
 import type { ContextEvidence, ContextFact, ContextSource } from '../../../types/contextEngine';
 
@@ -50,7 +50,7 @@ export default function AnsweredTurn({ answer, facts, evidence, sources, onOpenF
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
       <Box sx={{ minWidth: 0 }}>
-        <CitedAnswer answer={answer} passages={evidence.length} active={null} pinned={null} onHover={() => undefined} onPin={() => undefined} />
+        <AnswerMarkdown answer={answer} />
         {footer}
       </Box>
       <FactRail facts={facts} evidence={evidence} sources={sources} active={active} onHover={setActive} onOpen={onOpenFact} graphHref={graphHref} />
