@@ -16,16 +16,17 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, CircularProgress, Dialog, DialogContent, DialogTitle, InputBase, ListingTable, Stack, TablePagination, Typography } from '@wso2/oxygen-ui';
-import { Search, Send, User } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Avatar, Box, Button, CircularProgress, Dialog, DialogContent, DialogTitle, InputBase, Link, ListingTable, Stack, TablePagination, Typography } from '@wso2/oxygen-ui';
+import { Search, Send, SlidersHorizontal, User } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRetrieveFromKnowledgeBase } from '../../hooks/useKnowledgeBases';
 import { DEFAULT_RETRIEVAL_QUERY } from '../../constants/ragIngestion';
 import { httpStatusOf } from '../../utils/apiErrors';
-import { retrievalAccessReason } from '../../utils/knowledgeBase';
+import { retrievalAccessReason, type RetrievalSettings } from '../../utils/knowledgeBase';
 import { generateUUID } from '../../utils/string';
 import type { KnowledgeBase } from '../../types/knowledgeBase';
 import type { RetrievedChunk } from '../../types/ragIngestion';
+import RetrievalQueryConfigDialog from './RetrievalQueryConfigDialog';
 
 /** Inline chat shows only this many chunks; the rest open in a paginated modal. */
 const PREVIEW_ROWS = 3;
@@ -133,6 +134,8 @@ export default function RetrievalChat({ knowledgeBase, componentId, unavailableR
   const [input, setInput] = useState('');
   const [inputFocused, setInputFocused] = useState(false);
   const [modalChunks, setModalChunks] = useState<RetrievedChunk[] | null>(null);
+  const [settings, setSettings] = useState<RetrievalSettings>({ maxChunks: DEFAULT_RETRIEVAL_QUERY.maxChunks, minSimilarity: DEFAULT_RETRIEVAL_QUERY.minSimilarity });
+  const [configuring, setConfiguring] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
   const isRetrieving = retrieve.isPending;
 
@@ -150,7 +153,7 @@ export default function RetrievalChat({ knowledgeBase, componentId, unavailableR
     const id = generateUUID();
     setMessages((prev) => [...prev, { id, query, chunks: [], isPending: true }]);
     retrieve.mutate(
-      { userQuery: query, maxChunks: DEFAULT_RETRIEVAL_QUERY.maxChunks, minSimilarity: DEFAULT_RETRIEVAL_QUERY.minSimilarity },
+      { userQuery: query, maxChunks: settings.maxChunks, minSimilarity: settings.minSimilarity },
       {
         onSuccess: (chunks) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPending: false, chunks } : m))),
         onError: (err) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPending: false, error: retrieveErrorMessage(err) } : m))),
@@ -161,6 +164,15 @@ export default function RetrievalChat({ knowledgeBase, componentId, unavailableR
   return (
     <Stack gap={1.5} sx={{ width: '100%' }}>
       {unavailableReason && <Alert severity="info">{unavailableReason}</Alert>}
+
+      <Stack direction="row" justifyContent="flex-end" alignItems="center" gap={1.5}>
+        <Typography variant="caption" color="text.secondary">
+          Top {settings.maxChunks} chunk{settings.maxChunks === 1 ? '' : 's'} · similarity ≥ {settings.minSimilarity}
+        </Typography>
+        <Button variant="outlined" size="small" startIcon={<SlidersHorizontal size={14} />} onClick={() => setConfiguring(true)}>
+          Query configurations
+        </Button>
+      </Stack>
 
       <Box
         ref={threadRef}
@@ -219,9 +231,9 @@ export default function RetrievalChat({ knowledgeBase, componentId, unavailableR
                   <>
                     <ChunksTable chunks={m.chunks.slice(0, PREVIEW_ROWS)} />
                     {m.chunks.length > PREVIEW_ROWS && (
-                      <Typography variant="caption" color="primary" onClick={() => setModalChunks(m.chunks)} sx={{ display: 'inline-block', mt: 0.75, cursor: 'pointer', fontWeight: 500, '&:hover': { textDecoration: 'underline' } }}>
+                      <Link component="button" variant="caption" underline="hover" onClick={() => setModalChunks(m.chunks)} sx={{ display: 'inline-block', mt: 0.75, fontWeight: 500 }}>
                         See all {m.chunks.length} results
-                      </Typography>
+                      </Link>
                     )}
                   </>
                 )}
@@ -270,6 +282,16 @@ export default function RetrievalChat({ knowledgeBase, componentId, unavailableR
       </Box>
 
       <ChunksModal chunks={modalChunks} onClose={() => setModalChunks(null)} />
+      {configuring && (
+        <RetrievalQueryConfigDialog
+          value={settings}
+          onClose={() => setConfiguring(false)}
+          onApply={(next) => {
+            setSettings(next);
+            setConfiguring(false);
+          }}
+        />
+      )}
     </Stack>
   );
 }
