@@ -17,9 +17,9 @@
  */
 
 import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { /* Check, */ ExternalLink, History, X /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
+import { /* Check, */ ExternalLink, History, /* Link as LinkIcon, */ Waypoints, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
-// import { Link as RouterLink } from 'react-router';
+import { Link as RouterLink } from 'react-router';
 import { /* absoluteUrl, */ isOpaqueRecordId, passageExcerpt, queryTerms, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import PassageText from './PassageText';
 import { EvidencePlace } from './EvidenceCard';
@@ -45,7 +45,7 @@ interface RailCardProps {
   terms: string[];
 }
 
-function RailCard({ evidence, n, source, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen /* , graphHref */, terms }: RailCardProps): JSX.Element {
+function RailCard({ evidence, n, source, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen, graphHref, terms }: RailCardProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const opaque = isOpaqueRecordId(evidence.recordId);
   useEffect(() => {
@@ -120,6 +120,11 @@ function RailCard({ evidence, n, source, active, pinned, dimmed, /* href, */ onH
               }}>
               Open
             </Button>
+            {graphHref && (
+              <Button size="small" variant="text" component={RouterLink} to={graphHref} startIcon={<Waypoints size={14} />}>
+                In graph
+              </Button>
+            )}
           </Stack>
         </Box>
       )}
@@ -184,7 +189,6 @@ export default function EvidenceRail({ evidence, sources, active, pinned, hrefFo
         </Typography>
         <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
           Best match first
-          {/* See in graph, hidden for now.
           {graphHrefFor && (
             <>
               <span aria-hidden>·</span>
@@ -193,7 +197,6 @@ export default function EvidenceRail({ evidence, sources, active, pinned, hrefFo
               </Button>
             </>
           )}
-          */}
         </Typography>
       </Stack>
       {listed.slice(0, showAll ? listed.length : RAIL_PREVIEW).map(renderCard)}
