@@ -84,12 +84,12 @@ describe('engines', () => {
 
   it("takes API and MCP access from the BFF, not from the engine's own configuration", async () => {
     bff.get.mockResolvedValueOnce({ ...bffEngine, apiEnabled: false, mcpEnabled: true });
-    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { publicApi: true, mcp: false, answers: true } } : []));
+    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { publicApi: true, mcp: false, answers: true, agenticSearch: true } } : []));
 
     const engine = await getContextEngine(ENGINE);
 
     expect(engine.access).toEqual({ api: false, mcp: true });
-    expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true });
+    expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true, agenticSearch: true });
   });
 
   it('reads an engine that is restarting from the BFF alone', async () => {
@@ -210,7 +210,15 @@ describe('querying', () => {
     expect(result.facts[0]).toEqual({ subject: 'Finance', relation: 'approves', object: 'Refunds', evidenceIds: ['evi_1'], text: 'Finance approves every refund over $500.' });
   });
 
+  it('asks for agentic search only when it is chosen, so the engine keeps its own search otherwise', async () => {
+    engineRequest.mockResolvedValue({ ...stored, facts: [] });
+    await queryContextEngine({ engineId: ENGINE, question: 'q', mode: 'context', search: 'agentic' });
+    expect(engineRequest).toHaveBeenLastCalledWith(ENGINE, 'POST', '/v1/queries', { question: 'q', mode: 'context', search: 'agentic' });
+    await queryContextEngine({ engineId: ENGINE, question: 'q', mode: 'context', search: 'deterministic' });
+    expect(engineRequest).toHaveBeenLastCalledWith(ENGINE, 'POST', '/v1/queries', { question: 'q', mode: 'context' });
+  });
 });
+
 describe('setting up a new engine', () => {
   const upload: ContextSourceConfig = { type: 'upload', name: 'Handbook', values: {}, audience: [] };
   const db: ContextSourceConfig = { type: 'mysql', name: 'Team DB', values: { tables: '[{"tableName":"articles","primaryKey":"id","columns":"","updatedAtColumn":""}]' }, audience: [{ group: 'eng', role: 'eng' }] };

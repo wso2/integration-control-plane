@@ -1013,7 +1013,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     ],
     models: { embedding: null, llm: null },
     queryRoles: [],
-    exposure: { api: false, mcp: false, answers: true },
+    exposure: { api: false, mcp: false, answers: true, agenticSearch: true },
     storage: null,
     database: 'managed',
     ...over,
@@ -1063,7 +1063,7 @@ describe('playground modes', () => {
   });
 
   it('starts in Context when the engine is set up without answers', () => {
-    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false } }))).toBe('context');
+    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false, agenticSearch: false } }))).toBe('context');
   });
 
   it('lists Answer before Context', () => {
@@ -1733,8 +1733,8 @@ describe('changing models on a running engine', () => {
 
   it('keeps the last known models and sources while a restarted engine is not ready', () => {
     const last = engineDetail({ models: { embedding: null, llm: { provider: 'openai', model: 'gpt-5-mini' } } });
-    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false } });
-    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true } });
+    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false, agenticSearch: false } });
+    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true, agenticSearch: true } });
     expect(withLastKnownFacets({ ...restarting, restartedAt: undefined }, last)).toEqual({ ...restarting, restartedAt: undefined });
     const notReady = { ...restarting, state: 'provisioning' as const, startedAt: new Date().toISOString() };
     expect(withLastKnownFacets(notReady, last)).toMatchObject({ sources: last.sources, models: last.models });

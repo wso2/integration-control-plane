@@ -1656,7 +1656,7 @@ export function withLastKnownFacets(engine: ContextEngineDetail, last: ContextEn
     sources: last.sources,
     models: last.models,
     queryRoles: last.queryRoles,
-    exposure: { ...engine.exposure, answers: last.exposure.answers },
+    exposure: { ...engine.exposure, answers: last.exposure.answers, agenticSearch: last.exposure.agenticSearch },
     storage: last.storage,
   };
 }

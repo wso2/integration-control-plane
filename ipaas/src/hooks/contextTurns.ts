@@ -25,7 +25,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { PLAYGROUND_TURNS_MAX } from '../constants/contextEngine';
-import type { ContextQueryMode, PlaygroundConversation, PlaygroundTurn } from '../types/contextEngine';
+import type { ContextQueryMode, ContextQuerySearch, PlaygroundConversation, PlaygroundTurn } from '../types/contextEngine';
 
 const EMPTY: PlaygroundConversation = { turns: [] };
 const conversations = new Map<string, PlaygroundConversation>();
@@ -53,10 +53,10 @@ let lastToken = 0;
  * A question is on its way to the engine. It is kept here, not in the tab, so a tab that
  * remounts while it is pending still shows it and does not let it be asked twice.
  */
-export function startQuestion(engineId: string, question: string, mode: ContextQueryMode): number {
+export function startQuestion(engineId: string, question: string, mode: ContextQueryMode, search: ContextQuerySearch): number {
   lastToken += 1;
   const { failure: _, ...current } = getPlaygroundConversation(engineId);
-  write(engineId, { ...current, pending: { question, mode, token: lastToken } });
+  write(engineId, { ...current, pending: { question, mode, search, token: lastToken } });
   return lastToken;
 }
 
@@ -68,7 +68,7 @@ export function finishQuestion(engineId: string, token: number, outcome: { turn:
   const { pending, ...current } = getPlaygroundConversation(engineId);
   if (pending?.token !== token) return false;
   if ('turn' in outcome) write(engineId, { ...current, turns: [...current.turns, outcome.turn] });
-  else write(engineId, { ...current, failure: { error: outcome.error, mode: pending.mode, question: pending.question } });
+  else write(engineId, { ...current, failure: { error: outcome.error, mode: pending.mode, search: pending.search, question: pending.question } });
   return true;
 }
 
@@ -77,18 +77,29 @@ export function dismissQuestionFailure(engineId: string): void {
   write(engineId, current);
 }
 
+/** The search the user chose, when they chose one; it outlives a reopen and a clear. */
+const chosenSearch = (engineId: string): Pick<PlaygroundConversation, 'search'> => {
+  const { search } = getPlaygroundConversation(engineId);
+  return search ? { search } : {};
+};
+
 /** A reopened question replaces the conversation; follow-ups then build on it. */
 export function replaceTurns(engineId: string, turns: PlaygroundTurn[], mode: ContextQueryMode): void {
-  write(engineId, { turns, mode });
+  write(engineId, { turns, mode, ...chosenSearch(engineId) });
 }
 
 export function setPlaygroundMode(engineId: string, mode: ContextQueryMode): void {
   write(engineId, { ...getPlaygroundConversation(engineId), mode });
 }
 
-/** Empty the conversation; the chosen mode stays. */
+/** Switch agentic search on or off for the questions that follow. */
+export function setPlaygroundSearch(engineId: string, search: ContextQuerySearch): void {
+  write(engineId, { ...getPlaygroundConversation(engineId), search });
+}
+
+/** Empty the conversation; the chosen mode and search stay. */
 export function clearTurns(engineId: string): void {
-  write(engineId, { turns: [], mode: getPlaygroundConversation(engineId).mode });
+  write(engineId, { turns: [], mode: getPlaygroundConversation(engineId).mode, ...chosenSearch(engineId) });
 }
 
 /** This page's conversation with one engine, live. */

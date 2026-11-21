@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, /* Chip, */ CircularProgress, Divider, FormControlLabel, IconButton, Skeleton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, /* Chip, */ CircularProgress, Divider, FormControlLabel, IconButton, Skeleton, Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
@@ -24,7 +24,7 @@ import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useQueryContextEngine, useReopenContextQuery, useContextPrincipal } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules } from '../../../hooks/contextUploads';
 import { clearQuestions, forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
-import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
+import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, setPlaygroundSearch, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
 import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MODES } from '../../../constants/contextEngine';
 import { defaultQueryMode } from '../../../utils/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
@@ -38,7 +38,7 @@ import FactsTurn from './FactsTurn';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
 import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx /* , suggestionRowSx */ } from '../styles';
-import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, PlaygroundTurn } from '../../../types/contextEngine';
+import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, ContextQuerySearch, PlaygroundTurn } from '../../../types/contextEngine';
 
 interface PlaygroundTabProps {
   engine: ContextEngineDetail;
@@ -96,8 +96,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const { markAsked } = useAskedFlag(engine.id, engine.createdAt);
   // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
   // Until a mode is chosen the engine's default holds, and a stored Answer gives way when the engine offers no answers.
-  const { turns, mode: chosenMode, pending, failure } = usePlaygroundConversation(engine.id);
+  const { turns, mode: chosenMode, search: chosenSearch, pending, failure } = usePlaygroundConversation(engine.id);
   const mode = chosenMode && (chosenMode !== 'answer' || engine.exposure.answers) ? chosenMode : defaultQueryMode(engine);
+  // Agentic search switched on gives way, like Answer, when the engine does not offer it.
+  const search: ContextQuerySearch = chosenSearch === 'agentic' && engine.exposure.agenticSearch ? 'agentic' : 'deterministic';
   // A question pending from before a tab switch still counts, so it is not asked twice.
   const asking = pending !== undefined;
   const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
@@ -142,18 +144,18 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const openFact = (queryId: string, n: number) => navigate(contextFactUrl(orgHandle, engine.id, queryId, n), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
   // Without `text`, the question is the composer's; a re-ask from the thread leaves the composer as it is.
-  const ask = (text?: string, askMode = mode) => {
+  const ask = (text?: string, askMode = mode, askSearch = search) => {
     const fromComposer = text === undefined;
     const q = (text ?? question).trim();
     // A reopen in flight would replace the conversation and drop this question's turn.
     if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || asking || openingId !== null) return;
     setNotice(null);
-    const token = startQuestion(engine.id, q, askMode);
+    const token = startQuestion(engine.id, q, askMode, askSearch);
     // The question now sits in the thread, so the box empties; it comes back if asking fails.
     if (fromComposer) setQuestion('');
     window.requestAnimationFrame(() => pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
-    query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT }).then(
+    query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT, search: askSearch }).then(
       (result) => {
         // The engine stored the question either way, so it joins the recent list even when the conversation moved on.
         rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
@@ -428,8 +430,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Alert
             severity="error"
             onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
-            // Retried in the mode it failed in; a failed question from the composer is back in it, one asked from the thread is not.
-            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode)} /> : undefined}>
+            // Retried in the mode and search it failed in; a failed question from the composer is back in it, one asked from the thread is not.
+            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode, failure.search)} /> : undefined}>
             {queryFailure(failure.error, failure.mode).message}
           </Alert>
         )}
@@ -488,11 +490,16 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                   ),
                 )}
               </ToggleButtonGroup>
-              {/* A setting of the next question, so it sits with Answer/Context. Disabled until the query API has a field for it. */}
+              {/* A setting of the next question, so it sits with Answer/Context. */}
               <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-              <Tooltip title="Not available yet. This setting isn't sent with questions.">
+              <Tooltip title={engine.exposure.agenticSearch ? 'A model explores the knowledge graph to find the statements for your question.' : 'Agentic search is off for this engine.'}>
                 <span>
-                  <FormControlLabel control={<Checkbox size="small" checked={false} disabled />} label={<Typography variant="caption">AI indexed</Typography>} disabled sx={{ m: 0 }} />
+                  <FormControlLabel
+                    control={<Switch size="small" checked={search === 'agentic'} onChange={(_e, on) => setPlaygroundSearch(engine.id, on ? 'agentic' : 'deterministic')} />}
+                    label={<Typography variant="caption">Agentic search</Typography>}
+                    disabled={!engine.exposure.agenticSearch}
+                    sx={{ m: 0 }}
+                  />
                 </span>
               </Tooltip>
             </Stack>

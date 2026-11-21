@@ -97,6 +97,8 @@ export interface ContextEngineExposure {
   mcp: boolean;
   /** The engine offers answers; off, answer requests return not-found. */
   answers: boolean;
+  /** The engine offers agentic search; off, a query asking for it is refused. */
+  agenticSearch: boolean;
 }
 
 /** Provider + model, without credentials — what the engine reports back. */
@@ -721,11 +723,16 @@ export interface ContextJobHandle {
 
 export type ContextQueryMode = 'context' | 'answer';
 
+/** How the facts are found: the engine's own search, or a model exploring the knowledge graph from it. */
+export type ContextQuerySearch = 'deterministic' | 'agentic';
+
 export interface ContextQueryInput {
   engineId: string;
   question: string;
   mode: ContextQueryMode;
   limit?: number;
+  /** The engine's own search unless `agentic` is asked for on an engine that offers it. */
+  search?: ContextQuerySearch;
 }
 
 /** A first-to-last range, counted from one: lines as editors count them, sentences by the engine's rules. */
@@ -988,10 +995,12 @@ export interface PlaygroundConversation {
   turns: PlaygroundTurn[];
   /** The mode the user chose; unset until they choose one, so the tab picks its own default. */
   mode?: ContextQueryMode;
+  /** Whether the user switched agentic search on; unset until they do. */
+  search?: ContextQuerySearch;
   /** The question on its way to the engine; `token` tells its answer from a later question's. */
-  pending?: { question: string; mode: ContextQueryMode; token: number };
+  pending?: { question: string; mode: ContextQueryMode; search: ContextQuerySearch; token: number };
   /** The last question's failure, until it is dismissed or another question is asked. */
-  failure?: { error: unknown; mode: ContextQueryMode; question: string };
+  failure?: { error: unknown; mode: ContextQueryMode; search: ContextQuerySearch; question: string };
 }
 
 /** Router state the engines list is opened with after an engine page deleted its engine, so the list confirms the delete. */

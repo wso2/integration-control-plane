@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { PLAYGROUND_TURNS_MAX } from '../constants/contextEngine';
-import { appendTurn, clearTurns, dismissQuestionFailure, finishQuestion, getPlaygroundConversation, replaceTurns, setPlaygroundMode, startQuestion } from './contextTurns';
+import { appendTurn, clearTurns, dismissQuestionFailure, finishQuestion, getPlaygroundConversation, replaceTurns, setPlaygroundMode, setPlaygroundSearch, startQuestion } from './contextTurns';
 import type { PlaygroundTurn } from '../types/contextEngine';
 
 const turn = (n: number): PlaygroundTurn => ({
@@ -78,33 +78,43 @@ describe('contextTurns', () => {
     expect(getPlaygroundConversation('e-same')).toBe(after);
   });
 
+  it('keeps agentic search switched on through a clear and a reopen', () => {
+    setPlaygroundSearch('e-search', 'agentic');
+    appendTurn('e-search', turn(1));
+    clearTurns('e-search');
+    expect(getPlaygroundConversation('e-search').search).toBe('agentic');
+    replaceTurns('e-search', [turn(2)], 'context');
+    expect(getPlaygroundConversation('e-search').search).toBe('agentic');
+    expect(ids('e-search')).toEqual(['q2']);
+  });
+
   it('keeps a pending question until its answer arrives', () => {
-    const token = startQuestion('e-pending', 'q', 'answer');
-    expect(getPlaygroundConversation('e-pending').pending).toEqual({ question: 'q', mode: 'answer', token });
+    const token = startQuestion('e-pending', 'q', 'answer', 'agentic');
+    expect(getPlaygroundConversation('e-pending').pending).toEqual({ question: 'q', mode: 'answer', search: 'agentic', token });
     expect(finishQuestion('e-pending', token, { turn: turn(1) })).toBe(true);
     expect(getPlaygroundConversation('e-pending').pending).toBeUndefined();
     expect(ids('e-pending')).toEqual(['q1']);
   });
 
   it('drops an answer that arrives after the conversation was cleared or replaced', () => {
-    const cleared = startQuestion('e-stale', 'q1', 'answer');
+    const cleared = startQuestion('e-stale', 'q1', 'answer', 'deterministic');
     clearTurns('e-stale');
     expect(finishQuestion('e-stale', cleared, { turn: turn(1) })).toBe(false);
-    const replaced = startQuestion('e-stale', 'q2', 'answer');
+    const replaced = startQuestion('e-stale', 'q2', 'answer', 'deterministic');
     replaceTurns('e-stale', [turn(3)], 'context');
     expect(finishQuestion('e-stale', replaced, { turn: turn(2) })).toBe(false);
     expect(ids('e-stale')).toEqual(['q3']);
   });
 
-  it('keeps a failure with the question and mode it was asked in until dismissed or asked again', () => {
-    const token = startQuestion('e-fail', 'q', 'answer');
+  it('keeps a failure with the question, mode and search it was asked in until dismissed or asked again', () => {
+    const token = startQuestion('e-fail', 'q', 'answer', 'agentic');
     const error = new Error('down');
     finishQuestion('e-fail', token, { error });
-    expect(getPlaygroundConversation('e-fail').failure).toEqual({ error, mode: 'answer', question: 'q' });
+    expect(getPlaygroundConversation('e-fail').failure).toEqual({ error, mode: 'answer', search: 'agentic', question: 'q' });
     dismissQuestionFailure('e-fail');
     expect(getPlaygroundConversation('e-fail').failure).toBeUndefined();
-    finishQuestion('e-fail', startQuestion('e-fail', 'q', 'context'), { error });
-    startQuestion('e-fail', 'again', 'context');
+    finishQuestion('e-fail', startQuestion('e-fail', 'q', 'context', 'deterministic'), { error });
+    startQuestion('e-fail', 'again', 'context', 'deterministic');
     expect(getPlaygroundConversation('e-fail').failure).toBeUndefined();
   });
 });
