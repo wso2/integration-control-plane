@@ -288,7 +288,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else {
       const f = result.facts.length;
-      summary = `${n} evidence${f ? ` · ${f} fact${f === 1 ? '' : 's'}` : ''}`;
+      summary = `${n} evidence${f ? ` · ${f} statement${f === 1 ? '' : 's'}` : ''}`;
       // With graph facts, the passages move to a rail beside them, as an answer's do; without, they are the whole result.
       body = f ? (
         <FactsTurn question={t.question} facts={result.facts} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} graphHrefFor={(ev) => derivationHref(result.queryId, ev)} />

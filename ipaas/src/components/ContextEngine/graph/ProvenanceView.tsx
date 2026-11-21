@@ -277,7 +277,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
                 <Box sx={legendSx}>
                   <Stack direction="row" alignItems="center" gap={0.75}>
                     <Box sx={legendDotSx(colors.accent)} />
-                    {citedIds ? 'Named by facts on the cited evidence' : `Named by this ${subject}’s facts`}
+                    {citedIds ? 'Named by statements on the cited evidence' : `Named by this ${subject}’s statements`}
                   </Stack>
                   <Stack direction="row" alignItems="center" gap={0.75}>
                     <Box sx={legendDotSx(colors.muted)} />
@@ -526,13 +526,13 @@ function DerivationPanel({
       )}
       {conflictCount > 0 && (
         <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-          The index flagged {conflictCount} conflict{conflictCount === 1 ? '' : 's'} among the facts behind the {result.answer ? 'cited ' : ''}evidence. {conflictsDrawnText(conflictCount, drawnConflicts)}
+          The index flagged {conflictCount} conflict{conflictCount === 1 ? '' : 's'} among the statements behind the {result.answer ? 'cited ' : ''}evidence. {conflictsDrawnText(conflictCount, drawnConflicts)}
           {result.answer ? ' The model was told about them.' : ''}
         </Typography>
       )}
       {byFacts ? (
         <Box>
-          <Typography sx={panelLabelSx}>Evidence · {citedFacts.length}</Typography>
+          <Typography sx={panelLabelSx}>Statements · {citedFacts.length}</Typography>
           <Stack component="ul" gap={0.75} sx={listSx}>
             {citedFacts.map(renderFact)}
           </Stack>
