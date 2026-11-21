@@ -56,7 +56,7 @@ let lastToken = 0;
 export function startQuestion(engineId: string, question: string, mode: ContextQueryMode, search: ContextQuerySearch): number {
   lastToken += 1;
   const { failure: _, ...current } = getPlaygroundConversation(engineId);
-  write(engineId, { ...current, pending: { question, mode, search, token: lastToken } });
+  write(engineId, { ...current, pending: { question, mode, search, token: lastToken, startedAt: Date.now() } });
   return lastToken;
 }
 
@@ -84,12 +84,8 @@ const chosenSearch = (engineId: string): Pick<PlaygroundConversation, 'search'> 
 };
 
 /** A reopened question replaces the conversation; follow-ups then build on it. */
-export function replaceTurns(engineId: string, turns: PlaygroundTurn[], mode: ContextQueryMode): void {
-  write(engineId, { turns, mode, ...chosenSearch(engineId) });
-}
-
-export function setPlaygroundMode(engineId: string, mode: ContextQueryMode): void {
-  write(engineId, { ...getPlaygroundConversation(engineId), mode });
+export function replaceTurns(engineId: string, turns: PlaygroundTurn[]): void {
+  write(engineId, { turns, ...chosenSearch(engineId) });
 }
 
 /** Switch agentic search on or off for the questions that follow. */
@@ -97,9 +93,9 @@ export function setPlaygroundSearch(engineId: string, search: ContextQuerySearch
   write(engineId, { ...getPlaygroundConversation(engineId), search });
 }
 
-/** Empty the conversation; the chosen mode and search stay. */
+/** Empty the conversation; the chosen search stays. */
 export function clearTurns(engineId: string): void {
-  write(engineId, { turns: [], mode: getPlaygroundConversation(engineId).mode, ...chosenSearch(engineId) });
+  write(engineId, { turns: [], ...chosenSearch(engineId) });
 }
 
 /** This page's conversation with one engine, live. */

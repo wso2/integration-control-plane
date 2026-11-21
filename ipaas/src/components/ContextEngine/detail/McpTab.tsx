@@ -60,7 +60,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   if (!engine.publicApiUrl) {
     return (
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." />
+        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context." />
         <Alert severity="info" variant="outlined">
           The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
         </Alert>
@@ -71,7 +71,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   return (
     <Box>
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="mcp" />} />
+        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="mcp" />} />
         {mcpOff && <AccessOffAlert surface="mcp" />}
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
@@ -133,7 +133,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
               </ListingTable.Row>
             </ListingTable.Head>
             <ListingTable.Body>
-              {CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers).map((t) => (
+              {CONTEXT_MCP_TOOLS.map((t) => (
                 <ListingTable.Row key={t.name}>
                   <ListingTable.Cell>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>

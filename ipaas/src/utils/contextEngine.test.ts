@@ -16,9 +16,6 @@
  * under the License.
  */
 
-import remarkGfm from 'remark-gfm';
-import remarkParse from 'remark-parse';
-import { unified } from 'unified';
 import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
@@ -40,10 +37,8 @@ import {
   nextRecordVersion,
   reselectedFileProblem,
   describeUploadAudience,
-  endsSentence,
   splitSentences,
   askedQuestionMeta,
-  markCitations,
   evidencePart,
   evidencePlace,
   evidenceVersionLabel,
@@ -89,11 +84,15 @@ import {
   summarizeEngineProgress,
   buildMcpClientConfigs,
   buildQueryCurl,
+  buildQueryResponseExample,
   answerChoice,
   applyAnswerChoice,
   canShareApiKey,
   connectorCountsByCategory,
-  defaultQueryMode,
+  askWithAnswerFallback,
+  engineQueryMode,
+  isAnswerModelFailure,
+  playgroundSearch,
   effectiveLlm,
   databaseFieldErrors,
   databaseStepBlocker,
@@ -160,7 +159,6 @@ import {
   CONTEXT_EMBEDDING_PROVIDERS,
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
-  CONTEXT_QUERY_MODES,
   defaultDatabaseChoice,
   defaultStorage,
   isConnectorEnabled,
@@ -759,21 +757,30 @@ describe('wire payloads', () => {
 });
 
 describe('exposure snippets', () => {
-  it("builds a curl against the engine's public routes", () => {
+  it("builds a curl against the engine's one public route, leaving the search and limit to the engine", () => {
     const curl = buildQueryCurl('https://engine.example.com');
     expect(curl).toContain('https://engine.example.com/v1/context');
-    expect(curl).toContain('"question": "What is our rollback procedure?"');
-    // The mode is in the URL and the engine is its address; neither is in the body.
+    expect(curl).toContain('"query": "What is our rollback procedure?"');
+    // The engine is its address, and it decides whether to answer; neither is in the body.
     expect(curl).not.toContain('spaceId');
     expect(curl).not.toContain('"mode"');
+    expect(curl).not.toContain('/v1/answer');
     expect(curl).toContain('X-API-Key: $API_KEY');
-    expect(buildQueryCurl('https://engine.example.com', 'q', 'answer')).toContain('https://engine.example.com/v1/answer');
   });
 
   it('keeps a question from a link inside the curl body when pasted into a shell', () => {
     const curl = buildQueryCurl('https://engine.example.com', "x' ; touch /tmp/pwned ; echo '");
     const body = curl.slice(curl.indexOf("-d '"));
-    expect(body).toBe(`-d '${JSON.stringify({ question: "x' ; touch /tmp/pwned ; echo '", limit: 5 }, null, 2).replaceAll("'", "'\\''")}'`);
+    expect(body).toBe(`-d '${JSON.stringify({ query: "x' ; touch /tmp/pwned ; echo '" }, null, 2).replaceAll("'", "'\\''")}'`);
+  });
+
+  it('shows the public response with an answer only for an engine that answers', () => {
+    const answered = JSON.parse(buildQueryResponseExample(true, 'agentic'));
+    expect(Object.keys(answered)).toEqual(['state', 'search', 'answer', 'statements', 'evidence', 'agent']);
+    expect(typeof answered.answer).toBe('string');
+    const plain = JSON.parse(buildQueryResponseExample(false));
+    expect(plain).toMatchObject({ search: 'deterministic', answer: null });
+    expect(plain).not.toHaveProperty('agent');
   });
 
   it('builds an mcp client config keyed by the engine name', () => {
@@ -1013,7 +1020,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     ],
     models: { embedding: null, llm: null },
     queryRoles: [],
-    exposure: { api: false, mcp: false, answers: true, agenticSearch: true },
+    exposure: { api: false, mcp: false, answers: true, agenticSearch: true, defaultSearch: 'agentic' },
     storage: null,
     database: 'managed',
     ...over,
@@ -1057,17 +1064,62 @@ describe('first run', () => {
   });
 });
 
-describe('playground modes', () => {
-  it('starts in Answer when the engine offers answers', () => {
-    expect(defaultQueryMode(engineDetail())).toBe('answer');
+describe('playground mode and search', () => {
+  const exposure = (over: Partial<ContextEngineDetail['exposure']> = {}): ContextEngineDetail['exposure'] => ({ api: false, mcp: false, answers: true, agenticSearch: true, defaultSearch: 'agentic', ...over });
+
+  it('asks every question for an answer when the engine offers answers, and for facts only when it does not', () => {
+    expect(engineQueryMode(engineDetail())).toBe('answer');
+    expect(engineQueryMode(engineDetail({ exposure: exposure({ answers: false }) }))).toBe('context');
   });
 
-  it('starts in Context when the engine is set up without answers', () => {
-    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false, agenticSearch: false } }))).toBe('context');
+  it("starts with the engine's default search until the user picks one", () => {
+    expect(playgroundSearch(exposure())).toBe('agentic');
+    expect(playgroundSearch(exposure({ defaultSearch: 'deterministic' }))).toBe('deterministic');
+    expect(playgroundSearch(exposure(), 'deterministic')).toBe('deterministic');
+    expect(playgroundSearch(exposure({ defaultSearch: 'deterministic' }), 'agentic')).toBe('agentic');
   });
 
-  it('lists Answer before Context', () => {
-    expect(CONTEXT_QUERY_MODES.map((m) => m.label)).toEqual(['Answer', 'Context']);
+  it('never searches agentically on an engine that does not offer it, whatever the default or the choice', () => {
+    expect(playgroundSearch(exposure({ agenticSearch: false }))).toBe('deterministic');
+    expect(playgroundSearch(exposure({ agenticSearch: false }), 'agentic')).toBe('deterministic');
+  });
+});
+
+describe('a failed answer', () => {
+  const failed = (status: number, code: string, message = 'The answer model rejected the key.') => new HttpError(status, JSON.stringify({ code, message, traceId: 't' }));
+  const input = { engineId: 'e', question: 'Who does John Doe report to?', mode: 'answer' as const, limit: 15, search: 'agentic' as const };
+  const facts = { queryId: 'q2', state: 'completed', evidence: [], facts: [], conflicts: [], insufficientEvidence: false, traceId: 't2' };
+
+  it('is a 503 from the answer model: unavailable, or a model provider failure', () => {
+    expect(isAnswerModelFailure(failed(503, 'unavailable'))).toBe(true);
+    expect(isAnswerModelFailure(failed(503, 'backend_model_access_denied'))).toBe(true);
+    expect(isAnswerModelFailure(failed(503, 'search_failed'))).toBe(false);
+    expect(isAnswerModelFailure(failed(502, 'unavailable'))).toBe(false);
+    expect(isAnswerModelFailure(new Error('down'))).toBe(false);
+  });
+
+  it('asks once more for the facts alone, with the same question, search and limit, and keeps why', async () => {
+    const run = vi.fn().mockRejectedValueOnce(failed(503, 'backend_model_access_denied')).mockResolvedValueOnce(facts);
+    await expect(askWithAnswerFallback(run, input)).resolves.toEqual({ result: facts, mode: 'context', answerError: 'The answer model rejected the key.' });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenLastCalledWith({ ...input, mode: 'context' });
+  });
+
+  it('passes an answer straight through, and leaves other failures as errors', async () => {
+    await expect(askWithAnswerFallback(vi.fn().mockResolvedValue(facts), input)).resolves.toEqual({ result: facts, mode: 'answer' });
+    const searchFailed = failed(503, 'search_failed');
+    const run = vi.fn().mockRejectedValue(searchFailed);
+    await expect(askWithAnswerFallback(run, input)).rejects.toBe(searchFailed);
+    expect(run).toHaveBeenCalledTimes(1);
+    // A context question has no answer to give up on.
+    const unavailable = failed(503, 'unavailable');
+    await expect(askWithAnswerFallback(vi.fn().mockRejectedValue(unavailable), { ...input, mode: 'context' })).rejects.toBe(unavailable);
+  });
+
+  it("gives the retry's own failure when asking for the facts fails too", async () => {
+    const second = failed(503, 'search_failed');
+    const run = vi.fn().mockRejectedValueOnce(failed(503, 'unavailable')).mockRejectedValueOnce(second);
+    await expect(askWithAnswerFallback(run, input)).rejects.toBe(second);
   });
 });
 
@@ -1636,27 +1688,8 @@ describe('provenance and evidence', () => {
     const pieces = splitSentences(text);
     expect(pieces).toEqual(['Open the Deploy page. ', 'Pick the release!\n', 'Then promote it. ', 'Finally update DNS']);
     expect(pieces.join('')).toBe(text);
-    expect(pieces.map(endsSentence)).toEqual([true, true, true, false]);
     expect(splitSentences('e.g. 5 seconds.')).toEqual(['e.g. ', '5 seconds.']);
     expect(splitSentences('')).toEqual([]);
-  });
-
-  it('finds the [n] markers in an answer the way it is rendered', () => {
-    const cited = (answer: string | undefined, passages = 3) => (answer ? [...markCitations(unified().use(remarkParse).use(remarkGfm).parse(answer), passages, answer)].sort() : []);
-    expect(cited('Do this [2]. Then that [1][2].')).toEqual([1, 2]);
-    expect(cited(undefined)).toEqual([]);
-    // Only numbers that name a passage count.
-    expect(cited('Out of range [4] and zero [0], kept [1].')).toEqual([1]);
-    // Code of every kind holds no citation.
-    expect(cited('Use `arr[1]`, ``b[2]``, and [3].')).toEqual([3]);
-    expect(cited('```js\nconst x = arr[1];\n```\n\n    y = arr[2]\n\nSee [3].')).toEqual([3]);
-    // Nor do links: their address, or their text, which a mark would nest a link inside.
-    expect(cited('[1](https://example.com), [see [2]](https://example.com), and [3]')).toEqual([3]);
-    // Subscripts and reference links are not citations; scripts without spaces cite after the last character.
-    expect(cited('items[1], café[2], grid[3][1], and [guide][2] are not citations.')).toEqual([]);
-    expect(cited('\u4fdd\u7559\u671f\u4e3a30\u5929[2]\u3002')).toEqual([2]);
-    // A table cell cites like any other text.
-    expect(cited('| a | b |\n|---|---|\n| fact [1] | `y[2]` |')).toEqual([1]);
   });
 
   it('finds the passages a fact stands on, in its order, among those returned', () => {
@@ -1733,8 +1766,8 @@ describe('changing models on a running engine', () => {
 
   it('keeps the last known models and sources while a restarted engine is not ready', () => {
     const last = engineDetail({ models: { embedding: null, llm: { provider: 'openai', model: 'gpt-5-mini' } } });
-    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false, agenticSearch: false } });
-    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true, agenticSearch: true } });
+    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false, agenticSearch: false, defaultSearch: 'deterministic' } });
+    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true, agenticSearch: true, defaultSearch: 'agentic' } });
     expect(withLastKnownFacets({ ...restarting, restartedAt: undefined }, last)).toEqual({ ...restarting, restartedAt: undefined });
     const notReady = { ...restarting, state: 'provisioning' as const, startedAt: new Date().toISOString() };
     expect(withLastKnownFacets(notReady, last)).toMatchObject({ sources: last.sources, models: last.models });

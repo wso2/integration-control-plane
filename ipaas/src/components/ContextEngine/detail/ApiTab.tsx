@@ -20,7 +20,7 @@ import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { useEffect, type JSX } from 'react';
 import { useConnectViewedFlag } from '../../../hooks/useContextEngine';
 import { useSearchParams } from 'react-router';
-import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl } from '../../../utils/contextEngine';
+import { buildQueryCurl, buildQueryResponseExample, contextEndpointUrl, playgroundSearch } from '../../../utils/contextEngine';
 import AccessOffAlert from './AccessOffAlert';
 import AccessSwitch from './AccessSwitch';
 import ApiKeysSection from './ApiKeysSection';
@@ -39,15 +39,9 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
   const { markConnectViewed } = useConnectViewedFlag(engine.id, engine.createdAt);
   useEffect(() => markConnectViewed(), [markConnectViewed]);
   const [params] = useSearchParams();
-  // "Use in API" on the Playground lands here with the question, and the answer route when it was asked for an answer.
+  // "Use in API" on the Playground lands here with the question.
   const question = params.get('q')?.trim() || undefined;
-  const route = params.get('mode') === 'answer' && engine.exposure.answers ? 'answer' : 'context';
   const base = engine.publicApiUrl ?? '';
-  const endpoints = [
-    { label: 'Context', url: contextEndpointUrl(base), off: false },
-    // Served only when the engine offers answers; otherwise it returns not-found.
-    { label: 'Answer', url: answerEndpointUrl(base), off: !engine.exposure.answers },
-  ];
 
   if (!engine.publicApiUrl) {
     return (
@@ -68,26 +62,24 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Endpoints
       </Typography>
-      {endpoints.map((e) => (
-        <Box key={e.label} sx={endpointRowSx}>
-          <TextField labelPlacement="top" size="small" label={e.label} value={e.url} disabled={e.off} helperText={e.off ? 'Answers are turned off for this engine.' : undefined} slotProps={{ input: { readOnly: true } }} sx={endpointFieldSx} />
-        </Box>
-      ))}
+      <Box sx={endpointRowSx}>
+        <TextField labelPlacement="top" size="small" label="Context" value={contextEndpointUrl(base)} slotProps={{ input: { readOnly: true } }} sx={endpointFieldSx} />
+      </Box>
 
       <Stack gap={2} sx={{ mb: 3 }}>
         <Alert severity="info">
           Requests carry one of this engine's API keys in the <code>X-API-Key</code> header. The engine's gateway checks the key; a request without a valid one never reaches the engine.
         </Alert>
         <Typography variant="body2" sx={mutedSx}>
-          Send <code>{'{"question": "…"}'}</code>. With an <code>answer</code>, <code>facts</code> lists the statements that support it. With no answer, <code>state</code> is <code>"insufficient_evidence"</code>.
+          Send <code>{'{"query": "…"}'}</code>. The response lists the <code>statements</code> found, and an engine that answers puts its <code>answer</code> beside them. When nothing relevant is found, <code>state</code> is <code>"insufficient_evidence"</code>.
         </Typography>
       </Stack>
 
       <ApiKeysSection engineId={engine.id} />
 
-      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, question, route)} showCopyButton wrapLongLines />
+      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, question)} showCopyButton wrapLongLines />
       <Box sx={{ mt: 2 }}>
-        <CodeViewer title="Example response" language="json" code={buildQueryResponseExample(engine.sources[0]?.id)} showCopyButton wrapLongLines />
+        <CodeViewer title="Example response" language="json" code={buildQueryResponseExample(engine.exposure.answers, playgroundSearch(engine.exposure))} showCopyButton wrapLongLines />
       </Box>
     </Box>
   );

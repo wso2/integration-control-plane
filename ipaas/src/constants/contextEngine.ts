@@ -21,7 +21,6 @@ import type {
   DatabaseSslMode,
   EngineDataLocation,
   ContextEngineStorage,
-  ContextQueryMode,
   ContextSourceConfig,
   FileVisibility,
   LlmConfig,
@@ -790,14 +789,9 @@ export const OWNER_GRANT_PREFIX = 'owner-';
 /** Grants created for an org role are keyed `role-<handle>` so they can be told apart from ad-hoc grants. */
 export const ROLE_GRANT_PREFIX = 'role-';
 
-export const CONTEXT_QUERY_DEFAULT_LIMIT = 10;
+/** The public API's default; the console route's own is 10. Agentic search ignores it. */
+export const CONTEXT_QUERY_DEFAULT_LIMIT = 15;
 export const CONTEXT_QUERY_MAX_LENGTH = 10000;
-
-/** The Playground's query modes, in the order the toggle shows them. */
-export const CONTEXT_QUERY_MODES: readonly { value: ContextQueryMode; label: string }[] = [
-  { value: 'answer', label: 'Answer' },
-  { value: 'context', label: 'Context' },
-];
 
 /** Jobs stop being polled once they reach one of these. */
 export const CONTEXT_JOB_TERMINAL_STATES = new Set(['succeeded', 'failed']);
@@ -811,8 +805,10 @@ export interface ContextMcpToolInfo {
 
 /** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
-  { name: 'get_context', description: 'Returns the statements the caller may read that answer a question, with the evidence they stand on.' },
-  { name: 'get_answer', description: 'Answers a question, with the statements that support the answer.' },
+  {
+    name: 'get_context',
+    description: 'Returns the statements the caller may read for a query, in rank order, with the evidence they stand on. When the engine answers, it also returns an answer written from exactly these statements.',
+  },
 ];
 
 // ── Source progress ─────────────────────────────────────────────────────────
