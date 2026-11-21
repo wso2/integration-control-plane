@@ -272,6 +272,7 @@ interface RawEngineConfig {
   models?: { embedding?: RawModelSummary | null; llm?: RawModelSummary | null; answer?: RawModelSummary | null } | null;
   storage?: Partial<Record<StorageKind, { provider?: string } | null>> | null;
   interfaces?: { publicApi?: boolean; mcp?: boolean; answers?: boolean; agenticSearch?: boolean } | null;
+  defaultSearch?: string | null;
 }
 
 /** `GET /v1/progress` — one entry per source the caller may inspect. */
@@ -412,6 +413,8 @@ const toExposure = (raw: RawEngineConfig | null, access: ContextEngineAccess | u
   mcp: access?.mcp ?? false,
   answers: raw?.interfaces?.answers ?? false,
   agenticSearch: raw?.interfaces?.agenticSearch ?? false,
+  // An engine from before `defaultSearch` does not report it, and runs its own search by default.
+  defaultSearch: raw?.defaultSearch === 'agentic' ? 'agentic' : 'deterministic',
 });
 
 /** The engine reports a store by provider id; the card shows the name people know. */

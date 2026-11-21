@@ -93,7 +93,8 @@ import {
   applyAnswerChoice,
   canShareApiKey,
   connectorCountsByCategory,
-  defaultQueryMode,
+  engineQueryMode,
+  playgroundSearch,
   effectiveLlm,
   databaseFieldErrors,
   databaseStepBlocker,
@@ -160,7 +161,6 @@ import {
   CONTEXT_EMBEDDING_PROVIDERS,
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
-  CONTEXT_QUERY_MODES,
   defaultDatabaseChoice,
   defaultStorage,
   isConnectorEnabled,
@@ -1013,7 +1013,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     ],
     models: { embedding: null, llm: null },
     queryRoles: [],
-    exposure: { api: false, mcp: false, answers: true, agenticSearch: true },
+    exposure: { api: false, mcp: false, answers: true, agenticSearch: true, defaultSearch: 'agentic' },
     storage: null,
     database: 'managed',
     ...over,
@@ -1057,17 +1057,24 @@ describe('first run', () => {
   });
 });
 
-describe('playground modes', () => {
-  it('starts in Answer when the engine offers answers', () => {
-    expect(defaultQueryMode(engineDetail())).toBe('answer');
+describe('playground mode and search', () => {
+  const exposure = (over: Partial<ContextEngineDetail['exposure']> = {}): ContextEngineDetail['exposure'] => ({ api: false, mcp: false, answers: true, agenticSearch: true, defaultSearch: 'agentic', ...over });
+
+  it('asks every question for an answer when the engine offers answers, and for facts only when it does not', () => {
+    expect(engineQueryMode(engineDetail())).toBe('answer');
+    expect(engineQueryMode(engineDetail({ exposure: exposure({ answers: false }) }))).toBe('context');
   });
 
-  it('starts in Context when the engine is set up without answers', () => {
-    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false, agenticSearch: false } }))).toBe('context');
+  it("starts with the engine's default search until the user picks one", () => {
+    expect(playgroundSearch(exposure())).toBe('agentic');
+    expect(playgroundSearch(exposure({ defaultSearch: 'deterministic' }))).toBe('deterministic');
+    expect(playgroundSearch(exposure(), 'deterministic')).toBe('deterministic');
+    expect(playgroundSearch(exposure({ defaultSearch: 'deterministic' }), 'agentic')).toBe('agentic');
   });
 
-  it('lists Answer before Context', () => {
-    expect(CONTEXT_QUERY_MODES.map((m) => m.label)).toEqual(['Answer', 'Context']);
+  it('never searches agentically on an engine that does not offer it, whatever the default or the choice', () => {
+    expect(playgroundSearch(exposure({ agenticSearch: false }))).toBe('deterministic');
+    expect(playgroundSearch(exposure({ agenticSearch: false }), 'agentic')).toBe('deterministic');
   });
 });
 
@@ -1733,8 +1740,8 @@ describe('changing models on a running engine', () => {
 
   it('keeps the last known models and sources while a restarted engine is not ready', () => {
     const last = engineDetail({ models: { embedding: null, llm: { provider: 'openai', model: 'gpt-5-mini' } } });
-    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false, agenticSearch: false } });
-    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true, agenticSearch: true } });
+    const restarting = engineDetail({ startedAt: '2026-11-06T08:00:00Z', restartedAt: new Date().toISOString(), sources: [], models: { embedding: null, llm: null }, exposure: { api: true, mcp: false, answers: false, agenticSearch: false, defaultSearch: 'deterministic' } });
+    expect(withLastKnownFacets(restarting, last)).toMatchObject({ sources: last.sources, models: last.models, exposure: { api: true, mcp: false, answers: true, agenticSearch: true, defaultSearch: 'agentic' } });
     expect(withLastKnownFacets({ ...restarting, restartedAt: undefined }, last)).toEqual({ ...restarting, restartedAt: undefined });
     const notReady = { ...restarting, state: 'provisioning' as const, startedAt: new Date().toISOString() };
     expect(withLastKnownFacets(notReady, last)).toMatchObject({ sources: last.sources, models: last.models });

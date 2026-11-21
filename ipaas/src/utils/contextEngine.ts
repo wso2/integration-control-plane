@@ -84,6 +84,7 @@ import type {
   ContextFact,
   ContextQueryMode,
   ContextQueryResult,
+  ContextQuerySearch,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -1542,9 +1543,15 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
 
 // ── Playground ──────────────────────────────────────────────────────────────
 
-/** The mode a new Playground conversation starts in: Answer when the engine offers answers, Context otherwise. */
-export function defaultQueryMode(engine: { exposure: Pick<ContextEngineDetail['exposure'], 'answers'> }): ContextQueryMode {
+/** The mode every question is asked in: an engine that offers answers answers every query, one without returns facts only. */
+export function engineQueryMode(engine: { exposure: Pick<ContextEngineDetail['exposure'], 'answers'> }): ContextQueryMode {
   return engine.exposure.answers ? 'answer' : 'context';
+}
+
+/** The search a question starts with: the engine's default, or the one the user chose; agentic only where it is offered. */
+export function playgroundSearch(exposure: Pick<ContextEngineDetail['exposure'], 'agenticSearch' | 'defaultSearch'>, chosen?: ContextQuerySearch): ContextQuerySearch {
+  if (!exposure.agenticSearch) return 'deterministic';
+  return chosen ?? exposure.defaultSearch;
 }
 
 /** Questions to offer in an empty Playground, seeded from the engine's sources. */
@@ -1656,7 +1663,7 @@ export function withLastKnownFacets(engine: ContextEngineDetail, last: ContextEn
     sources: last.sources,
     models: last.models,
     queryRoles: last.queryRoles,
-    exposure: { ...engine.exposure, answers: last.exposure.answers, agenticSearch: last.exposure.agenticSearch },
+    exposure: { ...engine.exposure, answers: last.exposure.answers, agenticSearch: last.exposure.agenticSearch, defaultSearch: last.exposure.defaultSearch },
     storage: last.storage,
   };
 }

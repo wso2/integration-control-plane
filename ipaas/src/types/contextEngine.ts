@@ -95,10 +95,12 @@ export interface ContextEngineAccess {
 export interface ContextEngineExposure {
   api: boolean;
   mcp: boolean;
-  /** The engine offers answers; off, answer requests return not-found. */
+  /** The engine offers answers, so every question is answered; off, it returns facts only and refuses answer mode with 400 `not_offered`. */
   answers: boolean;
-  /** The engine offers agentic search; off, a query asking for it is refused. */
+  /** The engine offers agentic search; off, it refuses a query asking for it with 400 `not_offered`. */
   agenticSearch: boolean;
+  /** The search the engine runs when a public API or MCP call names none, and the Playground's starting choice. */
+  defaultSearch: ContextQuerySearch;
 }
 
 /** Provider + model, without credentials — what the engine reports back. */
@@ -632,7 +634,7 @@ export interface ContextEngineForm {
   llm: LlmConfig | null;
   /** Reuse the embedding API key for the language model when both use the same provider. */
   shareApiKey: boolean;
-  /** Offer answers (answer mode, `/v1/answer`, MCP's `get_answer`); off, the engine returns passages only. */
+  /** Offer answers: the engine answers every query; off, it returns facts only. */
   answersEnabled: boolean;
   /** A separate model for writing answers; null uses the language model. */
   answerLlm: LlmConfig | null;
@@ -993,12 +995,10 @@ export interface PlaygroundTurn {
 
 export interface PlaygroundConversation {
   turns: PlaygroundTurn[];
-  /** The mode the user chose; unset until they choose one, so the tab picks its own default. */
-  mode?: ContextQueryMode;
-  /** Whether the user switched agentic search on; unset until they do. */
+  /** The search the user chose; unset until they choose one, so the engine's default holds. */
   search?: ContextQuerySearch;
-  /** The question on its way to the engine; `token` tells its answer from a later question's. */
-  pending?: { question: string; mode: ContextQueryMode; search: ContextQuerySearch; token: number };
+  /** The question on its way to the engine; `token` tells its answer from a later question's, and `startedAt` is when it was sent. */
+  pending?: { question: string; mode: ContextQueryMode; search: ContextQuerySearch; token: number; startedAt: number };
   /** The last question's failure, until it is dismissed or another question is asked. */
   failure?: { error: unknown; mode: ContextQueryMode; search: ContextQuerySearch; question: string };
 }
