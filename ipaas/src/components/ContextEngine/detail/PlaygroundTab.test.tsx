@@ -152,12 +152,12 @@ afterEach(() => {
 
 describe('PlaygroundTab', () => {
   it('records an answer that arrives after the tab was left', async () => {
-    const answer = deferred<ContextQueryResult>();
+    const answer = deferred<{ result: ContextQueryResult; mode: 'answer' }>();
     queryContext.mutateAsync.mockReturnValue(answer.promise);
     renderEngine({}, '/?q=What%20changed%3F');
     act(() => button('Ask')?.click());
     act(() => root.unmount());
-    await act(async () => answer.resolve(result));
+    await act(async () => answer.resolve({ result, mode: 'answer' }));
     expect(getPlaygroundConversation(engine.id).turns.map((t) => t.question)).toEqual(['What changed?']);
     expect(rememberQuestion).toHaveBeenCalledWith(expect.objectContaining({ queryId: 'qry_1', question: 'What changed?' }));
     root = createRoot(host);
@@ -206,6 +206,30 @@ describe('PlaygroundTab', () => {
     act(() => button('Ask')?.click());
     expect(host.textContent).toContain('Agentic search is exploring the context graph, then the answer is written…');
     expect(host.textContent).toMatch(/the answer is written…\d+ s(?! ·)/);
+  });
+
+  it("shows the facts with a notice when the answer couldn't be written", async () => {
+    const facts = { queryId: 'qry_2', state: 'completed', evidence: [], facts: [], conflicts: [], insufficientEvidence: false, traceId: 't2' } as ContextQueryResult;
+    queryContext.mutateAsync.mockResolvedValue({ result: facts, mode: 'context', answerError: "The engine's answer model rejected its API key" });
+    renderEngine({ id: 'e-fallback' });
+    await act(async () => button('Ask')?.click());
+    expect(host.textContent).toContain("The answer couldn't be written");
+    expect(host.textContent).toContain("The engine's answer model rejected its API key. Here is what the search found.");
+    expect(getPlaygroundConversation('e-fallback').turns[0]).toMatchObject({ mode: 'context', answerError: "The engine's answer model rejected its API key" });
+    // The stored query is the facts-only one, so it reopens as facts.
+    expect(rememberQuestion).toHaveBeenCalledWith(expect.objectContaining({ queryId: 'qry_2', mode: 'context' }));
+  });
+
+  it('says what the engine does not offer when it refuses a question with not_offered', async () => {
+    queryContext.mutateAsync.mockReturnValueOnce(refusal(400, 'not_offered', 'Agentic search is not offered by this engine.'));
+    renderEngine({ id: 'e-no-agentic', exposure: { defaultSearch: 'agentic' } });
+    await act(async () => button('Ask')?.click());
+    expect(host.textContent).toContain('This engine does not offer agentic search.');
+
+    queryContext.mutateAsync.mockReturnValueOnce(refusal(400, 'not_offered', 'Answers are not offered by this engine.'));
+    renderEngine({ id: 'e-no-answers' });
+    await act(async () => button('Ask')?.click());
+    expect(host.textContent).toContain('This engine does not offer answers.');
   });
 
   it('retries a refused question with the search it was asked with, even after the search changed', async () => {

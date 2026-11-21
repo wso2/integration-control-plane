@@ -81,7 +81,9 @@ import type {
   UpdateContextModelsInput,
   ContextEvidence,
   ContextEvidenceLocationState,
+  ContextAskResult,
   ContextFact,
+  ContextQueryInput,
   ContextQueryMode,
   ContextQueryResult,
   ContextQuerySearch,
@@ -1552,6 +1554,30 @@ export function engineQueryMode(engine: { exposure: Pick<ContextEngineDetail['ex
 export function playgroundSearch(exposure: Pick<ContextEngineDetail['exposure'], 'agenticSearch' | 'defaultSearch'>, chosen?: ContextQuerySearch): ContextQuerySearch {
   if (!exposure.agenticSearch) return 'deterministic';
   return chosen ?? exposure.defaultSearch;
+}
+
+/**
+ * The answer model failed and the search did not: a 503 with code `unavailable`, or with the code of the model
+ * provider's own failure. Any other 503 is a failed search, with nothing to show.
+ */
+export function isAnswerModelFailure(err: unknown): boolean {
+  if (!(err instanceof HttpError) || err.status !== 503) return false;
+  const code = engineErrorCode(err);
+  return code === 'unavailable' || !!code?.startsWith('backend_model_');
+}
+
+/**
+ * Ask a question; when the answer model fails, ask once more for the facts alone, with the same question, search
+ * and limit, so the reader still gets what the search found. The failed answer's message comes back with them.
+ */
+export async function askWithAnswerFallback(run: (input: ContextQueryInput) => Promise<ContextQueryResult>, input: ContextQueryInput): Promise<ContextAskResult> {
+  try {
+    return { result: await run(input), mode: input.mode };
+  } catch (err) {
+    if (input.mode !== 'answer' || !isAnswerModelFailure(err)) throw err;
+    const result = await run({ ...input, mode: 'context' });
+    return { result, mode: 'context', answerError: engineMessage(err, "The engine's answer model failed.") };
+  }
 }
 
 /** Questions to offer in an empty Playground, seeded from the engine's sources. */

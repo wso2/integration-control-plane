@@ -989,8 +989,17 @@ export interface PlaygroundTurn {
   question: string;
   mode: ContextQueryMode;
   result: ContextQueryResult;
+  /** The answer model failed, so the facts were asked for again without an answer: the engine's message about the failure. */
+  answerError?: string;
   /** Reopened from the recent list: when it was asked, and how many passages it had then. */
   reopened?: { askedAt: string; passagesThen: number };
+}
+
+/** What asking came back with: the result, the mode it was answered in, and the answer model's failure when it was asked again for facts. */
+export interface ContextAskResult {
+  result: ContextQueryResult;
+  mode: ContextQueryMode;
+  answerError?: string;
 }
 
 export interface PlaygroundConversation {

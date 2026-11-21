@@ -49,7 +49,7 @@ import {
   updateContextSource,
 } from '../api/contextEngine';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_CONNECT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
-import { everyoneRoles, integrationsPollInterval, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
+import { askWithAnswerFallback, everyoneRoles, integrationsPollInterval, isEngineProgressActive, isRestartPending, listPollInterval, modelsAfterUpdate, ownerGrantId, withLastKnownFacets } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { clearQuestions } from './contextQuestions';
 import type {
@@ -346,9 +346,12 @@ export function useContextEngineProgress(engineId: string) {
   });
 }
 
-/** Natural-language query — a mutation because each question is a new request, not cached state. */
+/**
+ * Natural-language query — a mutation because each question is a new request, not cached state. When the answer
+ * model fails, the facts are asked for again without an answer, so the result says which mode it came back in.
+ */
 export function useQueryContextEngine() {
-  return useMutation({ mutationFn: (input: ContextQueryInput) => queryContextEngine(input) });
+  return useMutation({ mutationFn: (input: ContextQueryInput) => askWithAnswerFallback(queryContextEngine, input) });
 }
 
 export function useContextGrants(engineId: string) {
