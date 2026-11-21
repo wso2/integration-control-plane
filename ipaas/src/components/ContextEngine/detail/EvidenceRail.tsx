@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Box, Button, Chip, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { /* Check, */ ChevronDown, ChevronRight, ExternalLink, History, X /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { /* Check, */ ExternalLink, History, X /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 // import { Link as RouterLink } from 'react-router';
 import { /* absoluteUrl, */ isOpaqueRecordId, passageExcerpt, queryTerms, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
@@ -30,7 +30,6 @@ interface RailCardProps {
   evidence: ContextEvidence;
   n: number;
   source?: ContextSource;
-  cited: boolean;
   /** Its mark in the answer, or beside a graph fact, is hovered or focused. */
   active: boolean;
   pinned: boolean;
@@ -46,7 +45,7 @@ interface RailCardProps {
   terms: string[];
 }
 
-function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen /* , graphHref */, terms }: RailCardProps): JSX.Element {
+function RailCard({ evidence, n, source, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen /* , graphHref */, terms }: RailCardProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const opaque = isOpaqueRecordId(evidence.recordId);
   useEffect(() => {
@@ -77,7 +76,6 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
         <Typography variant="caption" sx={{ fontWeight: 600, minWidth: 0 }} noWrap title={evidence.recordId}>
           {opaque ? (source?.name ?? evidence.sourceId) : evidence.recordId}
         </Typography>
-        {!cited && <Chip size="small" variant="outlined" label="Not cited" sx={{ ml: 'auto', height: 20, color: 'text.secondary' }} />}
         {pinned && (
           <Tooltip title="Release (Esc)">
             <IconButton
@@ -87,7 +85,7 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
                 e.stopPropagation();
                 onPin(n);
               }}
-              sx={{ ml: cited ? 'auto' : 0, p: 0.25 }}>
+              sx={{ ml: 'auto', p: 0.25 }}>
               <X size={14} />
             </IconButton>
           </Tooltip>
@@ -133,11 +131,9 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
 const RAIL_PREVIEW = 3;
 
 interface EvidenceRailProps {
-  /** The passages the model was given, in prompt order: `[n]` is `evidence[n - 1]`. */
+  /** The passages the query returned, best match first. */
   evidence: ContextEvidence[];
   sources: ContextSource[];
-  /** Evidence numbers the answer cites; absent beside graph facts, where every passage was returned and none is cited. */
-  cited?: Set<number>;
   active: number | null;
   pinned: number | null;
   hrefFor: (evidence: ContextEvidence) => string;
@@ -150,24 +146,14 @@ interface EvidenceRailProps {
   question?: string;
 }
 
-/**
- * The passages beside an answer: the cited ones first, lit together with the
- * sentence that cites them, and the ones the model was given but did not cite
- * folded underneath. Those still count: the answer may draw on them, and the
- * engine checks all of them before showing the answer again. Beside graph
- * facts, with no answer, every passage is listed in the order it came back.
- */
-export default function EvidenceRail({ evidence, sources, cited, active, pinned, hrefFor, onHover, onPin, onOpen, graphHrefFor, question = '' }: EvidenceRailProps): JSX.Element {
+/** The passages beside graph facts, every one listed in the order it came back. */
+export default function EvidenceRail({ evidence, sources, active, pinned, hrefFor, onHover, onPin, onOpen, graphHrefFor, question = '' }: EvidenceRailProps): JSX.Element {
   const byId = new Map(sources.map((s) => [s.id, s]));
   const terms = queryTerms(question);
-  const uncited = cited ? evidence.map((_, i) => i + 1).filter((n) => !cited.has(n)) : [];
-  const [showUncited, setShowUncited] = useState(false);
-  const listed = evidence.map((_, i) => i + 1).filter((n) => !cited || cited.has(n));
+  const listed = evidence.map((_, i) => i + 1);
   // A long list collapses so it does not run far past the facts or answer beside it; a pinned passage stays reachable.
   const [showAllState, setShowAll] = useState(false);
   const showAll = showAllState || (pinned !== null && listed.indexOf(pinned) >= RAIL_PREVIEW);
-  // Pinning an uncited passage from the answer cannot happen, but hovering its card can; keep it reachable.
-  const open = showUncited || (pinned !== null && uncited.includes(pinned));
 
   const renderCard = (n: number) => {
     const ev = evidence[n - 1];
@@ -177,7 +163,6 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
         evidence={ev}
         n={n}
         source={byId.get(ev.sourceId)}
-        cited={!cited || cited.has(n)}
         active={active === n}
         pinned={pinned === n}
         dimmed={pinned !== null && pinned !== n}
@@ -198,7 +183,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
           Evidence
         </Typography>
         <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-          {cited ? 'Cited in the answer' : 'Best match first'}
+          Best match first
           {/* See in graph, hidden for now.
           {graphHrefFor && (
             <>
@@ -216,18 +201,6 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
         <Button size="small" variant="text" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} sx={{ alignSelf: 'flex-start' }}>
           {showAll ? 'Show fewer' : `Show all ${listed.length} evidence`}
         </Button>
-      )}
-      {uncited.length > 0 && (
-        <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 0.5, mt: 0.5 }}>
-          <Button size="small" variant="text" color="inherit" aria-expanded={open} startIcon={open ? <ChevronDown size={14} /> : <ChevronRight size={14} />} onClick={() => setShowUncited((v) => !v)} sx={{ color: 'text.secondary', fontWeight: 600, px: 0.5 }}>
-            Also given to the model ({uncited.length})
-          </Button>
-          {open && (
-            <Stack gap={1.25} sx={{ mt: 0.5 }}>
-              {uncited.map(renderCard)}
-            </Stack>
-          )}
-        </Box>
       )}
     </Stack>
   );

@@ -794,9 +794,9 @@ export const CONTEXT_QUERY_DEFAULT_LIMIT = 10;
 export const CONTEXT_QUERY_MAX_LENGTH = 10000;
 
 /** The Playground's query modes, in the order the toggle shows them. */
-export const CONTEXT_QUERY_MODES: readonly { value: ContextQueryMode; label: string; hint: string }[] = [
-  { value: 'answer', label: 'Answer', hint: 'A cited answer from passages you can read.' },
-  { value: 'context', label: 'Context', hint: 'Passages you can read, as an agent gets them.' },
+export const CONTEXT_QUERY_MODES: readonly { value: ContextQueryMode; label: string }[] = [
+  { value: 'answer', label: 'Answer' },
+  { value: 'context', label: 'Context' },
 ];
 
 /** Jobs stop being polled once they reach one of these. */
@@ -812,7 +812,7 @@ export interface ContextMcpToolInfo {
 /** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
   { name: 'get_context', description: 'Returns the statements the caller may read that answer a question, with the evidence they stand on.' },
-  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage.' },
+  { name: 'get_answer', description: 'Answers a question, with the statements that support the answer.' },
 ];
 
 // ── Source progress ─────────────────────────────────────────────────────────

@@ -584,15 +584,6 @@ export function searchNodes(m: GraphModel, text: string, limit = 8): number[] {
 const MARKER = /\[(\s*\d{1,3}(?:\s*,\s*\d{1,3})*\s*)\]/g;
 const LEADING_MARKERS = /^\s*(?:\[\s*\d{1,3}(?:\s*,\s*\d{1,3})*\s*\]\s*)+/;
 
-/** Every passage number an answer cites, including grouped markers such as `[1, 2]`, which the engine accepts. */
-export function citedPassages(answer: string | undefined): Set<number> {
-  const cited = new Set<number>();
-  for (const m of (answer ?? '').matchAll(MARKER)) {
-    for (const part of m[1].split(',')) cited.add(Number(part.trim()));
-  }
-  return cited;
-}
-
 /**
  * The answer's sentences, each with the markers that cite it. A model often puts
  * a marker after the full stop ("… ten minutes. [1]"); such a piece holds no words
@@ -611,37 +602,11 @@ export function answerSentences(answer: string | undefined): string[] {
   return sentences;
 }
 
-/** The answer's sentences that cite passage `n`, without their markers, in order. */
-export function sentencesCiting(answer: string | undefined, n: number): string[] {
-  if (!answer) return [];
-  return answerSentences(answer)
-    .filter((sentence) => [...sentence.matchAll(MARKER)].some((m) => m[1].split(',').some((part) => Number(part.trim()) === n)))
-    .map((sentence) =>
-      sentence
-        .replace(MARKER, '')
-        .replace(/\s+([.,;:!?])/g, '$1')
-        .replace(/\s+/g, ' ')
-        .trim(),
-    )
-    .filter(Boolean);
-}
-
 export const ordinal = (n: number): string => {
   const tens = n % 100;
   if (tens >= 11 && tens <= 13) return `${n}th`;
   return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 };
-
-/** Counts for the line under an answer: its sentences, the passages it cites, and the entities named by facts that stand on its passages. */
-export function derivationSummary(result: Pick<ContextQueryResult, 'answer' | 'evidence' | 'facts'>): { sentences: number; passages: number; entities: number } {
-  const cited = citedPassages(result.answer);
-  const passages = result.answer ? result.evidence.filter((_, i) => cited.has(i + 1)).length : result.evidence.length;
-  const ids = new Set(result.evidence.map((e) => e.id));
-  const standing = result.facts.filter((f) => f.evidenceIds.some((id) => ids.has(id)));
-  const names = new Set(standing.flatMap((f) => [f.subject.toLowerCase(), f.object.toLowerCase()]));
-  const sentences = answerSentences(result.answer).length;
-  return { sentences, passages, entities: names.size };
-}
 
 /** The entity names an answer's facts use, in lower case: subjects, objects, and what the graph walk went through. */
 export function factEntityNames(facts: ContextFact[]): Set<string> {

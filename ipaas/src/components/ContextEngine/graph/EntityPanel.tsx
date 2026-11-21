@@ -23,11 +23,11 @@ import { useContextEntity } from '../../../hooks/useContextEngine';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
-import { sentencesCiting, type EntityConflict } from '../../../utils/contextGraph';
+import type { EntityConflict } from '../../../utils/contextGraph';
 import { isOpaqueRecordId, restoreCase, tidyPassage } from '../../../utils/contextEngine';
 import { EvidencePlace } from '../detail/EvidenceCard';
 import { mutedSx } from '../styles';
-import { panelSx, panelLabelSx, selectRowSx, sentenceSx } from './graphStyles';
+import { panelSx, panelLabelSx, selectRowSx } from './graphStyles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
 
 interface PassageRowProps {
@@ -112,13 +112,6 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
   const used = new Map(derivation?.evidence.map((e, i) => [e.id, i + 1]) ?? []);
   const mentioned = (view?.mentionedIn ?? []).map((id) => byId.get(id)).filter((e): e is ContextEvidence => !!e);
   const records = new Set(mentioned.map((e) => `${e.sourceId}\u0000${e.recordId}`));
-  // The answer's sentences that cite a passage naming this entity or standing behind one of its relationships.
-  const behind = new Set([...(view?.mentionedIn ?? []), ...(view?.facts.flatMap((f) => f.evidenceIds) ?? [])]);
-  const numbers = [...behind]
-    .map((id) => used.get(id))
-    .filter((n): n is number => n !== undefined)
-    .sort((a, b) => a - b);
-  const inAnswer = derivation?.answer ? [...new Set(numbers.flatMap((n) => sentencesCiting(derivation.answer, n)))] : [];
   const notFound = entity.error instanceof HttpError && entity.error.status === 404;
   // The kind the caller picked wins; otherwise the kind the engine opened.
   const shownKind = kind ?? view?.entity.kind;
@@ -186,25 +179,6 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
             <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
               Mentioned in {mentioned.length} evidence across {records.size} document{records.size === 1 ? '' : 's'}.
             </Typography>
-          )}
-
-          {derivation?.answer && (
-            <Box>
-              <Typography sx={panelLabelSx}>In this answer</Typography>
-              {inAnswer.length ? (
-                <Stack gap={0.75} sx={{ mt: 0.75 }}>
-                  {inAnswer.map((sentence) => (
-                    <Box key={sentence} component="span" sx={sentenceSx}>
-                      {sentence}
-                    </Box>
-                  ))}
-                </Stack>
-              ) : (
-                <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
-                  No sentence of the answer cites evidence that names it.
-                </Typography>
-              )}
-            </Box>
           )}
 
           <Box>

@@ -97,16 +97,6 @@ export const panelSx = (lit: boolean) =>
 
 export const panelLabelSx = { fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'text.secondary' } as const;
 
-/** An answer sentence lit as part of a derivation, as the Playground lights a cited sentence. */
-export const sentenceSx = {
-  fontSize: 13,
-  lineHeight: 1.55,
-  bgcolor: 'action.hover',
-  boxShadow: (t: { palette: { primary: { main: string } } }) => `inset 0 -1px 0 ${t.palette.primary.main}`,
-  borderRadius: 0.5,
-  px: 0.5,
-} as const;
-
 /** The small legend over a canvas. */
 export const legendSx = {
   display: 'flex',

@@ -16,6 +16,9 @@
  * under the License.
  */
 
+import remarkGfm from 'remark-gfm';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
@@ -40,7 +43,7 @@ import {
   endsSentence,
   splitSentences,
   askedQuestionMeta,
-  citedNumbers,
+  markCitations,
   evidencePart,
   evidencePlace,
   evidenceVersionLabel,
@@ -1638,8 +1641,8 @@ describe('provenance and evidence', () => {
     expect(splitSentences('')).toEqual([]);
   });
 
-  it('collects the evidence an answer cites', () => {
-    const cited = (answer: string | undefined, passages = 3) => [...citedNumbers(answer, passages)].sort();
+  it('finds the [n] markers in an answer the way it is rendered', () => {
+    const cited = (answer: string | undefined, passages = 3) => (answer ? [...markCitations(unified().use(remarkParse).use(remarkGfm).parse(answer), passages, answer)].sort() : []);
     expect(cited('Do this [2]. Then that [1][2].')).toEqual([1, 2]);
     expect(cited(undefined)).toEqual([]);
     // Only numbers that name a passage count.

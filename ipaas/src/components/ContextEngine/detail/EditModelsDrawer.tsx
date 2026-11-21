@@ -149,7 +149,7 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
           <ModelProviderColumn<LlmConfig>
             key={draft.answerChoice}
             title="Answer language model"
-            purpose="Writes the cited answers."
+            purpose="Writes the answers."
             providers={LLM_OPTIONS}
             value={draft.answer}
             onChange={(answer) => set({ answer })}

@@ -19,14 +19,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerSentences,
-  citedPassages,
   CLUSTER_PULL,
   clusterLayout,
   conflictEnds,
   conflictLink,
   conflictsOn,
   cosmosBuffers,
-  derivationSummary,
   entityConflicts,
   entityId,
   entityIndex,
@@ -61,7 +59,6 @@ import {
   sameRelation,
   searchLabel,
   searchNodes,
-  sentencesCiting,
   shortLabel,
   withLinkSelection,
   type GraphPalette,
@@ -102,8 +99,6 @@ const PALETTE: GraphPalette = {
 
 /** Colours come back as 32-bit floats, so they are compared loosely. */
 const near = (got: ArrayLike<number>, want: number[]) => Array.from(got).forEach((v, i) => expect(v).toBeCloseTo(want[i], 5));
-
-const evidence = (id: string, recordId: string): ContextEvidence => ({ id, recordId, sourceId: 'src_a', sourceVersion: '1', passage: `${recordId} text` });
 
 describe('exploreModel', () => {
   it('puts records before entities and links mentions and relationships between drawn nodes', () => {
@@ -450,24 +445,10 @@ describe('links as selections', () => {
   });
 });
 
-describe('citations', () => {
-  it('reads single and grouped markers', () => {
-    expect([...citedPassages('One [1]. Two [2, 3]. None.')].sort()).toEqual([1, 2, 3]);
-    expect(citedPassages(undefined).size).toBe(0);
-  });
-
-  it('returns the sentences citing a passage without their markers', () => {
-    const answer = 'The train ships on Tuesday [1]. The cache is in eu-west-2 [1, 2]. Ask ops [2].';
-    expect(sentencesCiting(answer, 1)).toEqual(['The train ships on Tuesday.', 'The cache is in eu-west-2.']);
-    expect(sentencesCiting(answer, 3)).toEqual([]);
-  });
-
+describe('answer sentences', () => {
   it('joins a marker after the full stop to the sentence before it', () => {
     const answer = 'The checkpoint is error rate below 1 percent for ten minutes. [1] Ask ops first. [2, 3]';
     expect(answerSentences(answer)).toHaveLength(2);
-    expect(sentencesCiting(answer, 1)).toEqual(['The checkpoint is error rate below 1 percent for ten minutes.']);
-    expect(sentencesCiting(answer, 3)).toEqual(['Ask ops first.']);
-    expect(derivationSummary({ answer, evidence: [evidence('e1', 'a'), evidence('e2', 'b'), evidence('e3', 'c')], facts: [] }).sentences).toBe(2);
   });
 
   it('names ranks', () => {
@@ -639,16 +620,6 @@ describe('facts on the graph', () => {
     const k = m.index.get('ent_k') as number;
     near(colors.slice(k * 4, k * 4 + 4), PALETTE.lit);
     near(colors.slice(0, 4), PALETTE.node.record);
-  });
-
-  it('summarises an answer', () => {
-    const result = {
-      answer: 'Gateway 7 fails over to Kandy [1]. Ask the duty manager [2].',
-      evidence: [evidence('e1', 'failover.txt'), evidence('e2', 'oncall.md'), evidence('e3', 'pay.txt')],
-      facts: [...facts, { subject: 'ghost', relation: 'haunts', object: 'nobody', evidenceIds: ['e9'] }],
-    };
-    expect(derivationSummary(result)).toEqual({ sentences: 2, passages: 2, entities: 3 });
-    expect(derivationSummary({ evidence: result.evidence, facts: [] })).toEqual({ sentences: 0, passages: 3, entities: 0 });
   });
 });
 

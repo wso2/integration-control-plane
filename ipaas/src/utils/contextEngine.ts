@@ -50,9 +50,6 @@ import {
   UPLOAD_SLOW_AFTER_MS,
 } from '../constants/contextEngine';
 import type { Link, Parent, Root, RootContent, Text } from 'mdast';
-import remarkGfm from 'remark-gfm';
-import remarkParse from 'remark-parse';
-import { unified } from 'unified';
 import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
 import { formatDistanceToNow, formatElapsed } from './time';
@@ -1761,13 +1758,6 @@ export function remarkCitations(passages: number, source: string) {
   return () => (tree: Root) => {
     markCitations(tree, passages, source);
   };
-}
-
-/** The evidence numbers an answer cites, read the way the answer is rendered. */
-export function citedNumbers(answer: string | undefined, passages: number): Set<number> {
-  if (!answer) return new Set();
-  const tree = unified().use(remarkParse).use(remarkGfm).parse(answer);
-  return markCitations(tree, passages, answer);
 }
 
 /** The passages a fact stands on, in the order the fact names them. */
