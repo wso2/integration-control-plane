@@ -1655,8 +1655,8 @@ describe('provenance and evidence', () => {
 
   it('describes a stored question for the recent list', () => {
     const now = new Date().toISOString();
-    expect(askedQuestionMeta({ askedAt: now, outcome: 'answered', passages: 3 })).toBe('Just now · answered · 3 passages');
-    expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
+    expect(askedQuestionMeta({ askedAt: now, outcome: 'answered', passages: 3 })).toBe('Just now · answered · 3 evidence');
+    expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 evidence');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
   });
 });

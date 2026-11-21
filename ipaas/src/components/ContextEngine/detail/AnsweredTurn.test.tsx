@@ -83,16 +83,16 @@ describe('AnsweredTurn pinning', () => {
   });
 
   it('pins and releases from the rail', () => {
-    click(button(/^Pin passage 1$/));
-    expect(button(/passage 1$/).getAttribute('aria-label')).toBe('Release passage 1');
-    click(button(/^Release passage 1$/));
-    expect(button(/passage 1$/).getAttribute('aria-label')).toBe('Pin passage 1');
+    click(button(/^Pin evidence 1$/));
+    expect(button(/evidence 1$/).getAttribute('aria-label')).toBe('Release evidence 1');
+    click(button(/^Release evidence 1$/));
+    expect(button(/evidence 1$/).getAttribute('aria-label')).toBe('Pin evidence 1');
   });
 
   it('moves a pin from one passage to another', () => {
-    click(button(/^Pin passage 1$/));
-    click(button(/^Pin passage 2$/));
-    expect(button(/passage 1$/).getAttribute('aria-label')).toBe('Pin passage 1');
-    expect(button(/passage 2$/).getAttribute('aria-label')).toBe('Release passage 2');
+    click(button(/^Pin evidence 1$/));
+    click(button(/^Pin evidence 2$/));
+    expect(button(/evidence 1$/).getAttribute('aria-label')).toBe('Pin evidence 1');
+    expect(button(/evidence 2$/).getAttribute('aria-label')).toBe('Release evidence 2');
   });
 });

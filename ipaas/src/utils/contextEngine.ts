@@ -1825,7 +1825,7 @@ export function passageLines(evidence: Pick<ContextEvidence, 'locator' | 'passag
 /** How a stored question reads in the recent list, e.g. "2 hours ago · answered · 3 passages". */
 export function askedQuestionMeta(q: Pick<AskedQuestion, 'askedAt' | 'outcome' | 'passages'>): string {
   const when = formatDistanceToNow(q.askedAt) || 'Earlier';
-  const what = { answered: `answered · ${plural(q.passages, 'passage')}`, passages: plural(q.passages, 'passage'), none: 'no answer', hidden: 'answer hidden' }[q.outcome] ?? '';
+  const what = { answered: `answered · ${q.passages.toLocaleString('en-US')} evidence`, passages: `${q.passages.toLocaleString('en-US')} evidence`, none: 'no answer', hidden: 'answer hidden' }[q.outcome] ?? '';
   return `${when} · ${what}`;
 }
 

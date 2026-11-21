@@ -983,7 +983,7 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
   {
     kind: 'vector',
     title: 'Vector database',
-    purpose: 'Embeddings used to find relevant passages.',
+    purpose: 'Embeddings used to find relevant evidence.',
     managedName: 'LanceDB',
     serverName: 'PostgreSQL + pgvector',
     infraSegment: 'vector-databases',

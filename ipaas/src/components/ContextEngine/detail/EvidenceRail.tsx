@@ -53,12 +53,12 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
     if (pinned) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [pinned]);
   return (
-    // The whole card pins and releases the passage, so a click anywhere on it opens more of the text.
+    // The whole card pins and releases the evidence, so a click anywhere on it opens more of the text.
     <Box
       ref={ref}
       role="button"
       tabIndex={0}
-      aria-label={`${pinned ? 'Release' : 'Pin'} passage ${n}`}
+      aria-label={`${pinned ? 'Release' : 'Pin'} evidence ${n}`}
       aria-pressed={pinned}
       onClick={() => onPin(n)}
       onKeyDown={(e) => {
@@ -82,7 +82,7 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href,
           <Tooltip title="Release (Esc)">
             <IconButton
               size="small"
-              aria-label="Close pinned passage"
+              aria-label="Close pinned evidence"
               onClick={(e) => {
                 e.stopPropagation();
                 onPin(n);
@@ -195,7 +195,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
     <Stack gap={1.25} sx={{ position: { lg: 'sticky' }, top: { lg: 16 } }}>
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Passages
+          Evidence
         </Typography>
         <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
           {cited ? 'Cited in the answer' : 'Best match first'}
@@ -214,7 +214,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
       {listed.slice(0, showAll ? listed.length : RAIL_PREVIEW).map(renderCard)}
       {listed.length > RAIL_PREVIEW && (
         <Button size="small" variant="text" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} sx={{ alignSelf: 'flex-start' }}>
-          {showAll ? 'Show fewer' : `Show all ${listed.length} passages`}
+          {showAll ? 'Show fewer' : `Show all ${listed.length} evidence`}
         </Button>
       )}
       {uncited.length > 0 && (

@@ -64,7 +64,7 @@ export function PassageRow({ evidence: ev, engineId, orgHandle, sourceName, answ
       </Typography>
       {inDerivation ? (
         <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: n ? 'primary.main' : 'text.secondary' }}>
-          {n ? `Passage ${n} of this answer` : 'Not retrieved for this question'}
+          {n ? `Evidence ${n} of this answer` : 'Not retrieved for this question'}
         </Typography>
       ) : (
         <Typography variant="body2" sx={{ mt: 0.5, fontSize: 13, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -184,7 +184,7 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
           {/* Hidden on the provenance page; the explorer, which passes no derivation, still shows it. */}
           {!derivation && (
             <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-              Mentioned in {mentioned.length} passage{mentioned.length === 1 ? '' : 's'} across {records.size} document{records.size === 1 ? '' : 's'}.
+              Mentioned in {mentioned.length} evidence across {records.size} document{records.size === 1 ? '' : 's'}.
             </Typography>
           )}
 
@@ -201,7 +201,7 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
                 </Stack>
               ) : (
                 <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
-                  No sentence of the answer cites a passage that names it.
+                  No sentence of the answer cites evidence that names it.
                 </Typography>
               )}
             </Box>
@@ -215,7 +215,7 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
               ))}
               {!mentioned.length && (
                 <Typography variant="body2" component="li" sx={mutedSx}>
-                  No passage you can read names it directly.
+                  No evidence you can read names it directly.
                 </Typography>
               )}
             </Stack>

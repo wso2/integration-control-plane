@@ -241,7 +241,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     // An answer is usually short and its passages run longer beside it, so its footer sits under the answer, not under both.
     let answerTurn = false;
     if (result.answerWithheld) {
-      summary = `Answer hidden · ${t.reopened && lost ? `${n} of ${t.reopened.passagesThen} passages still available` : `${n} passage${n === 1 ? '' : 's'}`}`;
+      summary = `Answer hidden · ${t.reopened && lost ? `${n} of ${t.reopened.passagesThen} evidence still available` : `${n} evidence`}`;
       body = (
         <>
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', p: 2, borderRadius: 1, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
@@ -251,51 +251,51 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 The answer is hidden
               </Typography>
               <Typography variant="body2" sx={mutedSx}>
-                A passage it used is no longer available to you.
+                Evidence it used is no longer available to you.
               </Typography>
             </Box>
             <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || asking} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
               Ask again
             </Button>
           </Box>
-          {n > 0 && <SectionHeading title="Evidence you can still read" caption={t.reopened && lost ? `${n} of ${t.reopened.passagesThen} passages` : undefined} />}
+          {n > 0 && <SectionHeading title="Evidence you can still read" caption={t.reopened && lost ? `${n} of ${t.reopened.passagesThen} evidence` : undefined} />}
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
     } else if (answerText) {
-      summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
+      summary = `Answered${llmModel ? ` by ${llmModel}` : ''}`;
       answerTurn = true;
     } else if (n === 0) {
-      summary = t.mode === 'answer' ? 'No answer' : '0 passages';
+      summary = t.mode === 'answer' ? 'No answer' : 'No evidence';
       body = readsNothing ? (
         <Alert severity="info">Nothing came back because you can&apos;t read any content in this engine. Its sources are shared with roles you&apos;re not in.</Alert>
       ) : (
-        <Alert severity="info">No passages matched this question. Try different words.</Alert>
+        <Alert severity="info">No evidence matched this question. Try different words.</Alert>
       );
     } else if (t.mode === 'answer') {
-      summary = `No answer · ${n} passage${n === 1 ? '' : 's'} checked`;
+      summary = `No answer · ${n} evidence checked`;
       body = (
         <>
           <Alert severity="info">
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              No answer from the passages you can read
+              No answer from the evidence you can read
             </Typography>
-            Related passages were found, but none answers this.
+            Related evidence was found, but none of it answers this.
           </Alert>
-          <SectionHeading title="Passages it checked" />
+          <SectionHeading title="Evidence it checked" />
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
     } else {
       const f = result.facts.length;
-      summary = `${n} passage${n === 1 ? '' : 's'}${f ? ` · ${f} fact${f === 1 ? '' : 's'}` : ''}`;
+      summary = `${n} evidence${f ? ` · ${f} fact${f === 1 ? '' : 's'}` : ''}`;
       // With graph facts, the passages move to a rail beside them, as an answer's do; without, they are the whole result.
       body = f ? (
         <FactsTurn question={t.question} facts={result.facts} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} graphHrefFor={(ev) => derivationHref(result.queryId, ev)} />
       ) : (
         <>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-            Passages
+            Evidence
           </Typography>
           <Stack gap={1.5}>{cards}</Stack>
         </>
@@ -311,7 +311,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </Stack>
         <Stack direction="row" gap={1} flexWrap="wrap">
           <Button size="small" variant="outlined" startIcon={<Copy size={14} />} disabled={!answered && n === 0} onClick={() => copyResult(t)}>
-            {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy passages'}
+            {copied === result.queryId ? 'Copied' : answered ? 'Copy answer' : 'Copy evidence'}
           </Button>
           <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
             Use in API
@@ -339,11 +339,11 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </Box>
         <Box sx={answerCardSx}>
           {body}
-          {lost > 0 && !result.answerWithheld && (
+          {lost > 0 && t.reopened && !result.answerWithheld && (
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mt: 1.5, p: 1.5, borderRadius: 1, border: '1px dashed', borderColor: 'divider', color: 'text.secondary' }}>
               <Unlink size={16} aria-hidden style={{ marginTop: 2 }} />
               <Typography variant="body2">
-                {lost} passage{lost === 1 ? '' : 's'} from when you asked {lost === 1 ? 'is' : 'are'} no longer available.
+                Some evidence from when you asked is no longer available ({lost} of {t.reopened.passagesThen}).
               </Typography>
             </Box>
           )}
@@ -406,7 +406,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
                 <CircularProgress size={14} aria-hidden />
                 <Typography variant="body2" sx={mutedSx}>
-                  {pending.mode === 'answer' ? 'Finding passages and writing the answer…' : 'Finding passages…'}
+                  {pending.mode === 'answer' ? 'Finding evidence and writing the answer…' : 'Finding evidence…'}
                 </Typography>
               </Stack>
               <Skeleton variant="text" width="92%" />

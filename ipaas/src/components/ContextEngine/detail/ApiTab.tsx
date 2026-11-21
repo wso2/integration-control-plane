@@ -52,7 +52,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
   if (!engine.publicApiUrl) {
     return (
       <Box sx={{ maxWidth: 900 }}>
-        <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
+        <SurfaceHeader title="REST API" description="Send a question and get evidence or a cited answer." />
         <Alert severity="info" variant="outlined">
           The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
         </Alert>
@@ -62,7 +62,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
+      <SurfaceHeader title="REST API" description="Send a question and get evidence or a cited answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
       {engine.access?.api === false && <AccessOffAlert surface="api" />}
 
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>

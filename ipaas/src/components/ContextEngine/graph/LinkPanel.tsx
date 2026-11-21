@@ -173,7 +173,7 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourc
             </Stack>
           ) : (
             <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
-              No sentence of the answer cites a passage this relationship stands on.
+              No sentence of the answer cites evidence this relationship stands on.
             </Typography>
           )}
         </Box>
@@ -192,7 +192,7 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourc
         <Stack direction="row" alignItems="center" gap={1}>
           <CircularProgress size={14} />
           <Typography variant="caption" sx={mutedSx}>
-            Reading the passages behind it…
+            Reading the evidence behind it…
           </Typography>
         </Stack>
       ) : (

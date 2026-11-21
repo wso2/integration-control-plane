@@ -133,7 +133,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
               <Unlink size={22} aria-hidden />
             </Box>
             <Typography variant="h6" sx={{ mt: 2, fontWeight: 600 }}>
-              This passage is no longer available
+              This evidence is no longer available
             </Typography>
             <Typography variant="body2" sx={{ ...mutedSx, mt: 1, lineHeight: 1.55 }}>
               The item it came from may have changed or been removed, or you may not have access to it.
@@ -156,7 +156,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 Retry
               </Button>
             }>
-            Couldn&apos;t load this passage. Please try again.
+            Couldn&apos;t load this evidence. Please try again.
           </Alert>
         )}
       </PageContent>
@@ -225,7 +225,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             Provenance
           </Typography>
         </Box>
-        <Stack direction="row" alignItems="stretch" gap={1} sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' }, '& > svg': { alignSelf: 'center' } }} aria-label="Where this passage comes from">
+        <Stack direction="row" alignItems="stretch" gap={1} sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' }, '& > svg': { alignSelf: 'center' } }} aria-label="Where this evidence comes from">
           <ChainStep label="Source" value={source?.name ?? ev.sourceId} detail={source ? sourceTypeName(source.type) : undefined} />
           <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
           <ChainStep label="ID" value={ev.recordId} />
