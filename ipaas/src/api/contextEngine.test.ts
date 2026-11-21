@@ -84,12 +84,27 @@ describe('engines', () => {
 
   it("takes API and MCP access from the BFF, not from the engine's own configuration", async () => {
     bff.get.mockResolvedValueOnce({ ...bffEngine, apiEnabled: false, mcpEnabled: true });
-    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { publicApi: true, mcp: false, answers: true, agenticSearch: true } } : []));
+    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { publicApi: true, mcp: false, answers: true, agenticSearch: true }, defaultSearch: 'agentic' } : []));
 
     const engine = await getContextEngine(ENGINE);
 
     expect(engine.access).toEqual({ api: false, mcp: true });
-    expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true, agenticSearch: true });
+    expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true, agenticSearch: true, defaultSearch: 'agentic' });
+  });
+
+  it.each([
+    ['agentic', 'agentic'],
+    ['deterministic', 'deterministic'],
+    // An engine from before the field, or with a value this console does not know, runs its own search by default.
+    [undefined, 'deterministic'],
+    ['semantic', 'deterministic'],
+  ] as const)("reads the engine's default search %j as %s", async (defaultSearch, want) => {
+    bff.get.mockResolvedValueOnce(bffEngine);
+    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { answers: true, agenticSearch: true }, ...(defaultSearch ? { defaultSearch } : {}) } : []));
+
+    const engine = await getContextEngine(ENGINE);
+
+    expect(engine.exposure.defaultSearch).toBe(want);
   });
 
   it('reads an engine that is restarting from the BFF alone', async () => {

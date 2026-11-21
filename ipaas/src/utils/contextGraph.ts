@@ -581,25 +581,9 @@ export function searchNodes(m: GraphModel, text: string, limit = 8): number[] {
 
 // ── Answer derivation ───────────────────────────────────────────────────────
 
-const MARKER = /\[(\s*\d{1,3}(?:\s*,\s*\d{1,3})*\s*)\]/g;
-const LEADING_MARKERS = /^\s*(?:\[\s*\d{1,3}(?:\s*,\s*\d{1,3})*\s*\]\s*)+/;
-
-/**
- * The answer's sentences, each with the markers that cite it. A model often puts
- * a marker after the full stop ("… ten minutes. [1]"); such a piece holds no words
- * of its own, so it joins the sentence before it, as the Playground draws it.
- */
+/** The answer's sentences, without the blank pieces between paragraphs. */
 export function answerSentences(answer: string | undefined): string[] {
-  const sentences: string[] = [];
-  for (const piece of splitSentences(answer ?? '')) {
-    // Markers at the start of a piece cite the sentence before it.
-    const lead = sentences.length ? (piece.match(LEADING_MARKERS)?.[0] ?? '') : '';
-    if (lead) sentences[sentences.length - 1] += lead;
-    const rest = piece.slice(lead.length);
-    if (rest.replace(MARKER, '').trim()) sentences.push(rest);
-    else if (rest.trim() && sentences.length) sentences[sentences.length - 1] += rest;
-  }
-  return sentences;
+  return splitSentences(answer ?? '').filter((sentence) => sentence.trim());
 }
 
 export const ordinal = (n: number): string => {

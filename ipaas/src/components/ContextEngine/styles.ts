@@ -360,10 +360,15 @@ export const progressHeadlineSx = { display: 'flex', alignItems: 'center', gap: 
 
 // ── Playground ──────────────────────────────────────────────────────────────
 
-/** The question box and Ask button side by side, centred on the box; the shortcut hint sits below the row. */
+/**
+ * The question box and Ask button side by side, centred on the box. The search switch, when there is one, goes in
+ * Ask's column under it, starting where Ask starts; Ask fills that column.
+ */
 export const askBarSx = {
-  display: 'flex',
-  gap: 1.5,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  columnGap: 1.5,
+  rowGap: 0.75,
   alignItems: 'center',
 } as const;
 
@@ -491,29 +496,6 @@ export const listProgressTextSx = { display: 'block', mt: 0.5, whiteSpace: 'nowr
 
 export const suggestionRowSx = { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } as const;
 
-/** A `[n]` citation in an answer: an outlined number that fills while pointed at, with a ring while pinned. */
-export const citationMarkSx = (lit: boolean, pinned: boolean) =>
-  ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 18,
-    minWidth: 18,
-    px: 0.6,
-    mx: 0.25,
-    borderRadius: 9,
-    verticalAlign: 'super',
-    fontSize: 11,
-    fontWeight: 600,
-    lineHeight: 1,
-    border: '1px solid',
-    borderColor: lit ? 'primary.main' : 'primary.light',
-    bgcolor: lit ? 'primary.main' : 'background.paper',
-    color: lit ? 'primary.contrastText' : 'primary.main',
-    boxShadow: pinned ? '0 0 0 3px rgba(255, 115, 0, 0.25)' : 'none',
-    transition: 'background-color 120ms, color 120ms, box-shadow 120ms',
-  }) as const;
-
 /** An answer rendered from Markdown: modest headings, tight lists, inline code, the last block flush with the card. */
 export const answerMarkdownSx = {
   fontSize: '1rem',
@@ -532,19 +514,6 @@ export const answerMarkdownSx = {
   '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1.5, py: 0.5, textAlign: 'left' },
   '& th': { fontWeight: 600 },
   '& > :last-child, & > div > :last-child': { mb: 0 },
-} as const;
-
-/** A sentence's last word, its citation marks and its closing punctuation, kept on one line. */
-export const citationRunSx = { whiteSpace: 'nowrap' } as const;
-
-/** The sentence a pointed-at citation supports. */
-export const litSentenceSx = {
-  bgcolor: 'rgba(255, 115, 0, 0.12)',
-  boxShadow: (t: { palette: { primary: { main: string } } }) => `0 1px 0 ${t.palette.primary.main}`,
-  borderRadius: '3px',
-  // The margin cancels the padding, so lighting a sentence never reflows the line it sits on.
-  px: 0.25,
-  mx: -0.25,
 } as const;
 
 /** A passage in the evidence rail beside an answer. */

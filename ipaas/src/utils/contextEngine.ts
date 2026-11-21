@@ -49,7 +49,6 @@ import {
   UPLOAD_MAX_BYTES,
   UPLOAD_SLOW_AFTER_MS,
 } from '../constants/contextEngine';
-import type { Link, Parent, Root, RootContent, Text } from 'mdast';
 import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
 import { formatDistanceToNow, formatElapsed } from './time';
@@ -81,9 +80,12 @@ import type {
   UpdateContextModelsInput,
   ContextEvidence,
   ContextEvidenceLocationState,
+  ContextAskResult,
   ContextFact,
+  ContextQueryInput,
   ContextQueryMode,
   ContextQueryResult,
+  ContextQuerySearch,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -1542,9 +1544,39 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
 
 // ── Playground ──────────────────────────────────────────────────────────────
 
-/** The mode a new Playground conversation starts in: Answer when the engine offers answers, Context otherwise. */
-export function defaultQueryMode(engine: { exposure: Pick<ContextEngineDetail['exposure'], 'answers'> }): ContextQueryMode {
+/** The mode every question is asked in: an engine that offers answers answers every query, one without returns facts only. */
+export function engineQueryMode(engine: { exposure: Pick<ContextEngineDetail['exposure'], 'answers'> }): ContextQueryMode {
   return engine.exposure.answers ? 'answer' : 'context';
+}
+
+/** The search a question starts with: the engine's default, or the one the user chose; agentic only where it is offered. */
+export function playgroundSearch(exposure: Pick<ContextEngineDetail['exposure'], 'agenticSearch' | 'defaultSearch'>, chosen?: ContextQuerySearch): ContextQuerySearch {
+  if (!exposure.agenticSearch) return 'deterministic';
+  return chosen ?? exposure.defaultSearch;
+}
+
+/**
+ * The answer model failed and the search did not: a 503 with code `unavailable`, or with the code of the model
+ * provider's own failure. Any other 503 is a failed search, with nothing to show.
+ */
+export function isAnswerModelFailure(err: unknown): boolean {
+  if (!(err instanceof HttpError) || err.status !== 503) return false;
+  const code = engineErrorCode(err);
+  return code === 'unavailable' || !!code?.startsWith('backend_model_');
+}
+
+/**
+ * Ask a question; when the answer model fails, ask once more for the facts alone, with the same question, search
+ * and limit, so the reader still gets what the search found. The failed answer's message comes back with them.
+ */
+export async function askWithAnswerFallback(run: (input: ContextQueryInput) => Promise<ContextQueryResult>, input: ContextQueryInput): Promise<ContextAskResult> {
+  try {
+    return { result: await run(input), mode: input.mode };
+  } catch (err) {
+    if (input.mode !== 'answer' || !isAnswerModelFailure(err)) throw err;
+    const result = await run({ ...input, mode: 'context' });
+    return { result, mode: 'context', answerError: engineMessage(err, "The engine's answer model failed.") };
+  }
 }
 
 /** Questions to offer in an empty Playground, seeded from the engine's sources. */
@@ -1656,7 +1688,7 @@ export function withLastKnownFacets(engine: ContextEngineDetail, last: ContextEn
     sources: last.sources,
     models: last.models,
     queryRoles: last.queryRoles,
-    exposure: { ...engine.exposure, answers: last.exposure.answers, agenticSearch: last.exposure.agenticSearch },
+    exposure: { ...engine.exposure, answers: last.exposure.answers, agenticSearch: last.exposure.agenticSearch, defaultSearch: last.exposure.defaultSearch },
     storage: last.storage,
   };
 }
@@ -1684,80 +1716,6 @@ export function splitSentences(text: string): string[] {
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
-}
-
-/** Whether a piece from {@link splitSentences} ends at a sentence end. */
-export function endsSentence(piece: string): boolean {
-  return /([.!?]+["”')\]]*\s+|\n+)$/.test(piece);
-}
-
-// ── Citations ───────────────────────────────────────────────────────────────
-
-/**
- * The property a citation link carries to the renderer. Markdown has no way to
- * write it, so a link the model wrote, `#cite-` address or not, never becomes a mark.
- */
-export const CITE_PROPERTY = 'dataCite';
-
-const CITATION = /\[(\d{1,3})\]/g;
-// Scripts written without spaces between words put a citation right after the
-// last character, as in 天[1], so a letter of theirs does not make a subscript.
-const UNSPACED = /[\u0e00-\u0eff\u1000-\u109f\u1780-\u17ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff66-\uff9f]/;
-const WORD = /[\p{L}\p{N}_]/u;
-// Text inside these is a link's own text; a citation mark there would be a link inside a link.
-const LINK_TYPES = new Set(['link', 'linkReference']);
-
-/** Split one text node into text and citation links, recording each passage number cited. */
-function splitText(node: Text, passages: number, source: string, cited: Set<number>): RootContent[] {
-  const out: RootContent[] = [];
-  let last = 0;
-  let citeEnd = -1;
-  for (const m of node.value.matchAll(CITATION)) {
-    const idx = m.index ?? 0;
-    const n = Number(m[1]);
-    const offset = node.position?.start.offset;
-    const before = idx > 0 ? node.value[idx - 1] : offset ? source[offset - 1] : '';
-    // As the engine reads them: a bracket after a letter, digit, or underscore is a
-    // subscript, as in items[1]; one after another bracket is a subscript or a
-    // reference link, as in grid[1][2] or [guide][1], unless it follows a citation, as in [1][2].
-    const subscript = (WORD.test(before) && !UNSPACED.test(before)) || (before === ']' && idx !== citeEnd);
-    if (subscript || n < 1 || n > passages) continue;
-    if (idx > last) out.push({ type: 'text', value: node.value.slice(last, idx) });
-    const link: Link = { type: 'link', url: `#cite-${n}`, children: [{ type: 'text', value: String(n) }], data: { hProperties: { [CITE_PROPERTY]: n } } };
-    out.push(link);
-    cited.add(n);
-    last = idx + m[0].length;
-    citeEnd = last;
-  }
-  if (!out.length) return [node];
-  if (last < node.value.length) out.push({ type: 'text', value: node.value.slice(last) });
-  return out;
-}
-
-/**
- * Turn the `[n]` citations in a parsed answer into citation links, and return
- * the passage numbers cited. Only plain text is read, so code, link addresses,
- * and HTML never hold a citation, and only numbers that name a passage count.
- */
-export function markCitations(tree: Root, passages: number, source: string): Set<number> {
-  const cited = new Set<number>();
-  const visit = (parent: Parent) => {
-    if (LINK_TYPES.has(parent.type)) return;
-    parent.children = parent.children.flatMap((child) => {
-      if (child.type === 'text') return splitText(child, passages, source, cited);
-      if ('children' in child) visit(child);
-      return [child];
-    }) as Parent['children'];
-  };
-  visit(tree);
-  return cited;
-}
-
-/** A remark plugin that draws an answer's citations as citation links. */
-export function remarkCitations(passages: number, source: string) {
-  return () => (tree: Root) => {
-    markCitations(tree, passages, source);
-  };
 }
 
 /** The passages a fact stands on, in the order the fact names them. */
@@ -2051,14 +2009,9 @@ export function resolveEngineBaseUrl(configured: string, origin: string): string
  */
 const publicUrl = (baseUrl: string, route: string): string => `${trimSlash(baseUrl)}/v1/${route}`;
 
-/** The public route that returns the passages answering a question. */
+/** The public route that returns the statements for a query, with an answer when the engine answers. */
 export function contextEndpointUrl(baseUrl: string): string {
   return publicUrl(baseUrl, 'context');
-}
-
-/** The public route that answers a question with checked citations. */
-export function answerEndpointUrl(baseUrl: string): string {
-  return publicUrl(baseUrl, 'answer');
 }
 
 /** The engine's MCP endpoint. */
@@ -2069,29 +2022,25 @@ export function mcpEndpointUrl(baseUrl: string): string {
 /** The question can come from a link, so a `'` in it must not end the shell's single-quoted body. */
 const shellSingleQuoted = (text: string): string => text.replaceAll("'", "'\\''");
 
-export function buildQueryCurl(baseUrl: string, question = 'What is our rollback procedure?', route: 'context' | 'answer' = 'context'): string {
-  const body = JSON.stringify({ question, limit: 5 }, null, 2);
-  const url = route === 'answer' ? answerEndpointUrl(baseUrl) : contextEndpointUrl(baseUrl);
-  return `curl -X POST ${url} \\\n  -H "X-API-Key: $API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '${shellSingleQuoted(body)}'`;
+/** A `POST /v1/context` call; the search and limit are left to the engine's defaults. */
+export function buildQueryCurl(baseUrl: string, question = 'What is our rollback procedure?'): string {
+  const body = JSON.stringify({ query: question }, null, 2);
+  return `curl -X POST ${contextEndpointUrl(baseUrl)} \\\n  -H "X-API-Key: $API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '${shellSingleQuoted(body)}'`;
 }
 
-/** The shape of a `/v1/context` response, for the API tab; `/v1/answer` adds `answer`. */
-export function buildQueryResponseExample(sourceId = 'src_…'): string {
+/**
+ * The shape of a `POST /v1/context` response, for the API tab, with plainly placeholder values so no one mistakes
+ * it for the engine's content. `answer` is null on an engine that does not answer.
+ */
+export function buildQueryResponseExample(answers: boolean, search: ContextQuerySearch = 'deterministic'): string {
   return JSON.stringify(
     {
       state: 'completed',
-      evidence: [
-        {
-          id: 'evi_…',
-          recordId: 'rollback-runbook',
-          sourceId,
-          sourceVersion: '42',
-          passage: 'To roll back a failed deployment, open the Deploy page, pick the previous release and click Promote.',
-          location: 'chunk:0',
-          sourceUrl: 'https://docs.example.com/runbooks/rollback',
-        },
-      ],
-      traceId: 'trace_…',
+      search,
+      answer: answers ? 'The answer, as Markdown, written from the statements below.' : null,
+      statements: [{ n: 1, subject: '<entity>', relation: '<relation>', object: '<entity>', description: '<the statement as a sentence>', evidence: [1] }],
+      evidence: [{ n: 1, text: '<the passage text>' }],
+      ...(search === 'agentic' ? { agent: { outcome: 'finished' } } : {}),
     },
     null,
     2,

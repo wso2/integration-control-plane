@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, /* Chip, */ CircularProgress, Divider, FormControlLabel, IconButton, Skeleton, Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, /* Chip, */ CircularProgress, FormControlLabel, IconButton, Skeleton, Stack, Switch, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
@@ -24,9 +24,9 @@ import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useQueryContextEngine, useReopenContextQuery, useContextPrincipal } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules } from '../../../hooks/contextUploads';
 import { clearQuestions, forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
-import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, setPlaygroundSearch, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
-import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MODES } from '../../../constants/contextEngine';
-import { defaultQueryMode } from '../../../utils/contextEngine';
+import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundSearch, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
+import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
+import { engineQueryMode, playgroundSearch } from '../../../utils/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { contextEngineUrl, contextEvidenceUrl, contextFactUrl } from '../../../paths';
@@ -51,18 +51,23 @@ interface QueryFailure {
   forbidden?: boolean;
 }
 
-function queryFailure(e: unknown, mode: ContextQueryMode): QueryFailure {
+function queryFailure(e: unknown, mode: ContextQueryMode, search: ContextQuerySearch): QueryFailure {
   if (e instanceof HttpError) {
     if (e.status === 403) return { message: "You don't have query access to this engine.", forbidden: true };
-    // The engine names a model provider failure by its code, so the message says what to fix.
+    // The page asks only for what the engine offered when it was read, so the engine's settings changed since. When the
+    // question asked for both, the engine's message says which one it refused.
+    if (e.status === 400 && engineErrorCode(e) === 'not_offered') {
+      const what = search === 'agentic' && (mode !== 'answer' || /agentic|search/i.test(engineMessage(e))) ? 'agentic search' : 'answers';
+      return { message: `This engine does not offer ${what}. Its settings may have changed: reload the page, then ask again.` };
+    }
+    // The engine names a model provider failure by its code, so the message says what to fix. A failed answer never
+    // gets here: the facts are asked for again without one.
     if (e.status === 503 && engineErrorCode(e)?.startsWith('backend_model_')) return { message: `${engineMessage(e).replace(/\.$/, '')}. Fix the engine's model settings, then ask again.` };
-    if (e.status === 503 && mode === 'answer') return { message: "The engine couldn't get an answer from its language model just now, and stored nothing. Check the engine's models and keys, or ask in Context mode." };
     if (e.status === 503) return { message: "The engine is running without its knowledge backend, so it can't search yet. Start it in provider mode with model keys." };
-    if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };
     if (e.status === 400) return { message: `The engine rejected the question: ${e.message}` };
     if (e.status === 401) return { message: 'The context engine rejected the credential.' };
     if (e.status === 502) return { message: "The gateway couldn't reach the context engine. Check that the engine is running, then ask again." };
-    if (e.status === 504) return { message: 'The engine took too long to answer. Try a narrower question, or ask in Context mode.' };
+    if (e.status === 504) return { message: search === 'agentic' ? 'The engine took too long to answer. Agentic search can take a minute or more: ask again, or turn it off for a faster search.' : 'The engine took too long to answer. Try a narrower question.' };
   }
   return { message: "Couldn't run the query. Please try again." };
 }
@@ -72,6 +77,16 @@ function outcomeOf(mode: ContextQueryMode, result: ContextQueryResult): AskedQue
   if (result.answerWithheld) return 'hidden';
   if (mode === 'answer') return result.answer ? 'answered' : 'none';
   return result.evidence.length ? 'passages' : 'none';
+}
+
+/** Seconds since a question was sent, ticking, for an agentic search that takes a minute or more. */
+function ElapsedSeconds({ since }: { since: number }): JSX.Element {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, []);
+  return <>{Math.max(0, Math.round((now - since) / 1000))} s</>;
 }
 
 function SectionHeading({ title, caption }: { title: string; caption?: string }): JSX.Element {
@@ -94,15 +109,14 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const navigate = useAppNavigate();
   const [params, setSearchParams] = useSearchParams();
   const { markAsked } = useAskedFlag(engine.id, engine.createdAt);
-  // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
-  // Until a mode is chosen the engine's default holds, and a stored Answer gives way when the engine offers no answers.
-  const { turns, mode: chosenMode, search: chosenSearch, pending, failure } = usePlaygroundConversation(engine.id);
-  const mode = chosenMode && (chosenMode !== 'answer' || engine.exposure.answers) ? chosenMode : defaultQueryMode(engine);
-  // Agentic search switched on gives way, like Answer, when the engine does not offer it.
-  const search: ContextQuerySearch = chosenSearch === 'agentic' && engine.exposure.agenticSearch ? 'agentic' : 'deterministic';
+  // The conversation and the chosen search live outside the tab, so a tab switch or a passage page does not empty them.
+  const { turns, search: chosenSearch, pending, failure } = usePlaygroundConversation(engine.id);
+  // The engine decides whether a question is answered: one that offers answers answers every question.
+  const mode = engineQueryMode(engine);
+  // The engine's default search until the user picks one; agentic only where the engine offers it.
+  const search = playgroundSearch(engine.exposure, chosenSearch);
   // A question pending from before a tab switch still counts, so it is not asked twice.
   const asking = pending !== undefined;
-  const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
   const permissions = useContextPermissions(engine.id);
   const canQuery = !permissions.data || permissions.data.includes('context.read');
   // Whether the asker can read anything at all: each source maps its labels to roles, and a passage is readable
@@ -155,13 +169,15 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     if (fromComposer) setQuestion('');
     window.requestAnimationFrame(() => pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
+    // Agentic search ignores the limit and returns everything its agent selected.
     query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT, search: askSearch }).then(
-      (result) => {
+      // When the answer model failed, the facts came back alone, in context mode, with why the answer is missing.
+      ({ result, mode: answeredMode, answerError }) => {
         // The engine stored the question either way, so it joins the recent list even when the conversation moved on.
-        rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
+        rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: answeredMode, askedAt: new Date().toISOString(), outcome: outcomeOf(answeredMode, result), passages: result.evidence.length });
         markAsked();
         // The box was emptied when the question was sent; whatever was typed since stays.
-        finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } });
+        finishQuestion(engine.id, token, { turn: { question: q, mode: answeredMode, result, ...(answerError ? { answerError } : {}) } });
       },
       (error: unknown) => {
         if (finishQuestion(engine.id, token, { error }) && fromComposer) setQuestion((current) => current || q);
@@ -181,7 +197,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       .mutateAsync(q.queryId)
       .then(
         (result) => {
-          replaceTurns(engine.id, [{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }], q.mode);
+          replaceTurns(engine.id, [{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }]);
           if (result.answerWithheld && q.outcome !== 'hidden') updateQuestion(engine.id, q.queryId, { outcome: 'hidden' });
           window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         },
@@ -203,7 +219,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     });
   };
 
-  const openInApi = (turn: PlaygroundTurn) => navigate(contextEngineUrl(orgHandle, engine.id, 'api', { q: turn.question, mode: turn.mode === 'answer' ? 'answer' : undefined }));
+  const openInApi = (turn: PlaygroundTurn) => navigate(contextEngineUrl(orgHandle, engine.id, 'api', { q: turn.question }));
   // The Graph tab draws a stored query's derivation, with or without an answer; a passage given here opens chosen.
   const derivationHref = (queryId: string, ev?: ContextEvidence) => contextEngineUrl(orgHandle, engine.id, 'graph', { query: queryId, node: ev ? `p:${ev.id}` : undefined });
 
@@ -258,7 +274,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 Evidence it used is no longer available to you.
               </Typography>
             </Box>
-            <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || asking} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
+            <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || asking} onClick={() => ask(t.question)} sx={{ flexShrink: 0 }}>
               Ask again
             </Button>
           </Box>
@@ -342,6 +358,14 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Typography variant="body2">{t.question}</Typography>
         </Box>
         <Box sx={answerCardSx}>
+          {t.answerError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                The answer couldn&apos;t be written
+              </Typography>
+              {t.answerError.replace(/\.?$/, '.')} Here is what the search found.
+            </Alert>
+          )}
           {body}
           {lost > 0 && t.reopened && !result.answerWithheld && (
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mt: 1.5, p: 1.5, borderRadius: 1, border: '1px dashed', borderColor: 'divider', color: 'text.secondary' }}>
@@ -407,11 +431,23 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               <Typography variant="body2">{pending.question}</Typography>
             </Box>
             <Box sx={answerCardSx} aria-live="polite" aria-busy="true">
-              <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
+              <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mb: 1.5 }}>
                 <CircularProgress size={14} aria-hidden />
                 <Typography variant="body2" sx={mutedSx}>
-                  {pending.mode === 'answer' ? 'Finding evidence and writing the answer…' : 'Finding evidence…'}
+                  {pending.search === 'agentic'
+                    ? pending.mode === 'answer'
+                      ? 'Agentic search is exploring the context graph, then the answer is written…'
+                      : 'Agentic search is exploring the context graph…'
+                    : pending.mode === 'answer'
+                      ? 'Finding evidence and writing the answer…'
+                      : 'Finding evidence…'}
                 </Typography>
+                {/* A minute or more of waiting, so the time spent shows; hidden from screen readers, which would read every tick. */}
+                {pending.search === 'agentic' && (
+                  <Typography variant="caption" aria-hidden sx={{ ...mutedSx, ml: 'auto' }}>
+                    <ElapsedSeconds since={pending.startedAt} />
+                  </Typography>
+                )}
               </Stack>
               <Skeleton variant="text" width="92%" />
               <Skeleton variant="text" width="85%" />
@@ -429,10 +465,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         {failure && (
           <Alert
             severity="error"
-            onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
+            onClose={queryFailure(failure.error, failure.mode, failure.search).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
             // Retried in the mode and search it failed in; a failed question from the composer is back in it, one asked from the thread is not.
-            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode, failure.search)} /> : undefined}>
-            {queryFailure(failure.error, failure.mode).message}
+            action={queryFailure(failure.error, failure.mode, failure.search).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode, failure.search)} /> : undefined}>
+            {queryFailure(failure.error, failure.mode, failure.search).message}
           </Alert>
         )}
 
@@ -456,54 +492,20 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               }}
               inputProps={{ 'aria-label': 'Question', maxLength: CONTEXT_QUERY_MAX_LENGTH }}
             />
-            <Button variant="contained" disabled={!canAsk} startIcon={asking ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />} onClick={() => ask()} sx={{ flexShrink: 0 }}>
+            <Button variant="contained" disabled={!canAsk} startIcon={asking ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />} onClick={() => ask()}>
               {asking ? 'Asking…' : 'Ask'}
             </Button>
+            {/* How the next question is searched, under Ask: a setting of the question box, not a view of the results above
+                (round 1, 9.7). Whether it is answered is the engine's to decide. Without agentic search there is nothing to choose. */}
+            {engine.exposure.agenticSearch && (
+              <FormControlLabel
+                control={<Switch size="small" edge="start" checked={search === 'agentic'} onChange={(_e, on) => setPlaygroundSearch(engine.id, on ? 'agentic' : 'deterministic')} />}
+                label={<Typography variant="caption">Agentic search</Typography>}
+                // On a phone it spans the row, right-aligned under Ask, so Ask's column, and the question box, keep their width.
+                sx={{ m: 0, gridColumn: { xs: '1 / -1', sm: 2 }, justifySelf: { xs: 'end', sm: 'start' } }}
+              />
+            )}
           </Box>
-          {/* What the next question returns: a setting of the question box, not a view of the results above (round 1, 9.7). */}
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap" sx={{ ml: 1.75 }}>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Typography variant="caption" sx={{ ...mutedSx, fontWeight: 600 }}>
-                Ask for
-              </Typography>
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                value={mode}
-                onChange={(_e, next: ContextQueryMode | null) => {
-                  if (next) setMode(next);
-                }}
-                aria-label="Ask for">
-                {CONTEXT_QUERY_MODES.map((m) =>
-                  m.value !== 'answer' || engine.exposure.answers ? (
-                    <ToggleButton key={m.value} value={m.value} sx={{ textTransform: 'none', py: 0.25 }}>
-                      {m.label}
-                    </ToggleButton>
-                  ) : (
-                    <Tooltip key={m.value} title="Answers are off for this engine.">
-                      <span>
-                        <ToggleButton value={m.value} disabled sx={{ textTransform: 'none', py: 0.25 }}>
-                          {m.label}
-                        </ToggleButton>
-                      </span>
-                    </Tooltip>
-                  ),
-                )}
-              </ToggleButtonGroup>
-              {/* A setting of the next question, so it sits with Answer/Context. */}
-              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-              <Tooltip title={engine.exposure.agenticSearch ? 'A model explores the knowledge graph to find the statements for your question.' : 'Agentic search is off for this engine.'}>
-                <span>
-                  <FormControlLabel
-                    control={<Switch size="small" checked={search === 'agentic'} onChange={(_e, on) => setPlaygroundSearch(engine.id, on ? 'agentic' : 'deterministic')} />}
-                    label={<Typography variant="caption">Agentic search</Typography>}
-                    disabled={!engine.exposure.agenticSearch}
-                    sx={{ m: 0 }}
-                  />
-                </span>
-              </Tooltip>
-            </Stack>
-          </Stack>
         </Stack>
       </Stack>
 
