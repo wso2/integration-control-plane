@@ -93,7 +93,9 @@ import {
   applyAnswerChoice,
   canShareApiKey,
   connectorCountsByCategory,
+  askWithAnswerFallback,
   engineQueryMode,
+  isAnswerModelFailure,
   playgroundSearch,
   effectiveLlm,
   databaseFieldErrors,
@@ -1075,6 +1077,44 @@ describe('playground mode and search', () => {
   it('never searches agentically on an engine that does not offer it, whatever the default or the choice', () => {
     expect(playgroundSearch(exposure({ agenticSearch: false }))).toBe('deterministic');
     expect(playgroundSearch(exposure({ agenticSearch: false }), 'agentic')).toBe('deterministic');
+  });
+});
+
+describe('a failed answer', () => {
+  const failed = (status: number, code: string, message = 'The answer model rejected the key.') => new HttpError(status, JSON.stringify({ code, message, traceId: 't' }));
+  const input = { engineId: 'e', question: 'Who does John Doe report to?', mode: 'answer' as const, limit: 15, search: 'agentic' as const };
+  const facts = { queryId: 'q2', state: 'completed', evidence: [], facts: [], conflicts: [], insufficientEvidence: false, traceId: 't2' };
+
+  it('is a 503 from the answer model: unavailable, or a model provider failure', () => {
+    expect(isAnswerModelFailure(failed(503, 'unavailable'))).toBe(true);
+    expect(isAnswerModelFailure(failed(503, 'backend_model_access_denied'))).toBe(true);
+    expect(isAnswerModelFailure(failed(503, 'search_failed'))).toBe(false);
+    expect(isAnswerModelFailure(failed(502, 'unavailable'))).toBe(false);
+    expect(isAnswerModelFailure(new Error('down'))).toBe(false);
+  });
+
+  it('asks once more for the facts alone, with the same question, search and limit, and keeps why', async () => {
+    const run = vi.fn().mockRejectedValueOnce(failed(503, 'backend_model_access_denied')).mockResolvedValueOnce(facts);
+    await expect(askWithAnswerFallback(run, input)).resolves.toEqual({ result: facts, mode: 'context', answerError: 'The answer model rejected the key.' });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenLastCalledWith({ ...input, mode: 'context' });
+  });
+
+  it('passes an answer straight through, and leaves other failures as errors', async () => {
+    await expect(askWithAnswerFallback(vi.fn().mockResolvedValue(facts), input)).resolves.toEqual({ result: facts, mode: 'answer' });
+    const searchFailed = failed(503, 'search_failed');
+    const run = vi.fn().mockRejectedValue(searchFailed);
+    await expect(askWithAnswerFallback(run, input)).rejects.toBe(searchFailed);
+    expect(run).toHaveBeenCalledTimes(1);
+    // A context question has no answer to give up on.
+    const unavailable = failed(503, 'unavailable');
+    await expect(askWithAnswerFallback(vi.fn().mockRejectedValue(unavailable), { ...input, mode: 'context' })).rejects.toBe(unavailable);
+  });
+
+  it("gives the retry's own failure when asking for the facts fails too", async () => {
+    const second = failed(503, 'search_failed');
+    const run = vi.fn().mockRejectedValueOnce(failed(503, 'unavailable')).mockRejectedValueOnce(second);
+    await expect(askWithAnswerFallback(run, input)).rejects.toBe(second);
   });
 });
 

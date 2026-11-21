@@ -38,7 +38,7 @@ import FactsTurn from './FactsTurn';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
 import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx /* , suggestionRowSx */ } from '../styles';
-import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, PlaygroundTurn } from '../../../types/contextEngine';
+import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, ContextQuerySearch, PlaygroundTurn } from '../../../types/contextEngine';
 
 interface PlaygroundTabProps {
   engine: ContextEngineDetail;
@@ -51,18 +51,23 @@ interface QueryFailure {
   forbidden?: boolean;
 }
 
-function queryFailure(e: unknown, mode: ContextQueryMode): QueryFailure {
+function queryFailure(e: unknown, mode: ContextQueryMode, search: ContextQuerySearch): QueryFailure {
   if (e instanceof HttpError) {
     if (e.status === 403) return { message: "You don't have query access to this engine.", forbidden: true };
-    // The engine names a model provider failure by its code, so the message says what to fix.
+    // The page asks only for what the engine offered when it was read, so the engine's settings changed since. When the
+    // question asked for both, the engine's message says which one it refused.
+    if (e.status === 400 && engineErrorCode(e) === 'not_offered') {
+      const what = search === 'agentic' && (mode !== 'answer' || /agentic|search/i.test(engineMessage(e))) ? 'agentic search' : 'answers';
+      return { message: `This engine does not offer ${what}. Its settings may have changed: reload the page, then ask again.` };
+    }
+    // The engine names a model provider failure by its code, so the message says what to fix. A failed answer never
+    // gets here: the facts are asked for again without one.
     if (e.status === 503 && engineErrorCode(e)?.startsWith('backend_model_')) return { message: `${engineMessage(e).replace(/\.$/, '')}. Fix the engine's model settings, then ask again.` };
-    if (e.status === 503 && mode === 'answer') return { message: "The engine couldn't get an answer from its language model just now, and stored nothing. Check the engine's models and keys, or ask in Context mode." };
     if (e.status === 503) return { message: "The engine is running without its knowledge backend, so it can't search yet. Start it in provider mode with model keys." };
-    if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };
     if (e.status === 400) return { message: `The engine rejected the question: ${e.message}` };
     if (e.status === 401) return { message: 'The context engine rejected the credential.' };
     if (e.status === 502) return { message: "The gateway couldn't reach the context engine. Check that the engine is running, then ask again." };
-    if (e.status === 504) return { message: 'The engine took too long to answer. Try a narrower question, or ask in Context mode.' };
+    if (e.status === 504) return { message: search === 'agentic' ? 'The engine took too long to answer. Agentic search can take a minute or more: ask again, or turn it off for a faster search.' : 'The engine took too long to answer. Try a narrower question.' };
   }
   return { message: "Couldn't run the query. Please try again." };
 }
@@ -166,12 +171,13 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
     // Agentic search ignores the limit and returns everything its agent selected.
     query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT, search: askSearch }).then(
-      (result) => {
+      // When the answer model failed, the facts came back alone, in context mode, with why the answer is missing.
+      ({ result, mode: answeredMode, answerError }) => {
         // The engine stored the question either way, so it joins the recent list even when the conversation moved on.
-        rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
+        rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: answeredMode, askedAt: new Date().toISOString(), outcome: outcomeOf(answeredMode, result), passages: result.evidence.length });
         markAsked();
         // The box was emptied when the question was sent; whatever was typed since stays.
-        finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } });
+        finishQuestion(engine.id, token, { turn: { question: q, mode: answeredMode, result, ...(answerError ? { answerError } : {}) } });
       },
       (error: unknown) => {
         if (finishQuestion(engine.id, token, { error }) && fromComposer) setQuestion((current) => current || q);
@@ -352,6 +358,14 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Typography variant="body2">{t.question}</Typography>
         </Box>
         <Box sx={answerCardSx}>
+          {t.answerError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                The answer couldn&apos;t be written
+              </Typography>
+              {t.answerError.replace(/\.?$/, '.')} Here is what the search found.
+            </Alert>
+          )}
           {body}
           {lost > 0 && t.reopened && !result.answerWithheld && (
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mt: 1.5, p: 1.5, borderRadius: 1, border: '1px dashed', borderColor: 'divider', color: 'text.secondary' }}>
@@ -451,10 +465,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         {failure && (
           <Alert
             severity="error"
-            onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
+            onClose={queryFailure(failure.error, failure.mode, failure.search).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
             // Retried in the mode and search it failed in; a failed question from the composer is back in it, one asked from the thread is not.
-            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode, failure.search)} /> : undefined}>
-            {queryFailure(failure.error, failure.mode).message}
+            action={queryFailure(failure.error, failure.mode, failure.search).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask(question.trim() === failure.question ? undefined : failure.question, failure.mode, failure.search)} /> : undefined}>
+            {queryFailure(failure.error, failure.mode, failure.search).message}
           </Alert>
         )}
 
