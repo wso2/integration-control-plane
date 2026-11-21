@@ -464,7 +464,7 @@ function DerivationPanel({
               alignItems: 'center',
               justifyContent: 'center',
               bgcolor: 'primary.main',
-              color: '#fff',
+              color: 'primary.contrastText',
             }}>
             {n}
           </Box>
@@ -554,7 +554,7 @@ function PassagePanel({
     <Box component="aside" aria-label={`Evidence ${n}`} sx={panelSx(true)}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Stack direction="row" alignItems="center" gap={1}>
-          <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: 'primary.main', color: '#fff', fontSize: 11.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</Box>
+          <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 11.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</Box>
           <Typography variant="subtitle2" component="h2" sx={{ fontWeight: 600 }}>
             Evidence
           </Typography>

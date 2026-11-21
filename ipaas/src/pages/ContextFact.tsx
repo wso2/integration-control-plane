@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, PageContent, Paper, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, PageContent, PageTitle, Paper, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, ChevronRight } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
@@ -34,10 +34,11 @@ import type { OrgScope } from '../nav';
 
 const cardSx = { ...summaryCardSx, height: 'auto' } as const;
 
-/** Shaped like the page: the fact's card, and one passage. */
+/** Shaped like the page: the title, the fact's card, and one passage. */
 function ContextFactSkeleton(): JSX.Element {
   return (
     <>
+      <Skeleton variant="text" width={160} height={44} sx={{ mb: 2 }} />
       <Skeleton variant="rounded" height={112} />
       <Skeleton variant="text" width={180} sx={{ mt: 3 }} />
       <Skeleton variant="rounded" height={260} sx={{ mt: 1.5 }} />
@@ -61,11 +62,6 @@ function Entity({ name, kind }: { name: string; kind?: string }): JSX.Element {
 function FactCard({ fact, passages }: { fact: Fact; passages: string[] }): JSX.Element {
   return (
     <Paper variant="outlined" sx={cardSx}>
-      <Box sx={summaryCardHeaderSx}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Statement
-        </Typography>
-      </Box>
       <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap">
         <Entity name={restoreCase(fact.subject, passages)} kind={fact.subjectKind} />
         <Typography variant="body1" sx={mutedSx}>
@@ -155,8 +151,10 @@ export default function ContextFact(scope: OrgScope): JSX.Element {
     );
   }
 
-  // The engine answers 404 alike for a query that is gone and one that is not the reader's.
-  if (result.isError && !(result.error instanceof HttpError && result.error.status === 404)) {
+  // The engine answers 404 alike for a query that is gone and one that is not the reader's. A refetch that gets one
+  // keeps the data read before it, so a 404 shows the statement as unavailable without reading that data.
+  const gone = result.error instanceof HttpError && result.error.status === 404;
+  if (result.isError && !gone) {
     return (
       <PageContent fullWidth sx={wrapSx}>
         {back}
@@ -174,7 +172,7 @@ export default function ContextFact(scope: OrgScope): JSX.Element {
     );
   }
 
-  const found = answerFact(result.data, factNumberParam(factNumber));
+  const found = gone ? null : answerFact(result.data, factNumberParam(factNumber));
   if (!found) {
     return (
       <PageContent fullWidth sx={wrapSx}>
@@ -196,6 +194,9 @@ export default function ContextFact(scope: OrgScope): JSX.Element {
   return (
     <PageContent fullWidth sx={wrapSx}>
       {back}
+      <PageTitle>
+        <PageTitle.Header>Statement</PageTitle.Header>
+      </PageTitle>
       <FactCard fact={fact} passages={support.map((ev) => ev.passage)} />
 
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={2} sx={{ mt: 3, mb: 1.5 }}>
