@@ -360,10 +360,15 @@ export const progressHeadlineSx = { display: 'flex', alignItems: 'center', gap: 
 
 // ── Playground ──────────────────────────────────────────────────────────────
 
-/** The question box and Ask button side by side, centred on the box; the shortcut hint sits below the row. */
+/**
+ * The question box and Ask button side by side, centred on the box. The search switch, when there is one, goes in
+ * Ask's column under it, starting where Ask starts; Ask fills that column.
+ */
 export const askBarSx = {
-  display: 'flex',
-  gap: 1.5,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  columnGap: 1.5,
+  rowGap: 0.75,
   alignItems: 'center',
 } as const;
 

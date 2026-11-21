@@ -97,12 +97,12 @@ vi.mock('./RecentQuestions', () => ({
 }));
 
 import PlaygroundTab from './PlaygroundTab';
-import { appendTurn, getPlaygroundConversation, setPlaygroundMode, setPlaygroundSearch } from '../../../hooks/contextTurns';
+import { appendTurn, getPlaygroundConversation, setPlaygroundSearch } from '../../../hooks/contextTurns';
 import { rememberQuestion } from '../../../hooks/contextQuestions';
 import { HttpError } from '../../../types/http';
 
-const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true, agenticSearch: true } } as unknown as ContextEngineDetail;
-const result = { queryId: 'qry_1', evidence: [] } as unknown as ContextQueryResult;
+const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true, agenticSearch: true, defaultSearch: 'deterministic' } } as unknown as ContextEngineDetail;
+const result = { queryId: 'qry_1', evidence: [], facts: [] } as unknown as ContextQueryResult;
 let root: Root;
 let host: HTMLDivElement;
 
@@ -112,17 +112,28 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve };
 }
 
-function render(path = '/'): void {
+/** A fresh tab for an engine, with a question in the box from the URL, as "Ask about this" leaves it. */
+function renderEngine(over: Omit<Partial<ContextEngineDetail>, 'exposure'> & { exposure?: Partial<ContextEngineDetail['exposure']> } = {}, path = '/?q=Who%20does%20John%20Doe%20report%20to%3F'): void {
+  act(() => root.unmount());
+  root = createRoot(host);
+  const e = { ...engine, ...over, exposure: { ...engine.exposure, ...over.exposure } } as ContextEngineDetail;
   act(() =>
     root.render(
       <MemoryRouter initialEntries={[path]}>
-        <PlaygroundTab engine={engine} orgHandle="org" />
+        <PlaygroundTab engine={e} orgHandle="org" />
       </MemoryRouter>,
     ),
   );
 }
 
 const button = (name: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`) ?? [...host.querySelectorAll('button')].find((b) => b.textContent === name) ?? null;
+const agenticSwitch = () => host.querySelector<HTMLInputElement>('input[role="switch"]');
+const refusal = (status: number, code: string, message: string) => {
+  const refused = Promise.reject(new HttpError(status, JSON.stringify({ code, message, traceId: 't' })));
+  refused.catch(() => undefined);
+  return refused;
+};
+const QUESTION = 'Who does John Doe report to?';
 
 beforeEach(() => {
   host = document.createElement('div');
@@ -130,6 +141,7 @@ beforeEach(() => {
   root = createRoot(host);
   queryContext.mutateAsync.mockReset();
   reopenContext.mutateAsync.mockReset();
+  vi.mocked(rememberQuestion).mockClear();
   asked.list = [];
 });
 
@@ -142,7 +154,7 @@ describe('PlaygroundTab', () => {
   it('records an answer that arrives after the tab was left', async () => {
     const answer = deferred<ContextQueryResult>();
     queryContext.mutateAsync.mockReturnValue(answer.promise);
-    render('/?q=What%20changed%3F');
+    renderEngine({}, '/?q=What%20changed%3F');
     act(() => button('Ask')?.click());
     act(() => root.unmount());
     await act(async () => answer.resolve(result));
@@ -151,66 +163,67 @@ describe('PlaygroundTab', () => {
     root = createRoot(host);
   });
 
-  it('retries a refused question in the mode it was asked in, even after the mode changed', async () => {
-    const refused = Promise.reject(new HttpError(403, 'forbidden'));
-    refused.catch(() => undefined);
-    queryContext.mutateAsync.mockReturnValueOnce(refused).mockReturnValue(new Promise(() => undefined));
-    act(() =>
-      root.render(
-        <MemoryRouter initialEntries={['/?q=What%20changed%3F']}>
-          <PlaygroundTab engine={{ ...engine, id: 'e-mode' }} orgHandle="org" />
-        </MemoryRouter>,
-      ),
-    );
-    act(() => button('Ask')?.click());
-    await act(async () => undefined);
-    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'What changed?', mode: 'answer' }));
-    act(() => setPlaygroundMode('e-mode', 'context'));
-    act(() => button('Grant access')?.click());
-    expect(queryContext.mutateAsync).toHaveBeenCalledTimes(2);
-    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'What changed?', mode: 'answer' }));
-  });
-
-  it('asks with agentic search once it is switched on', () => {
+  it('asks for an answer on an engine that answers and for facts only on one that does not, with no control to choose', () => {
     queryContext.mutateAsync.mockReturnValue(new Promise(() => undefined));
-    act(() =>
-      root.render(
-        <MemoryRouter initialEntries={['/?q=Who%20approves%3F']}>
-          <PlaygroundTab engine={{ ...engine, id: 'e-agentic' }} orgHandle="org" />
-        </MemoryRouter>,
-      ),
-    );
-    act(() => host.querySelector<HTMLInputElement>('input[role="switch"]')?.click());
-    expect(getPlaygroundConversation('e-agentic').search).toBe('agentic');
+    renderEngine({ id: 'e-answers' });
+    expect(host.textContent).not.toMatch(/Ask for|Answer|Context/);
     act(() => button('Ask')?.click());
-    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'Who approves?', search: 'agentic' }));
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: QUESTION, mode: 'answer', limit: 15 }));
+
+    renderEngine({ id: 'e-facts', exposure: { answers: false } });
+    act(() => button('Ask')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: QUESTION, mode: 'context' }));
   });
 
-  it('asks with the engine’s own search when the engine does not offer agentic search', () => {
+  it("starts with the engine's default search, and the switch changes it", () => {
+    queryContext.mutateAsync.mockReturnValue(new Promise(() => undefined));
+    renderEngine({ id: 'e-default-agentic', exposure: { defaultSearch: 'agentic' } });
+    expect(agenticSwitch()?.checked).toBe(true);
+    act(() => button('Ask')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'agentic' }));
+
+    renderEngine({ id: 'e-default-deterministic' });
+    expect(agenticSwitch()?.checked).toBe(false);
+    act(() => agenticSwitch()?.click());
+    expect(getPlaygroundConversation('e-default-deterministic').search).toBe('agentic');
+    act(() => button('Ask')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'agentic' }));
+  });
+
+  it('hides agentic search on an engine that does not offer it, and asks with its own search', () => {
     queryContext.mutateAsync.mockReturnValue(new Promise(() => undefined));
     setPlaygroundSearch('e-plain', 'agentic');
-    act(() =>
-      root.render(
-        <MemoryRouter initialEntries={['/?q=Who%20approves%3F']}>
-          <PlaygroundTab engine={{ ...engine, id: 'e-plain', exposure: { ...engine.exposure, agenticSearch: false } }} orgHandle="org" />
-        </MemoryRouter>,
-      ),
-    );
+    renderEngine({ id: 'e-plain', exposure: { agenticSearch: false, defaultSearch: 'agentic' } });
+    expect(agenticSwitch()).toBeNull();
+    expect(host.textContent).not.toContain('Agentic search');
     act(() => button('Ask')?.click());
-    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: 'Who approves?', search: 'deterministic' }));
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'deterministic' }));
+  });
+
+  it('shows how long an agentic search has been running, as it takes a minute or more', () => {
+    queryContext.mutateAsync.mockReturnValue(new Promise(() => undefined));
+    renderEngine({ id: 'e-progress', exposure: { defaultSearch: 'agentic' } });
+    act(() => button('Ask')?.click());
+    expect(host.textContent).toContain('Agentic search is exploring the context graph, then the answer is written…');
+    expect(host.textContent).toMatch(/the answer is written…\d+ s(?! ·)/);
+  });
+
+  it('retries a refused question with the search it was asked with, even after the search changed', async () => {
+    queryContext.mutateAsync.mockReturnValueOnce(refusal(403, 'access_denied', 'forbidden')).mockReturnValue(new Promise(() => undefined));
+    renderEngine({ id: 'e-retry' });
+    await act(async () => button('Ask')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: QUESTION, mode: 'answer', search: 'deterministic' }));
+    act(() => setPlaygroundSearch('e-retry', 'agentic'));
+    act(() => button('Grant access')?.click());
+    expect(queryContext.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(queryContext.mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ question: QUESTION, mode: 'answer', search: 'deterministic' }));
   });
 
   it('holds asking and clearing while a recent question is being reopened', () => {
     appendTurn('e-hold', { question: 'Earlier', mode: 'context', result });
     asked.list = [{ queryId: 'qry_0', engineId: 'e-hold', question: 'Earlier', mode: 'context', askedAt: '2026-01-01T00:00:00Z', outcome: 'answered', passages: 1 } as AskedQuestion];
     reopenContext.mutateAsync.mockReturnValue(new Promise(() => undefined));
-    act(() =>
-      root.render(
-        <MemoryRouter initialEntries={['/?q=Next']}>
-          <PlaygroundTab engine={{ ...engine, id: 'e-hold' }} orgHandle="org" />
-        </MemoryRouter>,
-      ),
-    );
+    renderEngine({ id: 'e-hold' }, '/?q=Next');
     expect(button('Ask')?.disabled).toBe(false);
     act(() => button('Open recent')?.click());
     expect(button('Ask')?.disabled).toBe(true);
