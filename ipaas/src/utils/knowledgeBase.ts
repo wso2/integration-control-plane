@@ -16,9 +16,22 @@
  * under the License.
  */
 
-import { AZURE_DEFAULT_API_VERSION, CHUNKING_STRATEGIES, DATASOURCES, DEFAULT_CHUNKING, EMBEDDING_PROVIDERS, RAG_SECRET_KEYS, VECTOR_STORE_PROVIDERS } from '../constants/ragIngestion';
+import {
+  AZURE_DEFAULT_API_VERSION,
+  CHUNKING_STRATEGIES,
+  DATASOURCES,
+  DEFAULT_CHUNKING,
+  EMBEDDING_PROVIDERS,
+  GDRIVE_AUTH_TYPES,
+  KB_INGESTION_SUBTYPE,
+  KB_SERVICE_SUBTYPE,
+  MAX_RETRIEVE_CHUNKS,
+  RAG_SECRET_KEYS,
+  VECTOR_STORE_PROVIDERS,
+} from '../constants/ragIngestion';
 import type { EndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import { httpStatusOf } from './apiErrors';
+import { describeCron } from './cronUtils';
 import type { KnowledgeBase, KnowledgeBaseApiStatus, KnowledgeBaseSettings } from '../types/knowledgeBase';
 import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, VectorStoreConfig } from '../types/ragIngestion';
 import { datasourceEnvVars, embeddingEnvVars, isEmbeddingValid, isVectorStoreValid, vectorStoreEnvVars } from './ragIngestion';
@@ -255,4 +268,109 @@ function notOnGatewayReason(apiStatus: KnowledgeBaseApiStatus | undefined): stri
   }
   if (apiStatus.status === 'FAILED' || apiStatus.status === 'DEGRADED') return 'Publishing the knowledge base on the API gateway failed. It is retried automatically.';
   return 'The knowledge base is being published on the API gateway.';
+}
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+
+/**
+ * The knowledge base a component belongs to, or null for any other component. A knowledge
+ * base's KB Service is the component named after it; a data source names its knowledge base.
+ */
+export function knowledgeBaseOfComponent(component: { handler: string; componentSubType: string | null; knowledgeBase?: string }): string | null {
+  if (component.componentSubType === KB_SERVICE_SUBTYPE) return component.handler || null;
+  if (component.componentSubType === KB_INGESTION_SUBTYPE) return component.knowledgeBase || null;
+  return null;
+}
+
+// ── Review before create ────────────────────────────────────────────────────
+
+export type ReviewSectionId = 'name' | 'vectorStore' | 'embedding' | 'chunking' | 'dataSource' | 'schedule';
+
+export interface ReviewSection {
+  id: ReviewSectionId;
+  title: string;
+  rows: { label: string; value: string }[];
+}
+
+export interface KnowledgeBaseReviewInput {
+  names: NameFields;
+  vectorStore: VectorStoreConfig;
+  embedding: EmbeddingConfig;
+  chunking: ChunkingConfig;
+  /** null when the knowledge base is created without a data source. */
+  dataSource: { config: DatasourceConfig; schedule: { cron: string; timezone: string } | null } | null;
+}
+
+const NOT_SET = '—';
+
+/** Where a data source reads from, as the review shows it. Secrets are never shown. */
+function dataSourceLocation(ds: DatasourceConfig): { label: string; value: string }[] {
+  if (ds.type === 'amazons3') return [{ label: 'Bucket', value: ds.bucketName || NOT_SET }];
+  const auth = GDRIVE_AUTH_TYPES.find((a) => a.value === ds.authType)?.label ?? ds.authType;
+  return [
+    { label: 'Folder ID', value: ds.folderId || NOT_SET },
+    { label: 'Authentication', value: auth },
+  ];
+}
+
+/**
+ * What the create wizard is about to create, section by section, labelled as the knowledge base's
+ * Overview labels it afterwards. Credentials are left out: they are write-only.
+ */
+export function knowledgeBaseReview({ names, vectorStore, embedding, chunking, dataSource }: KnowledgeBaseReviewInput): ReviewSection[] {
+  const summary = knowledgeBaseSummary(buildKnowledgeBaseSettings(vectorStore, embedding, chunking).config);
+  const sections: ReviewSection[] = [
+    {
+      id: 'name',
+      title: 'Name',
+      rows: [
+        { label: 'Display name', value: names.displayName.trim() },
+        { label: 'Name', value: names.name },
+        { label: 'Description', value: names.description.trim() || NOT_SET },
+      ],
+    },
+    {
+      id: 'vectorStore',
+      title: 'Vector store',
+      rows: [
+        { label: 'Vector store', value: summary.vectorStore },
+        { label: 'Collection / table', value: summary.collection || NOT_SET },
+      ],
+    },
+    { id: 'embedding', title: 'Embedding model', rows: [{ label: 'Embedding provider', value: summary.embedding }] },
+    { id: 'chunking', title: 'Chunking', rows: [{ label: 'Strategy · segment / overlap', value: summary.chunking }] },
+  ];
+  if (!dataSource) {
+    sections.push({ id: 'dataSource', title: 'Data source', rows: [{ label: 'Data source', value: 'None. Add one later from the knowledge base.' }] });
+    return sections;
+  }
+  const label = DATASOURCES.find((d) => d.id === dataSource.config.type)?.name ?? dataSource.config.type;
+  sections.push({ id: 'dataSource', title: 'Data source', rows: [{ label: 'Data source', value: label }, ...dataSourceLocation(dataSource.config)] });
+  const { schedule } = dataSource;
+  sections.push({
+    id: 'schedule',
+    title: 'Ingestion schedule',
+    rows: schedule
+      ? [
+          { label: 'Ingestion', value: describeCron(schedule.cron) },
+          { label: 'Time zone', value: schedule.timezone || 'UTC' },
+        ]
+      : [{ label: 'Ingestion', value: 'Once, now' }],
+  });
+  return sections;
+}
+
+// ── Retrieval test settings ─────────────────────────────────────────────────
+
+export interface RetrievalSettings {
+  maxChunks: number;
+  minSimilarity: number;
+}
+
+/** Why each retrieval setting is invalid, keyed by field; empty when both are valid. */
+export function retrievalSettingsErrors({ maxChunks, minSimilarity }: RetrievalSettings): Partial<Record<keyof RetrievalSettings, string>> {
+  const errors: Partial<Record<keyof RetrievalSettings, string>> = {};
+  if (!Number.isInteger(maxChunks) || maxChunks < 1 || maxChunks > MAX_RETRIEVE_CHUNKS) errors.maxChunks = `Enter a whole number from 1 to ${MAX_RETRIEVE_CHUNKS}.`;
+  if (!Number.isFinite(minSimilarity) || minSimilarity < 0 || minSimilarity > 1) errors.minSimilarity = 'Enter a number from 0 to 1.';
+  return errors;
 }

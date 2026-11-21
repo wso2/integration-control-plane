@@ -24,3 +24,6 @@ export const fieldStackSx = { gap: 2.5, maxWidth: 560 } as const;
 
 /** Provider/datasource tile grid spacing. */
 export const tileGridSx = { mb: 3 } as const;
+
+/** One review section: its settings as label / value pairs. */
+export const reviewGridSx = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '200px 1fr' }, rowGap: 1, columnGap: 2 } as const;

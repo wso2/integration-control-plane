@@ -29,14 +29,17 @@ import {
   isNameValid,
   knowledgeBaseNameError,
   knowledgeBaseNameFrom,
+  knowledgeBaseOfComponent,
+  knowledgeBaseReview,
   knowledgeBaseSummary,
   secretsForUpdate,
   retrievalAccessReason,
   knowledgeBaseWriteBlockedReason,
+  retrievalSettingsErrors,
   retrievalUnavailableReason,
   vectorStoreFromConfig,
 } from './knowledgeBase';
-import type { EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
+import type { DatasourceConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
 
 const pinecone: VectorStoreConfig = { provider: 'pinecone', apiKey: 'pc-key', indexName: 'docs' };
 const openai: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'oa-key', azureApiVersion: '', azureBaseUrl: '' };
@@ -234,5 +237,73 @@ describe('isManualSchedule', () => {
     ['*/30 * * * *', false],
   ])('%j → %s', (cron, manual) => {
     expect(isManualSchedule(cron)).toBe(manual);
+  });
+});
+
+describe('knowledgeBaseOfComponent', () => {
+  it("names a KB Service's knowledge base after the service", () => {
+    expect(knowledgeBaseOfComponent({ handler: 'docs-kb', componentSubType: 'knowledge-base' })).toBe('docs-kb');
+  });
+
+  it("names a data source's knowledge base from its annotation", () => {
+    expect(knowledgeBaseOfComponent({ handler: 'docs-kb-amazons3', componentSubType: 'kb-ingestion', knowledgeBase: 'docs-kb' })).toBe('docs-kb');
+  });
+
+  it('gives none for a data source without one, or for any other integration', () => {
+    expect(knowledgeBaseOfComponent({ handler: 'orphan', componentSubType: 'kb-ingestion' })).toBeNull();
+    expect(knowledgeBaseOfComponent({ handler: 'orders-api', componentSubType: null, knowledgeBase: 'docs-kb' })).toBeNull();
+  });
+});
+
+describe('knowledgeBaseReview', () => {
+  const base = {
+    names: { displayName: ' Docs KB ', name: 'docs-kb', description: '' },
+    vectorStore: { provider: 'pinecone', apiKey: 'pc-secret', indexName: 'docs' } as VectorStoreConfig,
+    embedding: { provider: 'mistral', model: 'mistral-embed', apiKey: 'm-secret', azureApiVersion: '', azureBaseUrl: '' } as EmbeddingConfig,
+    chunking: { strategy: 'recursive' as const, maxSegmentSize: 1000, maxOverlapSize: 200 },
+  };
+  const s3: DatasourceConfig = { type: 'amazons3', accessKeyId: 'AKIA', secretAccessKey: 's3-secret', bucketName: 'hr-docs' };
+  const valuesOf = (sections: ReturnType<typeof knowledgeBaseReview>) => Object.fromEntries(sections.map((s) => [s.id, s.rows.map((r) => r.value)]));
+
+  it('summarises a knowledge base created without a data source, with no schedule', () => {
+    const sections = knowledgeBaseReview({ ...base, dataSource: null });
+    expect(sections.map((s) => s.id)).toEqual(['name', 'vectorStore', 'embedding', 'chunking', 'dataSource']);
+    expect(valuesOf(sections)).toMatchObject({
+      name: ['Docs KB', 'docs-kb', '—'],
+      vectorStore: ['Pinecone', 'docs'],
+      embedding: ['Mistral AI · mistral-embed'],
+      chunking: ['Recursive (default) · 1000 / 200'],
+    });
+  });
+
+  it('shows a one-time ingestion as once, now', () => {
+    expect(valuesOf(knowledgeBaseReview({ ...base, dataSource: { config: s3, schedule: null } }))).toMatchObject({ dataSource: ['Amazon S3', 'hr-docs'], schedule: ['Once, now'] });
+  });
+
+  it('describes a scheduled ingestion with its time zone', () => {
+    const schedule = valuesOf(knowledgeBaseReview({ ...base, dataSource: { config: s3, schedule: { cron: '0 0 * * *', timezone: 'Asia/Colombo' } } })).schedule;
+    expect(schedule[1]).toBe('Asia/Colombo');
+    expect(schedule[0]).not.toBe('');
+  });
+
+  it('never shows a credential', () => {
+    const text = JSON.stringify(knowledgeBaseReview({ ...base, dataSource: { config: s3, schedule: null } }));
+    for (const secret of ['pc-secret', 'm-secret', 's3-secret', 'AKIA']) expect(text).not.toContain(secret);
+  });
+});
+
+describe('retrievalSettingsErrors', () => {
+  it('accepts the defaults and the bounds', () => {
+    expect(retrievalSettingsErrors({ maxChunks: 5, minSimilarity: 0.7 })).toEqual({});
+    expect(retrievalSettingsErrors({ maxChunks: 1, minSimilarity: 0 })).toEqual({});
+    expect(retrievalSettingsErrors({ maxChunks: 10, minSimilarity: 1 })).toEqual({});
+  });
+
+  it.each([0, 11, 2.5, Number.NaN])('rejects %s chunks', (maxChunks) => {
+    expect(retrievalSettingsErrors({ maxChunks, minSimilarity: 0.7 }).maxChunks).toBeDefined();
+  });
+
+  it.each([-0.1, 1.1, Number.NaN])('rejects a %s threshold', (minSimilarity) => {
+    expect(retrievalSettingsErrors({ maxChunks: 5, minSimilarity }).minSimilarity).toBeDefined();
   });
 });
