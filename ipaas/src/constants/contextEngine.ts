@@ -650,22 +650,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...G(
         { label: 'Sync options', collapsed: true },
         // Seconds between runs: the BFF schedules the integration's CronJob from it. Only intervals that divide an hour or a day have a cron schedule.
-        O('pollInterval', 'Poll Interval', 'select', {
-          defaultValue: '900',
-          options: [
-            { value: '300', label: 'Every 5 minutes' },
-            { value: '600', label: 'Every 10 minutes' },
-            { value: '900', label: 'Every 15 minutes' },
-            { value: '1800', label: 'Every 30 minutes' },
-            { value: '3600', label: 'Every hour' },
-            { value: '7200', label: 'Every 2 hours' },
-            { value: '21600', label: 'Every 6 hours' },
-            { value: '43200', label: 'Every 12 hours' },
-            { value: '86400', label: 'Every day' },
-          ],
-          helper: 'How often the people are synced.',
-          valueType: 'integer',
-        }),
+        O('pollInterval', 'Poll Interval', 'text', { defaultValue: '900', helper: 'Seconds between syncs. They must divide an hour or a day evenly, such as 300, 900, 3600 or 86400.', valueType: 'integer', cronSeconds: true }),
         O('pageSize', 'Page Size', 'text', { defaultValue: '100', helper: 'People published per page, from 1 to 1000.', valueType: 'integer' }),
       ),
     ],

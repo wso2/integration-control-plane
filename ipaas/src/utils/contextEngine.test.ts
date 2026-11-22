@@ -122,6 +122,7 @@ import {
   isLlmValid,
   isNameStepValid,
   integrationTypeFor,
+  isCronInterval,
   isSourceValid,
   visibleFields,
   isSourcesStepValid,
@@ -346,6 +347,18 @@ describe('source validation', () => {
     // The cap is a number, and left out when empty.
     expect(toIntegrationRequest(withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p', maxPeople: '100' }), 'sap_successfactors').settings.maxPeople).toBe(100);
     expect(toIntegrationRequest(scoped, 'sap_successfactors').settings).not.toHaveProperty('maxPeople');
+
+    // The poll interval is typed in seconds, and only seconds with a cron schedule are accepted.
+    const basic = { ...connection, authType: 'basic', password: 'p' };
+    expect(toIntegrationRequest(withValues('sap-successfactors', { ...basic, pollInterval: '120' }), 'sap_successfactors').settings.pollInterval).toBe(120);
+    for (const bad of ['450', '5000', 'soon', '0']) {
+      expect(invalidSourceFields(withValues('sap-successfactors', { ...basic, pollInterval: bad })).map((f) => f.key)).toEqual(['pollInterval']);
+    }
+  });
+
+  it('accepts only poll intervals that have a cron schedule', () => {
+    for (const ok of [60, 120, 300, 900, 1200, 1800, 3600, 7200, 10800, 21600, 43200, 86400]) expect(isCronInterval(ok)).toBe(true);
+    for (const bad of [0, 30, 90, 450, 2400, 5400, 18000, 172800, 900.5]) expect(isCronInterval(bad)).toBe(false);
   });
 
   it('shows and requires only the fields of the chosen Google auth flow', () => {

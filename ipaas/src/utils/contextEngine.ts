@@ -295,6 +295,14 @@ function isFieldBlank(def: SourceFieldDef, value: string | undefined): boolean {
 /** A `tables` or `objects` field's value as the integration's setting. */
 const listSetting = (def: SourceFieldDef, value: string): Record<string, unknown>[] => (def.kind === 'tables' ? tablesSetting(parseTables(value)) : objectsSetting(parseObjects(value)));
 
+/** Whether seconds have a cron schedule: whole minutes that divide an hour, or whole hours that divide a day. Mirrors the BFF. */
+export function isCronInterval(seconds: number): boolean {
+  if (!Number.isInteger(seconds) || seconds <= 0) return false;
+  if (seconds % 60 === 0 && seconds <= 3600) return 60 % (seconds / 60) === 0;
+  if (seconds % 3600 === 0 && seconds <= 86400) return 24 % (seconds / 3600) === 0;
+  return false;
+}
+
 /** Validation message for one connector field; empty when the value is acceptable. */
 export function sourceFieldError(def: SourceFieldDef, value: string | undefined): string {
   if (def.kind === 'tables') return tablesError(value);
@@ -305,6 +313,7 @@ export function sourceFieldError(def: SourceFieldDef, value: string | undefined)
   if (def.kind === 'url' && !isHttpUrl(v)) return 'Enter a full http(s) URL.';
   if (def.valueType === 'integer' && !/^\d+$/.test(v)) return 'Enter a whole number.';
   if (def.valueType === 'number' && !Number.isFinite(Number(v))) return 'Enter a number.';
+  if (def.cronSeconds && !isCronInterval(Number(v))) return 'Enter seconds that divide an hour or a day evenly, such as 300, 900, 3600 or 86400.';
   if (def.kind === 'urls') {
     const bad = splitUrls(v).find((u) => !isHttpUrl(u));
     if (bad) return `Not a valid URL: ${bad}`;
