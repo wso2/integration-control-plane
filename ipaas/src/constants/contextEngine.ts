@@ -645,6 +645,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...G(
         { label: 'Data to sync', collapsed: true },
         O('fields', 'Fields', 'text', { placeholder: 'displayName, email', helper: 'Comma-separated fields of the person row to publish; personId is always published. Empty for every field.', valueType: 'list' }),
+        O('maxPeople', 'Max People', 'text', { placeholder: '100', helper: 'The most people to sync, up to 1000: the first ones listed, kept in sync. Empty for every person.', valueType: 'integer' }),
       ),
       ...G(
         { label: 'Sync options', collapsed: true },

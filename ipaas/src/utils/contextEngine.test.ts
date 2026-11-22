@@ -342,6 +342,10 @@ describe('source validation', () => {
     // The fields split on commas.
     const scoped = withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p', fields: 'displayName, email' });
     expect(toIntegrationRequest(scoped, 'sap_successfactors').settings.fields).toEqual(['displayName', 'email']);
+
+    // The cap is a number, and left out when empty.
+    expect(toIntegrationRequest(withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p', maxPeople: '100' }), 'sap_successfactors').settings.maxPeople).toBe(100);
+    expect(toIntegrationRequest(scoped, 'sap_successfactors').settings).not.toHaveProperty('maxPeople');
   });
 
   it('shows and requires only the fields of the chosen Google auth flow', () => {
