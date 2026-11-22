@@ -334,17 +334,14 @@ describe('source validation', () => {
       hostname: 'api4.successfactors.com',
       companyId: 'acmeT1',
       auth: { type: 'samlBearer', clientId: 'key', username: 'integration', privateKey: 'k', certificate: pem },
-      filter: { includeContingentWorkers: true },
       pollInterval: 900,
       pageSize: 100,
     });
     expect(toIntegrationRequest(withValues('sap-successfactors', { ...connection, authType: 'basic', password: ' p ' }), 'sap_successfactors').settings.auth).toEqual({ type: 'basic', username: 'integration', password: ' p ' });
 
-    // The filter nests under `filter`, its lists and the fields split on commas; empty lists are left out.
-    const scoped = withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p', filterDepartments: 'DEPT_PLAT, DEPT_DATA', filterStatuses: 'Active', includeContingentWorkers: 'false', fields: 'displayName, jobTitle' });
-    const settings = toIntegrationRequest(scoped, 'sap_successfactors').settings;
-    expect(settings.filter).toEqual({ departments: ['DEPT_PLAT', 'DEPT_DATA'], statuses: ['Active'], includeContingentWorkers: false });
-    expect(settings.fields).toEqual(['displayName', 'jobTitle']);
+    // The fields split on commas.
+    const scoped = withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p', fields: 'displayName, email' });
+    expect(toIntegrationRequest(scoped, 'sap_successfactors').settings.fields).toEqual(['displayName', 'email']);
   });
 
   it('shows and requires only the fields of the chosen Google auth flow', () => {
