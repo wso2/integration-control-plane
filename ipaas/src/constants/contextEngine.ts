@@ -622,7 +622,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Employees from Employee Central, kept in sync.',
     category: 'saas',
     icon: 'building',
-    // Mirrors the Ballerina `sap.successfactors` integration's settings: the API server, the company id, its auth block and the page size.
+    // Mirrors the Ballerina `sap.successfactors` integration's settings: the API server, the company id, its auth block, the employees and fields to publish, and the page size.
     fields: [
       ...G(
         'Connection',
@@ -641,6 +641,27 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
         F('privateKey', 'Private Key', 'secret', { showWhen: authIs('samlBearer'), helper: "The application's private key, in PEM.", setting: 'auth.privateKey' }),
         F('certificate', 'Certificate', 'multiline', { showWhen: authIs('samlBearer'), helper: "The application's X.509 certificate, in PEM.", setting: 'auth.certificate' }),
         F('password', 'Password', 'secret', { showWhen: authIs('basic'), verbatim: true, setting: 'auth.password' }),
+      ),
+      ...G(
+        { label: 'Data to sync', collapsed: true },
+        O('filterCompanies', 'Companies', 'text', { placeholder: 'ACME_LK, ACME_US', helper: 'Comma-separated legal entity codes. Empty for every company.', valueType: 'list', setting: 'filter.companies' }),
+        O('filterBusinessUnits', 'Business Units', 'text', { helper: 'Comma-separated business unit codes. Empty for every business unit.', valueType: 'list', setting: 'filter.businessUnits' }),
+        O('filterDivisions', 'Divisions', 'text', { helper: 'Comma-separated division codes. Empty for every division.', valueType: 'list', setting: 'filter.divisions' }),
+        O('filterDepartments', 'Departments', 'text', { helper: 'Comma-separated department codes. Empty for every department.', valueType: 'list', setting: 'filter.departments' }),
+        O('filterLocations', 'Locations', 'text', { helper: 'Comma-separated location codes. Empty for every location.', valueType: 'list', setting: 'filter.locations' }),
+        O('filterCountries', 'Countries', 'text', { placeholder: 'LKA, USA', helper: 'Comma-separated ISO 3166 alpha-3 codes of the legal entities. Empty for every country.', valueType: 'list', setting: 'filter.countries' }),
+        O('filterStatuses', 'Statuses', 'text', { placeholder: 'Active, Upcoming', helper: 'Comma-separated. Any of: Active, Upcoming, Terminated. Empty for every status.', valueType: 'list', setting: 'filter.statuses' }),
+        O('includeContingentWorkers', 'Contingent Workers', 'select', {
+          defaultValue: 'true',
+          options: [
+            { value: 'true', label: 'Include' },
+            { value: 'false', label: 'Exclude' },
+          ],
+          helper: 'An employee who stops matching the filter is removed.',
+          valueType: 'boolean',
+          setting: 'filter.includeContingentWorkers',
+        }),
+        O('fields', 'Fields', 'text', { placeholder: 'displayName, email, jobTitle, departmentCode, reportsToId', helper: 'Comma-separated fields of the employee row to publish; userId is always published. Empty for every field.', valueType: 'list' }),
       ),
       ...G(
         { label: 'Sync options', collapsed: true },
