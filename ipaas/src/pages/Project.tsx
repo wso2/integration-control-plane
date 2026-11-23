@@ -81,8 +81,8 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
 import { cloudConsoleProjectSettingsUrl, componentOverviewUrl, orgProjectsUrl } from '../paths';
 import { Scopes } from '../constants/permissions';
-import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
-import { identifyIntegration } from '../utils/identifyIntegration';
+import { CLOUD_EDITOR_MI_UNSUPPORTED, isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
+import { identifyIntegration, isMiIntegration } from '../utils/identifyIntegration';
 import IntegrationIcon from '../components/IntegrationIcon';
 import Authorized from '../components/Authorized';
 import { useCan } from '../hooks/useCan';
@@ -755,20 +755,25 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const isEmpty = justProvisionedDefaultProject || (isComponentsSuccess ? components.length === 0 : cachedIsEmpty);
   const isWorkspace = project.type === 'MONO_REPO';
   // The editor clones the project repo, so only an integration that builds from it can open.
-  const openInCloudComponent = components.find((c) => isSupportedIntegration(c.displayType, c.componentSubType, c.buildpackType) && !isExternalRepo(c) && (!isRepoLinked || repoByHandler.get(c.handler) !== undefined)) ?? null;
+  const opensInEditor = (c: Component): boolean => isSupportedIntegration(c.displayType, c.componentSubType, c.buildpackType) && !isExternalRepo(c) && (!isRepoLinked || repoByHandler.get(c.handler) !== undefined);
+  const openInCloudComponent = components.find(opensInEditor) ?? null;
+  // The Cloud Editor cannot open MI projects, so it opens on a non-MI integration; a project of only MI ones gets none.
+  const cloudEditorComponent = components.find((c) => opensInEditor(c) && !isMiIntegration(c)) ?? null;
+  const cloudEditorTooltip = cloudEditorComponent ? '' : CLOUD_EDITOR_MI_UNSUPPORTED;
+  const effectivePrimaryAction = cloudEditorComponent ? primaryAction : 'integrator';
   const projectRepoUrl = buildProjectRepoUrl(project.gitProvider, project.gitOrganization, project.repository, project.branch);
   const showEditor = !!openInCloudComponent && !!projectRepoUrl && (canUseEditor || openInIntegratorEnabled);
 
   const externalComponents = components.filter(isExternalRepo);
 
   const doOpenInCloud = () => {
-    if (!codeServerSample || !openInCloudComponent) return;
+    if (!codeServerSample || !cloudEditorComponent) return;
     const params = new URLSearchParams({
       userId: userId ?? '',
       orgUuid,
       orgHandle: scope.org,
       projectId,
-      componentId: openInCloudComponent.id,
+      componentId: cloudEditorComponent.id,
       codeServerSample: JSON.stringify(codeServerSample),
     });
     window.open(`${window.location.origin}${withBase('/editor')}?${params}`, '_blank', 'noopener,noreferrer');
@@ -778,8 +783,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
 
   const doOpenInIntegrator = () => {
     if (!openInCloudComponent) return;
-    const isMI = (openInCloudComponent.displayType ?? '').startsWith('mi');
-    const extensionId = isMI ? 'WSO2.micro-integrator' : 'WSO2.ballerina';
+    const extensionId = isMiIntegration(openInCloudComponent) ? 'WSO2.micro-integrator' : 'WSO2.ballerina';
     const params = new URLSearchParams({ project: project.handler, org: scope.org, component: openInCloudComponent.handler });
     window.open(`vscode://${extensionId}/open?${params}`, '_blank');
     setSplitOpen(false);
@@ -787,7 +791,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   };
 
   const handleOpenInCloud = () => {
-    if (!codeServerSample || !openInCloudComponent) return;
+    if (!codeServerSample || !cloudEditorComponent) return;
     if (externalComponents.length > 0) {
       setExcludedExpanded(true);
       setOpenEditorWarning('cloud');
@@ -1034,10 +1038,10 @@ export default function Project(scope: ProjectScope): JSX.Element {
                             <IntegratorIcon width={16} height={16} />
                           </Box>
                         }
-                        onClick={primaryAction === 'cloud' ? handleOpenInCloud : handleOpenInIntegrator}
-                        disabled={primaryAction === 'cloud' ? !codeServerSample : !openInCloudComponent}
+                        onClick={effectivePrimaryAction === 'cloud' ? handleOpenInCloud : handleOpenInIntegrator}
+                        disabled={effectivePrimaryAction === 'cloud' ? !codeServerSample : !openInCloudComponent}
                         sx={{ whiteSpace: 'nowrap' }}>
-                        {primaryAction === 'cloud' ? <>Open in Cloud</> : 'Open in Integrator'}
+                        {effectivePrimaryAction === 'cloud' ? <>Open in Cloud</> : 'Open in Integrator'}
                       </Button>
                       <Button size="small" sx={{ px: 0.5 }} aria-label="More options" onClick={() => setSplitOpen((prev) => !prev)}>
                         <ChevronDown size={14} />
@@ -1049,17 +1053,21 @@ export default function Project(scope: ProjectScope): JSX.Element {
                           <Paper elevation={3}>
                             <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
                               <MenuList dense sx={{ minWidth: 200 }}>
-                                <MenuItem
-                                  onClick={() => {
-                                    setPrimaryAction('cloud');
-                                    handleOpenInCloud();
-                                  }}
-                                  disabled={!codeServerSample}>
-                                  <Stack direction="row" alignItems="center" gap={1}>
-                                    <IntegratorIcon width={16} height={16} />
-                                    <Typography variant="body2">Open in Cloud</Typography>
-                                  </Stack>
-                                </MenuItem>
+                                <Tooltip title={cloudEditorTooltip} placement="left">
+                                  <span>
+                                    <MenuItem
+                                      onClick={() => {
+                                        setPrimaryAction('cloud');
+                                        handleOpenInCloud();
+                                      }}
+                                      disabled={!codeServerSample || !cloudEditorComponent}>
+                                      <Stack direction="row" alignItems="center" gap={1}>
+                                        <IntegratorIcon width={16} height={16} />
+                                        <Typography variant="body2">Open in Cloud</Typography>
+                                      </Stack>
+                                    </MenuItem>
+                                  </span>
+                                </Tooltip>
                                 <MenuItem
                                   onClick={() => {
                                     setPrimaryAction('integrator');
@@ -1078,9 +1086,13 @@ export default function Project(scope: ProjectScope): JSX.Element {
                     </Popper>
                   </>
                 ) : (
-                  <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
-                    Open in Cloud Editor
-                  </Button>
+                  <Tooltip title={cloudEditorTooltip}>
+                    <span>
+                      <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample || !cloudEditorComponent} sx={{ whiteSpace: 'nowrap' }}>
+                        Open in Cloud Editor
+                      </Button>
+                    </span>
+                  </Tooltip>
                 )}
               </Box>
             )}
@@ -1181,7 +1193,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
           <Button variant="outlined" color="inherit" onClick={() => setOpenEditorWarning(null)}>
             Cancel
           </Button>
-          <Button variant="contained" onClick={() => (openEditorWarning === 'cloud' ? doOpenInCloud() : doOpenInIntegrator())} disabled={openEditorWarning === 'cloud' ? !codeServerSample : !openInCloudComponent}>
+          <Button variant="contained" onClick={() => (openEditorWarning === 'cloud' ? doOpenInCloud() : doOpenInIntegrator())} disabled={openEditorWarning === 'cloud' ? !codeServerSample || !cloudEditorComponent : !openInCloudComponent}>
             Open {openEditorWarning === 'integrator' ? 'integrator' : 'editor'} anyway
           </Button>
         </DialogActions>

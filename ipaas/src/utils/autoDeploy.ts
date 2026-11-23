@@ -18,10 +18,7 @@
 
 import { AUTO_DEPLOY_AVAILABLE } from '../constants/build';
 import type { Component } from '../types/component';
-import { identifyIntegration } from './identifyIntegration';
-
-/** The buildpackType ipaas-service reports for an MI integration. */
-const MI_BUILDPACK_TYPE = 'MI';
+import { identifyIntegration, isMiIntegration } from './identifyIntegration';
 
 /** Integrations the platform provisions without a build, so auto-deploy on build has nothing to act on. */
 const UNBUILT_TYPES = new Set(['tailscale-vpn', 'rag-ingestion', 'mcp-proxy']);
@@ -29,7 +26,7 @@ const UNBUILT_SUBTYPES = new Set(['knowledge-base', 'rag-service', 'rag-retrieva
 
 /** Mirrors ipaas-service's auto-deploy hold, so the Deploy page offers the switch only where it can be turned on. */
 export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displayType' | 'componentSubType' | 'isPrebuilt'>, enabled = false): boolean {
-  const { type, runtime } = identifyIntegration(c.displayType ?? '', c.componentSubType ?? null);
+  const { type } = identifyIntegration(c.displayType ?? '', c.componentSubType ?? null);
   if (c.isPrebuilt || UNBUILT_TYPES.has(type) || UNBUILT_SUBTYPES.has(c.componentSubType ?? '')) return false;
   // Turning it off is always allowed, so a held integration that already has it on can still turn it off.
   if (enabled) return true;
@@ -39,5 +36,5 @@ export function isAutoDeployOffered(c: Pick<Component, 'buildpackType' | 'displa
   if (type === 'integration-as-api' || type === 'mcp-server') return false;
   if (AUTO_DEPLOY_AVAILABLE) return true;
   // MI deploys one way, through ipaas-service.
-  return c.buildpackType !== MI_BUILDPACK_TYPE && runtime !== 'mi';
+  return !isMiIntegration(c);
 }

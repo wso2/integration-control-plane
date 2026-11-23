@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { VOICE_AGENT_COMPONENT_TYPE } from '../constants/voiceAgent';
-import { identifyIntegration } from './identifyIntegration';
+import { identifyIntegration, isMiIntegration } from './identifyIntegration';
 
 describe('identifyIntegration — RAG types', () => {
   it('maps the ingestion cronjob subtype to rag-ingestion', () => {
@@ -57,5 +57,23 @@ describe('identifyIntegration — workflow', () => {
 describe('identifyIntegration — voice agent', () => {
   it('resolves the voice agent display type to a voice agent', () => {
     expect(identifyIntegration(VOICE_AGENT_COMPONENT_TYPE, null)).toMatchObject({ type: 'voice-agent', runtime: 'unknown' });
+  });
+});
+
+describe('isMiIntegration', () => {
+  it('is true for MI display types and MI subtypes', () => {
+    expect(isMiIntegration({ displayType: 'miApiService', componentSubType: null })).toBe(true);
+    expect(isMiIntegration({ displayType: 'miCronjob', componentSubType: null })).toBe(true);
+    expect(isMiIntegration({ displayType: 'fileIntegration', componentSubType: 'miFileIntegration' })).toBe(true);
+  });
+
+  it('is true for the MI buildpack whatever the display type', () => {
+    expect(isMiIntegration({ buildpackType: 'MI', displayType: 'service', componentSubType: null })).toBe(true);
+  });
+
+  it('is false for Ballerina and runtime-less integrations', () => {
+    expect(isMiIntegration({ displayType: 'ballerinaService', componentSubType: null })).toBe(false);
+    expect(isMiIntegration({ displayType: 'ballerinaService', componentSubType: 'MCP' })).toBe(false);
+    expect(isMiIntegration({ displayType: 'byoiService', componentSubType: 'rag-service' })).toBe(false);
   });
 });

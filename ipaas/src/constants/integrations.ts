@@ -288,6 +288,9 @@ export function normalizeComponentType(type: string): string {
   return type === 'automation' ? 'scheduled-task' : type;
 }
 
+/** Why the Cloud Editor entry is disabled for MI integrations. */
+export const CLOUD_EDITOR_MI_UNSUPPORTED = 'The Cloud Editor does not support MI integrations. Open them in WSO2 Integrator instead.';
+
 export const ALLOWED_SAMPLE_TYPES = new Set(['service', 'scheduled-task', 'automation', 'file-integration', 'event-handler', 'ai-agent']);
 
 export const APP_COLORS: Record<string, string> = {

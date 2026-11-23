@@ -128,3 +128,11 @@ export function identifyIntegration(displayType: string, componentSubType: strin
 export function isLiveAiAgent(component: Pick<Component, 'displayType' | 'componentSubType' | 'deleting'>): boolean {
   return !component.deleting && identifyIntegration(component.displayType, component.componentSubType).type === 'ai-agent';
 }
+
+/** The buildpackType ipaas-service reports for an MI integration. */
+const MI_BUILDPACK_TYPE = 'MI';
+
+/** Whether a component runs on the Micro Integrator, by its buildpack or its display type. */
+export function isMiIntegration(component: Pick<Component, 'buildpackType' | 'displayType' | 'componentSubType'>): boolean {
+  return component.buildpackType === MI_BUILDPACK_TYPE || identifyIntegration(component.displayType ?? '', component.componentSubType ?? null).runtime === 'mi';
+}

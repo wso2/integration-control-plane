@@ -20,7 +20,7 @@ import { Avatar, Box, Button, Chip, CircularProgress, IconButton, InputBase, Ske
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Tag, Cloud, GitCommitHorizontal, Copy, Check, Pencil, Globe, Lock } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentDetail } from '../../../types/component';
-import { identifyIntegration } from '../../../utils/identifyIntegration';
+import { identifyIntegration, isMiIntegration } from '../../../utils/identifyIntegration';
 import IntegrationIcon from '../../IntegrationIcon';
 import type { Repository, Commit } from '../../../types/repository';
 import { useUpdateComponent } from '../../../hooks/useComponents';
@@ -33,7 +33,7 @@ import { buildRepoBrowseUrl } from '../../../utils/gitProviderUrl';
 import { DESCRIPTION_MAX_LENGTH, clampDescription, isAtNewlineLimit } from '../../../utils/description';
 import { useAuth } from '../../../auth';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
-import { getDisplayLabel } from '../../../constants/integrations';
+import { CLOUD_EDITOR_MI_UNSUPPORTED, getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';
 import type { IntegrationModule } from '../../../types/integration';
 import type { Environment } from '../../../types/environment';
@@ -212,6 +212,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const { data: samplesData, isPending: isSamplesPending } = useSamples();
   const isSample = !!matchSample(repository, samplesData?.samples);
   const showOpenInEditor = hasSource && !isSamplesPending && !isSample && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
+  // The Cloud Editor cannot open MI projects, so MI keeps the entry but disabled, with the reason.
+  const isMi = isMiIntegration(component);
   const HeaderActions = module?.HeaderActions;
 
   const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;
@@ -222,7 +224,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const codeServerSample = (sampleImages ?? []).find((img) => img.name === 'Code Server');
 
   const handleOpenInCloud = () => {
-    if (!codeServerSample) return;
+    if (isMi || !codeServerSample) return;
     const params = new URLSearchParams({
       userId,
       orgUuid: orgUuidFromToken,
@@ -540,13 +542,15 @@ export default function ComponentHeader({ component, repository, latestCommit, o
 
         {/* RIGHT COLUMN */}
         <Stack direction="column" gap={1.5} alignItems="flex-end" sx={{ mt: 1, flexShrink: 0, width: 'auto', [NARROW_HEADER_QUERY]: { alignItems: 'flex-start', width: '100%' } }}>
-          {/* Open in Cloud Editor — hidden for repo-less / MCP components */}
+          {/* Open in Cloud Editor — hidden for repo-less / MCP components, disabled for MI */}
           {showOpenInEditor && (
-            <Box sx={{ position: 'relative' }}>
-              <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
-                Open in Cloud Editor
-              </Button>
-            </Box>
+            <Tooltip title={isMi ? CLOUD_EDITOR_MI_UNSUPPORTED : ''}>
+              <Box component="span" sx={{ position: 'relative', display: 'inline-flex' }}>
+                <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={isMi || !codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
+                  Open in Cloud Editor
+                </Button>
+              </Box>
+            </Tooltip>
           )}
 
           {HeaderActions && <HeaderActions component={component} environments={environments} versionId={versionId} projectId={projectId} orgHandler={orgHandler} />}
