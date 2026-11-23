@@ -50,7 +50,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
-import { useKnowledgeBase, useUpdateKnowledgeBase } from '../hooks/useKnowledgeBases';
+import { useKnowledgeBase, useKnowledgeBaseApiSecurity, useUpdateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { useDeleteComponent } from '../hooks/useComponents';
 import { useProjectByHandler } from '../hooks/useProjects';
 import { formatDistanceToNow } from '../utils/time';
@@ -69,6 +69,7 @@ import {
   knowledgeBaseWriteBlockedReason,
   secretsForUpdate,
   vectorStoreFromConfig,
+  apiKeyGuidance,
 } from '../utils/knowledgeBase';
 import { isChunkingValid, vectorStoreEnvVars } from '../utils/ragIngestion';
 import type { KnowledgeBase, KnowledgeBaseDataSource } from '../types/knowledgeBase';
@@ -483,6 +484,13 @@ const API_KEY_STEPS = [
 /** How an application reaches the knowledge base: the KB Service's URL, an API key for it, and the service itself. */
 function ConnectTab({ scope, kb, onDelete }: { scope: OrgScope; kb: KnowledgeBase; onDelete: () => void }): JSX.Element {
   const navigate = useAppNavigate();
+  const { data: security, error } = useKnowledgeBaseApiSecurity(kb);
+  const guidance = apiKeyGuidance(security, error, kb.apiStatus, useCan()(Scopes.ENDPOINT_API_KEY_MANAGE));
+  const viewService = (
+    <Button variant="outlined" size="small" onClick={() => navigate(componentOverviewUrl(scope.org, kb.projectName, kb.name))}>
+      View KB Service
+    </Button>
+  );
   return (
     <Stack gap={3}>
       <Card variant="outlined">
@@ -512,20 +520,35 @@ function ConnectTab({ scope, kb, onDelete }: { scope: OrgScope; kb: KnowledgeBas
 
       <Card variant="outlined">
         <CardContent>
-          <Typography variant="h6">Get an API key</Typography>
-          <Typography variant="body2" color="text.secondary" sx={sectionHeaderSx}>
-            Generate a key on the KB Service to call this knowledge base from your application.
-          </Typography>
-          <Button variant="outlined" size="small" onClick={() => navigate(componentOverviewUrl(scope.org, kb.projectName, kb.name))}>
-            View KB Service
-          </Button>
-          <Box component="ol" sx={{ mt: 2, mb: 0, pl: 2.5 }}>
-            {API_KEY_STEPS.map((step) => (
-              <Typography key={step} component="li" variant="body2" color="text.secondary">
-                {step}
+          <Typography variant="h6">{guidance.kind === 'info' ? guidance.title : 'Get an API key'}</Typography>
+          {guidance.kind === 'checking' && (
+            <Typography variant="body2" color="text.secondary">
+              Checking how the KB Service's API is secured…
+            </Typography>
+          )}
+          {guidance.kind === 'info' && (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={sectionHeaderSx}>
+                {guidance.message}
               </Typography>
-            ))}
-          </Box>
+              {viewService}
+            </>
+          )}
+          {guidance.kind === 'steps' && (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={sectionHeaderSx}>
+                Generate a key on the KB Service to call this knowledge base from your application.
+              </Typography>
+              {viewService}
+              <Box component="ol" sx={{ mt: 2, mb: 0, pl: 2.5 }}>
+                {API_KEY_STEPS.map((step) => (
+                  <Typography key={step} component="li" variant="body2" color="text.secondary">
+                    {step}
+                  </Typography>
+                ))}
+              </Box>
+            </>
+          )}
         </CardContent>
       </Card>
 

@@ -18,6 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  apiKeyGuidance,
   buildDataSourceSettings,
   buildKnowledgeBaseSettings,
   chunkingFromConfig,
@@ -305,5 +306,40 @@ describe('retrievalSettingsErrors', () => {
 
   it.each([-0.1, 1.1, Number.NaN])('rejects a %s threshold', (minSimilarity) => {
     expect(retrievalSettingsErrors({ maxChunks: 5, minSimilarity }).minSimilarity).toBeDefined();
+  });
+});
+
+describe('apiKeyGuidance', () => {
+  const onGateway = { publicUrl: 'https://gw.example/docs-kb/v1.0' };
+  const published = { status: 'SUCCEEDED' };
+
+  it('gives the API key steps for an API key API on the gateway, to a role that can manage keys', () => {
+    expect(apiKeyGuidance({ mode: 'api-key', ...onGateway }, null, published, true)).toEqual({ kind: 'steps' });
+  });
+
+  it('waits while the security is being read', () => {
+    expect(apiKeyGuidance(undefined, null, published, true)).toEqual({ kind: 'checking' });
+  });
+
+  it('points an OAuth API at OAuth clients instead of keys', () => {
+    expect(apiKeyGuidance({ mode: 'jwt', ...onGateway }, null, published, true)).toMatchObject({ kind: 'info', title: 'Get an OAuth token' });
+  });
+
+  it('says an unsecured API needs no credential', () => {
+    expect(apiKeyGuidance({ mode: 'none', ...onGateway }, null, published, true)).toMatchObject({ kind: 'info', title: 'No credential needed' });
+  });
+
+  it("tells a role that can't manage keys to ask for one", () => {
+    expect(apiKeyGuidance({ mode: 'api-key', ...onGateway }, null, published, false)).toMatchObject({ kind: 'info', message: expect.stringContaining("Your role can't generate API keys") });
+  });
+
+  it('says why there are no keys yet while the API is not on the gateway', () => {
+    const notOnGateway = apiKeyGuidance({ mode: 'api-key' }, null, { status: 'PENDING' }, true);
+    expect(notOnGateway).toMatchObject({ kind: 'info', message: expect.stringContaining('API keys can be generated once it is') });
+    expect(apiKeyGuidance(undefined, { status: 409 }, { status: 'PENDING' }, true)).toEqual(notOnGateway);
+  });
+
+  it('sends the user to the KB Service when the security read fails', () => {
+    expect(apiKeyGuidance(undefined, { status: 500 }, published, true)).toMatchObject({ kind: 'info', message: expect.stringContaining('Could not check') });
   });
 });

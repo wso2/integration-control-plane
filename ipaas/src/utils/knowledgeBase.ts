@@ -32,6 +32,7 @@ import {
 import type { EndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import { httpStatusOf } from './apiErrors';
 import { describeCron } from './cronUtils';
+import type { SecurityConfig } from '../types/consumers';
 import type { KnowledgeBase, KnowledgeBaseApiStatus, KnowledgeBaseSettings } from '../types/knowledgeBase';
 import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, VectorStoreConfig } from '../types/ragIngestion';
 import { datasourceEnvVars, embeddingEnvVars, isEmbeddingValid, isVectorStoreValid, vectorStoreEnvVars } from './ragIngestion';
@@ -373,4 +374,28 @@ export function retrievalSettingsErrors({ maxChunks, minSimilarity }: RetrievalS
   if (!Number.isInteger(maxChunks) || maxChunks < 1 || maxChunks > MAX_RETRIEVE_CHUNKS) errors.maxChunks = `Enter a whole number from 1 to ${MAX_RETRIEVE_CHUNKS}.`;
   if (!Number.isFinite(minSimilarity) || minSimilarity < 0 || minSimilarity > 1) errors.minSimilarity = 'Enter a number from 0 to 1.';
   return errors;
+}
+
+// ── Connect to KB: credentials ──────────────────────────────────────────────
+
+/** What Connect to KB tells the user about calling the KB Service: the API key steps, or why they don't apply. */
+export type ApiKeyGuidance = { kind: 'checking' } | { kind: 'steps' } | { kind: 'info'; title: string; message: string };
+
+/**
+ * Keys are generated on the KB Service's overview only while its API takes API keys on the gateway
+ * and the user's role can manage them. Otherwise the steps would lead nowhere, so say why instead.
+ */
+export function apiKeyGuidance(security: Pick<SecurityConfig, 'mode' | 'publicUrl'> | undefined, error: unknown, apiStatus: KnowledgeBaseApiStatus | undefined, canManageKeys: boolean): ApiKeyGuidance {
+  const unavailable = (message: string): ApiKeyGuidance => ({ kind: 'info', title: 'Get an API key', message });
+  if (error) {
+    // Only a 409 says the API is not on the gateway; anything else is a read that failed.
+    if (httpStatusOf(error) === 409) return unavailable(`${notOnGatewayReason(apiStatus)} API keys can be generated once it is.`);
+    return unavailable("Could not check how the KB Service's API is secured. View the KB Service to see its security settings.");
+  }
+  if (!security) return { kind: 'checking' };
+  if (!security.publicUrl) return unavailable(`${notOnGatewayReason(apiStatus)} API keys can be generated once it is.`);
+  if (security.mode === 'jwt') return { kind: 'info', title: 'Get an OAuth token', message: "The KB Service's API takes OAuth tokens, not API keys. View the KB Service, create an OAuth client under Security, and call the Service URL with a token from it." };
+  if (security.mode === 'none') return { kind: 'info', title: 'No credential needed', message: "The KB Service's API is not secured, so your application can call the Service URL without a key." };
+  if (!canManageKeys) return unavailable("Your role can't generate API keys. Ask someone who can manage API keys to generate one on the KB Service.");
+  return { kind: 'steps' };
 }
