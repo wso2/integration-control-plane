@@ -43,17 +43,16 @@ import {
   Typography,
   TextField,
 } from '@wso2/oxygen-ui';
-import { ArrowLeft, Clock, Database, ExternalLink, MoreVertical, Play, Plus, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, Clock, Database, MoreVertical, Play, Plus, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
-import { useKnowledgeBase, useUpdateKnowledgeBase } from '../hooks/useKnowledgeBases';
+import { useKnowledgeBase, useKnowledgeBaseApiSecurity, useUpdateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { useDeleteComponent } from '../hooks/useComponents';
 import { useProjectByHandler } from '../hooks/useProjects';
-import { getDevPortalBaseUrl } from '../config/runtimeConfig';
 import { formatDistanceToNow } from '../utils/time';
 import { useTriggerComponent } from '../hooks/useExecutions';
 import { knowledgeBasesUrl, newKnowledgeBaseDataSourceUrl, type OrgScope } from '../nav';
@@ -70,6 +69,7 @@ import {
   knowledgeBaseWriteBlockedReason,
   secretsForUpdate,
   vectorStoreFromConfig,
+  apiKeyGuidance,
 } from '../utils/knowledgeBase';
 import { isChunkingValid, vectorStoreEnvVars } from '../utils/ragIngestion';
 import type { KnowledgeBase, KnowledgeBaseDataSource } from '../types/knowledgeBase';
@@ -473,11 +473,24 @@ function DataSourceRow({ scope, kb, dataSource: ds, onNotify, onSchedule, onView
   );
 }
 
-const API_KEY_STEPS = ['Open the Developer Portal and sign in.', 'Create or select an application.', 'Subscribe the application to this KB service.', 'Generate and copy an API key from the application.'];
+// API keys are issued on the KB Service's own overview, as for any integration exposed as an API.
+const API_KEY_STEPS = [
+  'Open the KB Service: click View KB Service, or View in the Actions menu of the service below.',
+  "On the KB Service's overview, scroll to the API keys section of its environment card.",
+  'Click Generate API key, name the key, and copy it right away.',
+  'Use the key when your application calls the Service URL.',
+];
 
 /** How an application reaches the knowledge base: the KB Service's URL, an API key for it, and the service itself. */
 function ConnectTab({ scope, kb, onDelete }: { scope: OrgScope; kb: KnowledgeBase; onDelete: () => void }): JSX.Element {
-  const devPortalUrl = getDevPortalBaseUrl();
+  const navigate = useAppNavigate();
+  const { data: security, error } = useKnowledgeBaseApiSecurity(kb);
+  const guidance = apiKeyGuidance(security, error, kb.apiStatus, useCan()(Scopes.ENDPOINT_API_KEY_MANAGE));
+  const viewService = (
+    <Button variant="outlined" size="small" onClick={() => navigate(componentOverviewUrl(scope.org, kb.projectName, kb.name))}>
+      View KB Service
+    </Button>
+  );
   return (
     <Stack gap={3}>
       <Card variant="outlined">
@@ -507,24 +520,35 @@ function ConnectTab({ scope, kb, onDelete }: { scope: OrgScope; kb: KnowledgeBas
 
       <Card variant="outlined">
         <CardContent>
-          <Typography variant="h6">Get an API key</Typography>
-          <Typography variant="body2" color="text.secondary" sx={sectionHeaderSx}>
-            Generate a key in the Developer Portal to call this KB service from your application.
-          </Typography>
-          <Tooltip title={devPortalUrl ? '' : 'The Developer Portal is not configured for this environment.'}>
-            <span>
-              <Button variant="outlined" size="small" endIcon={<ExternalLink size={14} />} href={devPortalUrl ?? undefined} target="_blank" rel="noopener noreferrer" disabled={!devPortalUrl}>
-                Open Developer Portal
-              </Button>
-            </span>
-          </Tooltip>
-          <Box component="ol" sx={{ mt: 2, mb: 0, pl: 2.5 }}>
-            {API_KEY_STEPS.map((step) => (
-              <Typography key={step} component="li" variant="body2" color="text.secondary">
-                {step}
+          <Typography variant="h6">{guidance.kind === 'info' ? guidance.title : 'Get an API key'}</Typography>
+          {guidance.kind === 'checking' && (
+            <Typography variant="body2" color="text.secondary">
+              Checking how the KB Service's API is secured…
+            </Typography>
+          )}
+          {guidance.kind === 'info' && (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={sectionHeaderSx}>
+                {guidance.message}
               </Typography>
-            ))}
-          </Box>
+              {viewService}
+            </>
+          )}
+          {guidance.kind === 'steps' && (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={sectionHeaderSx}>
+                Generate a key on the KB Service to call this knowledge base from your application.
+              </Typography>
+              {viewService}
+              <Box component="ol" sx={{ mt: 2, mb: 0, pl: 2.5 }}>
+                {API_KEY_STEPS.map((step) => (
+                  <Typography key={step} component="li" variant="body2" color="text.secondary">
+                    {step}
+                  </Typography>
+                ))}
+              </Box>
+            </>
+          )}
         </CardContent>
       </Card>
 

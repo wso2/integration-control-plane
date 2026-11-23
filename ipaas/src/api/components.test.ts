@@ -230,6 +230,20 @@ describe('deployment tracks', () => {
     expect(c.deploymentTracks).toEqual([{ id: 'uid-1', latest: true }]);
   });
 
+  // A data source's overview links back to its knowledge base from this field, which the
+  // BFF reads off the component's ipaas.wso2.com/knowledge-base annotation.
+  it('keeps the knowledge base a data source feeds, from the detail and from the list', async () => {
+    get.mockResolvedValue({ id: 'uid-1', handler: 'docs-kb-amazons3', componentSubType: 'kb-ingestion', knowledgeBase: 'docs-kb' });
+    expect((await fetchComponentByHandler('proj', 'docs-kb-amazons3')).knowledgeBase).toBe('docs-kb');
+
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/docs-kb-amazons3') return {};
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'docs-kb-amazons3', componentSubType: 'kb-ingestion', knowledgeBase: 'docs-kb' }] };
+      throw new Error('HTTP 500');
+    });
+    expect((await fetchComponentByHandler('proj', 'docs-kb-amazons3')).knowledgeBase).toBe('docs-kb');
+  });
+
   // A BFF that predates the detail endpoint answers it with an empty stub.
   it('falls back to the list endpoint when the detail answer names no component', async () => {
     get.mockImplementation(async (path: string) => {

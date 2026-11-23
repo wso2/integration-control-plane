@@ -16,7 +16,8 @@
  * under the License.
  */
 
-import { Box, PageContent } from '@wso2/oxygen-ui';
+import { Box, Button, PageContent } from '@wso2/oxygen-ui';
+import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useEffect, useRef, useState, type JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
@@ -36,7 +37,9 @@ import IntegrationRenderer from '../components/Overview/_shared/IntegrationRende
 import HeaderShell from '../components/Overview/_shared/HeaderShell';
 import { useIntegrationModule } from '../hooks/useIntegrationModule';
 import type { SelectedArtifact } from '../components/artifact-config';
-import { resourceUrl, broaden, type ComponentScope } from '../nav';
+import { resourceUrl, broaden, knowledgeBaseUrl, type ComponentScope } from '../nav';
+import { useAppNavigate } from '../hooks/useAppNavigate';
+import { knowledgeBaseOfComponent } from '../utils/knowledgeBase';
 import BuildCard from '../components/BuildCard';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
@@ -62,6 +65,7 @@ const MIGRATED_INTEGRATION_TYPES = new Set<IntegrationType>(['automation', 'inte
 const CUSTOM_OVERVIEW_TYPES = new Set<IntegrationType>(['tailscale-vpn']);
 
 export default function Component(scope: ComponentScope): JSX.Element {
+  const navigate = useAppNavigate();
   // Support both UUID and handler in the URL — only one query will be enabled at a time
   const isUuid = UUID_RE.test(scope.project);
   const { data: projectByHandler, isLoading: loadingByHandler } = useProjectByHandler(!isUuid ? scope.project : '');
@@ -140,6 +144,8 @@ export default function Component(scope: ComponentScope): JSX.Element {
   const isVoiceAgent = identity?.type === 'voice-agent';
   const hasSource = !isProxyComponent && !isRagNoSource && !isVoiceAgent;
   const showBuildCard = !component.isPrebuilt && hasSource;
+  // A KB Service or data source is managed from its knowledge base's page, so it links back there.
+  const parentKnowledgeBase = knowledgeBaseOfComponent(component);
 
   return (
     <>
@@ -156,6 +162,12 @@ export default function Component(scope: ComponentScope): JSX.Element {
 
         {/* <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}> */}
         <PageContent fullWidth>
+          {parentKnowledgeBase && (
+            <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(knowledgeBaseUrl({ org: scope.org }, parentKnowledgeBase))} sx={{ mb: 2, alignSelf: 'flex-start' }}>
+              Back to Knowledge Base
+            </Button>
+          )}
+
           {/* Component header */}
           {!hasCustomOverview && (
             <HeaderShell

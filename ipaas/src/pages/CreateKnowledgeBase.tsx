@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -27,7 +27,7 @@ import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
 import { DATASOURCES, DEFAULT_CHUNKING } from '../constants/ragIngestion';
-import { buildDataSourceSettings, buildKnowledgeBaseSettings, dataSourceNameFor, isNameValid, type NameFields } from '../utils/knowledgeBase';
+import { buildDataSourceSettings, buildKnowledgeBaseSettings, dataSourceNameFor, isNameValid, knowledgeBaseReview, type NameFields, type ReviewSection, type ReviewSectionId } from '../utils/knowledgeBase';
 import { isChunkingValid, isDatasourceValid, isEmbeddingValid, isVectorStoreValid } from '../utils/ragIngestion';
 import type { ChunkingConfig, DatasourceConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
 import type { CreateKnowledgeBaseDataSourceInput } from '../types/knowledgeBase';
@@ -39,11 +39,15 @@ import EmbeddingModelStep from '../components/KnowledgeBase/steps/EmbeddingModel
 import ChunkingStep from '../components/KnowledgeBase/steps/ChunkingStep';
 import DatasourceStep from '../components/KnowledgeBase/steps/DatasourceStep';
 import IngestionScheduleStep, { type IngestionMode } from '../components/KnowledgeBase/steps/IngestionScheduleStep';
+import KnowledgeBaseReview from '../components/KnowledgeBase/steps/ReviewStep';
 import { wizardActionsSx, wizardBodySx, wizardLayoutSx, wizardStepperSx } from './KnowledgeBase.styles';
 
-const STEPS = ['Name', 'Vector Store', 'Embedding Model', 'Chunking', 'Data Source', 'Ingestion Schedule'];
+const STEPS = ['Name', 'Vector Store', 'Embedding Model', 'Chunking', 'Data Source', 'Ingestion Schedule', 'Review'];
 const DATA_SOURCE_STEP = 4;
-const LAST_STEP = STEPS.length - 1;
+const SCHEDULE_STEP = 5;
+const REVIEW_STEP = STEPS.length - 1;
+/** The step each review section's Edit goes back to. */
+const SECTION_STEP: Record<ReviewSectionId, number> = { name: 0, vectorStore: 1, embedding: 2, chunking: 3, dataSource: DATA_SOURCE_STEP, schedule: SCHEDULE_STEP };
 
 export default function CreateKnowledgeBase(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -72,8 +76,26 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
   const [datasource, setDatasource] = useState<DatasourceConfig | null>(null);
   const [mode, setMode] = useState<IngestionMode>('scheduled');
   const schedule = useScheduleForm(null, usePlanAccess(), SCHEDULE_POLICIES.ingestion);
+  // "Create Without Data Source" reviews the knowledge base in a dialog before creating it.
+  const [reviewingWithoutSource, setReviewingWithoutSource] = useState(false);
 
-  const stepValid = [isNameValid(names), isVectorStoreValid(vectorStore), isEmbeddingValid(embedding), isChunkingValid(chunking), isDatasourceValid(datasource), mode === 'once' || schedule.isValid];
+  const stepValid = [isNameValid(names), isVectorStoreValid(vectorStore), isEmbeddingValid(embedding), isChunkingValid(chunking), isDatasourceValid(datasource), mode === 'once' || schedule.isValid, true];
+
+  // Every step before the data source has been validated by the time a review shows.
+  const review = (withDataSource: boolean): ReviewSection[] =>
+    vectorStore && embedding
+      ? knowledgeBaseReview({
+          names,
+          vectorStore,
+          embedding,
+          chunking,
+          dataSource: withDataSource && datasource ? { config: datasource, schedule: mode === 'scheduled' ? { cron: schedule.cron, timezone: schedule.timezone } : null } : null,
+        })
+      : [];
+  const editSection = (section: ReviewSectionId) => {
+    setReviewingWithoutSource(false);
+    setStep(SECTION_STEP[section]);
+  };
 
   const submit = (withDataSource: boolean) => {
     // Every step before the data source has been validated to get here.
@@ -119,18 +141,19 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
             </Typography>
           </>
         )}
-        {step === LAST_STEP && <IngestionScheduleStep mode={mode} onModeChange={setMode} schedule={schedule} />}
+        {step === SCHEDULE_STEP && <IngestionScheduleStep mode={mode} onModeChange={setMode} schedule={schedule} />}
+        {step === REVIEW_STEP && <KnowledgeBaseReview heading="Review and create" sections={review(true)} onEdit={editSection} />}
 
         <Stack direction="row" gap={1.5} sx={wizardActionsSx}>
           <Button variant="outlined" disabled={create.isPending} onClick={() => (step === 0 ? navigate(knowledgeBasesUrl(scope)) : setStep((s) => s - 1))}>
             {step === 0 ? 'Cancel' : 'Back'}
           </Button>
           {step === DATA_SOURCE_STEP && (
-            <Button variant="outlined" disabled={!canManage || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={() => submit(false)}>
+            <Button variant="outlined" disabled={!canManage || create.isPending} onClick={() => setReviewingWithoutSource(true)}>
               Create Without Data Source
             </Button>
           )}
-          {step < LAST_STEP ? (
+          {step < REVIEW_STEP ? (
             <Button variant="contained" disabled={!stepValid[step] || create.isPending} onClick={() => setStep((s) => s + 1)}>
               Next
             </Button>
@@ -141,6 +164,26 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
           )}
         </Stack>
       </Box>
+
+      <Dialog open={reviewingWithoutSource} onClose={create.isPending ? undefined : () => setReviewingWithoutSource(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Review and create</DialogTitle>
+        <DialogContent>
+          {create.error && (
+            <Alert severity="error" variant="outlined" sx={{ mb: 2 }}>
+              {create.error.message}
+            </Alert>
+          )}
+          <KnowledgeBaseReview sections={review(false)} onEdit={editSection} />
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" disabled={create.isPending} onClick={() => setReviewingWithoutSource(false)}>
+            Cancel
+          </Button>
+          <Button variant="contained" disabled={!canManage || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={() => submit(false)}>
+            {create.isPending ? 'Creating…' : 'Create Knowledge Base'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

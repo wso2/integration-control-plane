@@ -23,7 +23,7 @@ import type { EndpointRef } from '../types/consumers';
 import type { CreateKnowledgeBaseDataSourceInput, CreateKnowledgeBaseInput, KnowledgeBase, UpdateKnowledgeBaseInput } from '../types/knowledgeBase';
 import type { RetrievalQuery } from '../types/ragIngestion';
 import { httpStatusOf } from '../utils/apiErrors';
-import { endpointSecurityQueryKey } from './useConsumers';
+import { endpointSecurityQueryKey, useEndpointSecurity } from './useConsumers';
 import { useEndpointTestAccess } from './useEndpointTestAccess';
 
 // A create finishes in the background, and a KB Service and its data sources take a
@@ -137,4 +137,10 @@ export function useRetrieveFromKnowledgeBase(kb: Pick<KnowledgeBase, 'name' | 'e
     },
   });
   return { retrieve, access };
+}
+
+/** How the KB Service's API on the gateway is secured: the same read the retrieval test makes. */
+export function useKnowledgeBaseApiSecurity(kb: Pick<KnowledgeBase, 'name' | 'environment'>) {
+  const ref = useMemo<EndpointRef>(() => ({ componentName: kb.name, environmentName: kb.environment, endpointName: KB_SERVICE_ENDPOINT, deploymentTrackId: '' }), [kb.name, kb.environment]);
+  return useEndpointSecurity(ref);
 }
