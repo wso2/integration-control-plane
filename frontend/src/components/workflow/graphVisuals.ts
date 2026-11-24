@@ -32,6 +32,10 @@ const iconByType: Record<string, ComponentType<{ size?: number }>> = {
   HUMAN_TASK: UserCheck, // a person completing/approving
   SIGNAL: Database, // an external signal carrying data
   TIMER: Timer, // a durable timer
+  // Descriptor kinds the flow rail draws, where they differ from the timeline's span categories.
+  SLEEP: Timer,
+  EVENT_WAIT: Database,
+  AWAIT_RESULT: Workflow,
 };
 
 // Icon component for a node/span kind (e.g. ACTIVITY, HUMAN_TASK), falling back to a generic dot.
