@@ -28,7 +28,7 @@ Add to `index.ts` only when code outside needs it. ESLint rejects imports of the
 
 ## Rules
 
-- **One organization per session.** The session is scoped to one organization and a URL for another organization shows "no access" (`AppLayout`). The only way to change it is the header's switcher (`ORGANIZATION_SWITCHER`, gateway sign-in only). It has the gateway move the cloud console's session and then this console's (`switchOrganization`), and reloads the console (`loadConsoleHome`). Do not switch organizations on the client any other way.
+- **One organization per session.** The session is scoped to one organization and a URL for another organization shows "no access" (`AppLayout`). The only way to change it is the header's switcher (`ORGANIZATION_SWITCHER`, gateway sign-in only). It has the gateway move the cloud console's session and then this console's (`switchOrganization`), and reloads the console on the same page in the new organization (`orgSwitchUrl`, `loadConsolePage`). Do not switch organizations on the client any other way.
 - **No org creation in the console.** Thunder creates the organization at sign-up.
 - **No password flows.** Thunder owns credentials, so the console has no password sign-in or password change.
 - **Config keys** come from `window.API_CONFIG` (`thunderConfig.ts`): `VITE_AUTH_BASE_URL`, `ASGARDEO_CLIENT_ID`, `ASGARDEO_SCOPE`, `ASGARDEO_RESOURCE` and `ASGARDEO_SIGN_IN_REDIRECT_URL`. The names are historical and the deployments set them, so do not rename them here.

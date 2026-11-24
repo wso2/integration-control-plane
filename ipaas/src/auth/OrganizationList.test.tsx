@@ -25,6 +25,7 @@ import type { OrganizationSwitchState } from './OrganizationList';
 
 const ACME = { id: 'acme-id', handle: 'acme', name: 'Acme' };
 const GLOBEX = { id: 'globex-id', handle: 'globex', name: 'Globex' };
+const GLOBEX_LOGS = '/organizations/globex/logs';
 
 const sdk = vi.hoisted(() => ({ props: {} as Record<string, unknown> }));
 
@@ -35,7 +36,7 @@ vi.mock('@thunderid/react', () => ({
   },
 }));
 
-const orgSwitch = vi.hoisted(() => ({ switchOrganization: vi.fn(), loadConsoleHome: vi.fn() }));
+const orgSwitch = vi.hoisted(() => ({ switchOrganization: vi.fn(), loadConsolePage: vi.fn() }));
 vi.mock('./orgSwitch', async (original) => ({ ...(await original<typeof import('./orgSwitch')>()), ...orgSwitch }));
 
 const { OrganizationList } = await import('./OrganizationList');
@@ -59,7 +60,7 @@ async function render(): Promise<void> {
 
 async function pick(unit = GLOBEX): Promise<void> {
   await act(async () => {
-    state.onSwitch(unit, ACME.id);
+    state.onSwitch(unit, ACME.id, GLOBEX_LOGS);
   });
 }
 
@@ -86,7 +87,7 @@ describe('OrganizationList', () => {
     await pick();
 
     expect(orgSwitch.switchOrganization).toHaveBeenCalledWith(GLOBEX.id, ACME.id);
-    expect(orgSwitch.loadConsoleHome).toHaveBeenCalled();
+    expect(orgSwitch.loadConsolePage).toHaveBeenCalledWith(GLOBEX_LOGS);
     expect(state.switchingId).toBe(GLOBEX.id);
   });
 
@@ -97,10 +98,10 @@ describe('OrganizationList', () => {
     const settled = vi.fn();
 
     await act(async () => {
-      void state.onSwitch(GLOBEX, ACME.id).then(settled, settled);
+      void state.onSwitch(GLOBEX, ACME.id, GLOBEX_LOGS).then(settled, settled);
     });
 
-    expect(orgSwitch.loadConsoleHome).toHaveBeenCalled();
+    expect(orgSwitch.loadConsolePage).toHaveBeenCalled();
     expect(settled).not.toHaveBeenCalled();
   });
 
@@ -109,7 +110,7 @@ describe('OrganizationList', () => {
     await render();
 
     await act(async () => {
-      await expect(state.onSwitch(GLOBEX, ACME.id)).resolves.toBeUndefined();
+      await expect(state.onSwitch(GLOBEX, ACME.id, GLOBEX_LOGS)).resolves.toBeUndefined();
     });
   });
 
@@ -132,6 +133,6 @@ describe('OrganizationList', () => {
 
     expect(state.error).toBe(message);
     expect(state.switchingId).toBeNull();
-    expect(orgSwitch.loadConsoleHome).not.toHaveBeenCalled();
+    expect(orgSwitch.loadConsolePage).not.toHaveBeenCalled();
   });
 });

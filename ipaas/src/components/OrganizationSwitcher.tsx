@@ -30,6 +30,8 @@ interface OrganizationSwitcherProps {
   name: string;
   /** Opens the organization's overview. */
   onHome: () => void;
+  /** Where a switch to the organization `org` (a handle) lands: the current page there, or its overview. */
+  switchUrl: (org: string) => string;
 }
 
 // Matches the Project/Integration cards.
@@ -50,7 +52,7 @@ const decorativeDisplayProps = { tabIndex: -1 };
  * The organization alone, as a card that opens its overview. The card is the one control: the select
  * inside only matches the look of the Project and Integration cards.
  */
-function OrganizationCard({ ref, org, name, onHome }: OrganizationSwitcherProps): JSX.Element {
+function OrganizationCard({ ref, org, name, onHome }: Omit<OrganizationSwitcherProps, 'switchUrl'>): JSX.Element {
   const onKeyDown = (e: KeyboardEvent): void => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -75,7 +77,7 @@ function OrganizationCard({ ref, org, name, onHome }: OrganizationSwitcherProps)
  * The user's organizations. Picking another one switches the session to it; picking the current one
  * opens its overview, as the card does.
  */
-function OrganizationSelect({ ref, org, name, onHome, organizationUnits, error, switchingId, onSwitch }: OrganizationSwitcherProps & OrganizationSwitchState): JSX.Element {
+function OrganizationSelect({ ref, org, name, onHome, switchUrl, organizationUnits, error, switchingId, onSwitch }: OrganizationSwitcherProps & OrganizationSwitchState): JSX.Element {
   // The failure the user has already seen: opening the select again hides it.
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const guardNavigation = useLeaveGuard();
@@ -105,7 +107,7 @@ function OrganizationSelect({ ref, org, name, onHome, organizationUnits, error, 
             // attempt's failure then shows even when it reads the same as the one dismissed.
             guardNavigation(() => {
               setDismissedError(null);
-              return onSwitch(unit, current.id);
+              return onSwitch(unit, current.id, switchUrl(unit.handle));
             });
           }}
           SelectDisplayProps={selectDisplayProps}
