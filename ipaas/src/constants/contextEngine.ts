@@ -621,6 +621,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'SAP SuccessFactors',
     description: 'People from Employee Central, with their names and email addresses, kept in sync.',
     category: 'saas',
+    popular: true,
     logo: `${CONNECTOR_LOGO_BASE}sap.webp`,
     icon: 'building',
     // Mirrors the Ballerina `sap.successfactors` integration's settings: the API server, the company id, its auth block, the fields to publish, and the page size.
