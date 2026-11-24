@@ -118,6 +118,8 @@ import {
   isFieldVisible,
   isCustomModel,
   isFormComplete,
+  isCronInterval,
+  integrationTypeFor,
   isHttpUrl,
   isLlmValid,
   isNameStepValid,
@@ -316,6 +318,24 @@ describe('source validation', () => {
     expect(isSourceValid(withValues('salesforce', { ...base, authType: 'bearer', token: 't' }))).toBe(true);
 
     expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
+  });
+
+  it('schedules the Google automations from a poll interval in seconds', () => {
+    const sources = { gdrive: { folderId: 'f', authType: 'bearer', token: 't' }, 'google-calendar': { authType: 'bearer', token: 't' } };
+    for (const [id, values] of Object.entries(sources)) {
+      const type = integrationTypeFor(id)!;
+      // Every 15 minutes unless set, as the catalog's default schedule.
+      expect(toIntegrationRequest(withValues(id, values), type).settings.pollInterval).toBe(900);
+      expect(toIntegrationRequest(withValues(id, { ...values, pollInterval: '3600' }), type).settings.pollInterval).toBe(3600);
+      for (const bad of ['450', '5000', 'soon', '0']) {
+        expect(invalidSourceFields(withValues(id, { ...values, pollInterval: bad })).map((f) => f.key)).toEqual(['pollInterval']);
+      }
+    }
+  });
+
+  it('accepts only poll intervals that have a cron schedule', () => {
+    for (const ok of [60, 120, 300, 900, 1200, 1800, 3600, 7200, 10800, 21600, 43200, 86400]) expect(isCronInterval(ok)).toBe(true);
+    for (const bad of [0, 30, 90, 450, 2400, 5400, 18000, 172800, 900.5]) expect(isCronInterval(bad)).toBe(false);
   });
 
   it('shows and requires only the fields of the chosen Google auth flow', () => {
@@ -727,7 +747,7 @@ describe('wire payloads', () => {
     });
 
     const calendar = withValues('google-calendar', { authType: 'bearer', token: 't', eventTypes: 'default' });
-    expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pageSize: 250 });
+    expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pollInterval: 900, pageSize: 250 });
   });
 
   it('sends a structured connector’s RML mapping with its integration request', () => {

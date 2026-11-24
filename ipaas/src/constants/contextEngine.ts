@@ -110,6 +110,17 @@ const GOOGLE_AUTH = [
   F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.', setting: 'auth.token' }),
 ];
 
+/**
+ * Seconds between an automation's runs: the BFF schedules the integration's CronJob from it. Only
+ * intervals that divide an hour or a day have a cron schedule. The default is the catalog's 15 minutes.
+ */
+const AUTOMATION_POLL_INTERVAL = O('pollInterval', 'Poll Interval', 'text', {
+  defaultValue: '900',
+  helper: 'Seconds between syncs. They must divide an hour or a day evenly, such as 300, 900, 3600 or 86400.',
+  valueType: 'integer',
+  cronSeconds: true,
+});
+
 const SQL_TABLES = (port: string) => [
   F('host', 'Host', 'text'),
   F('port', 'Port', 'text', { defaultValue: port }),
@@ -220,7 +231,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     icon: 'folder',
     // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
     // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
-    fields: [...G('Connection', ...GOOGLE_AUTH), ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'Subfolders are included.' }))],
+    fields: [...G('Connection', ...GOOGLE_AUTH), ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'Subfolders are included.' })), ...G({ label: 'Sync options', collapsed: true }, AUTOMATION_POLL_INTERVAL)],
     summaryKeys: ['folderId'],
   },
   {
@@ -440,7 +451,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
           valueType: 'boolean',
         }),
       ),
-      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.', valueType: 'integer' })),
+      ...G({ label: 'Sync options', collapsed: true }, AUTOMATION_POLL_INTERVAL, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.', valueType: 'integer' })),
     ],
     summaryKeys: ['calendarId'],
     isStructuredData: true,
