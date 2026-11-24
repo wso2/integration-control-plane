@@ -351,10 +351,7 @@ export const rotateComponentEnvironmentJwtSecret = (componentId: string, environ
 // APIP reconciles the endpoint's gateway exposure (Public, Organization or none) for this
 // environment. Project access is implicit and always on.
 export const updateEndpoint = (input: UpdateEndpointInput): Promise<EndpointVisibilityResult> =>
-  bff.put<EndpointVisibilityResult>(
-    `/components/${seg(input.componentId)}/environments/${seg(input.environmentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ projectName: input.projectId, deploymentTrackId: input.versionId })}`,
-    visibilityRequestBody(input.networkVisibilities),
-  );
+  bff.put<EndpointVisibilityResult>(`/components/${seg(input.componentId)}/environments/${seg(input.environmentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ deploymentTrackId: input.versionId })}`, visibilityRequestBody(input.networkVisibilities));
 
 // MCP proxy (convert from an existing HTTP API) is an APIM flow the BFF doesn't serve.
 export const createMcpProxyComponent = (_input: CreateMcpProxyComponentInput): Promise<Component> => {

@@ -156,13 +156,12 @@ export function toRepository(repo: Partial<Repository> | null | undefined): Repo
   return repo as Repository;
 }
 
-// BFF ComponentRepository fields map 1:1 to Repository; projectName scopes
-// the lookup to the component within the caller's namespace. Repo-less
-// components (knowledge base services, proxies) answer with an object that
-// lacks the org and repo name, which is no repository at all.
-export async function fetchComponentRepository(projectId: string, componentHandler: string): Promise<Repository | null> {
+// BFF ComponentRepository fields map 1:1 to Repository. Repo-less components
+// (knowledge base services, proxies) answer with an object that lacks the org
+// and repo name, which is no repository at all.
+export async function fetchComponentRepository(_projectId: string, componentHandler: string): Promise<Repository | null> {
   try {
-    const repo = await bff.get<Partial<Repository> | null>(`/components/${seg(componentHandler)}/repository${q({ projectName: projectId })}`);
+    const repo = await bff.get<Partial<Repository> | null>(`/components/${seg(componentHandler)}/repository`);
     return toRepository(repo);
   } catch {
     return null;

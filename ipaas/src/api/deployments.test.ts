@@ -176,6 +176,6 @@ describe('API exposure wire contract', () => {
   it('retries one environment of one track', async () => {
     post.mockResolvedValue({ status: 'PENDING', component: 'orders', environment: 'production', endpoints: [] });
     await retryProxyReconciliation('orders', 'production', 'project-a', 'v1');
-    expect(post).toHaveBeenCalledWith('/components/orders/environments/production/api-proxy-reconciliation/retry?projectName=project-a&deploymentTrackId=v1');
+    expect(post).toHaveBeenCalledWith('/components/orders/environments/production/api-proxy-reconciliation/retry?deploymentTrackId=v1');
   });
 });
