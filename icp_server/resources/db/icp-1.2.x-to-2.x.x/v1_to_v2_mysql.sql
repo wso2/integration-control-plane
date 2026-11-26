@@ -28,10 +28,15 @@ SELECT CONCAT('Found ', @old_user_count, ' user(s) in old database') AS status;
 
 -- ============================================================================
 -- BEGIN TRANSACTION
--- All DML below (Steps 1–3b) is atomic. If the script fails during these
--- steps, connect to the database and run ROLLBACK to undo partial changes
--- before re-running. Step 3c (DDL) runs after COMMIT because MySQL DDL
--- causes an implicit commit and cannot be rolled back.
+-- Everything below is atomic. The mysql client stops at the first error and
+-- closes the session, which rolls back any partial changes, so the script can
+-- simply be re-run after fixing the cause.
+--
+-- The old user store usually has a different collation from the ICP v2 tables
+-- (utf8mb4_unicode_ci), e.g. utf8mb4_0900_ai_ci when it was created with the
+-- MySQL 8 server default. Every comparison against an old-database column
+-- therefore converts it with
+--     CONVERT(<col> USING utf8mb4) COLLATE utf8mb4_unicode_ci
 -- ============================================================================
 
 SET autocommit = 0;
@@ -47,52 +52,56 @@ SELECT 'STEP 1: Migrating users into main database ...' AS status;
 --     also exists in the old DB.  The old system's version of those users will
 --     be inserted below, taking full priority (including UUID).
 --     The admin user is handled separately (credentials-merge, not replace).
+--     Their group_user_mapping rows go with them (ON DELETE CASCADE).
 
 SET @sql = CONCAT('
-    DELETE gum
-    FROM `', @new_main_db, '`.group_user_mapping gum
-    JOIN `', @new_main_db, '`.users nu ON gum.user_uuid = nu.user_id
-    JOIN `', @old_db, '`.UM_USER ou ON nu.username = ou.UM_USER_NAME
-    WHERE ou.UM_TENANT_ID = -1234
-      AND nu.username != ''admin''
+    DELETE FROM `', @new_creds_db, '`.user_credentials
+    WHERE username != ''admin''
+      AND username IN (
+          SELECT CONVERT(ou.UM_USER_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci
+          FROM `', @old_db, '`.UM_USER ou
+          WHERE ou.UM_TENANT_ID = -1234
+      )
 ');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @sql = CONCAT('
-    DELETE nc
-    FROM `', @new_creds_db, '`.user_credentials nc
-    JOIN `', @old_db, '`.UM_USER ou ON nc.username = ou.UM_USER_NAME
-    WHERE ou.UM_TENANT_ID = -1234
-      AND nc.username != ''admin''
+    DELETE FROM `', @new_main_db, '`.users
+    WHERE username != ''admin''
+      AND username IN (
+          SELECT CONVERT(ou.UM_USER_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci
+          FROM `', @old_db, '`.UM_USER ou
+          WHERE ou.UM_TENANT_ID = -1234
+      )
 ');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
+SET @removed = ROW_COUNT();
 DEALLOCATE PREPARE stmt;
 
-SET @sql = CONCAT('
-    DELETE nu
-    FROM `', @new_main_db, '`.users nu
-    JOIN `', @old_db, '`.UM_USER ou ON nu.username = ou.UM_USER_NAME
-    WHERE ou.UM_TENANT_ID = -1234
-      AND nu.username != ''admin''
-');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
+SELECT CONCAT(@removed, ' non-admin pre-existing user(s) removed from new DB') AS status;
 
-SELECT CONCAT(ROW_COUNT(), ' non-admin pre-existing user(s) removed from new DB') AS status;
-
--- 1b. Insert all old users.  Only 'admin' will trigger INSERT IGNORE (because
---     it was intentionally kept above); everyone else has been cleared out.
+-- 1b. Insert all old users.  Only 'admin' can already exist here (it was
+--     intentionally kept above, and exists only if someone has signed in to
+--     the new ICP as admin), in which case INSERT IGNORE skips it.
+--     The seed admin's user_id lives in the credentials DB, and ICP v2 looks up
+--     the users row by that id at login, so a user whose username already has
+--     credentials (only the seed admin, after 1a) keeps that credentials id
+--     instead of the old UM_USER_ID.
 
 SET @sql = CONCAT('
     INSERT IGNORE INTO `', @new_main_db, '`.users
         (user_id, username, display_name,
          is_super_admin, is_project_author, is_oidc_user, require_password_change)
     SELECT
-        u.UM_USER_ID,
+        COALESCE(
+            (SELECT nc.user_id
+             FROM `', @new_creds_db, '`.user_credentials nc
+             WHERE nc.username = CONVERT(u.UM_USER_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci),
+            u.UM_USER_ID
+        ) AS user_id,
         u.UM_USER_NAME,
         -- Use displayName claim when available, fall back to username
         COALESCE(
@@ -130,9 +139,10 @@ SET @sql = CONCAT('
 ');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
+SET @n = ROW_COUNT();
 DEALLOCATE PREPARE stmt;
 
-SELECT CONCAT(ROW_COUNT(), ' user row(s) inserted into main database') AS status;
+SELECT CONCAT(@n, ' user row(s) inserted into main database') AS status;
 
 -- ============================================================================
 -- STEP 2 — Migrate credentials into the new credentials database
@@ -163,7 +173,8 @@ DEALLOCATE PREPARE stmt;
 SET @sql = CONCAT('
     UPDATE `', @new_creds_db, '`.user_credentials nc
     JOIN   `', @old_db, '`.UM_USER ou
-           ON ou.UM_USER_NAME = nc.username AND ou.UM_TENANT_ID = -1234
+           ON nc.username = CONVERT(ou.UM_USER_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci
+          AND ou.UM_TENANT_ID = -1234
     SET    nc.password_hash = ou.UM_USER_PASSWORD,
            nc.password_salt = NULLIF(ou.UM_SALT_VALUE, ''''),
            nc.updated_at    = CURRENT_TIMESTAMP
@@ -171,9 +182,10 @@ SET @sql = CONCAT('
 ');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
+SET @n = ROW_COUNT();
 DEALLOCATE PREPARE stmt;
 
-SELECT CONCAT(ROW_COUNT(), ' seed admin credential(s) merged') AS status;
+SELECT CONCAT(@n, ' seed admin credential(s) merged') AS status;
 
 -- 2b. Insert credentials for all remaining users.
 --     INSERT IGNORE skips any username that already exists (which after 2a
@@ -201,9 +213,10 @@ SET @sql = CONCAT('
 ');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
+SET @n = ROW_COUNT();
 DEALLOCATE PREPARE stmt;
 
-SELECT CONCAT(ROW_COUNT(), ' credential row(s) inserted') AS status;
+SELECT CONCAT(@n, ' credential row(s) inserted') AS status;
 
 -- ============================================================================
 -- STEP 3 — Assign users to ICP v2 groups
@@ -223,7 +236,8 @@ SET @sql = CONCAT('
          WHERE group_name = ''Super Admins'' AND org_uuid = 1 LIMIT 1),
         nu.user_id
     FROM `', @old_db, '`.UM_USER u
-    JOIN `', @new_main_db, '`.users nu ON nu.username = u.UM_USER_NAME
+    JOIN `', @new_main_db, '`.users nu
+         ON nu.username = CONVERT(u.UM_USER_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci
     WHERE u.UM_TENANT_ID = -1234
       AND (
           EXISTS (
@@ -248,8 +262,9 @@ SET @sql = CONCAT('
 ');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
+SET @n = ROW_COUNT();
 DEALLOCATE PREPARE stmt;
-SELECT CONCAT(ROW_COUNT(), ' user(s) assigned to Super Admins') AS status;
+SELECT CONCAT(@n, ' user(s) assigned to Super Admins') AS status;
 
 -- 3b. All remaining users (any other role or no role) -> Developers
 
@@ -260,7 +275,8 @@ SET @sql = CONCAT('
          WHERE group_name = ''Developers'' AND org_uuid = 1 LIMIT 1),
         nu.user_id
     FROM `', @old_db, '`.UM_USER u
-    JOIN `', @new_main_db, '`.users nu ON nu.username = u.UM_USER_NAME
+    JOIN `', @new_main_db, '`.users nu
+         ON nu.username = CONVERT(u.UM_USER_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci
     WHERE u.UM_TENANT_ID = -1234
       AND NOT EXISTS (
           SELECT 1
@@ -270,8 +286,9 @@ SET @sql = CONCAT('
 ');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
+SET @n = ROW_COUNT();
 DEALLOCATE PREPARE stmt;
-SELECT CONCAT(ROW_COUNT(), ' user(s) assigned to Developers') AS status;
+SELECT CONCAT(@n, ' user(s) assigned to Developers') AS status;
 
 -- ============================================================================
 -- STEP 4 — Summary report
@@ -292,7 +309,8 @@ SET @sql = CONCAT('
         SUM(require_password_change)                  AS require_password_change
     FROM `', @new_main_db, '`.users
     WHERE username IN (
-        SELECT UM_USER_NAME FROM `', @old_db, '`.UM_USER WHERE UM_TENANT_ID = -1234
+        SELECT CONVERT(UM_USER_NAME USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        FROM `', @old_db, '`.UM_USER WHERE UM_TENANT_ID = -1234
     )
 ');
 PREPARE stmt FROM @sql;
@@ -307,73 +325,6 @@ COMMIT;
 SET autocommit = 1;
 
 -- ============================================================================
--- STEP 5 — Create org_secrets table and add key_id column to runtimes
--- DDL runs outside the transaction because MySQL DDL causes an implicit
--- commit. If this step fails, the DML migration (Steps 1–3b) is already
--- committed — re-run only this step after fixing the issue.
--- ============================================================================
-
-SELECT 'STEP 5: Creating org_secrets table ...' AS status;
-
-SET @sql = CONCAT('
-    CREATE TABLE `', @new_main_db, '`.org_secrets (
-        key_id          VARCHAR(16)  NOT NULL,
-        environment_id  CHAR(36)     NOT NULL,
-        key_material    VARCHAR(256) NOT NULL,
-        project_id      CHAR(36)     NULL,
-        component_id    CHAR(36)     NULL,
-        project_handler VARCHAR(255) NULL,
-        component_name  VARCHAR(255) NULL,
-        runtime_type    VARCHAR(8)   NULL,
-        bound_at        TIMESTAMP    NULL,
-        created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        created_by      CHAR(36)     NULL,
-        PRIMARY KEY (key_id),
-        CONSTRAINT fk_org_secrets_project     FOREIGN KEY (project_id)     REFERENCES `', @new_main_db, '`.projects      (project_id)      ON DELETE CASCADE,
-        CONSTRAINT fk_org_secrets_component   FOREIGN KEY (component_id)   REFERENCES `', @new_main_db, '`.components    (component_id)    ON DELETE CASCADE,
-        CONSTRAINT fk_org_secrets_environment FOREIGN KEY (environment_id) REFERENCES `', @new_main_db, '`.environments  (environment_id)  ON DELETE CASCADE,
-        CONSTRAINT fk_org_secrets_created_by  FOREIGN KEY (created_by)     REFERENCES `', @new_main_db, '`.users          (user_id)         ON DELETE SET NULL,
-        INDEX idx_org_secrets_environment (environment_id)
-    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
-');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SET @sql = CONCAT('
-    CREATE TABLE IF NOT EXISTS `', @new_main_db, '`.mi_composite_app_artifacts (
-        runtime_id CHAR(36) NOT NULL,
-        app_name VARCHAR(200) NOT NULL,
-        version VARCHAR(50) NOT NULL DEFAULT ''__UNVERSIONED__'',
-        state ENUM(''Active'', ''Faulty'') NOT NULL DEFAULT ''Active'',
-        error_message TEXT NULL,
-        artifacts VARCHAR(4000) NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (runtime_id, app_name, version),
-        CONSTRAINT fk_mi_composite_app_artifacts_runtime FOREIGN KEY (runtime_id) REFERENCES `', @new_main_db, '`.runtimes (runtime_id) ON DELETE CASCADE,
-        INDEX idx_runtime_id (runtime_id),
-        INDEX idx_app_name (app_name),
-        INDEX idx_state (state)
-    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
-');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SET @sql = CONCAT('
-    ALTER TABLE `', @new_main_db, '`.runtimes
-        ADD COLUMN key_id VARCHAR(16) NULL,
-        ADD CONSTRAINT fk_runtime_key_id FOREIGN KEY (key_id)
-            REFERENCES `', @new_main_db, '`.org_secrets (key_id) ON DELETE SET NULL
-');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SELECT 'org_secrets table and runtimes.key_id created.' AS status;
-
--- ============================================================================
 -- DONE
 -- ============================================================================
 
@@ -381,7 +332,7 @@ SELECT '================================================================' AS sta
 SELECT 'Migration complete.' AS status;
 SELECT 'POST-MIGRATION ACTION REQUIRED:' AS status;
 SELECT CONCAT(
-    'Set  passwordHashingAlgorithm = "<old_algorithm>"  in Config.toml ',
-    'so that migrated users can log in and be forced to change their password.'
+    'Set  passwordHashingAlgorithm = "<old_algorithm>"  at the top level of ',
+    '<ICP_HOME>/conf/deployment.toml before starting ICP, so that migrated users can log in.'
 ) AS status;
 SELECT '================================================================' AS status;
