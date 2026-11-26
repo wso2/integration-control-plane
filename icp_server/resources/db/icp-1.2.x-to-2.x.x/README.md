@@ -1,6 +1,6 @@
 # ICP v1 → v2 User Migration
 
-This directory contains SQL scripts for migrating user accounts, credentials, and role assignments from **ICP v1** to **ICP v2**.
+This directory contains SQL scripts for migrating user accounts, credentials, and role assignments from an **ICP v1** JDBC user store (ICP 1.0.0, 1.1.0 and 1.2.x, which all use the same `UM_*` schema as WSO2 Micro Integrator) to **ICP v2** (2.0.0 and 2.1.0).
 
 Scripts are provided for **MySQL / MariaDB** and **Microsoft SQL Server**. The script requires the old and new databases to be on the same server instance, using cross-database references to read from the old schema and write to both new schemas in a single session.
 
@@ -10,8 +10,9 @@ Scripts are provided for **MySQL / MariaDB** and **Microsoft SQL Server**. The s
 
 **Prerequisites:**
 
-1. The new ICP v2 main DB and credentials DB must already be initialised using the standard init scripts.
-2. The database user running the script must have `SELECT` privileges on the old database and `INSERT` / `UPDATE` / `DELETE` privileges on the two new databases.
+1. The new ICP v2 main DB and credentials DB must already be initialised using the standard init scripts (`dbscripts/<engine>_init.sql` and `dbscripts/credentials_<engine>_init.sql`). The script only moves data; it does not create or alter tables.
+2. The new ICP v2 server must be stopped while the script runs.
+3. The database user running the script must have `SELECT` privileges on the old database and `INSERT` / `UPDATE` / `DELETE` privileges on the two new databases.
 
 ---
 
@@ -55,17 +56,19 @@ Scripts are provided for **MySQL / MariaDB** and **Microsoft SQL Server**. The s
 
 The script prints a status message after each step and a summary table at the end.
 
+All changes run in a single transaction. If the script fails, nothing is written, and it can be re-run after fixing the cause. Re-running it on an already migrated database is also safe: migrated users are replaced with a fresh copy from the old database.
+
 ---
 
 ## Post-migration checklist
 
-1. **`Config.toml`** — set `passwordHashingAlgorithm` to match the old `PasswordDigest`:
+1. **`<ICP_HOME>/conf/deployment.toml`** — set `passwordHashingAlgorithm` to match the old `PasswordDigest`. It is a top-level key, so add it above the first `[section]` header (for example, above `[icp_server.storage]`):
 
    ```toml
-   passwordHashingAlgorithm = "sha-256"   # or sha-1, md5, sha-512, plain_text
+   passwordHashingAlgorithm = "sha-256"   # or sha-1, sha-384, sha-512, md5, plain_text
    ```
 
-2. **Restart** the ICP v2 server.
+2. **Start** the ICP v2 server.
 
 ---
 
@@ -88,7 +91,7 @@ The ICP v2 init scripts seed a default `admin` user. When the migration script e
 
 | Existing username in new DB | Action |
 |---|---|
-| `admin` | **Merge** — keep the v2 UUID and group membership intact; overwrite `password_hash`/`password_salt` with old system values |
+| `admin` | **Merge** — keep the v2 seed admin's UUID (`550e8400-…` from the credentials DB) and any group membership; overwrite `password_hash`/`password_salt` with old system values |
 | any other username | **Replace** — delete the pre-existing v2 user (and their group mappings) then insert the old system's version of that user with its original UUID |
 
 The replace strategy gives the old system full priority: any user account that was pre-created in ICP v2 before migration (other than the seed admin) will be overwritten by the migrated account.
@@ -105,7 +108,7 @@ Base64( Digest( password + salt ) )
 
 where `Digest` is the algorithm set in `user-mgt.xml` → `PasswordDigest` (default: `SHA-256`). Salt storage is controlled by `StoreSaltedPassword` (default: `true`).
 
-ICP v2's default authentication backend (`default_user_service.bal`) supports the **same algorithm family** via the `passwordHashingAlgorithm` setting in `Config.toml`:
+ICP v2's default authentication backend (`default_user_service.bal`) supports the **same algorithm family** via the `passwordHashingAlgorithm` setting in `<ICP_HOME>/conf/deployment.toml`:
 
 | Old `PasswordDigest` value | ICP v2 `passwordHashingAlgorithm` |
 |---|---|
@@ -116,7 +119,7 @@ ICP v2's default authentication backend (`default_user_service.bal`) supports th
 | `MD5` | `md5` |
 | *(null / `PLAIN_TEXT`)* | `plain_text` |
 
-The migration script copies hashes and salts **as-is**. After migration, set `passwordHashingAlgorithm` in `Config.toml` to match your old `PasswordDigest` value. Migrated users will not be forced to change their password on first login by default. Set `@reset_passwords = TRUE` in the script configuration to require a password change on first login.
+The migration script copies hashes and salts **as-is**. After migration, set `passwordHashingAlgorithm` in `<ICP_HOME>/conf/deployment.toml` to match your old `PasswordDigest` value. Migrated users will not be forced to change their password on first login by default. Set `@reset_passwords = TRUE` in the script configuration to require a password change on first login.
 
 ---
 

@@ -47,7 +47,7 @@ SET @sql = N'
     DELETE gum
     FROM [' + @new_main_db + N'].[dbo].[group_user_mapping] gum
     JOIN [' + @new_main_db + N'].[dbo].[users] nu ON gum.user_uuid = nu.user_id
-    JOIN [' + @old_db + N'].[dbo].[UM_USER] ou ON nu.username = ou.UM_USER_NAME
+    JOIN [' + @old_db + N'].[dbo].[UM_USER] ou ON nu.username = ou.UM_USER_NAME COLLATE DATABASE_DEFAULT
     WHERE ou.UM_TENANT_ID = -1234
       AND nu.username != ''admin''
 ';
@@ -57,7 +57,7 @@ PRINT 'Group mappings removed for replaced users: ' + CAST(@@ROWCOUNT AS NVARCHA
 SET @sql = N'
     DELETE nc
     FROM [' + @new_creds_db + N'].[dbo].[user_credentials] nc
-    JOIN [' + @old_db + N'].[dbo].[UM_USER] ou ON nc.username = ou.UM_USER_NAME
+    JOIN [' + @old_db + N'].[dbo].[UM_USER] ou ON nc.username = ou.UM_USER_NAME COLLATE DATABASE_DEFAULT
     WHERE ou.UM_TENANT_ID = -1234
       AND nc.username != ''admin''
 ';
@@ -67,22 +67,32 @@ PRINT 'Credentials removed for replaced users: ' + CAST(@@ROWCOUNT AS NVARCHAR);
 SET @sql = N'
     DELETE nu
     FROM [' + @new_main_db + N'].[dbo].[users] nu
-    JOIN [' + @old_db + N'].[dbo].[UM_USER] ou ON nu.username = ou.UM_USER_NAME
+    JOIN [' + @old_db + N'].[dbo].[UM_USER] ou ON nu.username = ou.UM_USER_NAME COLLATE DATABASE_DEFAULT
     WHERE ou.UM_TENANT_ID = -1234
       AND nu.username != ''admin''
 ';
 EXEC sp_executesql @sql;
 PRINT 'Non-admin pre-existing user(s) removed from new DB: ' + CAST(@@ROWCOUNT AS NVARCHAR);
 
--- 1b. Insert all old users.  Only 'admin' will be skipped by NOT EXISTS
---     (because it was intentionally kept above); all others have been cleared.
+-- 1b. Insert all old users.  Only 'admin' can already exist here (it was
+--     intentionally kept above, and exists only if someone has signed in to
+--     the new ICP as admin), in which case NOT EXISTS skips it.
+--     The seed admin's user_id lives in the credentials DB, and ICP v2 looks up
+--     the users row by that id at login, so a user whose username already has
+--     credentials (only the seed admin, after 1a) keeps that credentials id
+--     instead of the old UM_USER_ID.
 
 SET @sql = N'
     INSERT INTO [' + @new_main_db + N'].[dbo].[users]
         (user_id, username, display_name,
          is_super_admin, is_project_author, is_oidc_user, require_password_change)
     SELECT
-        u.UM_USER_ID,
+        ISNULL(
+            (SELECT nc.user_id
+             FROM [' + @new_creds_db + N'].[dbo].[user_credentials] nc
+             WHERE nc.username = u.UM_USER_NAME COLLATE DATABASE_DEFAULT),
+            u.UM_USER_ID
+        ) AS user_id,
         u.UM_USER_NAME,
         -- Use displayName claim when available, fall back to username
         ISNULL(
@@ -121,7 +131,7 @@ SET @sql = N'
     WHERE u.UM_TENANT_ID = -1234
       AND NOT EXISTS (
           SELECT 1 FROM [' + @new_main_db + N'].[dbo].[users] nu
-          WHERE nu.username = u.UM_USER_NAME
+          WHERE nu.username = u.UM_USER_NAME COLLATE DATABASE_DEFAULT
       )
 ';
 EXEC sp_executesql @sql;
@@ -134,8 +144,8 @@ PRINT 'Users inserted: ' + CAST(@@ROWCOUNT AS NVARCHAR);
 PRINT 'STEP 2: Migrating credentials ...';
 
 -- 2a. Merge the seed admin specifically.
---     The init script creates user_id 550e8400-... with password ''admin''.
---     We overwrite its hash/salt with the old system''s production credentials.
+--     The credentials init script creates user_id 550e8400-... with password
+--     'admin'. We overwrite its hash/salt with the old system's credentials.
 --     We match on user_id (not username) to be unambiguous — any other
 --     pre-existing user is left completely untouched.
 SET @sql = N'
@@ -158,7 +168,7 @@ SET @sql = N'
            nc.updated_at    = GETDATE()
     FROM   [' + @new_creds_db + N'].[dbo].[user_credentials] nc
     JOIN   [' + @old_db + N'].[dbo].[UM_USER] ou
-           ON ou.UM_USER_NAME = nc.username
+           ON nc.username = ou.UM_USER_NAME COLLATE DATABASE_DEFAULT
           AND ou.UM_TENANT_ID = -1234
     WHERE  nc.user_id = ''550e8400-e29b-41d4-a716-446655440000''
 ';
@@ -189,7 +199,7 @@ SET @sql = N'
     WHERE u.UM_TENANT_ID = -1234
       AND NOT EXISTS (
           SELECT 1 FROM [' + @new_creds_db + N'].[dbo].[user_credentials] nc
-          WHERE nc.username = u.UM_USER_NAME
+          WHERE nc.username = u.UM_USER_NAME COLLATE DATABASE_DEFAULT
       )
 ';
 EXEC sp_executesql @sql;
@@ -213,7 +223,8 @@ SET @sql = N'
          WHERE group_name = ''Super Admins'' AND org_uuid = 1),
         nu.user_id
     FROM [' + @old_db + N'].[dbo].[UM_USER] u
-    JOIN [' + @new_main_db + N'].[dbo].[users] nu ON nu.username = u.UM_USER_NAME
+    JOIN [' + @new_main_db + N'].[dbo].[users] nu
+         ON nu.username = u.UM_USER_NAME COLLATE DATABASE_DEFAULT
     WHERE u.UM_TENANT_ID = -1234
       AND (
           EXISTS (
@@ -252,7 +263,8 @@ SET @sql = N'
          WHERE group_name = ''Developers'' AND org_uuid = 1),
         nu.user_id
     FROM [' + @old_db + N'].[dbo].[UM_USER] u
-    JOIN [' + @new_main_db + N'].[dbo].[users] nu ON nu.username = u.UM_USER_NAME
+    JOIN [' + @new_main_db + N'].[dbo].[users] nu
+         ON nu.username = u.UM_USER_NAME COLLATE DATABASE_DEFAULT
     WHERE u.UM_TENANT_ID = -1234
       AND NOT EXISTS (
           SELECT 1 FROM [' + @new_main_db + N'].[dbo].[group_user_mapping] gum
@@ -261,82 +273,6 @@ SET @sql = N'
 ';
 EXEC sp_executesql @sql;
 PRINT 'Assigned to Developers: ' + CAST(@@ROWCOUNT AS NVARCHAR);
-
--- ============================================================================
--- STEP 3c — Create org_secrets table and add key_id column to runtimes
--- ============================================================================
-
-PRINT 'STEP 3c: Creating org_secrets table ...';
-
-SET @sql = N'
-    CREATE TABLE [' + @new_main_db + N'].[dbo].[org_secrets] (
-        key_id          VARCHAR(16)   NOT NULL,
-        environment_id  CHAR(36)      NOT NULL,
-        key_material    NVARCHAR(256) NOT NULL,
-        project_id      CHAR(36)      NULL,
-        component_id    CHAR(36)      NULL,
-        project_handler NVARCHAR(255) NULL,
-        component_name  NVARCHAR(255) NULL,
-        runtime_type    NVARCHAR(8)   NULL CHECK (runtime_type IN (''MI'', ''BI'')),
-        bound_at        DATETIME2     NULL,
-        created_at      DATETIME2     NOT NULL DEFAULT GETDATE(),
-        created_by      CHAR(36)      NULL,
-        PRIMARY KEY (key_id),
-        CONSTRAINT fk_org_secrets_project     FOREIGN KEY (project_id)     REFERENCES [' + @new_main_db + N'].[dbo].[projects]      (project_id)      ON DELETE CASCADE,
-        -- CASCADE/SET NULL blocked: MSSQL multiple-cascade-path. App layer handles cleanup.
-        CONSTRAINT fk_org_secrets_component   FOREIGN KEY (component_id)   REFERENCES [' + @new_main_db + N'].[dbo].[components]    (component_id)    ON DELETE NO ACTION,
-        CONSTRAINT fk_org_secrets_environment FOREIGN KEY (environment_id) REFERENCES [' + @new_main_db + N'].[dbo].[environments]  (environment_id)  ON DELETE CASCADE,
-        CONSTRAINT fk_org_secrets_created_by  FOREIGN KEY (created_by)     REFERENCES [' + @new_main_db + N'].[dbo].[users]          (user_id)         ON DELETE SET NULL
-    );
-    CREATE INDEX idx_org_secrets_environment ON [' + @new_main_db + N'].[dbo].[org_secrets] (environment_id);
-    ALTER TABLE [' + @new_main_db + N'].[dbo].[runtimes] ADD key_id VARCHAR(16) NULL;
-    -- SET NULL blocked: MSSQL multiple-cascade-path. App layer handles cleanup.
-    ALTER TABLE [' + @new_main_db + N'].[dbo].[runtimes]
-        ADD CONSTRAINT fk_runtime_key_id FOREIGN KEY (key_id)
-            REFERENCES [' + @new_main_db + N'].[dbo].[org_secrets] (key_id) ON DELETE NO ACTION;
-';
-EXEC sp_executesql @sql;
-PRINT 'org_secrets table and runtimes.key_id created.';
-
-SET @sql = N'
-    IF OBJECT_ID(N''[' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts]'', N''U'') IS NULL
-    BEGIN
-        CREATE TABLE [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts] (
-            runtime_id CHAR(36) NOT NULL,
-            app_name NVARCHAR(200) NOT NULL,
-            version NVARCHAR(50) NOT NULL DEFAULT ''__UNVERSIONED__'',
-            state NVARCHAR(20) NOT NULL DEFAULT ''Active'' CHECK (state IN (''Active'', ''Faulty'')),
-            error_message NVARCHAR(MAX) NULL,
-            artifacts NVARCHAR(4000) NULL,
-            created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
-            updated_at DATETIME2 NOT NULL DEFAULT GETDATE(),
-            PRIMARY KEY (runtime_id, app_name, version),
-            CONSTRAINT fk_mi_composite_app_artifacts_runtime FOREIGN KEY (runtime_id) REFERENCES [' + @new_main_db + N'].[dbo].[runtimes] (runtime_id) ON DELETE CASCADE
-        );
-
-        CREATE INDEX idx_runtime_id ON [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts] (runtime_id);
-        CREATE INDEX idx_app_name ON [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts] (app_name);
-        CREATE INDEX idx_state ON [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts] (state);
-
-        EXEC (N''
-            CREATE TRIGGER trg_mi_composite_app_artifacts_updated_at
-            ON [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts]
-            AFTER UPDATE
-            AS
-            BEGIN
-                SET NOCOUNT ON;
-                UPDATE [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts]
-                SET updated_at = GETDATE()
-                FROM [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts] rca
-                INNER JOIN inserted i ON rca.runtime_id = i.runtime_id
-                    AND rca.app_name = i.app_name
-                    AND rca.version = i.version;
-            END;
-        '');
-    END
-';
-EXEC sp_executesql @sql;
-PRINT 'mi_composite_app_artifacts table ensured.';
 
 -- ============================================================================
 -- STEP 4 — Summary report
@@ -351,7 +287,7 @@ SET @sql = N'
         SUM(CAST(require_password_change AS INT)) AS pending_password_change
     FROM [' + @new_main_db + N'].[dbo].[users]
     WHERE username IN (
-        SELECT UM_USER_NAME FROM [' + @old_db + N'].[dbo].[UM_USER]
+        SELECT UM_USER_NAME COLLATE DATABASE_DEFAULT FROM [' + @old_db + N'].[dbo].[UM_USER]
         WHERE UM_TENANT_ID = -1234
     )
 ';
@@ -375,6 +311,7 @@ END CATCH;
 
 PRINT '================================================================';
 PRINT 'Migration complete.';
-PRINT 'POST-MIGRATION: set passwordHashingAlgorithm = "<old_algorithm>"';
-PRINT 'in Config.toml so migrated users can log in and reset passwords.';
+PRINT 'POST-MIGRATION: set passwordHashingAlgorithm = "<old_algorithm>" at the';
+PRINT 'top level of <ICP_HOME>/conf/deployment.toml before starting ICP,';
+PRINT 'so that migrated users can log in.';
 PRINT '================================================================';
