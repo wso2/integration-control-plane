@@ -62,7 +62,7 @@ dependencies {
     testImplementation 'com.microsoft.playwright:playwright:1.49.0'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.3'
-    testImplementation 'org.testcontainers:testcontainers:1.20.4'
+    testImplementation 'org.testcontainers:testcontainers:1.21.4'
     testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.13'
     testImplementation 'org.jacoco:org.jacoco.core:0.8.12'
     testImplementation 'org.jacoco:org.jacoco.report:0.8.12'
@@ -92,8 +92,8 @@ def registerBiAppBuild = { String taskName, String app, String packageName, List
         description = "Build the '${app}' BI E2E artifact from source kept inside ./icp."
         inputs.dir("src/test/resources/bi/${app}")
         outputs.file(biAppJar(app, packageName))
-        // Two concurrent `bal build`s corrupt the shared ~/.ballerina cache; serialize after the ICP build.
-        mustRunAfter([rootProject.tasks.named('buildICP')] + runsAfter.collect { tasks.named(it) })
+        // Two concurrent `bal` builds corrupt the shared ~/.ballerina cache; serialize after the ICP build and tests.
+        mustRunAfter([rootProject.tasks.named('buildICP'), rootProject.tasks.named('testICP')] + runsAfter.collect { tasks.named(it) })
 
         doLast {
             def workDir = layout.buildDirectory.dir("bi/${app}").get().asFile
