@@ -62,6 +62,29 @@ describe('detectTechnology', () => {
     expect(detectTechnology({ ...baseMetadata, hasBallerinaTomlInRoot: true, hasPomXmlInRoot: true })).toBe('ballerina');
   });
 
+  it('reads the root markers for every spelling of the root path', () => {
+    for (const root of ['/', '', '//']) {
+      expect(detectTechnology({ ...baseMetadata, hasBallerinaTomlInRoot: true }, root)).toBe('ballerina');
+      expect(detectTechnology({ ...baseMetadata, hasPomXmlInRoot: true }, root)).toBe('mi');
+    }
+  });
+
+  it('returns mi for a pom.xml sub path under a Ballerina repository root', () => {
+    expect(detectTechnology({ ...baseMetadata, hasPomXmlInPath: true, hasBallerinaTomlInRoot: true }, '/services/orders')).toBe('mi');
+  });
+
+  it('returns ballerina for a Ballerina.toml sub path under an MI repository root', () => {
+    expect(detectTechnology({ ...baseMetadata, hasBallerinaTomlInPath: true, hasPomXmlInRoot: true }, '/services/orders')).toBe('ballerina');
+  });
+
+  it('ignores the root markers for a sub path that carries none of its own', () => {
+    expect(detectTechnology({ ...baseMetadata, hasBallerinaTomlInRoot: true, hasPomXmlInRoot: true }, '/docs')).toBe('non-empty');
+  });
+
+  it('reports an empty sub path as empty even when the root has markers', () => {
+    expect(detectTechnology({ ...baseMetadata, isSubPathEmpty: true, hasBallerinaTomlInRoot: true }, '/new-module')).toBe('empty');
+  });
+
   it('returns empty when the sub path is empty and no build files are present', () => {
     expect(detectTechnology({ ...baseMetadata, isSubPathEmpty: true })).toBe('empty');
   });

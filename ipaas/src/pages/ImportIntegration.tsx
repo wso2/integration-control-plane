@@ -116,7 +116,6 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const [subPath, setSubPath] = useState('/');
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
-  const [detectedMode, setDetectedMode] = useState<DetectedMode>(null);
   const [selectedTechnology, setSelectedTechnology] = useState<'MI' | 'BI' | null>(null);
   const [pickedIntegrationType, setSelectedIntegrationType] = useState<IntegrationType | null>(null);
   // Workflows are Ballerina only and need the platform's workflow runtime, and
@@ -183,8 +182,12 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const refetchMetadata = isAzureDevOps ? adoMetadata.refetch : githubMetadata.refetch;
   const adoAuthRequired = [adoOrganizationsError, adoProjectsError, adoRepositoriesError, adoBranches.error, adoContents.error, adoMetadata.error].some(isAzureDevOpsAuthRequired);
 
+  // Derived, not state: the metadata query is the only source of a verdict, so reading it here means the
+  // mode cannot be left at null by an interaction that doesn't move the query -- re-selecting the sub path
+  // already chosen did exactly that, and null disables both technology cards, which blocks the import.
+  const detectedMode: DetectedMode = !pathReady || isValidating ? null : detectTechnology(repoMetadata, subPath);
+
   const handleRevalidate = () => {
-    setDetectedMode(null);
     setSelectedTechnology(null);
     refetchMetadata();
   };
@@ -212,15 +215,6 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const handlerValid = effectiveHandler.length >= 3 && effectiveHandler.length <= 64;
   // The auto-selected org and default branch are not input the user would lose.
   const allowLeave = useUnsavedChanges(repoUrl !== '' || selectedRepo !== '' || selectedAdoProject !== '' || displayName !== '' || description !== '' || selectedIntegrationType !== null || ballerinaTokenInput !== '');
-
-  // Technology detection
-  useEffect(() => {
-    if (!pathReady || isValidating) {
-      setDetectedMode(null);
-      return;
-    }
-    setDetectedMode(detectTechnology(repoMetadata));
-  }, [pathReady, isValidating, repoMetadata]);
 
   // Project detected mode onto the selectable technology
   useEffect(() => {
@@ -855,8 +849,11 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                 repo={activeRepo}
                 value={subPath}
                 onChange={(path) => {
-                  setSubPath(path);
-                  setDetectedMode(null);
+                  // Re-read Ballerina.toml / pom.xml for whatever the dialog returns. A different path does
+                  // that by changing what the metadata query resolves; the same path leaves it untouched and
+                  // the last verdict would stand, so ask for it again explicitly.
+                  if (path === subPath) refetchMetadata();
+                  else setSubPath(path);
                 }}
                 statusIcon={<TechDetectionIcon mode={detectedMode} isValidating={isValidating} isError={isContentsError} />}
                 isValidating={isValidating}

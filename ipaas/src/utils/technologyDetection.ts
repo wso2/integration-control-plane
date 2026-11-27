@@ -20,13 +20,26 @@ import type { RepoMetadata, DetectedMode, RepoTreeNode } from '../types/reposito
 import type { WorkspaceModule } from '../types/project';
 import { formatRepoNameToDisplayName } from './string';
 
-export function detectTechnology(metadata: RepoMetadata | undefined): DetectedMode {
+/** True for '', '/' and '///' -- the forms the sub-path field and the backends use for the repository root. */
+function isRootPath(subPath: string): boolean {
+  return subPath.replace(/^\/+/, '').replace(/\/+$/, '') === '';
+}
+
+/**
+ * The technology the selected sub path is built with.
+ *
+ * The marker files are read at the sub path, and the root flags count only when the sub path *is* the root:
+ * a module is built from its own directory, so a `pom.xml` module in a repository whose root carries a
+ * `Ballerina.toml` is MI, and reading the root there locked it to BI with no way to correct it.
+ */
+export function detectTechnology(metadata: RepoMetadata | undefined, subPath = '/'): DetectedMode {
   if (!metadata) return null;
 
   const { hasBallerinaTomlInPath, hasBallerinaTomlInRoot, hasPomXmlInPath, hasPomXmlInRoot, isSubPathEmpty } = metadata;
+  const atRoot = isRootPath(subPath);
 
-  if (hasBallerinaTomlInPath || hasBallerinaTomlInRoot) return 'ballerina';
-  if (hasPomXmlInPath || hasPomXmlInRoot) return 'mi';
+  if (hasBallerinaTomlInPath || (atRoot && hasBallerinaTomlInRoot)) return 'ballerina';
+  if (hasPomXmlInPath || (atRoot && hasPomXmlInRoot)) return 'mi';
   if (isSubPathEmpty) return 'empty';
   return 'non-empty';
 }
