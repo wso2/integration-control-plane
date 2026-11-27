@@ -118,11 +118,11 @@ import {
   isFieldVisible,
   isCustomModel,
   isFormComplete,
+  isCronInterval,
+  integrationTypeFor,
   isHttpUrl,
   isLlmValid,
   isNameStepValid,
-  integrationTypeFor,
-  isCronInterval,
   isSourceValid,
   visibleFields,
   isSourcesStepValid,
@@ -353,6 +353,19 @@ describe('source validation', () => {
     expect(toIntegrationRequest(withValues('sap-successfactors', { ...basic, pollInterval: '120' }), 'sap_successfactors').settings.pollInterval).toBe(120);
     for (const bad of ['450', '5000', 'soon', '0']) {
       expect(invalidSourceFields(withValues('sap-successfactors', { ...basic, pollInterval: bad })).map((f) => f.key)).toEqual(['pollInterval']);
+    }
+  });
+
+  it('schedules the Google automations from a poll interval in seconds', () => {
+    const sources = { gdrive: { folderId: 'f', authType: 'bearer', token: 't' }, 'google-calendar': { authType: 'bearer', token: 't' } };
+    for (const [id, values] of Object.entries(sources)) {
+      const type = integrationTypeFor(id)!;
+      // Every 15 minutes unless set, as the catalog's default schedule.
+      expect(toIntegrationRequest(withValues(id, values), type).settings.pollInterval).toBe(900);
+      expect(toIntegrationRequest(withValues(id, { ...values, pollInterval: '3600' }), type).settings.pollInterval).toBe(3600);
+      for (const bad of ['450', '5000', 'soon', '0']) {
+        expect(invalidSourceFields(withValues(id, { ...values, pollInterval: bad })).map((f) => f.key)).toEqual(['pollInterval']);
+      }
     }
   });
 
@@ -770,7 +783,7 @@ describe('wire payloads', () => {
     });
 
     const calendar = withValues('google-calendar', { authType: 'bearer', token: 't', eventTypes: 'default' });
-    expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pageSize: 250 });
+    expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pollInterval: 900, pageSize: 250 });
   });
 
   it('sends a structured connector’s RML mapping with its integration request', () => {
