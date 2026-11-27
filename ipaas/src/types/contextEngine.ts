@@ -242,6 +242,8 @@ export interface SourceFieldDef {
   setting?: string;
   /** How the integration's settings type the value; a string when absent. A `list` is comma-separated in the form. */
   valueType?: 'integer' | 'number' | 'boolean' | 'list';
+  /** Seconds the BFF turns into a cron schedule, so they must divide an hour or a day evenly in whole minutes or hours. */
+  cronSeconds?: boolean;
 }
 
 export type SourceCategory = 'documentation' | 'cloud-storage' | 'code' | 'collaboration' | 'databases' | 'saas' | 'web-files';
