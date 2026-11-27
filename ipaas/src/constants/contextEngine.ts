@@ -627,6 +627,49 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['baseUrl'],
     isStructuredData: true,
   },
+  {
+    id: 'sap-successfactors',
+    name: 'SAP SuccessFactors',
+    description: 'People from Employee Central, with their names and email addresses, kept in sync.',
+    category: 'saas',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}sap.webp`,
+    icon: 'building',
+    // Mirrors the Ballerina `sap.successfactors` integration's settings: the API server, the company id, its auth block, the fields to publish, and the page size.
+    fields: [
+      ...G(
+        'Connection',
+        F('hostname', 'API Server', 'text', { placeholder: 'api4.successfactors.com', helper: "The host name of your data center's API server." }),
+        F('companyId', 'Company ID', 'text', { helper: 'The company ID you enter on the SuccessFactors sign-in page.' }),
+        F('authType', 'Authentication', 'select', {
+          defaultValue: 'samlBearer',
+          options: [
+            { value: 'samlBearer', label: 'OAuth (SAML bearer)' },
+            { value: 'basic', label: 'Username and password' },
+          ],
+          setting: 'auth.type',
+        }),
+        F('clientId', 'API Key', 'text', { showWhen: authIs('samlBearer'), helper: 'The API key of the OAuth client application registered in Admin Center.', setting: 'auth.clientId' }),
+        F('username', 'Username', 'text', { helper: 'The user the integration reads people as.', setting: 'auth.username' }),
+        F('privateKey', 'Private Key', 'secret', { showWhen: authIs('samlBearer'), helper: "The application's private key, in PEM.", setting: 'auth.privateKey' }),
+        F('certificate', 'Certificate', 'multiline', { showWhen: authIs('samlBearer'), helper: "The application's X.509 certificate, in PEM.", setting: 'auth.certificate' }),
+        F('password', 'Password', 'secret', { showWhen: authIs('basic'), verbatim: true, setting: 'auth.password' }),
+      ),
+      ...G(
+        { label: 'Data to sync', collapsed: true },
+        O('fields', 'Fields', 'text', { placeholder: 'displayName, email', helper: 'Comma-separated fields of the person row to publish; personId is always published. Empty for every field.', valueType: 'list' }),
+        O('maxPeople', 'Max People', 'text', { placeholder: '100', helper: 'The most people to sync, up to 1000: the first ones listed, kept in sync. Empty for every person.', valueType: 'integer' }),
+      ),
+      ...G(
+        { label: 'Sync options', collapsed: true },
+        // Seconds between runs: the BFF schedules the integration's CronJob from it. Only intervals that divide an hour or a day have a cron schedule.
+        O('pollInterval', 'Poll Interval', 'text', { defaultValue: '900', helper: 'Seconds between syncs. They must divide an hour or a day evenly, such as 300, 900, 3600 or 86400.', valueType: 'integer', cronSeconds: true }),
+        O('pageSize', 'Page Size', 'text', { defaultValue: '100', helper: 'People published per page, from 1 to 1000.', valueType: 'integer' }),
+      ),
+    ],
+    summaryKeys: ['hostname', 'companyId'],
+    isStructuredData: true,
+  },
   { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}hubspot.svg`, icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },
   { id: 'intercom', name: 'Intercom', description: 'Help center articles and conversations.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}intercom.svg`, icon: 'headset', fields: [F('accessToken', 'Access Token', 'secret')], summaryKeys: [] },
   {
@@ -687,7 +730,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'sap-successfactors', 'mysql', 'postgresql', 'mssql']);
 
 /**
  * Connectors the browser feeds itself, registered straight on the engine. Every other enabled
@@ -695,7 +738,7 @@ export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'googl
  */
 export const ENGINE_NATIVE_CONNECTOR_IDS: ReadonlySet<string> = new Set(['upload']);
 
-export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive', 'google-calendar': 'google_calendar' };
+export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive', 'google-calendar': 'google_calendar', 'sap-successfactors': 'sap_successfactors' };
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);

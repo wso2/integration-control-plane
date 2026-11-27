@@ -320,6 +320,42 @@ describe('source validation', () => {
     expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
   });
 
+  it('offers SAP SuccessFactors with the auth flows of its integration', () => {
+    expect(isConnectorEnabled('sap-successfactors')).toBe(true);
+    expect(integrationTypeFor('sap-successfactors')).toBe('sap_successfactors');
+    expect(blankSource('sap-successfactors').values.authType).toBe('samlBearer');
+    const connection = { hostname: 'api4.successfactors.com', companyId: 'acmeT1', username: 'integration' };
+    expect(invalidSourceFields(withValues('sap-successfactors', { ...connection, clientId: 'key' })).map((f) => f.key)).toEqual(['privateKey', 'certificate']);
+    expect(isSourceValid(withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p' }))).toBe(true);
+
+    // The settings are the integration's own: the auth block nested, the PEMs kept whole, the hidden flow's fields left out.
+    const pem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+    const sf = withValues('sap-successfactors', { ...connection, clientId: 'key', privateKey: 'k', certificate: pem, password: 'stale' });
+    expect(toIntegrationRequest(sf, 'sap_successfactors').settings).toEqual({
+      hostname: 'api4.successfactors.com',
+      companyId: 'acmeT1',
+      auth: { type: 'samlBearer', clientId: 'key', username: 'integration', privateKey: 'k', certificate: pem },
+      pollInterval: 900,
+      pageSize: 100,
+    });
+    expect(toIntegrationRequest(withValues('sap-successfactors', { ...connection, authType: 'basic', password: ' p ' }), 'sap_successfactors').settings.auth).toEqual({ type: 'basic', username: 'integration', password: ' p ' });
+
+    // The fields split on commas.
+    const scoped = withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p', fields: 'displayName, email' });
+    expect(toIntegrationRequest(scoped, 'sap_successfactors').settings.fields).toEqual(['displayName', 'email']);
+
+    // The cap is a number, and left out when empty.
+    expect(toIntegrationRequest(withValues('sap-successfactors', { ...connection, authType: 'basic', password: 'p', maxPeople: '100' }), 'sap_successfactors').settings.maxPeople).toBe(100);
+    expect(toIntegrationRequest(scoped, 'sap_successfactors').settings).not.toHaveProperty('maxPeople');
+
+    // The poll interval is typed in seconds, and only seconds with a cron schedule are accepted.
+    const basic = { ...connection, authType: 'basic', password: 'p' };
+    expect(toIntegrationRequest(withValues('sap-successfactors', { ...basic, pollInterval: '120' }), 'sap_successfactors').settings.pollInterval).toBe(120);
+    for (const bad of ['450', '5000', 'soon', '0']) {
+      expect(invalidSourceFields(withValues('sap-successfactors', { ...basic, pollInterval: bad })).map((f) => f.key)).toEqual(['pollInterval']);
+    }
+  });
+
   it('schedules the Google automations from a poll interval in seconds', () => {
     const sources = { gdrive: { folderId: 'f', authType: 'bearer', token: 't' }, 'google-calendar': { authType: 'bearer', token: 't' } };
     for (const [id, values] of Object.entries(sources)) {
